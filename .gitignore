@@ -1,0 +1,25 @@
+# .gitignore for SigmaHQ LLM RAG System
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Environment
+.venv/
+.env
+
+# Logs
+*.log
+
+# Data
+chroma_db/
+
+# Build
+build/
+dist/
+
+# IDE
+.vscode/
+.idea/

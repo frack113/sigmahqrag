@@ -1,0 +1,6 @@
+{
+  "model_name": "mistralai/ministral-3-14b-reasoning",
+  "embedding_dimension": 512,
+  "max_tokens": 1024,
+  "use_local_embeddings": true
+}
