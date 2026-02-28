@@ -30,6 +30,14 @@ def chat_page():
     Create the chat page for document analysis.
     """
     chat = ChatPage()
+    
+    # Navigation links in chat page
+    with ui.row().classes('mt-4'):
+        ui.link('Go to Dashboard', '/dashboard')
+        with ui.row().classes("ml-2"):
+            ui.icon("github").classes("mr-1")
+            ui.link('GitHub Repository Management', '/github-repo').classes("no-underline")
+    
     return chat.render()
 
 
