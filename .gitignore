@@ -13,8 +13,10 @@ __pycache__/
 # Logs
 *.log
 
-# Data
-chroma_db/
+# RAG Data
+.chromadb/
+docs/github/
+docs/local/
 
 # Build
 build/

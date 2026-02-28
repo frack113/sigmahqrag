@@ -1,4 +1,5 @@
 # Notification component for NiceGUI
+import asyncio
 from nicegui import ui, app
 
 
