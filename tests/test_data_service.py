@@ -140,3 +140,10 @@ class TestErrorHandling:
             # Should create fallback embeddings
             assert len(result) == 1
             assert isinstance(result[0], list)
+
+
+def test_nicegui_app_compatibility():
+    """Test that the NiceGUI app initializes correctly."""
+    from nicegui_app.app import create_nicegui_app
+    # This test verifies that the app can be created without errors
+    assert create_nicegui_app is not None

@@ -1,6 +1,18 @@
-# SigmaHQ Multi-Modal Chat Interface
+# SigmaHQ Chat Interface
 
 A comprehensive chat interface for document analysis powered by Retrieval-Augmented Generation (RAG) with local embeddings. This system allows users to upload documents (PDF, TXT, DOCX, images) and ask questions about their content.
+
+## TODO LIST
+
+Very WIP 
+
+- [ ] GitHub Repository Management 
+  - [x] fix github update
+  - [ ] fix Add repository
+  - [ ] Fix Actions
+  - [ ] Fix other errors I don't event kown 
+- [ ] chromadb
+- [ ] Chat
 
 ## Project Structure
 ```
@@ -16,13 +28,13 @@ src/
   │   │   └── data_service.py          # Embedding generation and vector store
   │   ├── pages/
   │   │   ├── chat_page.py            # Main chat interface
-  │   │   └── dashboard.py
+  │   │   └── github_repo_page.py      # GitHub repository management page
   │   ├── app.py                      # NiceGUI application setup
   │   └── __init__.py
   └── __init__.py
 config/
   ├── sigmahqllm.json
-  └── github.yml
+  └── github.json
 ```
 
 ## Features
@@ -33,6 +45,7 @@ config/
 - **Responsive UI**: Modern, user-friendly interface built with NiceGUI 3.x
 - **Drag-and-drop uploads**: Easy document uploading experience
 - **Real-time updates**: Typing indicators and instant message display
+- **GitHub Repository Management**: Add, edit, and manage GitHub repositories for indexing and analysis
 
 ## Installation
 1. Clone this repository.
@@ -62,14 +75,28 @@ config/
   ```
 
 ## Usage
-1. Open the chat interface in your browser
+1. Open the chat interface in your browser at `http://localhost:8000`
 2. Upload documents using drag-and-drop or file selector
 3. Ask questions about the uploaded document content
 4. View responses with context from your documents
 5. Clear chat history as needed
+6. Manage GitHub repositories by navigating to `/github-repo`:
+   - Add new repositories for indexing
+   - Enable/disable repositories using the toggle switch
+   - Update all enabled repositories at once
+   - Remove repositories no longer needed
 
-## RAG with ollama-python
-This application uses `ollama-python` for local embedding generation and Retrieval-Augmented Generation (RAG).
+## GitHub Repository Management
+The application includes a dedicated page for managing GitHub repositories that can be indexed and analyzed:
+
+- **Add Repositories**: Enter the repository URL, branch name, and file extensions to include (uses `add_box` icon)
+- **Enable/Disable**: Use the toggle switch to enable or disable repositories
+- **Update All**: Update all enabled repositories at once (uses `source` icon)
+- **Add/Edit/Delete**: Add new repositories, edit existing ones, or delete them permanently (uses `edit_document` for edit, `delete_outline` for delete)
+- **Reactive UI**: The page is centered and responsive, built with NiceGUI 3.x components
+- **Background Updates**: Repository updates run in the background without freezing the page
+
+All repository configurations are stored in `config/github.json`.
 
 ### Key Features:
 - **Local embeddings**: All embeddings are generated using the Ollama server running at `http://127.0.0.1:1234`

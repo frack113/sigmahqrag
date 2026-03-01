@@ -1,9 +1,0 @@
-# GitHub Repository Configuration
-repository:
-  owner: sample-owner
-  name: sample-repo
-  branch: main
-token: sample-token
-sync:
-  enabled: true
-  interval: 3600

@@ -1,1 +1,0 @@
-# Dashboard page for NiceGUI (Empty, as functionality is moved to app.py)

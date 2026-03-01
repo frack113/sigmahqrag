@@ -5,6 +5,8 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+.mypy_cache
+.pytest_cache
 
 # Environment
 .venv/

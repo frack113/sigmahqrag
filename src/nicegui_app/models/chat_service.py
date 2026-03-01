@@ -12,6 +12,7 @@ import tempfile
 import asyncio
 from pathlib import Path
 import markdown2
+import base64  # Added for proper base64 encoding
 
 # Import document processing libraries
 try:
@@ -198,8 +199,7 @@ class ChatService:
                 import io
                 buffered = io.BytesIO()
                 img.save(buffered, format="PNG")
-                from PIL import Image
-                img_str = Image.base64encode(buffered.getvalue()).decode()
+                img_str = base64.b64encode(buffered.getvalue()).decode()
                 preview_base64 = f"data:image/png;base64,{img_str}"
         
         except ImportError:
@@ -224,6 +224,7 @@ class ChatService:
         
         try:
             # Load image and generate preview
+            from PIL import Image  # Import here to avoid circular dependency
             img = Image.open(file_path)
             img.thumbnail((300, 300))
             
@@ -231,12 +232,12 @@ class ChatService:
             import io
             buffered = io.BytesIO()
             img.save(buffered, format="PNG")
-            from PIL import Image
-            img_str = Image.base64encode(buffered.getvalue()).decode()
+            img_str = base64.b64encode(buffered.getvalue()).decode()
             preview_base64 = f"data:image/png;base64,{img_str}"
             
             # Try OCR to extract text (if tesseract is available)
             try:
+                import pytesseract  # Import here to avoid circular dependency
                 extracted_text = pytesseract.image_to_string(img)
             except Exception as ocr_error:
                 self.logger.info(f"OCR not available or failed: {ocr_error}")

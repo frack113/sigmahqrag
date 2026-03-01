@@ -1,10 +1,11 @@
 {
     "repositories": [
         {
-            "url": "https://github.com/SigmaHQ/sigma-specification",
+            "url": "https://github.com/example/repo",
             "branch": "main",
             "enabled": true,
             "file_extensions": [
+                ".py",
                 ".md"
             ]
         }

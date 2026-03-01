@@ -7,6 +7,14 @@ import hashlib
 from datetime import datetime
 import time
 
+# Import GitPython for repository operations
+try:
+    from git import Repo
+    GITPYTHON_AVAILABLE = True
+except ImportError as e:
+    print(f"Warning: GitPython not available: {e}")
+    GITPYTHON_AVAILABLE = False
+
 # Import RAG components
 try:
     import chromadb
@@ -43,9 +51,9 @@ class DataService:
     def __init__(self, embedding_model_name: str = 'all-MiniLM-L6-v2'):
         self.logger = logging.getLogger(__name__)
         self.embedding_model_name = embedding_model_name
-        self.ollama_client = None
-        self.chroma_client = None
-        self.collection = None
+        self.ollama_client: Optional[Client] = None  # type: ignore[name-defined]
+        self.chroma_client: Optional[Any] = None
+        self.collection: Optional[Any] = None
         
         # Initialize RAG components
         self._initialize_rag()
@@ -91,6 +99,7 @@ class DataService:
         try:
             # Initialize ollama client for embeddings
             if OLLAMA_AVAILABLE:
+                from ollama import Client  # type: ignore[name-defined]
                 self.ollama_client = Client(host='http://127.0.0.1:1234')
                 self.logger.info(f"Initialized Ollama client at http://127.0.0.1:1234")
             else:
@@ -98,7 +107,7 @@ class DataService:
             
             # Initialize ChromaDB client only if available
             if CHROMADB_AVAILABLE:
-                import chromadb
+                import chromadb  # type: ignore[name-defined]
                 self.chroma_client = chromadb.PersistentClient(path=".chromadb")
                 
                 # Create or get collection for document context
@@ -128,6 +137,130 @@ class DataService:
         """
         # Placeholder logic
         return {"key": key, "data": "sample_data"}
+
+    def fetch_github_repositories(self, repo_config: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """
+        Fetch GitHub repositories based on the provided configuration.
+        
+        Args:
+            repo_config (Dict[str, Any]): Configuration containing repository URLs and branches.
+            
+        Returns:
+            List[Dict[str, Any]]: List of fetched repositories with metadata.
+        """
+        import requests
+        from typing import Dict, Any, List
+        
+        repositories = []
+        
+        try:
+            for repo in repo_config.get("repositories", []):
+                url = repo.get("url")
+                branch = repo.get("branch", "main")
+                enabled = repo.get("enabled", True)
+                file_extensions = repo.get("file_extensions", [])
+                
+                if not url:
+                    continue
+                
+                # Extract owner and repo name from URL (e.g., https://github.com/user/repo)
+                parts = url.strip().split('/')
+                if len(parts) < 5 or parts[2] != "github.com":
+                    self.logger.warning(f"Invalid GitHub repository URL: {url}")
+                    continue
+                
+                owner, repo_name = parts[3], parts[4]
+                api_url = f"https://api.github.com/repos/{owner}/{repo_name}/contents?path=/&ref={branch}"
+                
+                # Fetch repository contents from GitHub API
+                response = requests.get(api_url)
+                if response.status_code == 200:
+                    contents = response.json()
+                    repositories.append({
+                        "url": url,
+                        "branch": branch,
+                        "contents": contents,
+                        "enabled": enabled,
+                        "file_extensions": file_extensions
+                    })
+                else:
+                    self.logger.error(f"Failed to fetch repository {url}: HTTP {response.status_code}")
+        except Exception as e:
+            self.logger.error(f"Error fetching GitHub repositories: {e}")
+        
+        return repositories
+
+    def clone_enabled_repositories(self, repo_config: Dict[str, Any]) -> bool:
+        """
+        Clone enabled repositories into /docs/github and update existing ones.
+        
+        Args:
+            repo_config (Dict[str, Any]): Configuration containing repository URLs and branches.
+            
+        Returns:
+            bool: True if cloning was successful, False otherwise.
+        """
+        from pathlib import Path
+        
+        if not GITPYTHON_AVAILABLE:
+            self.logger.error("GitPython not available")
+            return False
+        
+        try:
+            docs_github_dir = Path("docs/github")
+            docs_github_dir.mkdir(parents=True, exist_ok=True)
+            
+            success_count = 0
+            total_repos = sum(1 for repo in repo_config.get("repositories", []) 
+                             if repo.get("enabled", False))
+            
+            for repo in repo_config.get("repositories", []):
+                if not repo.get("enabled", False):
+                    continue
+                
+                url = repo.get("url")
+                branch = repo.get("branch", "main")
+                
+                if not url:
+                    self.logger.warning(f"Repository missing URL, skipping")
+                    continue
+                
+                # Extract owner and repo name from URL (e.g., https://github.com/user/repo)
+                parts = url.strip().split('/')
+                if len(parts) < 5 or parts[2] != "github.com":
+                    self.logger.warning(f"Invalid GitHub repository URL: {url}")
+                    continue
+                
+                owner, repo_name = parts[3], parts[4]
+                repo_dir = docs_github_dir / repo_name
+                
+                try:
+                    if repo_dir.exists():
+                        # Update existing repository using GitPython
+                        self.logger.info(f"Updating existing repository: {repo_name}")
+                        repo_obj = Repo(str(repo_dir))
+                        origin = repo_obj.remotes.origin
+                        origin.pull()
+                    else:
+                        # Clone new repository using GitPython
+                        self.logger.info(f"Cloning repository: {repo_name}")
+                        repo_obj = Repo.clone_from(f"https://github.com/{owner}/{repo_name}.git", str(repo_dir))
+                        repo_obj.git.checkout(branch)
+                    
+                    success_count += 1
+                except Exception as e:
+                    self.logger.error(f"Failed to process repository {repo_name}: {e}")
+                    continue
+            
+            if success_count > 0:
+                self.logger.info(f"Repository update completed. Successfully processed {success_count}/{total_repos} enabled repositories.")
+                return True
+            else:
+                self.logger.warning("No enabled repositories were successfully updated.")
+                return False
+        except Exception as e:
+            self.logger.error(f"Error cloning or updating repositories: {e}")
+            return False
 
     def save_data(self, key: str, data: Dict[str, Any]) -> bool:
         """
