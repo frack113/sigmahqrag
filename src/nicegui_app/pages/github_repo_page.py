@@ -14,6 +14,22 @@ import asyncio
 grid = None
 repo_config = {"repositories": []}
 
+def fetch_github_repositories() -> List[Dict[str, Any]]:
+    """Fetch GitHub repositories using the data service."""
+    from ..models.data_service import DataService
+    
+    try:
+        repo_config = load_config()
+        if not repo_config.get("repositories"):
+            return []
+        
+        data_service = DataService()
+        repositories = data_service.fetch_github_repositories(repo_config)
+        return repositories
+    except Exception as e:
+        ui.notify(f"Error fetching repositories: {e}", type='negative')
+        return []
+
 def load_config() -> Dict[str, Any]:
     """Load configuration from file"""
     config_path = Path("config/github.json")
@@ -166,8 +182,7 @@ def initialize_page():
                 {"headerName": "URL", "field": "url", "editable": True, "flex": 2},
                 {"headerName": "Branch", "field": "branch", "editable": True, "flex": 1},
                 {"headerName": "Extensions", "field": "extensions", "editable": True, "flex": 1},
-                {"headerName": "Enabled", "field": "enabled", "cellRenderer": "agCheckboxCellRenderer", "flex": 1},
-                {"headerName": "Actions", "field": "actions", "cellRenderer": "agButtonCellRenderer", "flex": 1}
+                {"headerName": "Enabled", "field": "enabled", "cellRenderer": "agCheckboxCellRenderer", "flex": 1}
             ]
             
             grid = ui.aggrid({
@@ -175,9 +190,7 @@ def initialize_page():
                 "rowData": [],
                 "pagination": True,
                 "paginationPageSize": 10,
-                "editType": "fullRow",
-                "onCellValueChanged": lambda e: handle_cell_edit(e),
-                "onRowClicked": lambda e: handle_row_click(e)
+                "editType": "fullRow"
             })
     
     refresh_grid()
