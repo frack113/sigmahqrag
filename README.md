@@ -8,9 +8,10 @@ Very WIP
 
 - [ ] GitHub Repository Management 
   - [x] fix github update
-  - [ ] fix Add repository
+  - [x] fix Add repository
   - [ ] Fix Actions
   - [ ] Fix other errors I don't event kown 
+  - [ ] Add edit button back to repository table
 - [ ] chromadb
 - [ ] Chat
 

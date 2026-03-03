@@ -189,8 +189,8 @@ def refresh_repository_list() -> None:
     repo_config = load_config()
     repositories = repo_config.get("repositories", [])
     
-    if not AGGRID_AVAILABLE or repo_grid is None:
-        return  # AG Grid not available or grid not initialized yet
+    if repo_grid is None:
+        return  # Grid not initialized yet
     
     # Convert repositories to AG Grid rows format
     grid_rows = []
@@ -235,40 +235,32 @@ def initialize_page() -> None:
         
         # List of repositories using AG Grid
         with ui.card().classes("w-full"):
-            if AGGRID_AVAILABLE:
-                global repo_grid
-                
-                # Define column definitions for AG Grid
-                column_defs = [
-                    {"headerName": "URL", "field": "url", "flex": 3, "filter": True},
-                    {"headerName": "Branch", "field": "branch", "flex": 1, "filter": True},
-                    {"headerName": "File Extensions", "field": "extensions", "flex": 2, "filter": True},
-                    {
-                        "headerName": "Enabled",
-                        "field": "enabled",
-                        "flex": 1,
-                        "cellRenderer": "agCheckboxCellRenderer"
-                    },
-                    {
-                        "headerName": "Actions",
-                        "field": "actions",
-                        "flex": 2,
-                        "cellRenderer": lambda params: ui.button("Remove", on_click=lambda: remove_repository(params.data['index'])).props('flat').classes('text-negative')
-                    }
-                ]
-                
-                # Create AG Grid
-                repo_grid = aggrid(
-                    options={
-                        "columnDefs": column_defs,
-                        "rowData": [],  # Will be populated by refresh_repository_list
-                        "pagination": True,
-                        "paginationPageSize": 10,
-                        "enableCellChangeFlash": True
-                    }
-                )
-            else:
-                ui.label("AG Grid component not available").classes("text-negative")
+            global repo_grid
+            
+            # Define column definitions for AG Grid
+            column_defs = [
+                {"headerName": "URL", "field": "url", "flex": 3, "filter": True},
+                {"headerName": "Branch", "field": "branch", "flex": 1, "filter": True},
+                {"headerName": "File Extensions", "field": "extensions", "flex": 2, "filter": True},
+                {
+                    "headerName": "Enabled",
+                    "field": "enabled",
+                    "flex": 1,
+                    "cellRenderer": "agCheckboxCellRenderer"
+                },
+                {"headerName": "Actions", "field": "actions", "flex": 2}
+            ]
+            
+            # Create AG Grid
+            repo_grid = ui.aggrid(
+                options={
+                    "columnDefs": column_defs,
+                    "rowData": [],  # Will be populated by refresh_repository_list
+                    "pagination": True,
+                    "paginationPageSize": 10,
+                    "enableCellChangeFlash": True
+                }
+            )
         
         # Load repositories when page loads
         refresh_repository_list()

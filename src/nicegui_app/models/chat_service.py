@@ -4,7 +4,7 @@ Chat Service Layer
 Handles message history management, document processing pipeline,
 LLM query interface, and error handling for the multi-modal chat system.
 """
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional, Tuple, NoReturn
 from datetime import datetime
 import logging
 import os
@@ -43,7 +43,10 @@ class ChatMessage:
         content: str,
         document_path: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None
-    ):
+    ) -> None:
+        if role not in ('user', 'assistant'):
+            raise ValueError("Role must be either 'user' or 'assistant'")
+        
         self.id = str(datetime.now().timestamp()) + f"_{hash(content) % 1000}"
         self.role = role
         self.content = content
@@ -86,13 +89,19 @@ class ChatService:
         logger: Logging instance for debugging
     """
     
-    def __init__(self, max_history: int = 50):
+    def __init__(self, max_history: int = 50) -> None:
+        if max_history <= 0:
+            raise ValueError("max_history must be a positive integer")
+        
         self.message_history: List[ChatMessage] = []
         self.max_history = max_history
         self.logger = logging.getLogger(__name__)
         
-        # Configure logger
-        logging.basicConfig(level=logging.INFO)
+        # Configure logger with a more descriptive format
+        logging.basicConfig(
+            level=logging.INFO,
+            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        )
     
     def add_message(self, role: str, content: str, document_path: Optional[str] = None) -> ChatMessage:
         """
@@ -144,6 +153,10 @@ class ChatService:
             Tuple of (extracted_text, preview_base64)
             - extracted_text: Text content from the document
             - preview_base64: Optional base64-encoded image preview
+            
+        Raises:
+            ValueError: If the file type is unsupported.
+            Exception: For any other processing errors.
         """
         ext = os.path.splitext(file_path)[1].lower()
         extracted_text = ""
@@ -174,10 +187,14 @@ class ChatService:
         Process PDF file and extract text with optional first page preview.
         
         Args:
-            file_path: Path to PDF file
+            file_path: Path to PDF file.
             
         Returns:
-            Tuple of (extracted_text, preview_base64)
+            Tuple of (extracted_text, preview_base64).
+            
+        Raises:
+            ImportError: If pdf2image is not available.
+            Exception: For any other processing errors.
         """
         extracted_text = ""
         preview_base64 = None
@@ -214,10 +231,14 @@ class ChatService:
         Process image file and extract text using OCR.
         
         Args:
-            file_path: Path to image file
+            file_path: Path to image file.
             
         Returns:
-            Tuple of (extracted_text, preview_base64)
+            Tuple of (extracted_text, preview_base64).
+            
+        Raises:
+            ImportError: If PIL or pytesseract is not available.
+            Exception: For any other processing errors.
         """
         extracted_text = ""
         preview_base64 = None
@@ -254,10 +275,14 @@ class ChatService:
         Process DOCX file and extract text content.
         
         Args:
-            file_path: Path to DOCX file
+            file_path: Path to DOCX file.
             
         Returns:
-            Extracted text from the document
+            Extracted text from the document.
+            
+        Raises:
+            ImportError: If docx is not available.
+            Exception: For any other processing errors.
         """
         extracted_text = ""
         
@@ -282,12 +307,15 @@ class ChatService:
         Generate an assistant response using the LLM.
         
         Args:
-            user_message: The user's message text
-            document_content: Optional content from uploaded documents
-            context_documents: Optional list of additional context documents
+            user_message: The user's message text.
+            document_content: Optional content from uploaded documents.
+            context_documents: Optional list of additional context documents.
             
         Returns:
-            Generated response text
+            Generated response text.
+            
+        Raises:
+            Exception: If the LLM generation fails or times out.
         """
         # In a real implementation, this would call the LLM API
         # For now, we'll return a mock response
@@ -324,11 +352,14 @@ class ChatService:
         Process a complete chat turn (user input + optional files).
         
         Args:
-            user_input: The user's text input
-            file_paths: Optional list of uploaded file paths
+            user_input: The user's text input.
+            file_paths: Optional list of uploaded file paths.
             
         Returns:
-            Tuple of (user_message, assistant_message)
+            Tuple of (user_message, assistant_message).
+            
+        Raises:
+            ValueError: If the provided inputs are invalid.
         """
         # Add user message to history
         if file_paths and len(file_paths) > 0:

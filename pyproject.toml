@@ -14,6 +14,7 @@ dependencies = [
     "ollama>=0.6.1",
     "pdf2image>=1.17.0",
     "pillow>=12.1.1",
+    "pypdf2>=3.0.1",
     "python-multipart>=0.0.22",
     "uvicorn>=0.41.0",
 ]
@@ -27,4 +28,7 @@ dev = [
     "black>=26.1.0",
     "pytest>=9.0.2",
     "pytest-cov>=7.0.0",
+    "mypy>=1.19.1",
+    "ruff>=0.15.4",
+    "pyflakes>=3.4.0",
 ]
