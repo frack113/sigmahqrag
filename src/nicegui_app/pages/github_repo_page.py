@@ -161,6 +161,9 @@ def refresh_grid():
 def add_new_repository():
     """Add a new empty row for adding a repository - updates only grid data"""
     # Add directly to grid - no config modification
+    if not grid or not hasattr(grid, 'options'):
+        return
+    
     new_id = len(grid.options['rowData'])
     ext_text = "None"
     grid.options['rowData'].append({
