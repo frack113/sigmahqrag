@@ -5,22 +5,31 @@ readme = "README.md"
 license = "MIT"
 dependencies = [
     "asyncio>=4.0.0",
+    "black>=26.1.0",
     "chromadb>=1.5.1",
     "docx>=0.2.4",
+    "easyocr>=1.7.2",
+    "emoji>=2.15.0",
     "fastapi>=0.133.1",
     "gitpython>=3.1.46",
+    "langchain>=1.2.10",
+    "langchain-chroma>=1.1.0",
+    "langchain-community>=0.4.1",
+    "langchain-ollama>=1.0.1",
+    "langchain-openai>=1.1.10",
     "markdown>=3.10.2",
     "nicegui>=3.8.0",
     "ollama>=0.6.1",
     "pdf2image>=1.17.0",
     "pillow>=12.1.1",
+    "pypdf>=6.7.5",
     "pypdf2>=3.0.1",
+    "pysigma>=1.1.1",
     "python-multipart>=0.0.22",
-    "types-markdown>=3.10.2.20260211",
-    "types-requests>=2.32.4.20260107",
+    "uuid>=1.30",
     "uvicorn>=0.41.0",
 ]
-requires-python = ">=3.12"
+requires-python = ">=3.10"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
@@ -33,4 +42,10 @@ dev = [
     "mypy>=1.19.1",
     "ruff>=0.15.4",
     "pyflakes>=3.4.0",
+    "types-markdown>=3.10.2.20260211",
+    "types-requests>=2.32.4.20260107",
 ]
+
+[tool.black]
+line-length = 88
+target-version = ['py312']

@@ -1,13 +1,13 @@
 # Environment Instructions
 
-## documentation
+## Documentation
 - Use the documentation:
   - [NiceGUI 3.x](https://nicegui.io/documentation)
   - [Ollama Python](https://github.com/ollama/ollama-python)
   - [SigmaHQ/pySigma](https://github.com/SigmaHQ/pySigma)
   - [Material Icons](https://fonts.google.com/icons?icon.set=Material+Icons)
 
-## python
+## Python
 - Use the `python-pro` SKILL to review Python code.
 - Always use the `uv` Python environment and package manager for Python:
   - `uv run ...` to execute a Python script.
@@ -26,7 +26,13 @@ For code searches requiring syntax or structure understanding, use:
 ```bash
 ast-grep --lang [language] -p '<pattern>'
 ```
-Adjust the `--lang` flag for the specific language. Avoid text-only search tools unless explicitly requested.
+Adjust the --lang flag for the specific language. Avoid text-only search tools unless explicitly requested.
 
-## End of file
-- Always use `UTF-8` with LF line endings for files.
+## Git Policy
+
+Never perform Git commits, pushes, or any version control operations.
+If changes need to be saved or versioned, notify the user and request explicit instructions.
+
+## End of File
+
+Always use UTF-8 with LF line endings for files.

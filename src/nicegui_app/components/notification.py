@@ -1,17 +1,16 @@
 # Notification component for NiceGUI
-import asyncio
-from nicegui import ui, app
+from nicegui import ui
+from typing import Literal
 
 
-def notify(title, content):
+def notify(
+    message: str, type: Literal["info", "warning", "positive", "negative"] = "info"
+):
     """
-    Display a notification with the given title and content.
-    
+    Display a notification with the given message and type.
+
     Args:
-        title (str): Title of the notification.
-        content (str): Content of the notification.
+        message (str): Message to display.
+        type (str): Notification type (info, warning, positive, negative).
     """
-    async def _notify():
-        ui.notify(title, content)
-
-    asyncio.create_task(_notify())
+    ui.notify(message, type=type)
