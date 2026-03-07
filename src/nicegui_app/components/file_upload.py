@@ -1,7 +1,7 @@
 # File Upload Component
 """
-Component for handling document uploads with drag-and-drop support,
-file validation, preview generation, and progress indicators.
+Simplified file upload component for NiceGUI 3.x compatibility.
+Uses built-in NiceGUI file input with validation and preview generation.
 """
 
 from typing import Optional, List, Callable, Any
@@ -15,8 +15,8 @@ import tempfile
 
 class FileUpload:
     """
-    A file upload component that supports drag-and-drop, file validation,
-    preview generation for images and PDFs, and progress tracking.
+    A simplified file upload component that supports file validation,
+    preview generation for images, and progress tracking.
 
     Attributes:
         allowed_extensions: List of allowed file extensions (e.g., ['.pdf', '.txt'])
@@ -56,22 +56,36 @@ class FileUpload:
 
     def render(self):
         """
-        Render the file upload component with drag-and-drop zone.
+        Render the file upload component with NiceGUI 3.x compatible elements.
 
         Returns:
             The root element of the upload component
         """
         # Main container
-        container = ui.card().classes("w-full max-w-2xl")
+        container = ui.card().classes("w-full")
 
         with container:
-            # Drop zone
-            drop_zone = ui.element("div").classes(
-                "w-full h-48 border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-blue-500 transition-colors"
-            )
+            # Button row with [+] button and file count
+            with ui.row().classes("w-full mb-2 gap-2"):
+                # [+] button
+                ui.button(
+                    icon="add",
+                    text="Add Files",
+                    on_click=self._trigger_file_input,
+                ).classes("bg-blue-600 text-white hover:bg-blue-700")
 
-            with drop_zone:
-                ui.label("Drop files here or click to upload").classes(
+                # File count display
+                self.file_count = ui.label(f"{len(self.uploaded_files)} file(s) uploaded")
+                self.file_count.classes("text-sm text-gray-600")
+
+            # File input using NiceGUI's built-in component
+            self.file_input = ui.input(
+                placeholder="Select files..."
+            ).props("type=file multiple accept='*/*'").classes("hidden")
+
+            # Upload area with clear instructions
+            with ui.column().classes("w-full items-center gap-2"):
+                ui.label("Click 'Add Files' or drag and drop files here").classes(
                     "text-gray-600 mb-2"
                 )
                 ui.label(
@@ -81,52 +95,18 @@ class FileUpload:
                     "text-xs text-gray-500"
                 )
 
-            # Hidden file input
-            file_input = (
-                ui.input(placeholder="Select files...")
-                .props("type=file multiple")
-                .classes("hidden")
-            )
-
-            # Event handlers
-            drop_zone.on("dragenter", self._handle_drag_enter)
-            drop_zone.on("dragover", self._handle_drag_over)
-            drop_zone.on("dragleave", self._handle_drag_leave)
-            drop_zone.on("drop", self._handle_drop)
-            drop_zone.on("click", lambda: file_input.run_method("click"))
-
-            file_input.on("change", self._handle_file_selection)
+            # Event handlers using NiceGUI 3.x patterns
+            self.file_input.on('change', self._handle_file_selection)
 
         return container
 
-    def _handle_drag_enter(self, e):
-        """Handle drag enter event."""
-        e.sender.classes("border-blue-500 bg-blue-50")
-
-    def _handle_drag_over(self, e):
-        """Handle drag over event."""
-        e.prevent_default()
-        e.stop_propagation()
-
-    def _handle_drag_leave(self, e):
-        """Handle drag leave event."""
-        e.sender.classes("border-gray-300 bg-white")
-
-    def _handle_drop(self, e):
-        """Handle drop event with file validation and processing."""
-        e.prevent_default()
-        e.stop_propagation()
-
-        files = e.args.get("dataTransfer.files", [])
-        if not files:
-            self._call_error("No files dropped")
-            return
-
-        self._process_files(files)
+    def _trigger_file_input(self):
+        """Trigger the file input to open."""
+        self.file_input.run_method("click")
 
     def _handle_file_selection(self, e):
         """Handle file selection from file input."""
-        files = e.sender.element.files
+        files = e.args
         if not files:
             self._call_error("No files selected")
             return
@@ -155,12 +135,13 @@ class FileUpload:
         if uploaded_paths:
             self.uploaded_files.extend(uploaded_paths)
             self._call_upload(uploaded_paths)
+            self._update_file_count()
         elif not files:  # No valid files were processed
             self._call_error("No valid files were uploaded")
 
     def _validate_file(self, file_obj: Any) -> bool:
         """Validate file extension and size."""
-        filename = file_obj.name
+        filename = file_obj['name']
 
         # Check extension
         ext = os.path.splitext(filename)[1].lower()
@@ -170,7 +151,7 @@ class FileUpload:
             return False
 
         # Check size
-        file_size_mb = len(file_obj) / (1024 * 1024)
+        file_size_mb = file_obj['size'] / (1024 * 1024)
         if file_size_mb > self.max_size_mb:
             error_msg = f"File too large: {filename} ({file_size_mb:.1f}MB). Max size: {self.max_size_mb}MB"
             self._call_error(error_msg)
@@ -185,7 +166,7 @@ class FileUpload:
         os.makedirs(upload_dir, exist_ok=True)
 
         # Save file with unique name to prevent collisions
-        filename = file_obj.name
+        filename = file_obj['name']
         ext = os.path.splitext(filename)[1].lower()
         import uuid
 
@@ -193,16 +174,10 @@ class FileUpload:
         filepath = os.path.join(upload_dir, unique_filename)
 
         try:
+            # Get file content from NiceGUI's file object
+            content = file_obj['content']
             with open(filepath, "wb") as f:
-                # Read file content based on source (drop event vs file input)
-                if hasattr(file_obj, "get_data"):
-                    # For drop events
-                    data = file_obj.get_data()
-                    f.write(data)
-                else:
-                    # For file input
-                    content = file_obj.content
-                    f.write(content)
+                f.write(content)
         except Exception as e:
             # Clean up if save fails
             if os.path.exists(filepath):
@@ -256,6 +231,12 @@ class FileUpload:
 
         return None
 
+    def _update_file_count(self):
+        """Update the file count display."""
+        if hasattr(self, 'file_count'):
+            self.file_count.set_text(f"{len(self.uploaded_files)} file(s) uploaded")
+
     def clear_uploads(self) -> None:
         """Clear all uploaded files."""
         self.uploaded_files = []
+        self._update_file_count()

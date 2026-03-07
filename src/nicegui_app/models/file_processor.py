@@ -22,7 +22,7 @@ class FileProcessor:
 
         # Import PySigma for parsing YAML Sigma rules
         try:
-            import sigma.collection  # noqa: F401
+            import sigma.collection
 
             self.PYSIGMA_AVAILABLE = True
         except ImportError as e:

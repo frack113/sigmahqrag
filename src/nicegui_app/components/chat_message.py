@@ -14,15 +14,15 @@ MessageRole = Literal["user", "assistant"]
 
 class ChatMessage:
     """
-        A chat message component that displays messages with role indicators,
+    A chat message component that displays messages with role indicators,
     timestamps, and optional document previews.
 
-        Attributes:
-            role: Either "user" or "assistant" to indicate message sender
-            content: The text content of the message
-            timestamp: When the message was sent (auto-generated if None)
-            document_preview: Optional preview/image for uploaded documents
-            show_timestamp: Whether to display the timestamp
+    Attributes:
+        role: Either "user" or "assistant" to indicate message sender
+        content: The text content of the message
+        timestamp: When the message was sent (auto-generated if None)
+        document_preview: Optional preview/image for uploaded documents
+        show_timestamp: Whether to display the timestamp
     """
 
     def __init__(
@@ -51,43 +51,49 @@ class ChatMessage:
 
     def render(self):
         """
-        Render the chat message as a NiceGUI Card component.
+        Render the chat message with ChatGPT-style modern styling.
 
         Returns:
-            A styled card containing the message content
+            A styled message component
         """
-        # Create main container card
-        card = ui.card().classes("w-full max-w-3xl")
+        # Create message container with proper styling
+        message_container = ui.row().classes("w-full mb-4")
 
-        with card:
-            # Message header with role and timestamp
-            with ui.row().classes("items-center gap-2 pb-2"):
-                # Role indicator
-                role_badge = ui.badge(self.role)
-                role_badge.classes("capitalize text-xs")
+        with message_container:
+            # Role-specific styling
+            if self.role == "user":
+                # User message - right aligned, blue background
+                with ui.column().classes("items-end w-full"):
+                    # Message bubble with rounded corners
+                    bubble = ui.card().classes(
+                        "max-w-2xl bg-blue-600 text-white px-4 py-3 rounded-2xl shadow-sm"
+                    )
+                    with bubble:
+                        # Convert markdown to HTML and display
+                        html_content = markdown.markdown(self.content)
+                        ui.html(html_content).classes("whitespace-pre-wrap text-sm")
+            else:
+                # Assistant message - left aligned, gray background
+                with ui.column().classes("items-start w-full"):
+                    # Document preview (if provided)
+                    if self.document_preview:
+                        with ui.row().classes("mb-2 ml-2"):
+                            preview_img = ui.image(self.document_preview)
+                            preview_img.classes(
+                                "rounded-lg border max-h-32 object-contain"
+                            )
+                            preview_img.style("max-width: 200px;")
 
-                # Timestamp (if enabled)
-                if self.show_timestamp:
-                    time_str = self.timestamp.strftime("%H:%M")
-                    ui.label(time_str).classes("text-xs text-gray-500")
+                    # Message bubble with rounded corners
+                    bubble = ui.card().classes(
+                        "max-w-2xl bg-gray-100 text-gray-900 px-4 py-3 rounded-2xl shadow-sm"
+                    )
+                    with bubble:
+                        # Convert markdown to HTML and display
+                        html_content = markdown.markdown(self.content)
+                        ui.html(html_content).classes("whitespace-pre-wrap text-sm")
 
-            # Document preview (if provided)
-            if self.document_preview:
-                with ui.row().classes("pb-2"):
-                    preview_img = ui.image(self.document_preview)
-                    preview_img.classes("rounded border max-h-32 object-contain")
-                    preview_img.style("max-width: 200px;")
-
-            # Message content with markdown support
-            with ui.row():
-                message_container = ui.column()
-                message_container.classes("gap-1")
-
-                # Convert markdown to HTML and display
-                html_content = markdown.markdown(self.content)
-                ui.html(html_content).classes("whitespace-pre-wrap")
-
-        return card
+        return message_container
 
     def add_to_parent(self, parent_container):
         """

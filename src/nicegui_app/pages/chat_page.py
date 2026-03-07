@@ -16,8 +16,10 @@ from datetime import datetime
 # Import local components and services
 from ..components.chat_message import ChatMessage
 from ..components.file_upload import FileUpload
+from ..components.typing_indicator import TypingIndicator
 from ..models.chat_service import ChatService, ChatMessage as ChatMessageData
 from ..models.data_service import DataService
+from ..models.config_service import ConfigService
 
 
 class ChatPage:
@@ -27,15 +29,23 @@ class ChatPage:
     Attributes:
         chat_service: Service for managing conversation state
         data_service: Service for RAG operations
+        config_service: Service for configuration management
         message_container: UI element containing all messages
         typing_indicator: Optional typing indicator element
+        loading_spinner: Optional loading spinner element
+        confirm_dialog: Optional confirmation dialog element
+        file_upload_component: File upload component
+        conversation_key: Key for localStorage storage
     """
 
     def __init__(self):
         self.chat_service = ChatService()
         self.data_service = DataService()
+        self.config_service = ConfigService()
         self.message_container = None
         self.typing_indicator = None
+        self.loading_spinner = None
+        self.confirm_dialog = None
         self.file_upload_component = None
         self.conversation_key = "sigmahq_chat_history"
 
@@ -53,9 +63,9 @@ class ChatPage:
             # Header
             self._render_header()
 
-            # Chat messages area - use flex to fill available space
+            # Chat messages area - use flex to fill available space with responsive design
             self.message_container = ui.column().classes(
-                "flex-1 overflow-y-auto p-4 gap-3 min-h-0"
+                "flex-1 overflow-y-auto p-4 gap-4 min-h-0"
             )
 
             # File upload component
@@ -67,7 +77,7 @@ class ChatPage:
             self._render_input_area()
 
         # Load conversation from localStorage
-        self._load_conversation_from_storage()
+        asyncio.create_task(self._load_conversation_from_storage())
 
         return main_container
 
@@ -78,24 +88,27 @@ class ChatPage:
         with (
             ui.row()
             .classes("w-full bg-white border-b px-4 py-3 items-center")
-            .style("box-shadow: 0 2px 4px rgba(0,0,0,0.1)")
+            .style("box-shadow: 0 1px 2px rgba(0,0,0,0.05)")
         ):
-            ui.label("SigmaHQ Multi-Modal Chat").classes(
-                "text-xl font-semibold text-gray-800"
+            ui.label("SigmaHQ Chat").classes(
+                "text-lg font-semibold text-gray-800"
             )
 
             # Spacer
             ui.element("div").classes("flex-1")
 
             # Clear history button
-            ui.button(icon="delete_sweep", on_click=self._clear_chat_history).tooltip(
-                "Clear chat history"
-            ).props("size=sm")
+            ui.button(
+                icon="delete_sweep",
+                on_click=self._clear_chat_history,
+            ).props("flat").tooltip("Clear chat history")
 
             # Update database button
-            ui.button(icon="update", on_click=self._update_database).tooltip(
-                "Update knowledge base from GitHub repositories"
-            ).props("size=sm color=primary")
+            ui.button(
+                icon="update",
+                on_click=self._update_database,
+                color="primary",
+            ).props("flat").tooltip("Update knowledge base from GitHub repositories")
 
     def _render_input_area(self):
         """
@@ -103,26 +116,32 @@ class ChatPage:
         """
         with (
             ui.row()
-            .classes("w-full bg-white border-t p-4 gap-2")
-            .style("box-shadow: 0 -2px 4px rgba(0,0,0,0.1)")
+            .classes("w-full bg-white border-t px-4 py-3 gap-3")
+            .style("box-shadow: 0 -1px 2px rgba(0,0,0,0.05)")
         ):
-            # File upload component
-            self.file_upload_component.render()
+            # File upload button
+            with ui.row().classes("gap-2"):
+                self.file_upload_component.render()
 
             # Text input
             text_input = (
-                ui.input(placeholder="Type your message here...")
+                ui.input(
+                    placeholder="Message SigmaHQ...",
+                    value="",
+                )
                 .classes("flex-1")
-                .props('input-debounce="500"')
+                .props('input-debounce="500" clearable')
             )
 
-            # Handle Enter key press
-            text_input.on("keypress", self._handle_key_press)
+            # Handle Enter key press using NiceGUI 3.x pattern
+            text_input.on('keydown', self._handle_key_press)
 
             # Send button
             send_button = ui.button(
-                icon="send", on_click=lambda: self._send_message(text_input.value)
-            ).classes("bg-blue-600 text-white hover:bg-blue-700")
+                icon="send",
+                on_click=lambda: self._send_message(text_input.value),
+                color="primary",
+            ).props("flat")
 
         return text_input, send_button
 
@@ -156,9 +175,7 @@ class ChatPage:
                 )
 
                 # Process the document and get preview
-                doc_content, preview = asyncio.run(
-                    self.chat_service.process_document(file_path)
-                )
+                doc_content, preview = self.chat_service.process_document(file_path)
 
                 # Update message with document content info
                 user_msg.content = f"Uploaded: {file_path}\n\nDocument contains {len(doc_content.split()):,} words"
@@ -241,12 +258,13 @@ class ChatPage:
         Show a typing indicator in the chat.
         """
         if self.typing_indicator is None:
-            # Create typing indicator
-            self.typing_indicator = ui.html('<div class="typing-indicator">...</div>')
+            # Create typing indicator component
+            self.typing_indicator = TypingIndicator()
 
             # Add to message container
             if self.message_container:
-                self.message_container.append(self.typing_indicator)
+                with self.message_container:
+                    self.typing_indicator.render()
 
     def _hide_typing_indicator(self):
         """
@@ -254,8 +272,8 @@ class ChatPage:
         """
         if self.typing_indicator is not None:
             try:
-                self.typing_indicator.delete()
-                self.typing_indicator = None
+                # Hide the component instead of deleting it
+                self.typing_indicator.hide()
             except Exception:
                 pass  # Ignore cleanup errors
 
@@ -338,15 +356,25 @@ class ChatPage:
                 "Updating knowledge base from GitHub repositories...", type="info"
             )
 
-            # Load configuration
-            import json
+            # Load configuration using ConfigService
+            config_service = ConfigService()
+            repo_config = config_service.get_repositories()
 
-            config_path = "config/github.json"
-            with open(config_path, "r", encoding="utf-8") as f:
-                repo_config = json.load(f)
+            # Convert RepositoryConfig objects to dict format
+            repo_dict = {
+                "repositories": [
+                    {
+                        "url": repo.url,
+                        "branch": repo.branch,
+                        "enabled": repo.enabled,
+                        "file_extensions": repo.file_extensions,
+                    }
+                    for repo in repo_config
+                ]
+            }
 
             # First, clone or update enabled repositories
-            if not self.data_service.clone_enabled_repositories(repo_config):
+            if not self.data_service.clone_enabled_repositories(repo_dict):
                 ui.notify(
                     "Failed to update repositories. Please check the configuration.",
                     type="negative",
@@ -354,7 +382,7 @@ class ChatPage:
                 return
 
             # Then index all enabled repositories
-            if self.data_service.index_enabled_repositories(config_path):
+            if self.data_service.index_enabled_repositories(repo_dict):
                 ui.notify("Knowledge base updated successfully!", type="positive")
             else:
                 ui.notify(
@@ -406,13 +434,13 @@ class ChatPage:
         except Exception as e:
             print(f"Error saving conversation to storage: {e}")
 
-    def _load_conversation_from_storage(self):
+    async def _load_conversation_from_storage(self):
         """
         Load conversation from localStorage using JavaScript.
         """
         try:
             # Use JavaScript to get from localStorage
-            result = ui.run_javascript(f"""
+            result = await ui.run_javascript(f"""
                 if (typeof(Storage) !== 'undefined') {{
                     const data = localStorage.getItem('{self.conversation_key}');
                     return data || null;

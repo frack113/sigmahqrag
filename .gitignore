@@ -28,3 +28,5 @@ dist/
 # IDE
 .vscode/
 .idea/
+AGENTS.md
+refractor.md

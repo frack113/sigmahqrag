@@ -18,7 +18,7 @@ class RepositoryService:
 
         # Import GitPython for repository operations
         try:
-            import git  # noqa: F401
+            import git
 
             self.GITPYTHON_AVAILABLE = True
         except ImportError as e:

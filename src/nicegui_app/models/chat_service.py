@@ -7,6 +7,7 @@ Handles message history management and conversation state.
 from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime
 import logging
+import markdown
 
 
 class ChatMessage:
@@ -161,7 +162,7 @@ class ChatService:
 
         return service
 
-    async def process_document(self, file_path: str) -> Tuple[str, Optional[str]]:
+    def process_document(self, file_path: str) -> Tuple[str, Optional[str]]:
         """
         Process a document file and extract its content.
 
@@ -189,3 +190,30 @@ class ChatService:
             preview = upload_component.generate_preview(file_path)
 
         return content, preview
+
+    def convert_markdown_to_html(self, markdown_text: str) -> str:
+        """
+        Convert markdown text to HTML.
+
+        Args:
+            markdown_text: Markdown-formatted text
+
+        Returns:
+            HTML-formatted text
+        """
+        try:
+            # Convert markdown to HTML
+            html = markdown.markdown(
+                markdown_text,
+                extensions=[
+                    "extra",
+                    "codehilite",
+                    "fenced_code",
+                    "tables",
+                    "toc",
+                ],
+            )
+            return html
+        except Exception as e:
+            self.logger.error(f"Error converting markdown to HTML: {e}")
+            return markdown_text

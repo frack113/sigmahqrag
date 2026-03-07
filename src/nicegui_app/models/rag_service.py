@@ -8,10 +8,12 @@ import logging
 from typing import Optional, Dict, Any, List, Tuple
 
 try:
-    from langchain_community.embeddings import OllamaEmbeddings
+    from langchain_ollama import OllamaEmbeddings
+    from langchain_chroma import Chroma
 except ImportError:
     OllamaEmbeddings = None
-    logging.warning("langchain_community not available. RAG functionality disabled.")
+    Chroma = None
+    logging.warning("langchain_ollama or langchain_chroma not available. RAG functionality disabled.")
 
 
 class RagService:
@@ -53,16 +55,10 @@ class RagService:
             )
 
             # Initialize LangChain's Chroma vector store
-            try:
-                from langchain_community.vectorstores import Chroma
-
-                self.vectorstore = Chroma(
-                    embedding_function=self.embeddings, persist_directory=".chromadb"
-                )
-                self.logger.info("Initialized Chroma vector store for document context")
-            except ImportError as e:
-                self.logger.warning(f"Chroma not available: {e}")
-                self.logger.warning("RAG functionality disabled.")
+            self.vectorstore = Chroma(
+                embedding_function=self.embeddings, persist_directory=".chromadb"
+            )
+            self.logger.info("Initialized Chroma vector store for document context")
 
         except Exception as e:
             self.logger.error(f"Error initializing RAG: {e}")

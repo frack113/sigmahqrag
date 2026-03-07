@@ -6,6 +6,7 @@ Handles LLM integration using LangChain's ChatOpenAI.
 
 from typing import List, Optional
 import logging
+import markdown
 from langchain_openai import ChatOpenAI
 
 
@@ -169,3 +170,30 @@ Please provide a clear, concise, and helpful response to the user's question."""
             return True
         except Exception:
             return False
+
+    def convert_markdown_to_html(self, markdown_text: str) -> str:
+        """
+        Convert markdown text to HTML.
+
+        Args:
+            markdown_text: Markdown-formatted text
+
+        Returns:
+            HTML-formatted text
+        """
+        try:
+            # Convert markdown to HTML
+            html = markdown.markdown(
+                markdown_text,
+                extensions=[
+                    "extra",
+                    "codehilite",
+                    "fenced_code",
+                    "tables",
+                    "toc",
+                ],
+            )
+            return html
+        except Exception as e:
+            self.logger.error(f"Error converting markdown to HTML: {e}")
+            return markdown_text
