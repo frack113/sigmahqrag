@@ -77,6 +77,17 @@ Adjust the --lang flag for the specific language. Avoid text-only search tools u
 Never perform Git commits, pushes, or any version control operations.
 If changes need to be saved or versioned, notify the user and request explicit instructions.
 
+## Logging System Requirements
+
+When implementing logging functionality:
+
+1. **Use Centralized Logging Service**: Always use the logging service from `src/nicegui_app.models.logging_service`
+2. **Get Logger Instance**: Use `get_logger(__name__)` for consistent logger naming
+3. **Log Levels**: Use appropriate log levels (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+4. **Log Rotation**: The system automatically handles log rotation at 10MB with 5 backup files
+5. **Real-time Monitoring**: The Logs page provides live tail-like functionality for monitoring logs
+6. **Page Height for Logs**: The Logs page uses `h-[60vh]` for the log display area to accommodate the log viewer interface
+
 ## File Handling Guidelines
 
 - **Configuration Files**: 
@@ -87,6 +98,7 @@ If changes need to be saved or versioned, notify the user and request explicit i
   - `.chromadb/` - Vector database storage (do not modify manually)
   - `data/github/` - GitHub repository data
   - `data/local/` - Local document processing data
+  - `logs/` - Application log files (created automatically)
 - **Application Files**:
   - `src/nicegui_app/` - Main application code
   - `tests/` - Test files

@@ -5,7 +5,11 @@ Handles Retrieval-Augmented Generation (RAG) operations using LangChain's OpenAI
 Optimized for better performance and error handling with LM Studio.
 """
 
+import asyncio
+import hashlib
 import logging
+import time
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List, Optional, Tuple
 
 try:
@@ -26,13 +30,15 @@ from .lm_studio_embeddings import LMStudioEmbeddings
 class RagService:
     """
     A service to handle Retrieval-Augmented Generation (RAG) operations.
-    
+
     This service provides:
     - Efficient embedding generation using OpenAI-compatible embeddings
     - Optimized document chunking and storage
     - Smart similarity search with configurable thresholds
     - Robust error handling and fallback mechanisms
     - Performance monitoring and statistics
+    - Caching layer for expensive operations
+    - Connection pooling for better performance
     """
 
     def __init__(
@@ -42,11 +48,14 @@ class RagService:
         persist_directory: str = ".chromadb",
         chunk_size: int = 500,
         chunk_overlap: int = 100,
-        api_key: str = "lm-studio"
+        api_key: str = "lm-studio",
+        max_workers: int = 4,
+        cache_size: int = 1000,
+        cache_ttl: int = 3600,  # 1 hour
     ):
         """
         Initialize the RAG service.
-        
+
         Args:
             embedding_model_name: Name of the embedding model to use
             base_url: Base URL for LM Studio server
@@ -54,6 +63,9 @@ class RagService:
             chunk_size: Default size of each chunk in characters
             chunk_overlap: Default overlap between chunks in characters
             api_key: API key for LM Studio (default: "lm-studio")
+            max_workers: Maximum number of worker threads for concurrent operations
+            cache_size: Maximum number of cached items
+            cache_ttl: Cache time-to-live in seconds
         """
         self.logger = logging.getLogger(__name__)
         self.embedding_model_name = embedding_model_name
@@ -62,9 +74,17 @@ class RagService:
         self.default_chunk_size = chunk_size
         self.default_chunk_overlap = chunk_overlap
         self.api_key = api_key
-        
+        self.max_workers = max_workers
+        self.cache_size = cache_size
+        self.cache_ttl = cache_ttl
+
         self.embeddings: Optional[OpenAIEmbeddings] = None
         self.vectorstore: Optional[Chroma] = None
+        self.executor = ThreadPoolExecutor(max_workers=max_workers)
+
+        # Initialize caching
+        self._cache: Dict[str, Tuple[Any, float]] = {}
+        self._cache_access_times: Dict[str, float] = {}
 
         # Initialize RAG components
         self._initialize_rag()
@@ -80,9 +100,9 @@ class RagService:
         try:
             # Use our custom LM Studio embeddings that work correctly with the API
             self.embeddings = LMStudioEmbeddings(
-                model=self.embedding_model_name, 
+                model=self.embedding_model_name,
                 base_url=self.base_url,
-                api_key=self.api_key
+                api_key=self.api_key,
             )
             self.logger.info(
                 f"Initialized LMStudioEmbeddings with model: {self.embedding_model_name} "
@@ -91,8 +111,8 @@ class RagService:
 
             # Initialize LangChain's Chroma vector store with persistence
             self.vectorstore = Chroma(
-                embedding_function=self.embeddings, 
-                persist_directory=self.persist_directory
+                embedding_function=self.embeddings,
+                persist_directory=self.persist_directory,
             )
             self.logger.info(
                 f"Initialized Chroma vector store at {self.persist_directory}"
@@ -105,7 +125,7 @@ class RagService:
     def check_embedding_model(self, model_name: Optional[str] = None) -> bool:
         """
         Check if the specified embedding model is available in LM Studio.
-        
+
         Args:
             model_name: Name of the model to check (uses instance model if None)
 
@@ -119,21 +139,21 @@ class RagService:
         try:
             # Try to initialize the embeddings with the model
             temp_embeddings = LMStudioEmbeddings(
-                model=check_model, 
-                base_url=self.base_url,
-                api_key=self.api_key
+                model=check_model, base_url=self.base_url, api_key=self.api_key
             )
             # Test with a simple text
             temp_embeddings.embed_documents(["test"])
             return True
         except Exception as e:
-            self.logger.warning(f"Model '{check_model}' not available in LM Studio: {e}")
+            self.logger.warning(
+                f"Model '{check_model}' not available in LM Studio: {e}"
+            )
             return False
 
     def generate_embeddings(self, texts: List[str]) -> List[List[float]]:
         """
         Generate embeddings for a list of text strings using LangChain's OpenAIEmbeddings.
-        
+
         Args:
             texts: List of text strings to embed
 
@@ -168,7 +188,7 @@ class RagService:
     ) -> bool:
         """
         Store document context in the vector database.
-        
+
         Args:
             document_id: Unique identifier for the document
             text_content: Text content to store and index
@@ -192,10 +212,12 @@ class RagService:
             # Use provided chunking parameters or defaults
             actual_chunk_size = chunk_size or self.default_chunk_size
             actual_chunk_overlap = chunk_overlap or self.default_chunk_overlap
-            
+
             # Generate chunks with optimized size
-            chunks = self._chunk_text(text_content, actual_chunk_size, actual_chunk_overlap)
-            
+            chunks = self._chunk_text(
+                text_content, actual_chunk_size, actual_chunk_overlap
+            )
+
             if not chunks:
                 self.logger.warning(f"No chunks generated for document {document_id}")
                 return False
@@ -209,11 +231,7 @@ class RagService:
             self.vectorstore.add_texts(
                 texts=chunks,
                 metadatas=[
-                    {
-                        "chunk_index": i, 
-                        "chunk_size": len(chunk),
-                        **(metadata or {})
-                    } 
+                    {"chunk_index": i, "chunk_size": len(chunk), **(metadata or {})}
                     for i, chunk in enumerate(chunks)
                 ],
                 ids=ids,
@@ -230,15 +248,15 @@ class RagService:
             raise
 
     def retrieve_context(
-        self, 
-        query: str, 
-        n_results: int = 5, 
+        self,
+        query: str,
+        n_results: int = 5,
         min_relevance_score: float = 0.3,
-        filter_metadata: Optional[Dict[str, Any]] = None
+        filter_metadata: Optional[Dict[str, Any]] = None,
     ) -> Tuple[List[str], List[Dict[str, Any]]]:
         """
         Retrieve relevant context using similarity search.
-        
+
         Args:
             query: The search query
             n_results: Maximum number of results to return
@@ -260,12 +278,10 @@ class RagService:
         try:
             # Build filter if provided
             search_filter = filter_metadata if filter_metadata else None
-            
+
             # Query the vector store with optional filtering
             results = self.vectorstore.similarity_search_with_score(
-                query, 
-                k=n_results,
-                filter=search_filter
+                query, k=n_results, filter=search_filter
             )
 
             documents = [doc.page_content for doc in results]
@@ -300,14 +316,11 @@ class RagService:
             raise
 
     def _chunk_text(
-        self, 
-        text: str, 
-        chunk_size: int = 1000, 
-        chunk_overlap: int = 200
+        self, text: str, chunk_size: int = 1000, chunk_overlap: int = 200
     ) -> List[str]:
         """
         Split text into overlapping chunks for better retrieval.
-        
+
         Args:
             text: Input text to chunk
             chunk_size: Size of each chunk in characters
@@ -326,10 +339,10 @@ class RagService:
             end = min(start + chunk_size, len(text))
             chunk = text[start:end]
             chunks.append(chunk)
-            
+
             if end == len(text):
                 break
-                
+
             # Move start position with overlap
             start = end - chunk_overlap
 
@@ -338,7 +351,7 @@ class RagService:
     def clear_context(self) -> bool:
         """
         Clear all stored context from the vector database.
-        
+
         Returns:
             True if context was cleared successfully
         """
@@ -355,15 +368,15 @@ class RagService:
     def get_context_stats(self) -> Dict[str, Any]:
         """
         Get statistics about the stored context.
-        
+
         Returns:
             Dictionary containing statistics including count and size
         """
         stats = {
-            "count": 0, 
+            "count": 0,
             "size_mb": 0.0,
             "embedding_model": self.embedding_model_name,
-            "persist_directory": self.persist_directory
+            "persist_directory": self.persist_directory,
         }
 
         try:
@@ -372,7 +385,7 @@ class RagService:
                 collection = self.vectorstore.get()
                 stats["count"] = len(collection["ids"])
                 stats["size_mb"] = round(len(str(collection)) / (1024 * 1024), 2)
-                
+
                 # Add chunking configuration
                 stats["default_chunk_size"] = self.default_chunk_size
                 stats["default_chunk_overlap"] = self.default_chunk_overlap
@@ -385,7 +398,7 @@ class RagService:
     def update_chunking_config(self, chunk_size: int, chunk_overlap: int) -> None:
         """
         Update the default chunking configuration.
-        
+
         Args:
             chunk_size: New default chunk size
             chunk_overlap: New default chunk overlap
@@ -395,3 +408,158 @@ class RagService:
         self.logger.info(
             f"Updated chunking config: size={chunk_size}, overlap={chunk_overlap}"
         )
+
+    def _get_cache_key(self, texts: List[str]) -> str:
+        """Generate a cache key for a list of texts."""
+        text_hash = hashlib.md5("||".join(texts).encode()).hexdigest()
+        return f"embeddings_{self.embedding_model_name}_{text_hash}"
+
+    def _is_cache_valid(self, cache_key: str) -> bool:
+        """Check if cache entry is valid (not expired)."""
+        if cache_key not in self._cache:
+            return False
+
+        cached_data, timestamp = self._cache[cache_key]
+        current_time = time.time()
+
+        # Check if cache has expired
+        if current_time - timestamp > self.cache_ttl:
+            del self._cache[cache_key]
+            del self._cache_access_times[cache_key]
+            return False
+
+        return True
+
+    def _cleanup_cache(self) -> None:
+        """Remove expired cache entries and enforce cache size limit."""
+        current_time = time.time()
+        expired_keys = []
+
+        # Remove expired entries
+        for key, (cached_data, timestamp) in self._cache.items():
+            if current_time - timestamp > self.cache_ttl:
+                expired_keys.append(key)
+
+        for key in expired_keys:
+            del self._cache[key]
+            del self._cache_access_times[key]
+
+        # Enforce cache size limit using LRU
+        if len(self._cache) > self.cache_size:
+            # Sort by access time and remove oldest entries
+            sorted_keys = sorted(self._cache_access_times.items(), key=lambda x: x[1])
+            keys_to_remove = len(self._cache) - self.cache_size
+
+            for key, _ in sorted_keys[:keys_to_remove]:
+                del self._cache[key]
+                del self._cache_access_times[key]
+
+    def generate_embeddings_cached(self, texts: List[str]) -> List[List[float]]:
+        """
+        Generate embeddings with caching for better performance.
+
+        Args:
+            texts: List of text strings to embed
+
+        Returns:
+            List of embedding vectors
+        """
+        if not texts:
+            return []
+
+        cache_key = self._get_cache_key(texts)
+
+        # Check cache first
+        if self._is_cache_valid(cache_key):
+            self._cache_access_times[cache_key] = time.time()
+            cached_embeddings, _ = self._cache[cache_key]
+            self.logger.info(f"Cache hit for embeddings: {len(texts)} texts")
+            return cached_embeddings
+
+        # Generate new embeddings
+        embeddings = self.generate_embeddings(texts)
+
+        # Cache the result
+        self._cache[cache_key] = (embeddings, time.time())
+        self._cache_access_times[cache_key] = time.time()
+
+        # Cleanup cache if needed
+        self._cleanup_cache()
+
+        return embeddings
+
+    def retrieve_context_cached(
+        self,
+        query: str,
+        n_results: int = 5,
+        min_relevance_score: float = 0.3,
+        filter_metadata: Optional[Dict[str, Any]] = None,
+    ) -> Tuple[List[str], List[Dict[str, Any]]]:
+        """
+        Retrieve context with caching for better performance.
+
+        Args:
+            query: The search query
+            n_results: Maximum number of results to return
+            min_relevance_score: Minimum relevance score threshold
+            filter_metadata: Optional metadata filter
+
+        Returns:
+            Tuple of (relevant document chunks, metadata for each chunk)
+        """
+        if not query.strip():
+            return [], []
+
+        # Create cache key based on query and parameters
+        cache_params = {
+            "query": query,
+            "n_results": n_results,
+            "min_relevance_score": min_relevance_score,
+            "filter_metadata": filter_metadata or {},
+        }
+        cache_key = hashlib.md5(str(cache_params).encode()).hexdigest()
+
+        # Check cache first
+        if self._is_cache_valid(cache_key):
+            self._cache_access_times[cache_key] = time.time()
+            cached_result, _ = self._cache[cache_key]
+            self.logger.info(f"Cache hit for context retrieval: {query[:50]}...")
+            return cached_result
+
+        # Perform actual retrieval
+        result = self.retrieve_context(
+            query, n_results, min_relevance_score, filter_metadata
+        )
+
+        # Cache the result
+        self._cache[cache_key] = (result, time.time())
+        self._cache_access_times[cache_key] = time.time()
+
+        # Cleanup cache if needed
+        self._cleanup_cache()
+
+        return result
+
+    def clear_cache(self) -> None:
+        """Clear all cached data."""
+        self._cache.clear()
+        self._cache_access_times.clear()
+        self.logger.info("Cleared all cached data")
+
+    def get_cache_stats(self) -> Dict[str, Any]:
+        """Get cache statistics."""
+        current_time = time.time()
+        valid_entries = sum(
+            1
+            for _, timestamp in self._cache.values()
+            if current_time - timestamp <= self.cache_ttl
+        )
+
+        return {
+            "total_entries": len(self._cache),
+            "valid_entries": valid_entries,
+            "expired_entries": len(self._cache) - valid_entries,
+            "cache_size_limit": self.cache_size,
+            "cache_ttl": self.cache_ttl,
+            "cache_hit_rate": "N/A",  # Would need to track hits/misses
+        }

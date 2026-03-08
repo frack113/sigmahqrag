@@ -1,11 +1,14 @@
 """
 LLM Service for NiceGUI
 
-Handles LLM integration using OpenAI-compatible endpoints for LM Studio.
+Handles LLM integration and response generation using OpenAI-compatible endpoints for LM Studio.
 Optimized for better performance, error handling, and streaming capabilities.
 """
 
+import asyncio
 import logging
+import time
+from concurrent.futures import ThreadPoolExecutor
 from typing import AsyncGenerator, List, Optional
 
 import markdown
@@ -19,7 +22,7 @@ logger = logging.getLogger(__name__)
 class LLMService:
     """
     Handles LLM integration and response generation using OpenAI-compatible endpoints.
-    
+
     This service provides:
     - Efficient model initialization and validation
     - Structured prompt templating
@@ -36,11 +39,11 @@ class LLMService:
         temperature: float = 0.7,
         max_tokens: int = 512,
         streaming: bool = True,
-        api_key: str = "lm-studio"
+        api_key: str = "lm-studio",
     ):
         """
         Initialize the LLM service using ChatOpenAI.
-        
+
         Args:
             model_name: Name of the model to use
             base_url: Base URL for the LLM server
@@ -60,20 +63,24 @@ class LLMService:
 
     def _create_prompt_template(self) -> ChatPromptTemplate:
         """Create a structured prompt template for better LLM responses."""
-        return ChatPromptTemplate.from_messages([
-            SystemMessage(content=(
-                "You are a helpful AI assistant specialized in document analysis "
-                "and technical queries. Provide clear, concise, and accurate responses. "
-                "When given context documents, base your answers primarily on that information."
-            )),
-            MessagesPlaceholder(variable_name="context"),
-            HumanMessage(content="{input}")
-        ])
+        return ChatPromptTemplate.from_messages(
+            [
+                SystemMessage(
+                    content=(
+                        "You are a helpful AI assistant specialized in document analysis "
+                        "and technical queries. Provide clear, concise, and accurate responses. "
+                        "When given context documents, base your answers primarily on that information."
+                    )
+                ),
+                MessagesPlaceholder(variable_name="context"),
+                HumanMessage(content="{input}"),
+            ]
+        )
 
     def initialize(self) -> bool:
         """
         Initialize the LLM instance using ChatOpenAI.
-        
+
         Returns:
             True if initialization successful, False otherwise
         """
@@ -88,8 +95,7 @@ class LLMService:
                 http_client=None,  # Let it use default HTTP client
             )
             logger.info(
-                f"LLM initialized with model: {self.model_name} "
-                f"at {self.base_url}"
+                f"LLM initialized with model: {self.model_name} " f"at {self.base_url}"
             )
             return True
         except Exception as e:
@@ -105,9 +111,9 @@ class LLMService:
     ) -> str:
         """
         Generate an assistant response using the LLM.
-        
+
         Uses structured prompts and proper error handling for better results.
-        
+
         Args:
             user_message: The user's message text.
             document_content: Optional content from uploaded documents.
@@ -130,18 +136,17 @@ class LLMService:
             context_messages = self._build_context_messages(
                 document_content, context_documents
             )
-            
+
             # Create the prompt
             prompt = self._prompt_template.format(
-                context=context_messages,
-                input=user_message
+                context=context_messages, input=user_message
             )
 
             # Generate response using LangChain ChatOllama
             # Using invoke() for non-streaming, which automatically handles streaming
             # if the model is configured for it
             response = await self.llm.invoke(prompt)
-            
+
             assistant_response = response.content
 
             logger.info("Successfully generated response using ChatOllama")
@@ -159,9 +164,9 @@ class LLMService:
     ) -> AsyncGenerator[str, None]:
         """
         Generate a streaming response using the LLM.
-        
+
         Leverages LangChain's auto-streaming capabilities for optimal performance.
-        
+
         Args:
             user_message: The user's message text.
             document_content: Optional content from uploaded documents.
@@ -182,11 +187,10 @@ class LLMService:
             context_messages = self._build_context_messages(
                 document_content, context_documents
             )
-            
+
             # Create the prompt
             prompt = self._prompt_template.format(
-                context=context_messages,
-                input=user_message
+                context=context_messages, input=user_message
             )
 
             # Use stream() for explicit streaming
@@ -200,45 +204,43 @@ class LLMService:
             yield self._get_fallback_response(user_message, document_content)
 
     def _build_context_messages(
-        self, 
-        document_content: Optional[str], 
-        context_documents: Optional[List[str]]
+        self, document_content: Optional[str], context_documents: Optional[List[str]]
     ) -> List[HumanMessage]:
         """
         Build context messages from document content and context documents.
-        
+
         Args:
             document_content: Content from uploaded documents
             context_documents: List of additional context documents
-            
+
         Returns:
             List of HumanMessage objects for context
         """
         context_messages = []
-        
+
         if document_content:
             context_messages.append(
                 HumanMessage(
                     content=f"Document content:\n{document_content[:1000]}...",
-                    name="document"
+                    name="document",
                 )
             )
-            
+
         if context_documents:
             for i, doc in enumerate(context_documents):
                 context_messages.append(
                     HumanMessage(
                         content=f"Context document {i+1}:\n{doc[:1000]}...",
-                        name=f"context_{i+1}"
+                        name=f"context_{i+1}",
                     )
                 )
-        
+
         return context_messages
 
     def check_model(self, model_name: Optional[str] = None) -> bool:
         """
         Check if a model is available.
-        
+
         Args:
             model_name: Name of the model to check (uses instance model if None)
 
@@ -252,7 +254,7 @@ class LLMService:
     def get_embedding_model(self, model_name: Optional[str] = None) -> Optional:
         """
         Get an embedding model instance for LM Studio.
-        
+
         Args:
             model_name: Name of the embedding model to use (defaults to config)
 
@@ -263,6 +265,7 @@ class LLMService:
             embedding_model_name = model_name or self.model_name
             # Use our custom LM Studio embeddings that work correctly with the API
             from .lm_studio_embeddings import LMStudioEmbeddings
+
             return LMStudioEmbeddings(
                 model=embedding_model_name,
                 base_url=self.base_url,
@@ -275,7 +278,7 @@ class LLMService:
     def convert_markdown_to_html(self, markdown_text: str) -> str:
         """
         Convert markdown text to HTML.
-        
+
         Args:
             markdown_text: Markdown-formatted text
 
@@ -287,11 +290,11 @@ class LLMService:
             html = markdown.markdown(
                 markdown_text,
                 extensions=[
-                    "extra",           # Extra features like tables
-                    "codehilite",      # Syntax highlighting
-                    "fenced_code",     # Fenced code blocks
-                    "tables",          # Table support
-                    "toc",            # Table of contents
+                    "extra",  # Extra features like tables
+                    "codehilite",  # Syntax highlighting
+                    "fenced_code",  # Fenced code blocks
+                    "tables",  # Table support
+                    "toc",  # Table of contents
                 ],
             )
             return html
@@ -304,7 +307,7 @@ class LLMService:
     ) -> str:
         """
         Get a fallback response when LLM fails.
-        
+
         Args:
             user_message: The user's message.
             document_content: Optional document content.

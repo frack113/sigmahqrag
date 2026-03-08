@@ -95,7 +95,6 @@ class ChatPage:
                 "flat"
             ).tooltip("Clear chat history")
 
-
     def _render_input_area(self):
         """
         Render the input area with text box, file upload, and send button.
@@ -315,7 +314,7 @@ class ChatPage:
         """
         # Create a persistent notification for progress updates
         self.progress_notification = ui.notification(timeout=None)
-        
+
         # Start the background update process
         asyncio.create_task(self._update_database_with_progress())
 
@@ -327,7 +326,7 @@ class ChatPage:
             # Step 1: Load configuration
             self.progress_notification.message = "Loading configuration..."
             self.progress_notification.spinner = True
-            
+
             config_service = ConfigService()
             repo_config = config_service.get_repositories()
 
@@ -345,51 +344,56 @@ class ChatPage:
             }
 
             enabled_repos = [repo for repo in repo_config if repo.enabled]
-            
+
             if not enabled_repos:
-                self.progress_notification.message = "No enabled repositories found in configuration."
+                self.progress_notification.message = (
+                    "No enabled repositories found in configuration."
+                )
                 self.progress_notification.spinner = False
                 await asyncio.sleep(2)
                 self.progress_notification.dismiss()
                 return
 
             # Step 2: Clone repositories (Step 1/2)
-            self.progress_notification.message = f"Step 1/2: Updating {len(enabled_repos)} repositories..."
+            self.progress_notification.message = (
+                f"Step 1/2: Updating {len(enabled_repos)} repositories..."
+            )
             self.progress_notification.spinner = True
-            
+
             # Run clone operation in thread pool
             import concurrent.futures
+
             loop = asyncio.get_event_loop()
             with concurrent.futures.ThreadPoolExecutor() as executor:
                 clone_result = await loop.run_in_executor(
-                    executor, 
-                    self.data_service.clone_enabled_repositories, 
-                    repo_dict
+                    executor, self.data_service.clone_enabled_repositories, repo_dict
                 )
-            
+
             if not clone_result:
-                self.progress_notification.message = "Failed to update repositories. Please check the configuration."
+                self.progress_notification.message = (
+                    "Failed to update repositories. Please check the configuration."
+                )
                 self.progress_notification.spinner = False
                 await asyncio.sleep(3)
                 self.progress_notification.dismiss()
                 return
-            
+
             # Step 3: Index repositories (Step 2/2)
-            self.progress_notification.message = "Step 2/2: Indexing repository content..."
+            self.progress_notification.message = (
+                "Step 2/2: Indexing repository content..."
+            )
             self.progress_notification.spinner = True
-            
+
             # Run indexing operation in thread pool
             with concurrent.futures.ThreadPoolExecutor() as executor:
                 index_result = await loop.run_in_executor(
-                    executor, 
-                    self.data_service.index_enabled_repositories, 
-                    repo_dict
+                    executor, self.data_service.index_enabled_repositories, repo_dict
                 )
-            
+
             if index_result:
                 # Get context stats for detailed feedback
                 stats = self.data_service.get_context_stats()
-                total_docs = stats.get('total_documents', 0)
+                total_docs = stats.get("total_documents", 0)
                 self.progress_notification.message = (
                     f"✅ Knowledge base updated successfully! "
                     f"Indexed {total_docs} documents from {len(enabled_repos)} repositories."
@@ -398,7 +402,9 @@ class ChatPage:
                 await asyncio.sleep(3)
                 self.progress_notification.dismiss()
             else:
-                self.progress_notification.message = "No repositories were indexed. Please check the configuration."
+                self.progress_notification.message = (
+                    "No repositories were indexed. Please check the configuration."
+                )
                 self.progress_notification.spinner = False
                 await asyncio.sleep(3)
                 self.progress_notification.dismiss()
@@ -475,7 +481,7 @@ class ChatPage:
                 def render_messages():
                     for msg in self.chat_service.get_message_history():
                         self._render_message(msg)
-                
+
                 # Schedule rendering in the main UI thread
                 ui.timer(0.1, render_messages, once=True)
         except Exception as e:

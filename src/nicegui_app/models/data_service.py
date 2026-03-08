@@ -107,7 +107,7 @@ class DataService:
             # Traverse the repository and process files
             processed_count = 0
             total_files = 0
-            
+
             # First, count total files to process
             for root, _, files in os.walk(repo_dir):
                 for file in files:
@@ -116,7 +116,9 @@ class DataService:
                     if file_ext in file_extensions:
                         total_files += 1
 
-            self.logger.info(f"Found {total_files} files to process in repository {repo_name}")
+            self.logger.info(
+                f"Found {total_files} files to process in repository {repo_name}"
+            )
 
             for root, _, files in os.walk(repo_dir):
                 for file in files:
@@ -131,7 +133,7 @@ class DataService:
                         # Show progress notification for each file
                         relative_path = os.path.relpath(file_path, repo_dir)
                         self.logger.info(f"Processing file: {relative_path}")
-                        
+
                         # Process the file using FileProcessor
                         content = self.file_processor.process_file(file_path)
                         if content:
@@ -149,7 +151,7 @@ class DataService:
                             # Store the context using RagService
                             self.rag_service.store_context(doc_id, content, metadata)
                             processed_count += 1
-                            
+
                             # Log progress
                             self.logger.info(
                                 f"Successfully processed: {relative_path} "

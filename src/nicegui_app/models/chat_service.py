@@ -4,11 +4,16 @@ Chat Service Layer
 Handles message history management and conversation state.
 """
 
+import asyncio
 import logging
+import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
-from typing import Any
+from typing import Any, AsyncGenerator, List, Optional
 
 import markdown
+
+logger = logging.getLogger(__name__)
 
 
 class ChatMessage:
@@ -58,7 +63,7 @@ class ChatService:
 
         self.message_history: list[ChatMessage] = []
         self.max_history = max_history
-        self.logger = logging.getLogger(__name__)
+        self.logger = logger
 
     def add_message(
         self, role: str, content: str, document_path: str | None = None
@@ -191,4 +196,3 @@ class ChatService:
             preview = upload_component.generate_preview(file_path)
 
         return content, preview
-

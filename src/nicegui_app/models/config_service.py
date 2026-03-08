@@ -5,9 +5,17 @@ Centralized configuration management for the SigmaHQ RAG application.
 Handles loading, saving, and updating configuration from a single source of truth.
 """
 
+import asyncio
 import json
-from dataclasses import dataclass
+import logging
+import os
+import time
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass, asdict
 from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -30,14 +38,26 @@ class LLMConfig:
     base_url: str
 
 
+@dataclass
+class AppConfig:
+    """Complete application configuration."""
+
+    repositories: List[RepositoryConfig]
+    llm: LLMConfig
+    rag: Dict[str, Any]
+    performance: Dict[str, Any]
+
+
 class ConfigService:
     """
     Service for managing application configuration.
 
-    Attributes:
-        config_path: Path to the configuration file
-        repositories: List of repository configurations
-        llm_config: LLM configuration
+    Features:
+        - Async configuration loading and saving
+        - Configuration validation and defaults
+        - Environment variable overrides
+        - Configuration caching for performance
+        - Thread-safe operations
     """
 
     def __init__(self, config_path: str = "data/config.json"):
@@ -50,6 +70,15 @@ class ConfigService:
         self.config_path = Path(config_path)
         self.repositories: list[RepositoryConfig] = []
         self.llm_config: LLMConfig | None = None
+        self.app_config: AppConfig | None = None
+        self.executor = ThreadPoolExecutor(max_workers=2)
+
+        # Configuration cache
+        self._config_cache: Optional[Dict[str, Any]] = None
+        self._cache_timestamp: float = 0
+        self._cache_ttl: int = 30  # 30 seconds cache
+
+        # Load configuration
         self._load_config()
 
     def _load_config(self) -> None:
@@ -318,3 +347,224 @@ class ConfigService:
             Number of enabled repositories
         """
         return sum(1 for repo in self.repositories if repo.enabled)
+
+    async def load_config_async(self) -> bool:
+        """
+        Load configuration asynchronously.
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            loop = asyncio.get_event_loop()
+            return await loop.run_in_executor(self.executor, self._load_config)
+        except Exception as e:
+            logger.error(f"Error loading config asynchronously: {e}")
+            return False
+
+    async def save_config_async(self) -> bool:
+        """
+        Save configuration asynchronously.
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            loop = asyncio.get_event_loop()
+            return await loop.run_in_executor(self.executor, self.save_config)
+        except Exception as e:
+            logger.error(f"Error saving config asynchronously: {e}")
+            return False
+
+    def get_config_with_defaults(self) -> Dict[str, Any]:
+        """
+        Get configuration with environment variable overrides and defaults.
+
+        Returns:
+            Complete configuration dictionary
+        """
+        # Check cache first
+        current_time = time.time()
+        if (
+            self._config_cache
+            and (current_time - self._cache_timestamp) < self._cache_ttl
+        ):
+            return self._config_cache
+
+        # Build configuration with environment overrides
+        config = {
+            "repositories": [
+                {
+                    "url": repo.url,
+                    "branch": repo.branch,
+                    "enabled": repo.enabled,
+                    "file_extensions": repo.file_extensions,
+                }
+                for repo in self.repositories
+            ],
+            "llm": {
+                "model": os.getenv(
+                    "LLM_MODEL",
+                    self.llm_config.model if self.llm_config else "llama3.2",
+                ),
+                "temperature": float(
+                    os.getenv(
+                        "LLM_TEMPERATURE",
+                        self.llm_config.temperature if self.llm_config else 0.7,
+                    )
+                ),
+                "max_tokens": int(
+                    os.getenv(
+                        "LLM_MAX_TOKENS",
+                        self.llm_config.max_tokens if self.llm_config else 1000,
+                    )
+                ),
+                "base_url": os.getenv(
+                    "LLM_BASE_URL",
+                    (
+                        self.llm_config.base_url
+                        if self.llm_config
+                        else "http://127.0.0.1:1234"
+                    ),
+                ),
+            },
+            "rag": {
+                "embedding_model": os.getenv(
+                    "RAG_EMBEDDING_MODEL", "text-embedding-all-minilm-l6-v2-embedding"
+                ),
+                "chunk_size": int(os.getenv("RAG_CHUNK_SIZE", "500")),
+                "chunk_overlap": int(os.getenv("RAG_CHUNK_OVERLAP", "100")),
+                "persist_directory": os.getenv("RAG_PERSIST_DIR", ".chromadb"),
+                "cache_size": int(os.getenv("RAG_CACHE_SIZE", "1000")),
+                "cache_ttl": int(os.getenv("RAG_CACHE_TTL", "3600")),
+            },
+            "performance": {
+                "max_workers": int(os.getenv("MAX_WORKERS", "4")),
+                "thread_pool_size": int(os.getenv("THREAD_POOL_SIZE", "4")),
+                "request_timeout": int(os.getenv("REQUEST_TIMEOUT", "30")),
+            },
+        }
+
+        # Cache the result
+        self._config_cache = config
+        self._cache_timestamp = current_time
+
+        return config
+
+    def validate_config(self) -> List[str]:
+        """
+        Validate the current configuration.
+
+        Returns:
+            List of validation errors (empty if valid)
+        """
+        errors = []
+
+        # Validate LLM config
+        if self.llm_config:
+            if not self.llm_config.model:
+                errors.append("LLM model name is required")
+            if not self.llm_config.base_url:
+                errors.append("LLM base URL is required")
+            if not (0.0 <= self.llm_config.temperature <= 1.0):
+                errors.append("LLM temperature must be between 0.0 and 1.0")
+            if not (1 <= self.llm_config.max_tokens <= 8192):
+                errors.append("LLM max_tokens must be between 1 and 8192")
+
+        # Validate repositories
+        for i, repo in enumerate(self.repositories):
+            if not repo.url:
+                errors.append(f"Repository {i+1} URL is required")
+            if not repo.branch:
+                errors.append(f"Repository {i+1} branch is required")
+
+        return errors
+
+    def reset_to_defaults(self) -> bool:
+        """
+        Reset configuration to default values.
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            self._create_default_config()
+            return True
+        except Exception as e:
+            logger.error(f"Error resetting to defaults: {e}")
+            return False
+
+    def export_config(self) -> Dict[str, Any]:
+        """
+        Export complete configuration for backup or sharing.
+
+        Returns:
+            Complete configuration with metadata
+        """
+        return {
+            "config": self.get_config_with_defaults(),
+            "metadata": {
+                "exported_at": time.time(),
+                "version": "1.0.0",
+                "repository_count": len(self.repositories),
+                "enabled_count": self.get_enabled_count(),
+            },
+        }
+
+    def import_config(self, config_data: Dict[str, Any]) -> bool:
+        """
+        Import configuration from exported data.
+
+        Args:
+            config_data: Configuration data to import
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            if "config" not in config_data:
+                raise ValueError("Invalid configuration format")
+
+            config = config_data["config"]
+
+            # Update repositories
+            if "repositories" in config:
+                self.repositories = [
+                    RepositoryConfig(
+                        url=repo["url"],
+                        branch=repo["branch"],
+                        enabled=repo.get("enabled", True),
+                        file_extensions=repo.get("file_extensions", []),
+                    )
+                    for repo in config["repositories"]
+                ]
+
+            # Update LLM config
+            if "llm" in config:
+                llm_data = config["llm"]
+                self.llm_config = LLMConfig(
+                    model=llm_data.get("model", "llama3.2"),
+                    temperature=llm_data.get("temperature", 0.7),
+                    max_tokens=llm_data.get("max_tokens", 1000),
+                    base_url=llm_data.get("base_url", "http://127.0.0.1:1234"),
+                )
+
+            # Clear cache since config changed
+            self._config_cache = None
+
+            return self.save_config()
+
+        except Exception as e:
+            logger.error(f"Error importing configuration: {e}")
+            return False
+
+    def cleanup(self):
+        """Clean up resources."""
+        try:
+            self.executor.shutdown(wait=True)
+        except Exception as e:
+            logger.error(f"Error during config service cleanup: {e}")
+
+    def __del__(self):
+        """Destructor to ensure cleanup."""
+        self.cleanup()
