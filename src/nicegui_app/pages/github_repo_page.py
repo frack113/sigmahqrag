@@ -203,96 +203,93 @@ def initialize_page():
     """Initialize the GitHub repository management page"""
     global grid
 
-    with ui.card().classes("p-6 w-full max-w-6xl mx-auto shadow-lg"):
+    with ui.column().classes("w-full h-screen bg-gray-100"):
         # Header
-        with ui.row().classes("justify-between items-center mb-6 flex-wrap gap-3"):
-            ui.label("GitHub Repository Management").classes("text-h5 font-bold")
+        with ui.row().classes("w-full bg-white border-b px-4 py-3 items-center"):
+            ui.label("GitHub Repository Management").classes("text-lg font-semibold text-gray-800")
+            ui.element("div").classes("flex-1")
+
+        # Main content area - use flex to fill available space
+        with ui.column().classes("w-full p-4 gap-4 flex-1"):
+            # Action buttons
             with ui.row().classes("gap-3 flex-wrap"):
                 ui.button(
-                    icon="home",
-                    text="Back to Chat",
-                    on_click=lambda: ui.navigate.to("/"),
-                ).props("flat outlined")
+                    icon="add",
+                    text="Add New",
+                    on_click=add_new_repository,
+                ).props("flat")
                 ui.button(
-                    icon="source",
+                    icon="save",
+                    text="Save",
+                    on_click=save_edits,
+                    color="primary",
+                ).props("flat")
+                ui.button(
+                    icon="delete",
+                    text="Delete Selected",
+                    color="negative",
+                ).props(
+                    "flat"
+                ).on_click(lambda: remove_selected())
+                ui.button(
+                    icon="update",
                     text="UPDATE ALL",
                     on_click=lambda: update_all_enabled_repos(),
                     color="primary",
                 ).props("flat")
 
-        # Action buttons
-        with ui.row().classes("mt-6 gap-3 flex-wrap"):
-            ui.button(
-                icon="add",
-                text="Add New",
-                on_click=add_new_repository,
-            ).props("flat")
-            ui.button(
-                icon="save",
-                text="Save",
-                on_click=save_edits,
-                color="primary",
-            ).props("flat")
-            ui.button(
-                icon="delete",
-                text="Delete Selected",
-                color="negative",
-            ).props(
-                "flat"
-            ).on_click(lambda: remove_selected())
-
-        # AG Grid Table
-        with ui.card().classes("w-full p-4"):
-            column_defs = [
-                {"field": "url", "editable": True},
-                {"field": "branch", "editable": True},
-                {"field": "extensions", "editable": True},
-                {
-                    "field": "enabled",
-                    "cellRenderer": "agCheckboxCellRenderer",
-                    "editable": True,
-                },
-            ]
-
-            # Load initial data from config
-            config = load_config()
-            grid_rows = []
-
-            for idx, repo in enumerate(config["repositories"]):
-                ext_text = (
-                    ", ".join(repo["file_extensions"])
-                    if repo.get("file_extensions")
-                    else "None"
-                )
-                grid_rows.append(
+            # AG Grid Table - use flex to fill available space
+            with ui.card().classes("w-full p-4 flex-1"):
+                column_defs = [
+                    {"field": "url", "editable": True},
+                    {"field": "branch", "editable": True},
+                    {"field": "extensions", "editable": True},
                     {
-                        "id": idx,
-                        "url": repo["url"],
-                        "branch": repo["branch"],
-                        "extensions": ext_text,
-                        "enabled": repo["enabled"],
-                    }
-                )
+                        "field": "enabled",
+                        "cellRenderer": "agCheckboxCellRenderer",
+                        "editable": True,
+                    },
+                ]
 
-            grid = (
-                ui.aggrid(
-                    {
-                        "columnDefs": column_defs,
-                        "rowData": grid_rows,
-                        "pagination": True,
-                        "paginationPageSize": 10,
-                        "editType": "fullRow",
-                        "rowSelection": {"mode": "multiRow"},
-                        "domLayout": "normal",
-                        "animateRows": True,
-                        "rowHeight": 40,
-                        "headerHeight": 50,
-                        "responsive": True,
-                    }
+                # Load initial data from config
+                config = load_config()
+                grid_rows = []
+
+                for idx, repo in enumerate(config["repositories"]):
+                    ext_text = (
+                        ", ".join(repo["file_extensions"])
+                        if repo.get("file_extensions")
+                        else "None"
+                    )
+                    grid_rows.append(
+                        {
+                            "id": idx,
+                            "url": repo["url"],
+                            "branch": repo["branch"],
+                            "extensions": ext_text,
+                            "enabled": repo["enabled"],
+                        }
+                    )
+
+                grid = (
+                    ui.aggrid(
+                        {
+                            "columnDefs": column_defs,
+                            "rowData": grid_rows,
+                            "pagination": True,
+                            "paginationPageSize": 10,
+                            "editType": "fullRow",
+                            "rowSelection": {"mode": "multiRow"},
+                            "domLayout": "normal",
+                            "animateRows": True,
+                            "rowHeight": 40,
+                            "headerHeight": 50,
+                            "responsive": True,
+                        }
+                    )
+                    .classes("w-full h-full")
+                    .on("cellValueChanged", handle_cell_edit)
                 )
-                .classes("w-full")
-                .on("cellValueChanged", handle_cell_edit)
-            )
 
 
 def handle_cell_edit(e):

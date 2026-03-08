@@ -95,12 +95,6 @@ class ChatPage:
                 "flat"
             ).tooltip("Clear chat history")
 
-            # Update database button
-            ui.button(
-                icon="update",
-                on_click=self._update_database,
-                color="primary",
-            ).props("flat").tooltip("Update knowledge base from GitHub repositories")
 
     def _render_input_area(self):
         """
