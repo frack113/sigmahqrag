@@ -5,6 +5,9 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+.mypy_cache
+.pytest_cache
+.ruff_cache
 
 # Environment
 .venv/
@@ -15,8 +18,8 @@ __pycache__/
 
 # RAG Data
 .chromadb/
-docs/github/
-docs/local/
+data/github/
+data/local/
 
 # Build
 build/
@@ -25,3 +28,4 @@ dist/
 # IDE
 .vscode/
 .idea/
+AGENTS.md

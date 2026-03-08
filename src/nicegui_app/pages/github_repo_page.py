@@ -1,126 +1,300 @@
 """
-GitHub Repository Management Page
-Handles adding, removing, and updating GitHub repositories for indexing.
+GitHub Repository Management Page with AG Grid
+Complete rewrite using AG Grid for all CRUD operations based on NiceGUI example
 """
-from typing import List, Dict, Any
-import json
-import os
-from pathlib import Path
+
+import asyncio
+from typing import Any
+
 from nicegui import ui
 
+# Import modern components
+from ..components.notification import notify
 
-def load_config() -> Dict[str, Any]:
-    """Load the GitHub repository configuration from /config/github.json."""
-    config_path = Path("config/github.json")
-    if not config_path.exists():
+# Import ConfigService and RepositoryConfig
+from ..models.config_service import ConfigService, RepositoryConfig
+
+# Global state
+grid = None
+
+
+def load_config() -> dict[str, Any]:
+    """Load configuration from file using ConfigService"""
+    try:
+        config_service = ConfigService()
+        config_data = config_service.get_repositories()
+
+        # Convert RepositoryConfig objects to dicts
+        repositories = [
+            {
+                "url": repo.url,
+                "branch": repo.branch,
+                "enabled": repo.enabled,
+                "file_extensions": repo.file_extensions,
+            }
+            for repo in config_data
+        ]
+
+        return {"repositories": repositories}
+    except Exception as e:
+        print(f"Error loading config: {e}")
         return {"repositories": []}
 
-    with open(config_path, "r") as file:
-        try:
-            return json.load(file) or {"repositories": []}
-        except (json.JSONDecodeError, FileNotFoundError):
-            return {"repositories": []}
 
-def save_config(config: Dict[str, Any]) -> None:
-    """Save the GitHub repository configuration to /config/github.json."""
-    config_path = Path("config/github.json")
-    os.makedirs(config_path.parent, exist_ok=True)
+def save_config(config: dict[str, Any]) -> None:
+    """Save configuration to file using ConfigService"""
+    try:
+        config_service = ConfigService()
 
-    with open(config_path, "w") as file:
-        json.dump(config, file, indent=4)
+        # Convert dict to RepositoryConfig objects
+        repositories = [
+            RepositoryConfig(
+                url=repo["url"],
+                branch=repo["branch"],
+                enabled=repo["enabled"],
+                file_extensions=repo.get("file_extensions", []),
+            )
+            for repo in config.get("repositories", [])
+        ]
 
-def add_repository() -> None:
-    """Add a new repository to the configuration."""
-    url = ui.input("URL", placeholder="https://github.com/user/repo").value
-    branch = ui.input("Branch", placeholder="main").value
-    enabled = True  # Default to enabled
-    extensions = [ext.strip() for ext in ui.input("File Extensions (comma-separated)", placeholder=".md, .py").value.split(",") if ext.strip()]
+        config_service.update_repositories(repositories)
+    except Exception as e:
+        print(f"Error saving config: {e}")
 
-    repositories = load_config()["repositories"]
-    repositories.append({
-        "url": url,
-        "branch": branch,
-        "enabled": enabled,
-        "file_extensions": extensions
-    })
-    save_config({"repositories": repositories})
-    ui.notify("Repository added successfully!")
-    refresh_repository_list()
 
-def remove_repository(index: int) -> None:
-    """Remove a repository from the configuration."""
-    repositories = load_config()["repositories"]
-    if 0 <= index < len(repositories):
-        removed_url = repositories.pop(index)["url"]
-        save_config({"repositories": repositories})
-        ui.notify(f"Repository '{removed_url}' removed successfully!")
-        refresh_repository_list()
+def is_duplicate(url: str, branch: str, exclude_index: int = -1) -> bool:
+    """Check if repository URL+branch combination already exists"""
+    if grid is None or not hasattr(grid, "options"):
+        return False
 
-def update_repository(index: int) -> None:
-    """Update an existing repository in the configuration."""
-    url = ui.input("URL", placeholder="https://github.com/user/repo").value
-    branch = ui.input("Branch", placeholder="main").value
-    enabled = True  # Default to enabled
-    extensions = [ext.strip() for ext in ui.input("File Extensions (comma-separated)", placeholder=".md, .py").value.split(",") if ext.strip()]
+    for i, repo in enumerate(grid.options["rowData"]):
+        if i == exclude_index:
+            continue
+        if (
+            repo.get("url", "").lower() == url.lower()
+            and repo.get("branch", "").lower() == branch.lower()
+        ):
+            return True
+    return False
 
-    repositories = load_config()["repositories"]
-    if 0 <= index < len(repositories):
-        repositories[index] = {
-            "url": url,
-            "branch": branch,
-            "enabled": enabled,
-            "file_extensions": extensions
-        }
-        save_config({"repositories": repositories})
-        ui.notify("Repository updated successfully!")
-        refresh_repository_list()
 
-def refresh_repository_list() -> None:
-    """Refresh the list of repositories."""
-    repositories = load_config()["repositories"]
-    repo_list.clear()
+def add_new_repository():
+    """Add a new empty row for adding a repository"""
+    if not grid or not hasattr(grid, "options"):
+        return
 
-    for idx, repo in enumerate(repositories):
-        with ui.card().classes("w-full max-w-md m-2"):
-            ui.label(f"Repository {idx + 1}").classes("text-lg font-bold")
-            ui.input("URL", value=repo["url"]).props("readonly").classes("mb-2")
-            ui.input("Branch", value=repo["branch"]).props("readonly").classes("mb-2")
+    new_id = max((dx["id"] for dx in grid.options["rowData"]), default=-1) + 1
+    new_row = {
+        "id": new_id,
+        "url": "",
+        "branch": "",
+        "extensions": "None",
+        "enabled": True,
+    }
+    grid.options["rowData"].append(new_row)
+    notify(f"Added row with ID {new_id}")
+    # Force a full refresh of the grid data
+    grid.options = grid.options.copy()
+    grid.update()
+    # Additional refresh to ensure the grid renders the new row
+    ui.run_javascript(
+        "setTimeout(() => { window.dispatchEvent(new Event('resize')); }, 100)"
+    )
 
-            # Enable toggle (slider)
-            slider = ui.toggle([
-                {"label": "Disabled", "value": False},
-                {"label": "Enabled", "value": True}
-            ]).bind_value(repo, "enabled").on("update:model-value", lambda e: save_config(load_config()))
 
-            # File extensions (multiselect)
-            ui.label("File Extensions:")
-            for ext in repo["file_extensions"]:
-                ui.input(f"Extension {len(repo['file_extensions']) + 1}", value=ext).props("readonly").classes("mb-1")
+def save_edits():
+    """Save all edits made to the grid to config file"""
+    try:
+        # Get current data from grid
+        if not grid or not hasattr(grid, "options"):
+            notify("Grid not initialized!", type="negative")
+            return
 
-            # Action buttons
-            with ui.row().classes("mt-2"):
-                ui.button("Update", on_click=lambda: update_repository(idx)).classes("q-mr-sm")
-                ui.button("Remove", on_click=lambda: remove_repository(idx), color="negative").classes("q-mr-sm")
+        grid_data = grid.options["rowData"]
 
-# Initialize the page
-repo_list = None
+        if not grid_data:
+            notify("No changes to save!", type="info")
+            return
 
-def initialize_page() -> None:
-    global repo_list
-    
-    with ui.card():
-        ui.label("GitHub Repository Management").classes("text-h5")
-        # Add new repository form
-        with ui.expansion("Add New Repository", icon="add"):
-            ui.input("URL", placeholder="https://github.com/user/repo").classes("mb-2")
-            ui.input("Branch", placeholder="main").classes("mb-2")
-            ui.input("File Extensions (comma-separated)", placeholder=".md, .py").classes("mb-2")
-            ui.button("Add Repository", on_click=add_repository).classes("q-mr-sm")
+        # Validate enabled state
+        for row in grid_data:
+            if not isinstance(row.get("enabled"), bool):
+                notify("Invalid Enabled state!", type="negative")
+                return
 
-        # List of repositories
-        with ui.expansion("Repository List", icon="list"):
-            repo_list = ui.column()
-            refresh_repository_list()
+        # Load existing config and update with grid data
+        config = load_config()
+        config["repositories"] = []
 
-# Start the page
-initialize_page()
+        for row in grid_data:
+            # Skip rows with empty URL and branch (new rows)
+            if not row.get("url") or not row.get("branch"):
+                continue
+
+            extensions_list = [
+                ext.strip()
+                for ext in row.get("extensions", "").split(",")
+                if ext.strip() and ext.strip() != "None"
+            ]
+            config["repositories"].append(
+                {
+                    "url": row["url"],
+                    "branch": row["branch"],
+                    "enabled": row["enabled"],
+                    "file_extensions": extensions_list,
+                }
+            )
+
+        save_config(config)
+        notify("Changes saved successfully!", type="positive")
+    except Exception as e:
+        notify(f"Error saving changes: {e}", type="negative")
+
+
+async def remove_selected():
+    """Remove selected rows from the grid"""
+    if not grid or not hasattr(grid, "options"):
+        return
+
+    try:
+        # Get selected rows - this returns a coroutine that needs to be awaited
+        selected_rows = await grid.get_selected_rows()
+        if not selected_rows:
+            notify("No rows selected!", type="warning")
+            return
+
+        # Remove selected rows from grid data
+        selected_ids = {row["id"] for row in selected_rows}
+        grid.options["rowData"] = [
+            row for row in grid.options["rowData"] if row["id"] not in selected_ids
+        ]
+
+        # Update IDs after removal
+        for i, row in enumerate(grid.options["rowData"]):
+            row["id"] = i
+
+        grid.update()
+        notify(f"Deleted {len(selected_ids)} repository(ies)!", type="positive")
+    except Exception as e:
+        notify(f"Error deleting repositories: {e}", type="negative")
+
+
+async def update_all_enabled_repos():
+    """Update all enabled repositories"""
+    from ..models.data_service import DataService
+
+    notify("Updating repositories...")
+    try:
+        config = load_config()
+        data_service = DataService()
+        success = await asyncio.to_thread(
+            data_service.clone_enabled_repositories, config
+        )
+
+        if success:
+            notify("Update completed!", type="positive")
+        else:
+            notify("Update failed", type="negative")
+    except Exception as e:
+        notify(f"Error: {e}", type="negative")
+
+
+def initialize_page():
+    """Initialize the GitHub repository management page"""
+    global grid
+
+    with ui.column().classes("w-full h-[70vh] gap-4"):
+        # Action buttons
+        with ui.row().classes("gap-3 flex-wrap"):
+            ui.button(
+                icon="add",
+                text="Add New",
+                on_click=add_new_repository,
+            ).props("flat")
+            ui.button(
+                icon="save",
+                text="Save",
+                on_click=save_edits,
+                color="primary",
+            ).props("flat")
+            ui.button(
+                icon="delete",
+                text="Delete Selected",
+                color="negative",
+            ).props(
+                "flat"
+            ).on_click(lambda: remove_selected())
+            ui.button(
+                icon="update",
+                text="UPDATE ALL",
+                on_click=lambda: update_all_enabled_repos(),
+                color="primary",
+            ).props("flat")
+
+        # AG Grid Table - use remaining space
+        with ui.card().classes("w-full p-4 flex-1"):
+            column_defs = [
+                {"field": "url", "editable": True},
+                {"field": "branch", "editable": True},
+                {"field": "extensions", "editable": True},
+                {
+                    "field": "enabled",
+                    "cellRenderer": "agCheckboxCellRenderer",
+                    "editable": True,
+                },
+            ]
+
+            # Load initial data from config
+            config = load_config()
+            grid_rows = []
+
+            for idx, repo in enumerate(config["repositories"]):
+                ext_text = (
+                    ", ".join(repo["file_extensions"])
+                    if repo.get("file_extensions")
+                    else "None"
+                )
+                grid_rows.append(
+                    {
+                        "id": idx,
+                        "url": repo["url"],
+                        "branch": repo["branch"],
+                        "extensions": ext_text,
+                        "enabled": repo["enabled"],
+                    }
+                )
+
+            grid = (
+                ui.aggrid(
+                    {
+                        "columnDefs": column_defs,
+                        "rowData": grid_rows,
+                        "pagination": True,
+                        "paginationPageSize": 10,
+                        "editType": "fullRow",
+                        "rowSelection": {"mode": "multiRow"},
+                        "domLayout": "normal",
+                        "animateRows": True,
+                        "rowHeight": 40,
+                        "headerHeight": 50,
+                        "responsive": True,
+                        "height": "100%",
+                    }
+                )
+                .classes("w-full h-full")
+                .on("cellValueChanged", handle_cell_edit)
+            )
+
+
+def handle_cell_edit(e):
+    """Handle cell edit events from AG Grid"""
+    try:
+        new_row = e.args["data"]
+        # Update the grid data directly
+        grid.options["rowData"][:] = [
+            row | new_row if row["id"] == new_row["id"] else row
+            for row in grid.options["rowData"]
+        ]
+        grid.update()
+    except Exception as e:
+        print(f"Error handling cell edit: {e}")
