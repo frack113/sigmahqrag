@@ -203,7 +203,7 @@ def initialize_page():
     """Initialize the GitHub repository management page"""
     global grid
 
-    with ui.column().classes("w-full h-screen bg-gray-100"):
+    with ui.column().classes("w-full  bg-gray-100"):
         # Header
         with ui.row().classes("w-full bg-white border-b px-4 py-3 items-center"):
             ui.label("GitHub Repository Management").classes("text-lg font-semibold text-gray-800")

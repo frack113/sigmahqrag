@@ -54,7 +54,7 @@ class ChatPage:
             The root element of the chat page
         """
         # Main container with responsive layout
-        main_container = ui.column().classes("w-full h-screen bg-gray-100")
+        main_container = ui.column().classes("w-full  bg-gray-100")
 
         with main_container:
             # Header

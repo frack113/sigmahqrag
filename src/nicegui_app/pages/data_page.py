@@ -39,17 +39,14 @@ class DataPage:
             The root element of the data page
         """
         # Main container with responsive layout
-        main_container = ui.column().classes("w-full h-screen bg-gray-100")
+        main_container = ui.column().classes("w-full bg-gray-100")
 
         with main_container:
             # Header
             self._render_header()
 
-            # Statistics area - use flex to fill available space
-            self._render_statistics()
-
-            # Repository management area - use flex to fill available space
-            self._render_repository_management()
+            # Statistics and Repository Status side by side
+            self._render_side_by_side_content()
 
         # Load initial data
         asyncio.create_task(self._load_initial_data())
@@ -62,29 +59,33 @@ class DataPage:
         """
         with (
             ui.row()
-            .classes("w-full bg-white border-b px-4 py-3 items-center")
+            .classes("w-full bg-white border-b px-4 py-3 items-center justify-between")
             .style("box-shadow: 0 1px 2px rgba(0,0,0,0.05)")
         ):
-            ui.label("Database Management").classes("text-lg font-semibold text-gray-800")
-
-            # Spacer
-            ui.element("div").classes("flex-1")
-
-            # Update database button
+            # Left side: Update database button
+            with ui.row().classes("items-center gap-2"):
+                ui.button(
+                    icon="cloud_download",
+                    text="Update Database",
+                    on_click=self._update_database,
+                    color="primary",
+                ).props("flat").tooltip("Update knowledge base from GitHub repositories")
+            
+            # Right side: Refresh button
             ui.button(
-                icon="update",
-                text="Update Database",
-                on_click=self._update_database,
-                color="primary",
-            ).props("flat").tooltip("Update knowledge base from GitHub repositories")
+                icon="refresh",
+                text="Refresh",
+                on_click=self._refresh_data,
+                color="secondary",
+            ).props("flat").tooltip("Refresh statistics and repository status")
 
-    def _render_statistics(self):
+    def _render_side_by_side_content(self):
         """
-        Render the statistics display area.
+        Render the statistics and repository status side by side.
         """
-        with ui.column().classes("w-full p-4 gap-4 flex-1"):
+        with ui.row().classes("w-full flex-1 gap-4 p-4"):
             # Database Statistics Card
-            with ui.card().classes("w-full p-4 h-full"):
+            with ui.card().classes("flex-1 p-4"):
                 ui.markdown("### Database Statistics")
                 
                 self.stats_container = ui.column().classes("gap-2")
@@ -93,13 +94,8 @@ class DataPage:
                 with self.stats_container:
                     ui.label("Loading database statistics...").classes("text-sm text-gray-600")
 
-    def _render_repository_management(self):
-        """
-        Render the repository management section.
-        """
-        with ui.column().classes("w-full p-4 gap-4 flex-1"):
             # Repository Status Card
-            with ui.card().classes("w-full p-4 h-full"):
+            with ui.card().classes("flex-1 p-4"):
                 ui.markdown("### Repository Status")
                 
                 self.repo_container = ui.column().classes("gap-2")
@@ -186,6 +182,36 @@ class DataPage:
                             ui.label(f"[{status_text}]").classes(f"text-xs {status_color}")
                 else:
                     ui.label("No repositories configured").classes("text-sm text-gray-500")
+
+    async def _refresh_data(self):
+        """
+        Refresh the statistics and repository status display.
+        """
+        try:
+            # Show refresh notification
+            refresh_notification = ui.notification(
+                message="Refreshing data...",
+                spinner=True,
+                timeout=None
+            )
+            
+            # Load database statistics
+            stats = self.data_service.get_context_stats()
+            self._update_statistics(stats)
+            
+            # Load repository information
+            config_service = ConfigService()
+            repo_config = config_service.get_repositories()
+            self._update_repository_status(repo_config)
+            
+            # Update notification with success
+            refresh_notification.message = "Data refreshed successfully!"
+            refresh_notification.spinner = False
+            await asyncio.sleep(2)
+            refresh_notification.dismiss()
+            
+        except Exception as e:
+            ui.notify(f"Error refreshing data: {str(e)}", type="negative")
 
     async def _update_database(self):
         """
