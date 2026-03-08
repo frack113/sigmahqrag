@@ -1,4 +1,4 @@
 # Initialize the pages package
-from .chat_page import ChatPage
+from .chat_page_simple import SimpleChatPage
 
-__all__ = ["ChatPage"]
+__all__ = ["SimpleChatPage"]

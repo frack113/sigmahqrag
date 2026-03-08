@@ -6,11 +6,11 @@ import sys
 import threading
 import time
 
-from .pages.chat_page import ChatPage
-from .pages.data_page import DataPage
-from .pages.github_repo_page import initialize_page
-from .pages.logs_page import initialize_page as initialize_logs_page
-from .models.logging_service import get_logger
+from nicegui_app.pages.chat_page_simple import SimpleChatPage
+from nicegui_app.pages.data_page import DataPage
+from nicegui_app.pages.github_repo_page import initialize_page
+from nicegui_app.pages.logs_page import initialize_page as initialize_logs_page
+from nicegui_app.models.logging_service import get_logger
 
 logger = get_logger(__name__)
 
@@ -55,7 +55,7 @@ def create_nicegui_app():
     def chat_page():
         """Chat page - main functionality"""
         with ui.column().classes("w-full h-[70vh] p-4"):
-            chat = ChatPage()
+            chat = SimpleChatPage()
             chat.render()
 
     def data_page():
