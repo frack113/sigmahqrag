@@ -97,7 +97,7 @@ class RepositoryService:
 
     def clone_enabled_repositories(self, repo_config: dict[str, Any]) -> bool:
         """
-        Clone enabled repositories into /docs/github and update existing ones.
+        Clone enabled repositories into /data/github and update existing ones.
 
         Args:
             repo_config (Dict[str, Any]): Configuration containing repository URLs
@@ -113,7 +113,7 @@ class RepositoryService:
         try:
             from git import Repo
 
-            docs_github_dir = Path("docs/github")
+            docs_github_dir = Path("data/github")
             docs_github_dir.mkdir(parents=True, exist_ok=True)
 
             success_count = 0

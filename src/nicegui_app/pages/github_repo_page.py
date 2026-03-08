@@ -239,7 +239,7 @@ def initialize_page():
                 color="negative",
             ).props(
                 "flat"
-            ).on_click(lambda: ui.run_task(remove_selected()))
+            ).on_click(lambda: remove_selected())
 
         # AG Grid Table
         with ui.card().classes("w-full p-4"):

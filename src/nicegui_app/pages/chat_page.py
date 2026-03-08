@@ -423,8 +423,13 @@ class ChatPage:
                 self.chat_service = ChatService.import_conversation(conversation_data)
 
                 # Re-render all messages from the loaded conversation
-                for msg in self.chat_service.get_message_history():
-                    self._render_message(msg)
+                # Use ui.timer to ensure we're in the correct context
+                def render_messages():
+                    for msg in self.chat_service.get_message_history():
+                        self._render_message(msg)
+                
+                # Schedule rendering in the main UI thread
+                ui.timer(0.1, render_messages, once=True)
         except Exception as e:
             print(f"Error loading conversation from storage: {e}")
 
