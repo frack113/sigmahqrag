@@ -106,6 +106,18 @@ class DataService:
 
             # Traverse the repository and process files
             processed_count = 0
+            total_files = 0
+            
+            # First, count total files to process
+            for root, _, files in os.walk(repo_dir):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    file_ext = os.path.splitext(file)[1].lower()
+                    if file_ext in file_extensions:
+                        total_files += 1
+
+            self.logger.info(f"Found {total_files} files to process in repository {repo_name}")
+
             for root, _, files in os.walk(repo_dir):
                 for file in files:
                     file_path = os.path.join(root, file)
@@ -116,6 +128,10 @@ class DataService:
                         continue
 
                     try:
+                        # Show progress notification for each file
+                        relative_path = os.path.relpath(file_path, repo_dir)
+                        self.logger.info(f"Processing file: {relative_path}")
+                        
                         # Process the file using FileProcessor
                         content = self.file_processor.process_file(file_path)
                         if content:
@@ -133,6 +149,12 @@ class DataService:
                             # Store the context using RagService
                             self.rag_service.store_context(doc_id, content, metadata)
                             processed_count += 1
+                            
+                            # Log progress
+                            self.logger.info(
+                                f"Successfully processed: {relative_path} "
+                                f"({processed_count}/{total_files})"
+                            )
                     except Exception as e:
                         self.logger.error(f"Error processing file {file_path}: {e}")
                         continue
@@ -145,22 +167,18 @@ class DataService:
             self.logger.error(f"Error indexing repository: {e}")
             return False
 
-    def index_enabled_repositories(self, config_path: str) -> bool:
+    def index_enabled_repositories(self, repo_config: dict[str, Any]) -> bool:
         """
-        Index all enabled repositories from the configuration file.
+        Index all enabled repositories from the configuration.
 
         Args:
-            config_path (str): Path to the GitHub repository configuration file
+            repo_config (Dict[str, Any]): Repository configuration dictionary
 
         Returns:
             bool: True if indexing was successful for at least one repository,
                  False otherwise
         """
         try:
-            # Load configuration from file
-            with open(config_path, encoding="utf-8") as f:
-                repo_config = json.load(f)
-
             repositories = repo_config.get("repositories", [])
             if not repositories:
                 self.logger.warning("No repositories found in configuration.")
