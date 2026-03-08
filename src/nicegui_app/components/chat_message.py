@@ -4,10 +4,11 @@ Component for displaying individual chat messages in the multi-modal chat interf
 Supports both user and assistant messages with optional document previews.
 """
 
-from typing import Optional, Literal
-from nicegui import ui
 from datetime import datetime
+from typing import Literal
+
 import markdown
+from nicegui import ui
 
 MessageRole = Literal["user", "assistant"]
 
@@ -29,8 +30,8 @@ class ChatMessage:
         self,
         role: MessageRole,
         content: str,
-        timestamp: Optional[datetime] = None,
-        document_preview: Optional[str] = None,
+        timestamp: datetime | None = None,
+        document_preview: str | None = None,
         show_timestamp: bool = True,
     ):
         """
@@ -134,7 +135,10 @@ class ChatMessage:
         # Using regex to check for emoji characters
         import re
 
-        emoji_pattern = r"[\U0001F600-\U0001F64F\U0001F300-\U0001F5FF\U0001F680-\U0001F6FF\U0001F1E0-\U0001F1FF\U00002702-\U000027B0\U000024C2-\U0001F251]"
+        emoji_pattern = (
+            r"[\U0001F600-\U0001F64F\U0001F300-\U0001F5FF\U0001F680-\U0001F6FF"
+            r"\U0001F1E0-\U0001F1FF\U00002702-\U000027B0\U000024C2-\U0001F251]"
+        )
         if not re.search(emoji_pattern, emoji):
             raise ValueError(f"Invalid emoji: {emoji}")
 

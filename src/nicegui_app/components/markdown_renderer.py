@@ -4,12 +4,11 @@ Markdown Renderer Component
 Component for rendering markdown content with syntax highlighting and custom styling.
 """
 
-from typing import Optional
-from nicegui import ui
 import markdown
+from nicegui import ui
 from pygments import highlight
-from pygments.lexers import get_lexer_by_name
 from pygments.formatters import HtmlFormatter
+from pygments.lexers import get_lexer_by_name
 from pygments.util import ClassNotFound
 
 
@@ -29,7 +28,7 @@ class MarkdownRenderer:
         content: str,
         theme: str = "monokai",
         show_line_numbers: bool = False,
-        max_width: Optional[int] = None,
+        max_width: int | None = None,
     ):
         """
         Initialize the markdown renderer component.
@@ -111,7 +110,9 @@ class MarkdownRenderer:
         import re
 
         # Pattern to match code blocks with language specification
-        code_block_pattern = r'<pre><code class="language-(\w+)">([\s\S]*?)</code></pre>'
+        code_block_pattern = (
+            r'<pre><code class="language-(\w+)">([\s\S]*?)</code></pre>'
+        )
 
         def replace_code_block(match):
             language = match.group(1)

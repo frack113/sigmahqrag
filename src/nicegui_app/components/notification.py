@@ -1,6 +1,7 @@
 # Notification component for NiceGUI
-from nicegui import ui
 from typing import Literal
+
+from nicegui import ui
 
 
 def notify(

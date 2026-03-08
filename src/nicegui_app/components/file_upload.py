@@ -4,13 +4,15 @@ Simplified file upload component for NiceGUI 3.x compatibility.
 Uses built-in NiceGUI file input with validation and preview generation.
 """
 
-from typing import Optional, List, Callable, Any
-from nicegui import ui
 import base64
-from PIL import Image
 import io
 import os
 import tempfile
+from collections.abc import Callable
+from typing import Any
+
+from nicegui import ui
+from PIL import Image
 
 
 class FileUpload:
@@ -27,7 +29,7 @@ class FileUpload:
 
     def __init__(
         self,
-        allowed_extensions: List[str] = [
+        allowed_extensions: list[str] = [
             ".pdf",
             ".txt",
             ".docx",
@@ -36,8 +38,8 @@ class FileUpload:
             ".jpeg",
         ],
         max_size_mb: int = 10,
-        on_upload: Optional[Callable[[List[str]], None]] = None,
-        on_error: Optional[Callable[[str], None]] = None,
+        on_upload: Callable[[list[str]], None] | None = None,
+        on_error: Callable[[str], None] | None = None,
     ):
         """
         Initialize the file upload component.
@@ -52,7 +54,7 @@ class FileUpload:
         self.max_size_mb = max_size_mb
         self.on_upload = on_upload
         self.on_error = on_error
-        self.uploaded_files: List[str] = []
+        self.uploaded_files: list[str] = []
 
     def render(self):
         """
@@ -75,13 +77,16 @@ class FileUpload:
                 ).classes("bg-blue-600 text-white hover:bg-blue-700")
 
                 # File count display
-                self.file_count = ui.label(f"{len(self.uploaded_files)} file(s) uploaded")
+                file_count_text = f"{len(self.uploaded_files)} file(s) uploaded"
+                self.file_count = ui.label(file_count_text)
                 self.file_count.classes("text-sm text-gray-600")
 
             # File input using NiceGUI's built-in component
-            self.file_input = ui.input(
-                placeholder="Select files..."
-            ).props("type=file multiple accept='*/*'").classes("hidden")
+            self.file_input = (
+                ui.input(placeholder="Select files...")
+                .props("type=file multiple accept='*/*'")
+                .classes("hidden")
+            )
 
             # Upload area with clear instructions
             with ui.column().classes("w-full items-center gap-2"):
@@ -96,7 +101,7 @@ class FileUpload:
                 )
 
             # Event handlers using NiceGUI 3.x patterns
-            self.file_input.on('change', self._handle_file_selection)
+            self.file_input.on("change", self._handle_file_selection)
 
         return container
 
@@ -113,7 +118,7 @@ class FileUpload:
 
         self._process_files(files)
 
-    def _process_files(self, files: List[Any]):
+    def _process_files(self, files: list[Any]):
         """Process uploaded files with validation and preview generation."""
         uploaded_paths = []
 
@@ -141,19 +146,25 @@ class FileUpload:
 
     def _validate_file(self, file_obj: Any) -> bool:
         """Validate file extension and size."""
-        filename = file_obj['name']
+        filename = file_obj["name"]
 
         # Check extension
         ext = os.path.splitext(filename)[1].lower()
         if ext not in self.allowed_extensions:
-            error_msg = f"File type not allowed: {filename}. Allowed types: {', '.join(self.allowed_extensions)}"
+            allowed_types = ", ".join(self.allowed_extensions)
+            error_msg = (
+                f"File type not allowed: {filename}. Allowed types: {allowed_types}"
+            )
             self._call_error(error_msg)
             return False
 
         # Check size
-        file_size_mb = file_obj['size'] / (1024 * 1024)
+        file_size_mb = file_obj["size"] / (1024 * 1024)
         if file_size_mb > self.max_size_mb:
-            error_msg = f"File too large: {filename} ({file_size_mb:.1f}MB). Max size: {self.max_size_mb}MB"
+            error_msg = (
+                f"File too large: {filename} ({file_size_mb:.1f}MB). "
+                f"Max size: {self.max_size_mb}MB"
+            )
             self._call_error(error_msg)
             return False
 
@@ -166,7 +177,7 @@ class FileUpload:
         os.makedirs(upload_dir, exist_ok=True)
 
         # Save file with unique name to prevent collisions
-        filename = file_obj['name']
+        filename = file_obj["name"]
         ext = os.path.splitext(filename)[1].lower()
         import uuid
 
@@ -175,7 +186,7 @@ class FileUpload:
 
         try:
             # Get file content from NiceGUI's file object
-            content = file_obj['content']
+            content = file_obj["content"]
             with open(filepath, "wb") as f:
                 f.write(content)
         except Exception as e:
@@ -186,7 +197,7 @@ class FileUpload:
 
         return filepath
 
-    def _call_upload(self, files: List[str]):
+    def _call_upload(self, files: list[str]):
         """Call upload callback if provided."""
         if self.on_upload:
             self.on_upload(files)
@@ -196,7 +207,7 @@ class FileUpload:
         if self.on_error:
             self.on_error(error)
 
-    def generate_preview(self, file_path: str) -> Optional[str]:
+    def generate_preview(self, file_path: str) -> str | None:
         """
         Generate preview image for supported file types.
 
@@ -233,7 +244,7 @@ class FileUpload:
 
     def _update_file_count(self):
         """Update the file count display."""
-        if hasattr(self, 'file_count'):
+        if hasattr(self, "file_count"):
             self.file_count.set_text(f"{len(self.uploaded_files)} file(s) uploaded")
 
     def clear_uploads(self) -> None:

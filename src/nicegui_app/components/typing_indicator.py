@@ -34,44 +34,62 @@ class TypingIndicator:
 
         with self.container:
             # Create three animated dots using NiceGUI's element
-            self.dot1 = ui.element("div").classes(
-                "w-2 h-2 bg-gray-400 rounded-full"
-            )
-            self.dot2 = ui.element("div").classes(
-                "w-2 h-2 bg-gray-400 rounded-full"
-            )
-            self.dot3 = ui.element("div").classes(
-                "w-2 h-2 bg-gray-400 rounded-full"
-            )
+            self.dot1 = ui.element("div").classes("w-2 h-2 bg-gray-400 rounded-full")
+            self.dot2 = ui.element("div").classes("w-2 h-2 bg-gray-400 rounded-full")
+            self.dot3 = ui.element("div").classes("w-2 h-2 bg-gray-400 rounded-full")
 
         # Add CSS animations using style method
         self._apply_animations()
-        
+
         # Set initial visibility
         self.container.visible = self.visible
-        
+
         return self.container
 
     def _apply_animations(self):
         """Apply CSS animations to the dots."""
         if self.container:
-            # Use CSS-in-JS style for animations
-            self.container.style("""
-                .w-2.h-2.bg-gray-400.rounded-full:nth-child(1) {
-                    animation: typing-bounce 1.4s ease-in-out infinite;
-                    animation-delay: 0s;
-                }
-                .w-2.h-2.bg-gray-400.rounded-full:nth-child(2) {
-                    animation: typing-bounce 1.4s ease-in-out infinite;
-                    animation-delay: 0.2s;
-                }
-                .w-2.h-2.bg-gray-400.rounded-full:nth-child(3) {
-                    animation: typing-bounce 1.4s ease-in-out infinite;
-                    animation-delay: 0.4s;
-                }
-                @keyframes typing-bounce {
-                    0%, 80%, 100% { transform: scale(0); }
-                    40% { transform: scale(1.0); }
+            # Apply individual styles to each dot with inline CSS
+            self.dot1.style(
+                "animation: typing-bounce 1.4s ease-in-out infinite; animation-delay: 0s;"
+            )
+            self.dot2.style(
+                "animation: typing-bounce 1.4s ease-in-out infinite; animation-delay: 0.2s;"
+            )
+            self.dot3.style(
+                "animation: typing-bounce 1.4s ease-in-out infinite; animation-delay: 0.4s;"
+            )
+            self.dot1.style(
+                "animation: typing-bounce 1.4s ease-in-out infinite; animation-delay: 0s;"
+            )
+            self.dot2.style(
+                "animation: typing-bounce 1.4s ease-in-out infinite; animation-delay: 0.2s;"
+            )
+            self.dot3.style(
+                "animation: typing-bounce 1.4s ease-in-out infinite; animation-delay: 0.4s;"
+            )
+            self.dot1.style(
+                "animation: typing-bounce 1.4s ease-in-out infinite; animation-delay: 0s;"
+            )
+            self.dot2.style(
+                "animation: typing-bounce 1.4s ease-in-out infinite; animation-delay: 0.2s;"
+            )
+            self.dot3.style(
+                "animation: typing-bounce 1.4s ease-in-out infinite; animation-delay: 0.4s;"
+            )
+
+            # Add global keyframes using JavaScript
+            ui.run_javascript("""
+                if (!document.getElementById('typing-animations')) {
+                    const style = document.createElement('style');
+                    style.id = 'typing-animations';
+                    style.textContent = `
+                        @keyframes typing-bounce {
+                            0%, 80%, 100% { transform: scale(0); }
+                            40% { transform: scale(1.0); }
+                        }
+                    `;
+                    document.head.appendChild(style);
                 }
             """)
 

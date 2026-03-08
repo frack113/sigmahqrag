@@ -8,18 +8,17 @@ Main chat interface page that integrates all components:
 - Real-time updates
 """
 
-from nicegui import ui
-from typing import Optional, List
 import asyncio
-from datetime import datetime
+
+from nicegui import ui
 
 # Import local components and services
 from ..components.chat_message import ChatMessage
-from ..components.file_upload import FileUpload
 from ..components.typing_indicator import TypingIndicator
-from ..models.chat_service import ChatService, ChatMessage as ChatMessageData
-from ..models.data_service import DataService
+from ..models.chat_service import ChatMessage as ChatMessageData
+from ..models.chat_service import ChatService
 from ..models.config_service import ConfigService
+from ..models.data_service import DataService
 
 
 class ChatPage:
@@ -34,7 +33,6 @@ class ChatPage:
         typing_indicator: Optional typing indicator element
         loading_spinner: Optional loading spinner element
         confirm_dialog: Optional confirmation dialog element
-        file_upload_component: File upload component
         conversation_key: Key for localStorage storage
     """
 
@@ -46,7 +44,6 @@ class ChatPage:
         self.typing_indicator = None
         self.loading_spinner = None
         self.confirm_dialog = None
-        self.file_upload_component = None
         self.conversation_key = "sigmahq_chat_history"
 
     def render(self):
@@ -68,11 +65,6 @@ class ChatPage:
                 "flex-1 overflow-y-auto p-4 gap-4 min-h-0"
             )
 
-            # File upload component
-            self.file_upload_component = FileUpload(
-                on_upload=self._handle_file_upload, on_error=self._handle_upload_error
-            )
-
             # Input area
             self._render_input_area()
 
@@ -90,9 +82,7 @@ class ChatPage:
             .classes("w-full bg-white border-b px-4 py-3 items-center")
             .style("box-shadow: 0 1px 2px rgba(0,0,0,0.05)")
         ):
-            ui.label("SigmaHQ Chat").classes(
-                "text-lg font-semibold text-gray-800"
-            )
+            ui.label("SigmaHQ Chat").classes("text-lg font-semibold text-gray-800")
 
             # Spacer
             ui.element("div").classes("flex-1")
@@ -101,7 +91,9 @@ class ChatPage:
             ui.button(
                 icon="delete_sweep",
                 on_click=self._clear_chat_history,
-            ).props("flat").tooltip("Clear chat history")
+            ).props(
+                "flat"
+            ).tooltip("Clear chat history")
 
             # Update database button
             ui.button(
@@ -119,9 +111,6 @@ class ChatPage:
             .classes("w-full bg-white border-t px-4 py-3 gap-3")
             .style("box-shadow: 0 -1px 2px rgba(0,0,0,0.05)")
         ):
-            # File upload button
-            with ui.row().classes("gap-2"):
-                self.file_upload_component.render()
 
             # Text input
             text_input = (
@@ -134,7 +123,7 @@ class ChatPage:
             )
 
             # Handle Enter key press using NiceGUI 3.x pattern
-            text_input.on('keydown', self._handle_key_press)
+            text_input.on("keydown", self._handle_key_press)
 
             # Send button
             send_button = ui.button(
@@ -152,64 +141,25 @@ class ChatPage:
         Args:
             e: Key press event
         """
-        if e.key == "Enter" and not e.shift_key:
+        # Check if this is an Enter key press without shift
+        if (
+            hasattr(e, "key")
+            and e.key == "Enter"
+            and not getattr(e, "shift_key", False)
+        ):
             # Get the input element from the event
             input_element = e.sender
             self._send_message(input_element.value)
-
-    def _handle_file_upload(self, file_paths: List[str]):
-        """
-        Handle successful file uploads.
-
-        Args:
-            file_paths: List of paths to uploaded files
-        """
-        ui.notify(f"Uploaded {len(file_paths)} file(s)")
-
-        # Process each file and add to chat
-        for file_path in file_paths:
-            try:
-                # Add user message with document reference
-                user_msg = self.chat_service.add_message(
-                    "user", f"Uploaded: {file_path}", document_path=file_path
-                )
-
-                # Process the document and get preview
-                doc_content, preview = self.chat_service.process_document(file_path)
-
-                # Update message with document content info
-                user_msg.content = f"Uploaded: {file_path}\n\nDocument contains {len(doc_content.split()):,} words"
-
-                # Render the message with preview
-                self._render_message(user_msg, document_preview=preview)
-
-                # Store context for RAG
-                doc_id = f"doc_{datetime.now().timestamp()}"
-                self.data_service.store_context(
-                    doc_id,
-                    doc_content,
-                    {
-                        "filename": file_path.split("/")[-1],
-                        "upload_time": datetime.now().isoformat(),
-                        "word_count": len(doc_content.split()),
-                    },
-                )
-
-            except Exception as e:
-                self._handle_upload_error(str(e))
-
-    def _handle_upload_error(self, error: str):
-        """
-        Handle upload errors with user notification.
-
-        Args:
-            error: Error message
-        """
-        ui.notify(error, type="negative")
+        elif hasattr(e, "key") and e.key == "Enter":
+            # If shift is pressed, don't send message (allow new line)
+            pass
+        else:
+            # Handle other key presses if needed
+            pass
 
     async def _send_message(self, message_text: str):
         """
-        Send a message and get assistant response.
+        Send a message and get assistant response with streaming.
 
         Args:
             message_text: The user's message text
@@ -223,23 +173,41 @@ class ChatPage:
             # Show typing indicator
             self._show_typing_indicator()
 
-            # Process the chat turn (user input + any uploaded files)
-            user_message, assistant_message = await self.chat_service.process_chat_turn(
-                message_text,
-                file_paths=(
-                    self.file_upload_component.uploaded_files
-                    if hasattr(self.file_upload_component, "uploaded_files")
-                    else None
-                ),
-            )
-
-            # Clear uploaded files after processing
-            if hasattr(self.file_upload_component, "clear_uploads"):
-                self.file_upload_component.clear_uploads()
-
-            # Render messages
+            # Add user message to chat
+            user_message = self.chat_service.add_message("user", message_text)
             self._render_message(user_message)
-            self._render_message(assistant_message, role="assistant")
+
+            # Get assistant response with streaming
+            assistant_response = ""
+            response_message = None
+
+            # Create a placeholder for the assistant message
+            with self.message_container:
+                response_message = ui.chat_message(name="Bot", sent=False)
+                spinner = ui.spinner(type="dots")
+
+            # Get streaming response from LLM
+            llm_service = self.chat_service.llm_service
+            async for chunk in llm_service.generate_streaming_response(
+                message_text,
+            ):
+                assistant_response += chunk
+                if response_message:
+                    with response_message.clear():
+                        # Convert markdown to HTML for rendering
+                        html_content = llm_service.convert_markdown_to_html(
+                            assistant_response
+                        )
+                        ui.html(html_content, sanitize=True)
+                    # Scroll to bottom after each update
+                    ui.run_javascript("window.scrollTo(0, document.body.scrollHeight)")
+
+            # Remove spinner when done
+            if response_message and spinner:
+                self.message_container.remove(spinner)
+
+            # Create final assistant message
+            self.chat_service.add_message("assistant", assistant_response)
 
         except Exception as e:
             error_msg = f"Error processing message: {str(e)}"
@@ -280,8 +248,8 @@ class ChatPage:
     def _render_message(
         self,
         message: ChatMessageData,
-        role: Optional[str] = None,
-        document_preview: Optional[str] = None,
+        role: str | None = None,
+        document_preview: str | None = None,
     ):
         """
         Render a chat message in the UI.
@@ -395,7 +363,7 @@ class ChatPage:
             ui.notify(error_msg, type="negative")
 
     def load_initial_messages(
-        self, initial_messages: Optional[List[ChatMessageData]] = None
+        self, initial_messages: list[ChatMessageData] | None = None
     ):
         """
         Load initial messages into the chat (e.g., welcome message).

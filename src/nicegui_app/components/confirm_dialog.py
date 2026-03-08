@@ -4,7 +4,8 @@ Confirm Dialog Component
 Component for displaying confirmation dialogs with custom messages and actions.
 """
 
-from typing import Optional, Callable
+from collections.abc import Callable
+
 from nicegui import ui
 
 
@@ -27,8 +28,8 @@ class ConfirmDialog:
         message: str = "Are you sure?",
         confirm_text: str = "Confirm",
         cancel_text: str = "Cancel",
-        on_confirm: Optional[Callable] = None,
-        on_cancel: Optional[Callable] = None,
+        on_confirm: Callable | None = None,
+        on_cancel: Callable | None = None,
     ):
         """
         Initialize the confirm dialog component.
@@ -117,7 +118,7 @@ class ConfirmDialog:
         if self.dialog:
             # Find and update the message label
             for child in self.dialog.children:
-                if hasattr(child, 'text'):
+                if hasattr(child, "text"):
                     child.text = message
 
     def update_title(self, title: str) -> None:
@@ -131,5 +132,5 @@ class ConfirmDialog:
         if self.dialog:
             # Find and update the title label
             for child in self.dialog.children:
-                if hasattr(child, 'text'):
+                if hasattr(child, "text"):
                     child.text = title

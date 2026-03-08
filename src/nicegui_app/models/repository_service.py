@@ -1,7 +1,7 @@
 # Repository Service for NiceGUI - GitHub repository management
 import logging
-from typing import Dict, Any, List
 from pathlib import Path
+from typing import Any
 
 
 class RepositoryService:
@@ -18,7 +18,7 @@ class RepositoryService:
 
         # Import GitPython for repository operations
         try:
-            import git
+            import git  # noqa: F401
 
             self.GITPYTHON_AVAILABLE = True
         except ImportError as e:
@@ -26,13 +26,14 @@ class RepositoryService:
             self.GITPYTHON_AVAILABLE = False
 
     def fetch_github_repositories(
-        self, repo_config: Dict[str, Any]
-    ) -> List[Dict[str, Any]]:
+        self, repo_config: dict[str, Any]
+    ) -> list[dict[str, Any]]:
         """
         Fetch GitHub repositories based on the provided configuration.
 
         Args:
-            repo_config (Dict[str, Any]): Configuration containing repository URLs and branches.
+            repo_config (Dict[str, Any]): Configuration containing repository URLs
+                and branches.
 
         Returns:
             List[Dict[str, Any]]: List of fetched repositories with metadata.
@@ -94,12 +95,13 @@ class RepositoryService:
 
         return repositories
 
-    def clone_enabled_repositories(self, repo_config: Dict[str, Any]) -> bool:
+    def clone_enabled_repositories(self, repo_config: dict[str, Any]) -> bool:
         """
         Clone enabled repositories into /docs/github and update existing ones.
 
         Args:
-            repo_config (Dict[str, Any]): Configuration containing repository URLs and branches.
+            repo_config (Dict[str, Any]): Configuration containing repository URLs
+                and branches.
 
         Returns:
             bool: True if cloning was successful, False otherwise.
@@ -163,8 +165,8 @@ class RepositoryService:
 
             if success_count > 0:
                 self.logger.info(
-                    f"Repository update completed. "
-                    f"Successfully processed {success_count}/{total_repos} enabled repositories."
+                    f"Repository update completed. Successfully processed "
+                    f"{success_count}/{total_repos} enabled repositories."
                 )
                 return True
             else:

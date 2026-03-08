@@ -4,9 +4,10 @@ Chat Service Layer
 Handles message history management and conversation state.
 """
 
-from typing import List, Dict, Any, Optional, Tuple
-from datetime import datetime
 import logging
+from datetime import datetime
+from typing import Any
+
 import markdown
 
 
@@ -16,7 +17,7 @@ class ChatMessage:
 
     Attributes:
         id: Unique identifier for the message
-        role: Either 'user' or 'assistant'
+        role: Either 'user', 'assistant', or 'system'
         content: Text content of the message
         timestamp: When the message was created
         document_path: Optional path to uploaded document
@@ -27,11 +28,11 @@ class ChatMessage:
         self,
         role: str,
         content: str,
-        document_path: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        document_path: str | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> None:
-        if role not in ("user", "assistant"):
-            raise ValueError("Role must be either 'user' or 'assistant'")
+        if role not in ("user", "assistant", "system"):
+            raise ValueError("Role must be either 'user', 'assistant', or 'system'")
 
         self.id = str(datetime.now().timestamp()) + f"_{hash(content) % 1000}"
         self.role = role
@@ -55,12 +56,12 @@ class ChatService:
         if max_history <= 0:
             raise ValueError("max_history must be a positive integer")
 
-        self.message_history: List[ChatMessage] = []
+        self.message_history: list[ChatMessage] = []
         self.max_history = max_history
         self.logger = logging.getLogger(__name__)
 
     def add_message(
-        self, role: str, content: str, document_path: Optional[str] = None
+        self, role: str, content: str, document_path: str | None = None
     ) -> ChatMessage:
         """
         Add a message to the conversation history.
@@ -82,7 +83,7 @@ class ChatService:
 
         return message
 
-    def get_message_history(self, limit: Optional[int] = None) -> List[ChatMessage]:
+    def get_message_history(self, limit: int | None = None) -> list[ChatMessage]:
         """
         Get the conversation history.
 
@@ -100,7 +101,7 @@ class ChatService:
         """Clear the entire conversation history."""
         self.message_history = []
 
-    def export_conversation(self) -> Dict[str, Any]:
+    def export_conversation(self) -> dict[str, Any]:
         """
         Export the entire conversation history as a dictionary.
 
@@ -128,7 +129,7 @@ class ChatService:
         }
 
     @classmethod
-    def import_conversation(cls, data: Dict[str, Any]) -> "ChatService":
+    def import_conversation(cls, data: dict[str, Any]) -> "ChatService":
         """
         Import conversation from exported data.
 
@@ -162,7 +163,7 @@ class ChatService:
 
         return service
 
-    def process_document(self, file_path: str) -> Tuple[str, Optional[str]]:
+    def process_document(self, file_path: str) -> tuple[str, str | None]:
         """
         Process a document file and extract its content.
 
@@ -191,29 +192,3 @@ class ChatService:
 
         return content, preview
 
-    def convert_markdown_to_html(self, markdown_text: str) -> str:
-        """
-        Convert markdown text to HTML.
-
-        Args:
-            markdown_text: Markdown-formatted text
-
-        Returns:
-            HTML-formatted text
-        """
-        try:
-            # Convert markdown to HTML
-            html = markdown.markdown(
-                markdown_text,
-                extensions=[
-                    "extra",
-                    "codehilite",
-                    "fenced_code",
-                    "tables",
-                    "toc",
-                ],
-            )
-            return html
-        except Exception as e:
-            self.logger.error(f"Error converting markdown to HTML: {e}")
-            return markdown_text

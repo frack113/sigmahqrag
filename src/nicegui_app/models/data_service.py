@@ -2,10 +2,10 @@
 Data Service for NiceGUI - Orchestrates RAG, Repository, and File Processing services
 """
 
+import json
 import logging
 import os
-import json
-from typing import Optional, Dict, Any, List
+from typing import Any
 
 
 class DataService:
@@ -28,15 +28,15 @@ class DataService:
         self.logger = logging.getLogger(__name__)
 
         # Initialize sub-services
+        from .file_processor import FileProcessor
         from .rag_service import RagService
         from .repository_service import RepositoryService
-        from .file_processor import FileProcessor
 
         self.rag_service = RagService(embedding_model_name=embedding_model_name)
         self.repository_service = RepositoryService()
         self.file_processor = FileProcessor()
 
-    def get_data(self, key: str) -> Optional[Dict[str, Any]]:
+    def get_data(self, key: str) -> dict[str, Any] | None:
         """
         Retrieve data for the given key.
 
@@ -51,7 +51,7 @@ class DataService:
         self.logger.info(f"Retrieving data for key: {key}")
         return None
 
-    def save_data(self, key: str, data: Dict[str, Any]) -> bool:
+    def save_data(self, key: str, data: dict[str, Any]) -> bool:
         """
         Save the given data for the specified key.
 
@@ -67,7 +67,7 @@ class DataService:
         self.logger.info(f"Saving data for key: {key}")
         return True
 
-    def index_repository(self, repo_config: Dict[str, Any]) -> bool:
+    def index_repository(self, repo_config: dict[str, Any]) -> bool:
         """
         Index a repository by processing files based on allowed extensions.
 
@@ -158,7 +158,7 @@ class DataService:
         """
         try:
             # Load configuration from file
-            with open(config_path, "r", encoding="utf-8") as f:
+            with open(config_path, encoding="utf-8") as f:
                 repo_config = json.load(f)
 
             repositories = repo_config.get("repositories", [])
@@ -183,7 +183,8 @@ class DataService:
             if success_count > 0:
                 self.logger.info(
                     f"Indexing completed. "
-                    f"Successfully indexed {success_count}/{total_repos} enabled repositories."
+                    f"Successfully indexed {success_count}/{total_repos} "
+                    f"enabled repositories."
                 )
                 return True
             else:
@@ -198,16 +199,16 @@ class DataService:
     # --- Delegated methods for backward compatibility ---
 
     def fetch_github_repositories(
-        self, repo_config: Dict[str, Any]
-    ) -> List[Dict[str, Any]]:
+        self, repo_config: dict[str, Any]
+    ) -> list[dict[str, Any]]:
         """Delegate to RepositoryService."""
         return self.repository_service.fetch_github_repositories(repo_config)
 
-    def clone_enabled_repositories(self, repo_config: Dict[str, Any]) -> bool:
+    def clone_enabled_repositories(self, repo_config: dict[str, Any]) -> bool:
         """Delegate to RepositoryService."""
         return self.repository_service.clone_enabled_repositories(repo_config)
 
-    def generate_embeddings(self, texts: List[str]) -> List[List[float]]:
+    def generate_embeddings(self, texts: list[str]) -> list[list[float]]:
         """Delegate to RagService."""
         return self.rag_service.generate_embeddings(texts)
 
@@ -215,14 +216,14 @@ class DataService:
         self,
         document_id: str,
         text_content: str,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> bool:
         """Delegate to RagService."""
         return self.rag_service.store_context(document_id, text_content, metadata)
 
     def retrieve_context(
         self, query: str, n_results: int = 5, min_relevance_score: float = 0.3
-    ) -> tuple[List[str], List[Dict[str, Any]]]:
+    ) -> tuple[list[str], list[dict[str, Any]]]:
         """Delegate to RagService."""
         return self.rag_service.retrieve_context(query, n_results, min_relevance_score)
 
@@ -230,7 +231,7 @@ class DataService:
         """Delegate to RagService."""
         return self.rag_service.clear_context()
 
-    def get_context_stats(self) -> Dict[str, Any]:
+    def get_context_stats(self) -> dict[str, Any]:
         """Delegate to RagService."""
         return self.rag_service.get_context_stats()
 

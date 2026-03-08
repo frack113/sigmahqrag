@@ -1,5 +1,6 @@
 # NiceGUI Application
 from nicegui import ui
+
 from .pages.chat_page import ChatPage
 from .pages.github_repo_page import initialize_page
 

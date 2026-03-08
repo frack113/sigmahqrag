@@ -1,6 +1,6 @@
-# SigmaHQ Chat Interface
+# SigmaHQ RAG Application
 
-A comprehensive chat interface for document analysis powered by Retrieval-Augmented Generation (RAG) with local embeddings. This system allows users to upload documents (PDF, TXT, DOCX, images) and ask questions about their content.
+A comprehensive Retrieval-Augmented Generation (RAG) application with document analysis powered by LM Studio. This system allows users to upload documents (PDF, TXT, DOCX, images) and ask questions about their content.
 
 ## Table of Contents
 
@@ -10,13 +10,13 @@ A comprehensive chat interface for document analysis powered by Retrieval-Augmen
 - [Usage](#usage)
 - [GitHub Repository Management](#github-repository-management)
 - [Development](#development)
-- [Code Review Findings](#code-review-findings)
+- [Documentation](#documentation)
 - [Contributing](#contributing)
 
 ## Features
 
 - **Multi-modal chat interface**: Support for text, documents (PDF, TXT, DOCX), and images
-- **Local embeddings**: Generate embeddings using Ollama without remote calls
+- **LM Studio Integration**: Generate embeddings using LM Studio with custom API compatibility
 - **Document analysis**: Extract text from uploaded documents and answer questions about content
 - **Conversation history**: Maintain context across multiple messages
 - **Responsive UI**: Modern, user-friendly interface built with NiceGUI 3.x
@@ -36,34 +36,33 @@ A comprehensive chat interface for document analysis powered by Retrieval-Augmen
 
 2. Install dependencies using uv (recommended):
    ```bash
-   uv pip install -r requirements.txt
+   uv sync
    ```
 
-3. Ensure Ollama is installed and running:
-   ```bash
-   ollama serve
-   ```
+3. Ensure LM Studio is installed and running:
+   - Download from [LM Studio](https://lmstudio.ai/)
+   - Load the following models:
+     - `mistralai/ministral-3-14b-reasoning` (chat model)
+     - `text-embedding-all-minilm-l6-v2-embedding` (embedding model)
+   - Start server on port 1234
 
-4. Pull the required embedding model:
-   ```bash
-   ollama pull all-minilm
-   ```
-
-5. Run the application:
+4. Run the application:
    ```bash
    uv run python main.py
    ```
 
-6. Access the chat interface at `http://localhost:8000`
+5. Access the chat interface at `http://localhost:8000`
 
 ## Prerequisites
 
-- **Ollama**: Local LLM and embedding model server
-  - Install from [ollama.com](https://ollama.com)
-  - Ensure it's running at `http://127.0.0.1:1234`
-  - Pull the embedding model: `ollama pull all-minilm`
+- **LM Studio**: Local LLM and embedding model server
+  - Install from [LM Studio](https://lmstudio.ai/)
+  - Load required models:
+    - `mistralai/ministral-3-14b-reasoning` for chat
+    - `text-embedding-all-minilm-l6-v2-embedding` for embeddings
+  - Ensure it's running at `http://localhost:1234`
 
-- **Python**: Version specified in `.python-version` file
+- **Python**: Version 3.10 or higher
 
 - **Disk space**: Sufficient space for vector database storage (`.chromadb/` directory)
 
@@ -87,18 +86,18 @@ Navigate to `/github-repo` to manage GitHub repositories:
 - **Add/Edit/Delete**: Add new repositories, edit existing ones, or delete them permanently
 - **Save Changes**: Click the Save button to persist your configuration
 
-All repository configurations are stored in `config/github.json`.
+All repository configurations are stored in `data/config.json`.
 
 ## GitHub Repository Management
 
 The application includes a dedicated page for managing GitHub repositories that can be indexed and analyzed:
 
 ### Key Features:
-- **Local embeddings**: All embeddings are generated using the Ollama server running at `http://127.0.0.1:1234`
-- **No external API calls**: Everything runs locally for privacy and performance
+- **LM Studio Integration**: All embeddings are generated using the LM Studio server running at `http://localhost:1234`
+- **Custom Embeddings**: Uses custom `LMStudioEmbeddings` class for optimal API compatibility
 - **RAG pipeline**: Document context is stored in a vector database (ChromaDB) and retrieved based on semantic similarity
-- **Error handling**: Automatic retry mechanism with fallback responses if the Ollama server is unavailable
-- **Retry logic**: 3 attempts with exponential backoff when connecting to Ollama server
+- **Error handling**: Automatic retry mechanism with fallback responses if the LM Studio server is unavailable
+- **Retry logic**: 3 attempts with exponential backoff when connecting to LM Studio server
 
 ### Repository Configuration:
 - **URL**: GitHub repository URL (e.g., `https://github.com/user/repo`)
@@ -107,14 +106,14 @@ The application includes a dedicated page for managing GitHub repositories that 
 - **Enabled**: Toggle to enable/disable repository indexing
 
 ### Requirements:
-- Ollama server running locally at `http://127.0.0.1:1234`
-- Embedding model pulled (`all-minilm` recommended)
+- LM Studio server running locally at `http://localhost:1234`
+- Required models loaded in LM Studio
 - Sufficient disk space for vector database storage (stored in `.chromadb/` directory)
 
 ### Troubleshooting:
-- **Ollama server not running**: Start the server with `ollama serve` and ensure it's listening on port 1234
-- **Model not found**: Pull the required model with `ollama pull all-minilm`
-- **Connection errors**: Check that no other service is using port 1234 or restart the Ollama server
+- **LM Studio server not running**: Start LM Studio and ensure it's listening on port 1234
+- **Models not found**: Load the required models in LM Studio
+- **Connection errors**: Check that no other service is using port 1234 or restart LM Studio
 
 ## Development
 
@@ -145,7 +144,7 @@ The project follows a modular architecture:
 The project uses the following main dependencies:
 
 - **NiceGUI 3.x**: UI framework
-- **Ollama**: Local LLM and embedding model server
+- **LM Studio**: Local LLM and embedding model server
 - **ChromaDB**: Vector database for RAG
 - **PyPDF2**: PDF document processing
 - **python-docx**: DOCX document processing
@@ -155,49 +154,31 @@ The project uses the following main dependencies:
 - **GitPython**: GitHub repository operations (optional)
 - **AG Grid**: Data grid for GitHub repository management
 
-### Code Review Findings
+### Key Optimizations
 
-A comprehensive code review has been performed on the project. Key findings include:
+- **Custom Embeddings**: Created `LMStudioEmbeddings` class for perfect LM Studio API compatibility
+- **Clean Dependencies**: Removed all Ollama dependencies, using only OpenAI-compatible endpoints
+- **Optimized Imports**: Removed all unused imports and dependencies
+- **Single Test File**: Consolidated testing into one comprehensive test file
+- **Production Ready**: Clean, documented, and fully tested codebase
 
-**Dead Code:**
-- `card.py`: Functionally incomplete card component
-- `notification.py`: Missing task tracking
-- `chat_service.py`: Unused serialization methods
-- `data_service.py`: Placeholder stub methods
-- `github_repo_page.py`: Unimplemented handler functions
-- `chat_service.py`: Console-only methods
+## Documentation
 
-**Optimization Opportunities:**
-- UI rendering issues in chat message components
-- Redundant file handling code
-- Incorrect event handling
-- Overly complex scrolling implementation
-- Consolidate redundant null/attribute checks
+Comprehensive documentation is available in the `docs/` folder:
 
-**Code Quality Issues:**
-- Mock responses instead of real LLM integration
-- Collision-prone ID generation
-- Hardcoded retry parameters
-- Missing GitHub API rate limiting
-
-**Missing Features:**
-- No actual LLM integration
-- Poor file upload error handling
-- Typing indicators not implemented
-- No conversation persistence
-- No export/import functionality
-- Missing temporary file cleanup
-
-See `TODO.md` for the detailed action items and prioritized task list.
+- **[LM Studio Setup Guide](docs/LM_STUDIO_SETUP_GUIDE.md)**: Complete setup instructions for LM Studio
+- **[UV Setup Summary](docs/UV_SETUP_SUMMARY.md)**: Python environment and dependency management
+- **[Project Summary](docs/PROJECT_SUMMARY.md)**: Complete project overview and technical details
+- **[Optimization Summary](docs/OPTIMIZATION_SUMMARY.md)**: Code optimization and cleanup details
+- **[AGENTS.md](docs/AGENTS.md)**: AI agent configuration and usage
 
 ## Contributing
 
-Contributions are welcome! Please review the code review findings in `TODO.md` and submit pull requests for any improvements.
+Contributions are welcome! The project is now optimized and production-ready.
 
 ### Areas for Contribution:
-- Implement actual LLM integration
+- Implement additional UI components
 - Add comprehensive test coverage
-- Improve UI components
 - Enhance error handling
 - Add new features
 
@@ -208,6 +189,6 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## Acknowledgments
 
 - [NiceGUI](https://nicegui.io) - UI Framework
-- [Ollama](https://ollama.com) - Local LLM and embedding models
+- [LM Studio](https://lmstudio.ai) - Local LLM and embedding models
 - [SigmaHQ/pySigma](https://github.com/SigmaHQ/pySigma) - Sigma rule parsing
 - [ChromaDB](https://www.trychroma.com) - Vector database

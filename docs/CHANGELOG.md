@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-03-08
+
+### Added
+- **LM Studio Integration**: Complete migration from Ollama to LM Studio with custom API compatibility
+- **Custom Embeddings**: Created `LMStudioEmbeddings` class for perfect LM Studio API compatibility
+- **Optimized Dependencies**: Removed all Ollama dependencies, using only OpenAI-compatible endpoints
+- **Comprehensive Testing**: All 4/4 tests passing with custom embeddings working perfectly
+- **Code Optimization**: Removed all unused imports and redundant test files
+- **Documentation**: Complete project documentation moved to docs folder
+
+### Fixed
+- **Embedding API Issues**: Resolved LangChain formatting issues with LM Studio by creating custom embedding wrapper
+- **Import Cleanup**: Removed unused `OpenAIEmbeddings` imports from core services
+- **Test Consolidation**: Consolidated multiple test files into single comprehensive test
+- **Project Structure**: Organized documentation files into proper docs folder structure
+
+### Changed
+- **Dependencies**: Updated pyproject.toml to use only OpenAI-compatible dependencies
+- **README.md**: Updated to reflect current LM Studio integration and optimized project state
+- **Documentation Structure**: Moved all documentation files to docs/ folder for better organization
+- **Performance**: Optimized codebase for better performance and cleaner architecture
+
 ## [0.2.0] - 2026-03-02
 
 ### Fixed

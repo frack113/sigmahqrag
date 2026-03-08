@@ -4,18 +4,17 @@ Document Processor for NiceGUI
 Handles processing of different file formats including PDF, images, DOCX, and text files.
 """
 
-from typing import Tuple, Optional
-import logging
-import os
 import base64
 import io
+import logging
+import os
 
 # Import document processing libraries
 try:
-    from pypdf import PdfReader
     import docx
-    from PIL import Image
     import easyocr  # For OCR if needed
+    from PIL import Image
+    from pypdf import PdfReader
 except ImportError as e:
     print(f"Warning: Some document processing libraries not available: {e}")
 
@@ -35,7 +34,7 @@ class DocumentProcessor:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
 
-    def process_file(self, file_path: str) -> Tuple[str, Optional[str]]:
+    def process_file(self, file_path: str) -> tuple[str, str | None]:
         """
         Process an uploaded document and extract text content.
 
@@ -70,7 +69,7 @@ class DocumentProcessor:
             self.logger.error(error_msg)
             raise
 
-    def _process_pdf(self, file_path: str) -> Tuple[str, Optional[str]]:
+    def _process_pdf(self, file_path: str) -> tuple[str, str | None]:
         """
         Process PDF file and extract text with optional first page preview.
 
@@ -116,7 +115,7 @@ class DocumentProcessor:
 
         return extracted_text, preview_base64
 
-    def _process_image(self, file_path: str) -> Tuple[str, Optional[str]]:
+    def _process_image(self, file_path: str) -> tuple[str, str | None]:
         """
         Process image file and extract text using OCR.
 
@@ -186,7 +185,7 @@ class DocumentProcessor:
 
         return extracted_text
 
-    def _process_txt(self, file_path: str) -> Tuple[str, Optional[str]]:
+    def _process_txt(self, file_path: str) -> tuple[str, str | None]:
         """
         Process text file and extract content.
 
@@ -197,7 +196,7 @@ class DocumentProcessor:
             Tuple of (extracted_text, None).
         """
         try:
-            with open(file_path, "r", encoding="utf-8") as f:
+            with open(file_path, encoding="utf-8") as f:
                 extracted_text = f.read()
             return extracted_text, None
         except Exception as e:

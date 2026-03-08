@@ -6,23 +6,24 @@ Handles loading, saving, and updating configuration from a single source of trut
 """
 
 import json
-from pathlib import Path
-from typing import List, Optional
 from dataclasses import dataclass
+from pathlib import Path
 
 
 @dataclass
 class RepositoryConfig:
     """Configuration for a single repository."""
+
     url: str
     branch: str
     enabled: bool
-    file_extensions: List[str]
+    file_extensions: list[str]
 
 
 @dataclass
 class LLMConfig:
     """Configuration for LLM settings."""
+
     model: str
     temperature: float
     max_tokens: int
@@ -47,8 +48,8 @@ class ConfigService:
             config_path: Path to the configuration file
         """
         self.config_path = Path(config_path)
-        self.repositories: List[RepositoryConfig] = []
-        self.llm_config: Optional[LLMConfig] = None
+        self.repositories: list[RepositoryConfig] = []
+        self.llm_config: LLMConfig | None = None
         self._load_config()
 
     def _load_config(self) -> None:
@@ -59,7 +60,7 @@ class ConfigService:
             return
 
         try:
-            with open(self.config_path, "r", encoding="utf-8") as f:
+            with open(self.config_path, encoding="utf-8") as f:
                 config_data = json.load(f)
 
             # Load repositories
@@ -97,7 +98,7 @@ class ConfigService:
                 "temperature": 0.7,
                 "max_tokens": 1000,
                 "base_url": "http://127.0.0.1:1234",
-            }
+            },
         }
 
         self.config_path.parent.mkdir(parents=True, exist_ok=True)
@@ -148,7 +149,7 @@ class ConfigService:
             print(f"Error saving configuration: {e}")
             return False
 
-    def update_repositories(self, repositories: List[RepositoryConfig]) -> bool:
+    def update_repositories(self, repositories: list[RepositoryConfig]) -> bool:
         """
         Update repository configurations.
 
@@ -184,7 +185,7 @@ class ConfigService:
             print(f"Error updating LLM config: {e}")
             return False
 
-    def get_repositories(self) -> List[RepositoryConfig]:
+    def get_repositories(self) -> list[RepositoryConfig]:
         """
         Get current repository configurations.
 
@@ -193,7 +194,7 @@ class ConfigService:
         """
         return self.repositories.copy()
 
-    def get_enabled_repositories(self) -> List[RepositoryConfig]:
+    def get_enabled_repositories(self) -> list[RepositoryConfig]:
         """
         Get only enabled repository configurations.
 
@@ -202,7 +203,7 @@ class ConfigService:
         """
         return [repo for repo in self.repositories if repo.enabled]
 
-    def get_llm_config(self) -> Optional[LLMConfig]:
+    def get_llm_config(self) -> LLMConfig | None:
         """
         Get current LLM configuration.
 
@@ -216,7 +217,7 @@ class ConfigService:
         url: str,
         branch: str,
         enabled: bool = True,
-        file_extensions: Optional[List[str]] = None,
+        file_extensions: list[str] | None = None,
     ) -> bool:
         """
         Add a new repository configuration.
@@ -270,7 +271,7 @@ class ConfigService:
         url: str,
         branch: str,
         enabled: bool,
-        file_extensions: Optional[List[str]] = None,
+        file_extensions: list[str] | None = None,
     ) -> bool:
         """
         Update an existing repository configuration.

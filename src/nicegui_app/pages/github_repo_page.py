@@ -3,29 +3,27 @@ GitHub Repository Management Page with AG Grid
 Complete rewrite using AG Grid for all CRUD operations based on NiceGUI example
 """
 
-from typing import List, Dict, Any
-import shutil
-from pathlib import Path
-from nicegui import ui
 import asyncio
+from typing import Any
+
+from nicegui import ui
+
+# Import modern components
+from ..components.notification import notify
 
 # Import ConfigService and RepositoryConfig
 from ..models.config_service import ConfigService, RepositoryConfig
-
-# Import modern components
-from ..components.confirm_dialog import ConfirmDialog
-from ..components.notification import notify
 
 # Global state
 grid = None
 
 
-def load_config() -> Dict[str, Any]:
+def load_config() -> dict[str, Any]:
     """Load configuration from file using ConfigService"""
     try:
         config_service = ConfigService()
         config_data = config_service.get_repositories()
-        
+
         # Convert RepositoryConfig objects to dicts
         repositories = [
             {
@@ -36,18 +34,18 @@ def load_config() -> Dict[str, Any]:
             }
             for repo in config_data
         ]
-        
+
         return {"repositories": repositories}
     except Exception as e:
         print(f"Error loading config: {e}")
         return {"repositories": []}
 
 
-def save_config(config: Dict[str, Any]) -> None:
+def save_config(config: dict[str, Any]) -> None:
     """Save configuration to file using ConfigService"""
     try:
         config_service = ConfigService()
-        
+
         # Convert dict to RepositoryConfig objects
         repositories = [
             RepositoryConfig(
@@ -58,7 +56,7 @@ def save_config(config: Dict[str, Any]) -> None:
             )
             for repo in config.get("repositories", [])
         ]
-        
+
         config_service.update_repositories(repositories)
     except Exception as e:
         print(f"Error saving config: {e}")
@@ -85,21 +83,23 @@ def add_new_repository():
     if not grid or not hasattr(grid, "options"):
         return
 
-    new_id = max((dx['id'] for dx in grid.options['rowData']), default=-1) + 1
+    new_id = max((dx["id"] for dx in grid.options["rowData"]), default=-1) + 1
     new_row = {
-        'id': new_id, 
-        'url': '', 
-        'branch': '', 
-        'extensions': 'None',
-        'enabled': True
+        "id": new_id,
+        "url": "",
+        "branch": "",
+        "extensions": "None",
+        "enabled": True,
     }
-    grid.options['rowData'].append(new_row)
-    notify(f'Added row with ID {new_id}')
+    grid.options["rowData"].append(new_row)
+    notify(f"Added row with ID {new_id}")
     # Force a full refresh of the grid data
     grid.options = grid.options.copy()
     grid.update()
     # Additional refresh to ensure the grid renders the new row
-    ui.run_javascript("setTimeout(() => { window.dispatchEvent(new Event('resize')); }, 100)")
+    ui.run_javascript(
+        "setTimeout(() => { window.dispatchEvent(new Event('resize')); }, 100)"
+    )
 
 
 def save_edits():
@@ -130,7 +130,7 @@ def save_edits():
             # Skip rows with empty URL and branch (new rows)
             if not row.get("url") or not row.get("branch"):
                 continue
-                
+
             extensions_list = [
                 ext.strip()
                 for ext in row.get("extensions", "").split(",")
@@ -168,11 +168,11 @@ async def remove_selected():
         grid.options["rowData"] = [
             row for row in grid.options["rowData"] if row["id"] not in selected_ids
         ]
-        
+
         # Update IDs after removal
         for i, row in enumerate(grid.options["rowData"]):
             row["id"] = i
-            
+
         grid.update()
         notify(f"Deleted {len(selected_ids)} repository(ies)!", type="positive")
     except Exception as e:
@@ -237,15 +237,21 @@ def initialize_page():
                 icon="delete",
                 text="Delete Selected",
                 color="negative",
-            ).props("flat").on_click(lambda: ui.run_task(remove_selected()))
+            ).props(
+                "flat"
+            ).on_click(lambda: ui.run_task(remove_selected()))
 
         # AG Grid Table
         with ui.card().classes("w-full p-4"):
             column_defs = [
                 {"field": "url", "editable": True},
-                {"field": "branch","editable": True},
-                {"field": "extensions","editable": True},
-                {"field": "enabled","cellRenderer": "agCheckboxCellRenderer","editable": True},
+                {"field": "branch", "editable": True},
+                {"field": "extensions", "editable": True},
+                {
+                    "field": "enabled",
+                    "cellRenderer": "agCheckboxCellRenderer",
+                    "editable": True,
+                },
             ]
 
             # Load initial data from config
@@ -292,10 +298,12 @@ def initialize_page():
 def handle_cell_edit(e):
     """Handle cell edit events from AG Grid"""
     try:
-        new_row = e.args['data']
+        new_row = e.args["data"]
         notify(f'Updated row to: {e.args["data"]}')
-        grid.options['rowData'][:] = [row | new_row if row['id'] ==
-                                    new_row['id'] else row for row in grid.options['rowData']]
+        grid.options["rowData"][:] = [
+            row | new_row if row["id"] == new_row["id"] else row
+            for row in grid.options["rowData"]
+        ]
         grid.update()
     except Exception as e:
         notify(f"Error handling cell edit: {e}", type="negative")
