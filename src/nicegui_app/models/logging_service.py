@@ -53,7 +53,11 @@ class LoggingService:
 
         # Configure root logger
         root_logger = logging.getLogger()
-        root_logger.setLevel(logging.DEBUG)
+        
+        # Only set level if it's not already configured (e.g., by CLI)
+        current_level = root_logger.level
+        if current_level == 0:  # 0 means NOTSET, not configured
+            root_logger.setLevel(logging.DEBUG)
 
         # Clear any existing handlers
         for handler in root_logger.handlers[:]:
@@ -69,14 +73,15 @@ class LoggingService:
         file_handler.setLevel(logging.DEBUG)
         file_handler.setFormatter(formatter)
 
-        # Console handler
-        console_handler = logging.StreamHandler()
-        console_handler.setLevel(logging.INFO)
-        console_handler.setFormatter(formatter)
+        # Console handler - only add if not in CLI mode (check if level is WARNING or higher)
+        if root_logger.level < logging.WARNING:
+            console_handler = logging.StreamHandler()
+            console_handler.setLevel(logging.INFO)
+            console_handler.setFormatter(formatter)
+            root_logger.addHandler(console_handler)
 
-        # Add handlers to root logger
+        # Add file handler always
         root_logger.addHandler(file_handler)
-        root_logger.addHandler(console_handler)
 
         # Prevent duplicate logs in child loggers
         logging.getLogger("uvicorn").propagate = False

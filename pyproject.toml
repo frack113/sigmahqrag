@@ -9,20 +9,22 @@ dependencies = [
     "markdown>=3.10.2",
     "nicegui>=3.8.0",
     "openai>=1.50.0",
+    "chromadb>=0.5.0",
+    "gitpython>=3.1.0",
+    "colorama>=0.4.6",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "black>=26.1.0",
     "pytest>=9.0.2",
     "pytest-cov>=7.0.0",
     "mypy>=1.19.1",
-    "ruff>=0.15.4",
     "pyflakes>=3.4.0",
 ]
 
 [project.scripts]
 sigmahqrag = "main:main"
+rag-cli = "src.cli.rag_cli:main"
 
 [build-system]
 requires = ["hatchling"]

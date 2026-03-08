@@ -24,8 +24,9 @@ This is the **SigmaHQ RAG Application** - a Retrieval-Augmented Generation syste
   - `uvx ...` to run a program directly from PyPI
   - `uv add ...` to add or manage packages, dependencies, etc.
   - `uv run pytest` to run tests
-  - `uv run black .` to format code
-  - `uv run ruff check .` to lint code
+  - `uvx black .` to format code
+  - `uvx ruff check .` to lint code
+  - `uvx pyflakes` to find unused import
 
 ## NiceGUI 3.x
 - Use the latest NiceGUI 3.x for building UIs:
