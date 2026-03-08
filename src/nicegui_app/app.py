@@ -44,13 +44,13 @@ def create_nicegui_app():
 
     def chat_page():
         """Chat page - main functionality"""
-        with ui.column().classes("w-full  p-4"):
+        with ui.column().classes("w-full h-[70vh] p-4"):
             chat = ChatPage()
             chat.render()
 
     def data_page():
         """Data management and database information"""
-        with ui.column().classes("w-full  p-4"):
+        with ui.column().classes("w-full h-[70vh] p-4"):
             ui.markdown('''
                 ### Database Management 📊
                 
@@ -61,7 +61,7 @@ def create_nicegui_app():
 
     def github_page():
         """GitHub repository management"""
-        with ui.column().classes("w-full  p-4"):
+        with ui.column().classes("w-full h-[70vh] p-4"):
             ui.markdown('''
                 ### GitHub Repository Management 📁
                 
@@ -71,7 +71,7 @@ def create_nicegui_app():
 
     def files_page():
         """Local files management (WIP)"""
-        with ui.column().classes("w-full  bg-gray-100"):
+        with ui.column().classes("w-full h-[70vh] bg-gray-100"):
             # Header
             with ui.row().classes("w-full bg-white border-b px-4 py-3 items-center"):
                 ui.label("Local Files Management").classes("text-lg font-semibold text-gray-800")
@@ -89,7 +89,7 @@ def create_nicegui_app():
 
     def config_page():
         """Configuration settings (WIP)"""
-        with ui.column().classes("w-full  bg-gray-100"):
+        with ui.column().classes("w-full h-[70vh] bg-gray-100"):
             # Header
             with ui.row().classes("w-full bg-white border-b px-4 py-3 items-center"):
                 ui.label("Configuration Settings").classes("text-lg font-semibold text-gray-800")
@@ -107,7 +107,7 @@ def create_nicegui_app():
 
     def logs_page():
         """Logs viewer (WIP)"""
-        with ui.column().classes("w-full  bg-gray-100"):
+        with ui.column().classes("w-full h-[70vh] bg-gray-100"):
             # Header
             with ui.row().classes("w-full bg-white border-b px-4 py-3 items-center"):
                 ui.label("Logs Viewer").classes("text-lg font-semibold text-gray-800")
