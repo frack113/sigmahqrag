@@ -166,11 +166,13 @@ The project uses the following main dependencies:
 
 Comprehensive documentation is available in the `docs/` folder:
 
+- **[CHANGELOG.md](docs/CHANGELOG.md)**: Project version history and changes
 - **[LM Studio Setup Guide](docs/LM_STUDIO_SETUP_GUIDE.md)**: Complete setup instructions for LM Studio
 - **[UV Setup Summary](docs/UV_SETUP_SUMMARY.md)**: Python environment and dependency management
 - **[Project Summary](docs/PROJECT_SUMMARY.md)**: Complete project overview and technical details
 - **[Optimization Summary](docs/OPTIMIZATION_SUMMARY.md)**: Code optimization and cleanup details
-- **[AGENTS.md](docs/AGENTS.md)**: AI agent configuration and usage
+- **[LOGGING.md](docs/LOGGING.md)**: Application logging configuration and usage
+- **[TECHNICAL.md](docs/TECHNICAL.md)**: Technical architecture and implementation details
 
 ## Contributing
 

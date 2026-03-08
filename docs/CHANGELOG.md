@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.3.0] - 2026-03-08
+## [WIP] - 2026-03-08
 
 ### Added
 - **LM Studio Integration**: Complete migration from Ollama to LM Studio with custom API compatibility
@@ -27,7 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Documentation Structure**: Moved all documentation files to docs/ folder for better organization
 - **Performance**: Optimized codebase for better performance and cleaner architecture
 
-## [0.2.0] - 2026-03-02
+## [WIP] - 2026-03-02
 
 ### Fixed
 - **GitHub Repository Management**: Fixed the "URL and Branch are required fields!" error that occurred when trying to add repositories even when all fields were filled. The issue was caused by undefined variables in the `add_repository()` function.
