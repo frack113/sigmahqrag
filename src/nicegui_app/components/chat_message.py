@@ -1,148 +1,164 @@
-# Chat Message Component
 """
-Component for displaying individual chat messages in the multi-modal chat interface.
-Supports both user and assistant messages with optional document previews.
+Chat Message Component
+
+A reusable component for displaying chat messages with proper formatting,
+metadata display, and interactive features.
 """
 
-from datetime import datetime
-from typing import Literal
-
-import markdown
 from nicegui import ui
-
-MessageRole = Literal["user", "assistant"]
+from typing import Dict, Any, Optional
+import datetime
 
 
 class ChatMessage:
     """
-    A chat message component that displays messages with role indicators,
-    timestamps, and optional document previews.
-
-    Attributes:
-        role: Either "user" or "assistant" to indicate message sender
-        content: The text content of the message
-        timestamp: When the message was sent (auto-generated if None)
-        document_preview: Optional preview/image for uploaded documents
-        show_timestamp: Whether to display the timestamp
+    A component for displaying individual chat messages.
+    
+    Features:
+    - Proper message alignment (user vs assistant)
+    - Metadata display (timestamps, sources, etc.)
+    - Message formatting and styling
+    - Interactive elements (copy, expand, etc.)
     """
-
-    def __init__(
-        self,
-        role: MessageRole,
-        content: str,
-        timestamp: datetime | None = None,
-        document_preview: str | None = None,
-        show_timestamp: bool = True,
-    ):
+    
+    def __init__(self, role: str, content: str, metadata: Optional[Dict] = None):
         """
         Initialize a chat message component.
-
+        
         Args:
-            role: Either "user" or "assistant"
-            content: Message text content
-            timestamp: Optional datetime for the message
-            document_preview: Optional base64 image string or URL for document preview
-            show_timestamp: Whether to display timestamp
+            role: 'user' or 'assistant'
+            content: The message content
+            metadata: Optional metadata dictionary
         """
         self.role = role
         self.content = content
-        self.timestamp = timestamp if timestamp else datetime.now()
-        self.document_preview = document_preview
-        self.show_timestamp = show_timestamp
-
-    def render(self):
+        self.metadata = metadata or {}
+        
+        self._render()
+    
+    def _render(self):
+        """Render the chat message with appropriate styling."""
+        # Determine message alignment and styling based on role
+        if self.role == "user":
+            self._render_user_message()
+        else:
+            self._render_assistant_message()
+    
+    def _render_user_message(self):
+        """Render a user message (right-aligned)."""
+        with ui.row().classes("w-full justify-end mb-4"):
+            with ui.card().classes(
+                "bg-blue-500 text-white px-4 py-3 rounded-lg max-w-3xl shadow-md"
+            ):
+                # Message content
+                with ui.column().classes("gap-1"):
+                    ui.html(self._format_content(self.content)).classes(
+                        "whitespace-pre-wrap text-sm leading-relaxed"
+                    )
+                    
+                    # Metadata (if any)
+                    if self.metadata:
+                        self._render_metadata()
+                    
+                    # Timestamp
+                    self._render_timestamp()
+    
+    def _render_assistant_message(self):
+        """Render an assistant message (left-aligned)."""
+        with ui.row().classes("w-full justify-start mb-4"):
+            with ui.card().classes(
+                "bg-white text-gray-800 px-4 py-3 rounded-lg max-w-3xl shadow-md border"
+            ):
+                # Message content
+                with ui.column().classes("gap-2"):
+                    ui.html(self._format_content(self.content)).classes(
+                        "whitespace-pre-wrap text-sm leading-relaxed"
+                    )
+                    
+                    # Metadata (if any)
+                    if self.metadata:
+                        self._render_metadata()
+                    
+                    # Timestamp
+                    self._render_timestamp()
+    
+    def _format_content(self, content: str) -> str:
         """
-        Render the chat message with ChatGPT-style modern styling.
-
+        Format message content with HTML support.
+        
+        Args:
+            content: Raw message content
+            
         Returns:
-            A styled message component
+            HTML-formatted content
         """
-        # Create message container with proper styling
-        message_container = ui.row().classes("w-full mb-4")
-
-        with message_container:
-            # Role-specific styling
-            if self.role == "user":
-                # User message - right aligned, blue background
-                with ui.column().classes("items-end w-full"):
-                    # Message bubble with rounded corners
-                    bubble = ui.card().classes(
-                        "max-w-2xl bg-blue-600 text-white px-4 py-3 rounded-2xl shadow-sm"
-                    )
-                    with bubble:
-                        # Convert markdown to HTML and display
-                        html_content = markdown.markdown(self.content)
-                        ui.html(html_content).classes("whitespace-pre-wrap text-sm")
-            else:
-                # Assistant message - left aligned, gray background
-                with ui.column().classes("items-start w-full"):
-                    # Document preview (if provided)
-                    if self.document_preview:
-                        with ui.row().classes("mb-2 ml-2"):
-                            preview_img = ui.image(self.document_preview)
-                            preview_img.classes(
-                                "rounded-lg border max-h-32 object-contain"
-                            )
-                            preview_img.style("max-width: 200px;")
-
-                    # Message bubble with rounded corners
-                    bubble = ui.card().classes(
-                        "max-w-2xl bg-gray-100 text-gray-900 px-4 py-3 rounded-2xl shadow-sm"
-                    )
-                    with bubble:
-                        # Convert markdown to HTML and display
-                        html_content = markdown.markdown(self.content)
-                        ui.html(html_content).classes("whitespace-pre-wrap text-sm")
-
-        return message_container
-
-    def add_to_parent(self, parent_container):
-        """
-        Add the rendered card to a parent container.
-
-        Args:
-            parent_container: The UI container to add the card to
-        """
-        if parent_container:
-            parent_container.append(self.render())
-
-    def update_content(self, new_content: str) -> None:
-        """
-        Update the message content and re-render.
-
-        Args:
-            new_content: New text content for the message
-        """
-        if not new_content or not new_content.strip():
-            raise ValueError("Content cannot be empty")
-
-        self.content = new_content
-
-    def add_reaction(self, emoji: str) -> None:
-        """
-        Add a reaction to the message.
-
-        Args:
-            emoji: Emoji string to add as reaction (e.g., "👍", "❤️", "🎉")
-
-        Raises:
-            ValueError: If emoji is empty or not a valid emoji
-        """
-        if not emoji or not emoji.strip():
-            raise ValueError("Emoji cannot be empty")
-
-        # Validate emoji contains at least one valid emoji character
-        # Using regex to check for emoji characters
+        # Convert markdown-style formatting to HTML
+        formatted = content
+        
+        # Handle line breaks
+        formatted = formatted.replace('\n', '<br>')
+        
+        # Handle bold text (**text**)
         import re
+        formatted = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', formatted)
+        
+        # Handle italic text (*text*)
+        formatted = re.sub(r'\*(.*?)\*', r'<em>\1</em>', formatted)
+        
+        # Handle code blocks (```code```)
+        formatted = re.sub(r'```([^`]+)```', r'<code>\1</code>', formatted)
+        
+        return formatted
+    
+    def _render_metadata(self):
+        """Render message metadata."""
+        if not self.metadata:
+            return
+        
+        with ui.row().classes("text-xs text-gray-500 gap-2 mt-1"):
+            # Show sources if available
+            if 'sources' in self.metadata:
+                sources = self.metadata['sources']
+                if sources:
+                    ui.label(f"Sources: {len(sources)} documents").classes("italic")
+            
+            # Show confidence score if available
+            if 'confidence' in self.metadata:
+                confidence = self.metadata['confidence']
+                ui.label(f"Confidence: {confidence:.2f}").classes("italic")
+            
+            # Show any other metadata keys
+            for key, value in self.metadata.items():
+                if key not in ['sources', 'confidence']:
+                    ui.label(f"{key}: {value}").classes("italic")
+    
+    def _render_timestamp(self):
+        """Render message timestamp."""
+        timestamp = self.metadata.get('timestamp')
+        if timestamp:
+            try:
+                # Parse ISO format timestamp
+                dt = datetime.datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+                time_str = dt.strftime("%H:%M")
+            except:
+                time_str = "now"
+        else:
+            time_str = "now"
+        
+        with ui.row().classes("justify-end mt-1"):
+            ui.label(time_str).classes("text-xs text-gray-400")
 
-        emoji_pattern = (
-            r"[\U0001F600-\U0001F64F\U0001F300-\U0001F5FF\U0001F680-\U0001F6FF"
-            r"\U0001F1E0-\U0001F1FF\U00002702-\U000027B0\U000024C2-\U0001F251]"
-        )
-        if not re.search(emoji_pattern, emoji):
-            raise ValueError(f"Invalid emoji: {emoji}")
 
-        # In a real implementation, this would store the reaction
-        # and update the UI to show the reaction
-        # For now, we'll just log it
-        print(f"Added reaction '{emoji}' to message")
+def create_chat_message(role: str, content: str, metadata: Optional[Dict] = None):
+    """
+    Factory function to create a chat message component.
+    
+    Args:
+        role: 'user' or 'assistant'
+        content: The message content
+        metadata: Optional metadata dictionary
+        
+    Returns:
+        ChatMessage instance
+    """
+    return ChatMessage(role, content, metadata)

@@ -6,11 +6,14 @@ import sys
 import threading
 import time
 
-from nicegui_app.pages.chat_page_simple import SimpleChatPage
-from nicegui_app.pages.data_page import DataPage
-from nicegui_app.pages.github_repo_page import initialize_page
-from nicegui_app.pages.logs_page import initialize_page as initialize_logs_page
-from nicegui_app.models.logging_service import get_logger
+# Add current directory to Python path for imports
+sys.path.insert(0, '.')
+
+from src.nicegui_app.pages.rag_chat_page import create_rag_chat_page
+from src.nicegui_app.pages.data_page import DataPage
+from src.nicegui_app.pages.github_repo_page import initialize_page
+from src.nicegui_app.pages.logs_page import initialize_page as initialize_logs_page
+from src.nicegui_app.models.logging_service import get_logger
 
 logger = get_logger(__name__)
 
@@ -54,9 +57,8 @@ def create_nicegui_app():
 
     def chat_page():
         """Chat page - main functionality"""
-        with ui.column().classes("w-full h-[70vh] p-4"):
-            chat = SimpleChatPage()
-            chat.render()
+        with ui.column().classes("w-full h-screen p-0"):
+            create_rag_chat_page()
 
     def data_page():
         """Data management and database information"""
@@ -163,6 +165,9 @@ def create_nicegui_app():
         storage_secret="demo_secret_key_change_in_production",
         title="SigmaHQ RAG",
         favicon="🤖",
+        reconnect_timeout=10.0,  # Increase reconnection timeout to reduce frequent messages
+        binding_refresh_interval=0.5,  # Adjust binding refresh interval
+        reload=False,  # Disable auto-reload to improve stability
     )
 
 

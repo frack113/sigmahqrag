@@ -12,20 +12,73 @@ __pycache__/
 # Environment
 .venv/
 .env
+.env.local
+.env.development
+.env.production
 
 # Logs
 *.log
+logs/
+*.log.*
 
 # RAG Data
 .chromadb/
 data/github/
 data/local/
+data/*.db
+data/.current_session
 
 # Build
 build/
 dist/
+*.egg-info/
 
 # IDE
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Testing
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+*.orig
+
+# Documentation build
+docs/_build/
+docs/build/
+
+# AGENTS.md (keep for development)
 AGENTS.md
+
+# Local CLI rules
+.clinerules/

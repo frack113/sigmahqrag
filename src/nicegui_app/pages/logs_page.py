@@ -273,8 +273,10 @@ def initialize_page():
     """Initialize the logs page."""
     global status_label, monitor_button, log_content, line_count_label, log_container
 
-    # Main container that fits the navigator layout
-    with ui.column().classes("w-full h-[70vh] gap-4"):
+    # Main container with consistent layout
+    main_container = ui.column().classes("w-full h-[90vh] bg-gray-100")
+
+    with main_container:
         # Status bar
         with ui.row().classes("gap-3 flex-wrap"):
             status_label = ui.label("Ready")

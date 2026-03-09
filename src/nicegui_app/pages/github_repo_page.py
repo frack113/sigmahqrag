@@ -9,7 +9,7 @@ from typing import Any
 from nicegui import ui
 
 # Import modern components
-from ..components.notification import notify
+from ..components.notification import show_notification
 
 # Import ConfigService and RepositoryConfig
 from ..models.config_service import ConfigService, RepositoryConfig
@@ -203,7 +203,10 @@ def initialize_page():
     """Initialize the GitHub repository management page"""
     global grid
 
-    with ui.column().classes("w-full h-[70vh] gap-4"):
+    # Main container with consistent layout
+    main_container = ui.column().classes("w-full h-[90vh] bg-gray-100")
+
+    with main_container:
         # Action buttons
         with ui.row().classes("gap-3 flex-wrap"):
             ui.button(

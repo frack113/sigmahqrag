@@ -39,7 +39,7 @@ class DataPage:
             The root element of the data page
         """
         # Main container with responsive layout
-        main_container = ui.column().classes("w-full h-[70vh] bg-gray-100")
+        main_container = ui.column().classes("w-full h-[90vh] bg-gray-100")
 
         with main_container:
             # Header

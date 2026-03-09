@@ -53,7 +53,7 @@ class LoggingService:
 
         # Configure root logger
         root_logger = logging.getLogger()
-        
+
         # Only set level if it's not already configured (e.g., by CLI)
         current_level = root_logger.level
         if current_level == 0:  # 0 means NOTSET, not configured

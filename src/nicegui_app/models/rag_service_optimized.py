@@ -20,9 +20,7 @@ try:
 except ImportError as e:
     chromadb = None
     embedding_functions = None
-    logging.warning(
-        f"chromadb not available: {e}. RAG functionality disabled."
-    )
+    logging.warning(f"chromadb not available: {e}. RAG functionality disabled.")
 
 from .llm_service_optimized import OptimizedLLMService
 
@@ -83,9 +81,7 @@ class OptimizedRAGService:
 
         # Initialize LLM service
         self.llm_service = llm_service or OptimizedLLMService(
-            base_url=base_url,
-            api_key=api_key,
-            enable_streaming=True
+            base_url=base_url, api_key=api_key, enable_streaming=True
         )
 
         # Initialize ChromaDB
@@ -109,13 +105,13 @@ class OptimizedRAGService:
         try:
             # Initialize ChromaDB client
             self.client = chromadb.PersistentClient(path=self.persist_directory)
-            
+
             # Create or get collection with custom embedding function
             self.collection = self.client.get_or_create_collection(
                 name=self.collection_name,
-                metadata={"description": "RAG vector store for document retrieval"}
+                metadata={"description": "RAG vector store for document retrieval"},
             )
-            
+
             self.logger.info(
                 f"Initialized ChromaDB at {self.persist_directory} "
                 f"with collection '{self.collection_name}'"
@@ -132,12 +128,12 @@ class OptimizedRAGService:
 
         try:
             import requests
-            
+
             headers = {
                 "Content-Type": "application/json",
                 "Authorization": f"Bearer {self.api_key}",
             }
-            
+
             # LM Studio expects the input as a string or array of strings
             payload = {"model": self.embedding_model_name, "input": texts}
 
@@ -145,7 +141,7 @@ class OptimizedRAGService:
                 f"{self.base_url}/v1/embeddings",
                 headers=headers,
                 json=payload,
-                timeout=30,
+                timeout=10,  # Reduced timeout to 10 seconds
             )
 
             response.raise_for_status()
@@ -163,9 +159,22 @@ class OptimizedRAGService:
             self.logger.info(f"Generated embeddings for {len(texts)} texts")
             return embeddings
 
+        except requests.exceptions.ConnectionError as e:
+            self.logger.warning(f"Connection error generating embeddings: {e}")
+            # Return empty embeddings instead of raising error to prevent disconnection
+            return [[] for _ in texts]
+        except requests.exceptions.Timeout as e:
+            self.logger.warning(f"Timeout generating embeddings: {e}")
+            # Return empty embeddings instead of raising error to prevent disconnection
+            return [[] for _ in texts]
+        except requests.exceptions.RequestException as e:
+            self.logger.warning(f"Request error generating embeddings: {e}")
+            # Return empty embeddings instead of raising error to prevent disconnection
+            return [[] for _ in texts]
         except Exception as e:
             self.logger.error(f"Error generating embeddings: {e}")
-            raise RuntimeError(f"Failed to generate embeddings: {str(e)}")
+            # Return empty embeddings instead of raising error to prevent disconnection
+            return [[] for _ in texts]
 
     async def generate_embeddings(self, texts: List[str]) -> List[List[float]]:
         """
@@ -237,11 +246,14 @@ class OptimizedRAGService:
                 if loop.is_running():
                     # If we're already in an event loop, run in executor
                     import concurrent.futures
+
                     with concurrent.futures.ThreadPoolExecutor() as executor:
                         future = executor.submit(self._generate_embeddings_sync, chunks)
                         embeddings = future.result()
                 else:
-                    embeddings = loop.run_until_complete(self.generate_embeddings(chunks))
+                    embeddings = loop.run_until_complete(
+                        self.generate_embeddings(chunks)
+                    )
             except RuntimeError:
                 # No event loop available, use sync method
                 embeddings = self._generate_embeddings_sync(chunks)
@@ -254,17 +266,14 @@ class OptimizedRAGService:
                     "chunk_index": i,
                     "chunk_size": len(chunk),
                     "source": "rag_service",
-                    **(metadata or {})
+                    **(metadata or {}),
                 }
                 for i, chunk in enumerate(chunks)
             ]
 
             # Add to collection
             self.collection.add(
-                ids=ids,
-                embeddings=embeddings,
-                metadatas=metadatas,
-                documents=chunks
+                ids=ids, embeddings=embeddings, metadatas=metadatas, documents=chunks
             )
 
             self.logger.info(
@@ -310,7 +319,9 @@ class OptimizedRAGService:
                     # If we're already in an event loop, use sync method
                     query_embedding = self._generate_embeddings_sync([query])[0]
                 else:
-                    query_embedding = loop.run_until_complete(self.generate_embeddings([query]))[0]
+                    query_embedding = loop.run_until_complete(
+                        self.generate_embeddings([query])
+                    )[0]
             except RuntimeError:
                 # No event loop available, use sync method
                 query_embedding = self._generate_embeddings_sync([query])[0]
@@ -320,7 +331,7 @@ class OptimizedRAGService:
                 query_embeddings=[query_embedding],
                 n_results=n_results,
                 where=filter_metadata,
-                include=["documents", "metadatas", "distances"]
+                include=["documents", "metadatas", "distances"],
             )
 
             if not results["documents"] or not results["documents"][0]:
@@ -558,11 +569,11 @@ class OptimizedRAGService:
         }
 
     async def generate_rag_response(
-        self, 
-        query: str, 
+        self,
+        query: str,
         system_prompt: Optional[str] = None,
         n_results: int = 3,
-        min_relevance_score: float = 0.1
+        min_relevance_score: float = 0.1,
     ) -> str:
         """
         Generate a RAG response by combining retrieval and generation.
@@ -579,9 +590,9 @@ class OptimizedRAGService:
         try:
             # Retrieve relevant context from vector database
             relevant_docs, metadata = self.retrieve_context(
-                query=query, 
-                n_results=n_results, 
-                min_relevance_score=min_relevance_score
+                query=query,
+                n_results=n_results,
+                min_relevance_score=min_relevance_score,
             )
 
             # Build context string
@@ -590,7 +601,7 @@ class OptimizedRAGService:
                 # Limit context length to avoid token limits
                 if len(context_text) > 4000:
                     context_text = context_text[:4000] + "..."
-                
+
                 # Create enhanced prompt with context
                 enhanced_prompt = f"""Use the following context to answer the question:
 
@@ -606,8 +617,7 @@ Answer concisely and accurately based on the provided context."""
 
             # Generate response using LLM service
             response = self.llm_service.simple_completion(
-                prompt=enhanced_prompt,
-                system_prompt=system_prompt
+                prompt=enhanced_prompt, system_prompt=system_prompt
             )
 
             return response
@@ -617,15 +627,15 @@ Answer concisely and accurately based on the provided context."""
             # Fallback to simple completion
             return self.llm_service.simple_completion(
                 prompt=query,
-                system_prompt=system_prompt or "You are a helpful assistant."
+                system_prompt=system_prompt or "You are a helpful assistant.",
             )
 
     async def generate_streaming_rag_response(
-        self, 
-        query: str, 
+        self,
+        query: str,
         system_prompt: Optional[str] = None,
         n_results: int = 3,
-        min_relevance_score: float = 0.1
+        min_relevance_score: float = 0.1,
     ) -> AsyncGenerator[str, None]:
         """
         Generate a streaming RAG response.
@@ -642,9 +652,9 @@ Answer concisely and accurately based on the provided context."""
         try:
             # Retrieve relevant context
             relevant_docs, metadata = self.retrieve_context(
-                query=query, 
-                n_results=n_results, 
-                min_relevance_score=min_relevance_score
+                query=query,
+                n_results=n_results,
+                min_relevance_score=min_relevance_score,
             )
 
             # Build context string
@@ -653,7 +663,7 @@ Answer concisely and accurately based on the provided context."""
                 # Limit context length to avoid token limits
                 if len(context_text) > 4000:
                     context_text = context_text[:4000] + "..."
-                
+
                 # Create enhanced prompt with context
                 enhanced_prompt = f"""Use the following context to answer the question:
 
@@ -669,8 +679,7 @@ Answer concisely and accurately based on the provided context."""
 
             # Generate streaming response using LLM service
             async for chunk in self.llm_service.streaming_completion(
-                prompt=enhanced_prompt,
-                system_prompt=system_prompt
+                prompt=enhanced_prompt, system_prompt=system_prompt
             ):
                 yield chunk
 
@@ -679,7 +688,7 @@ Answer concisely and accurately based on the provided context."""
             # Fallback to simple streaming completion
             async for chunk in self.llm_service.streaming_completion(
                 prompt=query,
-                system_prompt=system_prompt or "You are a helpful assistant."
+                system_prompt=system_prompt or "You are a helpful assistant.",
             ):
                 yield chunk
 
@@ -717,7 +726,7 @@ def create_rag_service(
     persist_directory: str = ".chromadb",
     chunk_size: int = 500,
     chunk_overlap: int = 100,
-    collection_name: str = "rag_collection"
+    collection_name: str = "rag_collection",
 ) -> OptimizedRAGService:
     """Create a general-purpose RAG service."""
     return OptimizedRAGService(
@@ -727,7 +736,7 @@ def create_rag_service(
         persist_directory=persist_directory,
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,
-        collection_name=collection_name
+        collection_name=collection_name,
     )
 
 
@@ -735,7 +744,7 @@ def create_document_rag_service(
     llm_service: Optional[OptimizedLLMService] = None,
     base_url: str = "http://localhost:1234",
     persist_directory: str = ".chromadb",
-    collection_name: str = "documents"
+    collection_name: str = "documents",
 ) -> OptimizedRAGService:
     """Create a RAG service optimized for document processing."""
     return OptimizedRAGService(
@@ -745,7 +754,7 @@ def create_document_rag_service(
         persist_directory=persist_directory,
         chunk_size=1000,  # Larger chunks for documents
         chunk_overlap=200,
-        collection_name=collection_name
+        collection_name=collection_name,
     )
 
 
@@ -753,7 +762,7 @@ def create_chat_rag_service(
     llm_service: Optional[OptimizedLLMService] = None,
     base_url: str = "http://localhost:1234",
     persist_directory: str = ".chromadb",
-    collection_name: str = "chat_context"
+    collection_name: str = "chat_context",
 ) -> OptimizedRAGService:
     """Create a RAG service optimized for chat applications."""
     return OptimizedRAGService(
@@ -761,9 +770,9 @@ def create_chat_rag_service(
         embedding_model_name="text-embedding-all-minilm-l6-v2-embedding",
         base_url=base_url,
         persist_directory=persist_directory,
-        chunk_size=300,   # Smaller chunks for chat
+        chunk_size=300,  # Smaller chunks for chat
         chunk_overlap=50,
-        collection_name=collection_name
+        collection_name=collection_name,
     )
 
 
