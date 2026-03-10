@@ -85,7 +85,6 @@ class LoggingService:
 
         # Prevent duplicate logs in child loggers
         logging.getLogger("uvicorn").propagate = False
-        logging.getLogger("nicegui").propagate = False
 
         # Log initialization
         logger = logging.getLogger(__name__)

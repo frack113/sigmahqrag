@@ -14,7 +14,6 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 from uuid import uuid4
 
-from ..components.notification import show_notification
 
 logger = logging.getLogger(__name__)
 

@@ -13,8 +13,8 @@ import os
 # Add the src directory to the path so we can import the services
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
-from nicegui_app.models.llm_service_optimized import create_chat_service
-from nicegui_app.models.rag_service_optimized import (
+from src.models.llm_service_optimized import create_chat_service
+from src.models.rag_service_optimized import (
     create_rag_service,
     create_document_rag_service,
     create_chat_rag_service,

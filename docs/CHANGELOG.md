@@ -68,7 +68,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Factory Pattern**: Implemented factory functions for easy service creation
 - **Connection Pooling**: Optimized resource management with connection pooling
 - **Memory Management**: Implemented efficient memory usage with proper cleanup
-- **Enhanced CLI Interface**: Improved command-line interface with better error handling and user feedback
+- **Enhanced Web Interface**: Improved web interface with better error handling and user feedback
 - **Documentation Updates**: Updated all documentation to reflect current optimizations and best practices
 
 #### Fixed

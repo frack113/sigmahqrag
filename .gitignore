@@ -26,6 +26,7 @@ logs/
 data/github/
 data/local/
 data/*.db
+data/*.db-db-journal
 data/.current_session
 
 # Build

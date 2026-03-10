@@ -29,10 +29,10 @@ class DataService:
 
         # Initialize sub-services
         from .file_processor import FileProcessor
-        from .rag_service import RagService
+        from .rag_service_optimized import OptimizedRAGService
         from .repository_service import RepositoryService
 
-        self.rag_service = RagService(embedding_model_name=embedding_model_name)
+        self.rag_service = OptimizedRAGService(embedding_model_name=embedding_model_name)
         self.repository_service = RepositoryService()
         self.file_processor = FileProcessor()
 
