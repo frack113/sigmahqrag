@@ -12,6 +12,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 from src.application.app import SigmaHQGradioApp
+from src.infrastructure.port_manager import PortManager
 
 
 def signal_handler(signum, frame):
@@ -48,6 +49,19 @@ def main():
     if args.reload:
         os.environ["GRADIO_ALLOW_ORIGIN"] = "*http://*/*"
 
+    # Check if the requested port is available before starting the application
+    port_manager = PortManager()
+    logger.info(f"Checking if port {args.port} is available...")
+    
+    if not port_manager.is_port_available(args.port, server_host):
+        logger.error(
+            f"Port {args.port} is already in use! Please either:\n"
+            f"  1. Stop the application using this port\n"
+            f"  2. Run with --port <different_port> to specify an alternative port\n"
+            f"  3. Use --reload flag to automatically find an available nearby port (e.g., {args.port+1})\n"
+        )
+        sys.exit(1)
+
     logger.info(
         f"Starting application on {server_host}:{args.port}" +
         (" (auto-reload enabled)" if args.reload else "")
@@ -63,5 +77,5 @@ def main():
         app.cleanup()
 
 
-if __name__ in {"__main__", "__mp_main__"}:
+if __name__ == "__main__":
     main()

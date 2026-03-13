@@ -28,14 +28,21 @@ class ConfigurationError(SigmaHQError):
     pass
 
 
-class ServiceError(SigmaHQError):
-    """Raised when a service operation fails."""
+class BaseServiceError(SigmaHQError):
+    """Base exception for base service operations."""
 
     pass
 
 
-class DatabaseError(ServiceError):
-    """Raised when database operations fail."""
+class BaseServiceNotInitializedError(BaseServiceError):
+    """Raised when a service is not properly initialized."""
+
+    pass
+
+
+# Service exceptions inherit from BaseServiceError as the primary service exception class
+class ServiceError(BaseServiceError):
+    """Raised when a service operation fails."""
 
     pass
 
@@ -58,8 +65,14 @@ class ChatError(ServiceError):
     pass
 
 
-class ValidationError(SigmaHQError):
-    """Raised when input validation fails."""
+class DatabaseError(BaseServiceError):
+    """Raised when database operations fail."""
+
+    pass
+
+
+class DataError(DatabaseError):
+    """Data error for data layer operations."""
 
     pass
 
@@ -94,13 +107,19 @@ class AuthorizationError(SigmaHQError):
     pass
 
 
+class ValidationError(SigmaHQError):
+    """Raised when input validation fails."""
+
+    pass
+
+
 class RateLimitError(ServiceError):
     """Raised when rate limits are exceeded."""
 
     pass
 
 
-class EmbeddingError(ServiceError):
+class EmbeddingError(SigmaHQError):
     """Raised when embedding operations fail."""
 
     pass
@@ -126,5 +145,11 @@ class AsyncManagerError(ServiceError):
 
 class ResourceCleanupError(ServiceError):
     """Error during resource cleanup."""
+
+    pass
+
+
+class RepoServiceError(BaseServiceError):
+    """Raised when repository operations fail."""
 
     pass

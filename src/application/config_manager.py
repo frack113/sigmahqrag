@@ -10,14 +10,61 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
-from src.shared import (
-    DEFAULT_CONFIG,
+from src.shared import (  # noqa: RUF012
+    DEFAULT_CHUNK_OVERLAP,
+    DEFAULT_CONVERSATION_HISTORY_LIMIT,
+    DEFAULT_DB_MAX_CONNECTIONS,
+    DEFAULT_DB_PATH,
+    DEFAULT_DB_TIMEOUT,
+    DEFAULT_LLM_API_KEY,
+    DEFAULT_LLM_BASE_URL,
+    DEFAULT_LLM_MODEL,
+    DEFAULT_LLM_TEMPERATURE,
+    DEFAULT_RAG_N_RESULTS,
+    DEFAULT_RAG_MIN_SCORE,
     SERVICE_CONFIG,
     STATUS_DEGRADED,
     STATUS_HEALTHY,
     STATUS_UNHEALTHY,
     BaseService,
 )
+
+# Default configuration values (used when config is missing/invalid)
+DEFAULT_LLM_CONFIG = {
+    "base_url": DEFAULT_LLM_BASE_URL,
+    "api_key": DEFAULT_LLM_API_KEY,
+    "model": DEFAULT_LLM_MODEL,
+    "temperature": DEFAULT_LLM_TEMPERATURE,
+}
+
+DEFAULT_RAG_CONFIG = {
+    "embedding_model": DEFAULT_EMBEDDING_MODEL,
+    "chunk_size": 500,
+    "chunk_overlap": DEFAULT_CHUNK_OVERLAP,
+    "n_results": DEFAULT_RAG_N_RESULTS,
+    "min_score": DEFAULT_RAG_MIN_SCORE,
+}
+
+DEFAULT_DATABASE_CONFIG = {
+    "path": DEFAULT_DB_PATH,
+    "max_connections": DEFAULT_DB_MAX_CONNECTIONS,
+    "timeout": DEFAULT_DB_TIMEOUT,
+}
+
+DEFAULT_FILE_PROCESSOR_CONFIG = {
+    "allowed_extensions": [".txt", ".md", ".pdf", ".docx", ".json"],
+    "max_file_size_mb": 50,
+    "temp_dir": "temp/",
+    "chunk_size": 500,
+    "chunk_overlap": DEFAULT_CHUNK_OVERLAP,
+}
+
+DEFAULT_FILE_STORAGE_CONFIG = {
+    "upload_dir": "uploads/",
+    "allowed_extensions": [".txt", ".md", ".pdf", ".docx"],
+    "max_file_size_mb": 50,
+    "max_storage_size_gb": 100,
+}
 
 
 @dataclass
@@ -39,24 +86,21 @@ class ConfigManager(BaseService):
     Provides:
     - Configuration loading from files
     - Configuration validation
-    - Configuration merging
+    - Configuration merging with defaults
     - Environment variable support
     """
 
     def __init__(self, config_path: str | None = None):
-        """
-        Initialize the configuration manager.
-
+        """Initialize configuration manager.
+        
         Args:
-            config_path: Path to configuration file
+            config_path: Optional path to configuration file
         """
         BaseService.__init__(self, f"{SERVICE_CONFIG}.config_manager")
-
-        # Configuration
         self.config_path = config_path
+        # Start with sensible defaults
         self.config: dict[str, Any] = {}
 
-        # Statistics
         self.stats = ConfigStats()
 
     def load_config(self, config_path: str | None = None) -> bool:
@@ -88,37 +132,35 @@ class ConfigManager(BaseService):
         except Exception as e:
             self.stats.last_error = str(e)
             self.logger.error(f"Error loading configuration from {load_path}: {e}")
-            return False
-
-    def save_config(self, config_path: str | None = None) -> bool:
-        """
-        Save configuration to file.
-
-        Args:
-            config_path: Path to save configuration file (uses instance path if None)
-
-        Returns:
-            True if saving successful, False otherwise
-        """
-        save_path = config_path or self.config_path
-
-        if not save_path:
-            self.logger.error("No configuration path specified for saving")
-            return False
-
+    async def initialize(self) -> bool:
+        """Initialize the configuration manager with defaults."""
         try:
-            # Create directory if it doesn't exist
-            os.makedirs(os.path.dirname(save_path), exist_ok=True)
-
-            with open(save_path, "w") as f:
-                json.dump(self.config, f, indent=2)
-
-            self.logger.info(f"Configuration saved to {save_path}")
+            # Set up default configuration structure
+            self.config = {
+                "llm_service": DEFAULT_LLM_CONFIG,
+                "rag_service": DEFAULT_RAG_CONFIG,
+                "database": DEFAULT_DATABASE_CONFIG,
+                "file_processor": DEFAULT_FILE_PROCESSOR_CONFIG,
+                "file_storage": DEFAULT_FILE_STORAGE_CONFIG,
+            }
+            
+            self.stats.config_loaded = True
+            
+            # Log successful initialization
+            self.logger.info("Configuration manager initialized with defaults")
             return True
 
         except Exception as e:
-            self.logger.error(f"Error saving configuration to {save_path}: {e}")
+            self.logger.error(f"Failed to initialize configuration manager: {e}")
+            self.stats.last_error = str(e)
             return False
+
+    def cleanup(self) -> None:
+        """Clean up resources."""
+        try:
+            self.logger.info("Config manager cleanup completed")
+        except Exception as e:
+            self.logger.error(f"Error during config manager cleanup: {e}")
 
     def validate_config(self) -> bool:
         """

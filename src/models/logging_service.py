@@ -1,48 +1,44 @@
-"""
-Logging service for SigmaHQ RAG application.
-
-Provides centralized logging functionality across the application.
-"""
-
-import logging
+# This file has been deprecated.
+# Logging is now handled by Python's built-in logging module.
+# No separate service needed for standard logging functionality.
+from typing import Any
 
 
-def get_logger(name: str) -> logging.Logger:
+class LoggingService:
     """
-    Get a logger instance with standard configuration.
+    Deprecated: Use Python's built-in logging module directly.
+    
+    Standard Python logging provides all necessary functionality:
+    - Logger setup with log levels
+    - Formatters and handlers
+    - Console/file output
+    - Log rotation
+    
+    Example usage:
+        import logging
+        
+        logger = logging.getLogger(__name__)
+        logger.info("Message")
+    """
 
+
+# Convenience function for quick logging (optional)
+def get_logger(name: str, level: int | None = None) -> logging.Logger:
+    """
+    Get a logger instance.
+    
     Args:
-        name: Logger name (typically __name__)
-
+        name: Logger name (usually __name__)
+        level: Log level (None uses default)
+    
     Returns:
-        Configured logger instance
+        Logger instance
     """
+    import logging
+    
     logger = logging.getLogger(name)
-
-    # Configure handlers only if not already configured
-    if not logger.handlers:
-        # Create formatter
-        formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-            datefmt='%Y-%m-%d %H:%M:%S'
-        )
-
-        # Create console handler
-        console_handler = logging.StreamHandler()
-        console_handler.setLevel(logging.INFO)
-        console_handler.setFormatter(formatter)
-
-        # Create file handler for debug logs
-        file_handler = logging.FileHandler('logs/app.log')
-        file_handler.setLevel(logging.DEBUG)
-        file_handler.setFormatter(formatter)
-
-        # Add handlers to logger
-        logger.addHandler(console_handler)
-        logger.addHandler(file_handler)
-
-        # Set default level
-        if logger.level == logging.NOTSET:
-            logger.setLevel(logging.INFO)
-
+    
+    if level is not None:
+        logger.setLevel(level)
+    
     return logger

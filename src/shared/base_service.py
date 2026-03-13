@@ -52,11 +52,6 @@ class BaseService(ABC):
             message += f" - {details}"
         self.logger.log(level, message)
 
-    def _generate_cache_key(self, *args, **kwargs) -> str:
-        """Generate cache key from arguments."""
-        key_data = str(args) + str(sorted(kwargs.items()))
-        return hashlib.md5(key_data.encode()).hexdigest()
-
 
 class AsyncComponent:
     """Base class for async Gradio components."""
@@ -95,9 +90,17 @@ class CacheService:
         self._access_times: dict[str, float] = {}
         self._lock = asyncio.Lock()
 
-    def _generate_key(self, *args, **kwargs) -> str:
-        """Generate cache key from arguments."""
-        key_data = str(args) + str(sorted(kwargs.items()))
+    def _generate_key(self, *args: Any, **kwargs: Any) -> str:
+        """Generate cache key from arguments (must be async-compatible)."""
+        import asyncio
+
+        # Make kwargs hashable for caching
+        hash_args = args
+        hash_kwargs = {
+            k: v for k, v in sorted(kwargs.items()) if asyncio.iscoroutine(v)
+        }
+
+        key_data = str(hash_args) + str(sorted(hash_kwargs.items()))
         return hashlib.md5(key_data.encode()).hexdigest()
 
     async def get(self, key: str) -> Any | None:

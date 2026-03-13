@@ -1,9 +1,0 @@
-{
-  "server_url": "http://localhost:1234",
-  "default_model": "mistralai/ministral-3-14b-reasoning",
-  "embedding_model": "text-embedding-all-minilm-l6-v2-embedding",
-  "timeout": 30,
-  "max_tokens": 1000,
-  "temperature": 0.7,
-  "auto_start": true
-}

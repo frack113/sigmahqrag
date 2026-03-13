@@ -38,17 +38,12 @@ from src.shared import (
     DatabaseConfig,
     DatabaseError,
     EmbeddingConfig,
+    LLMError,
     RAGError,
     handle_service_errors,
 )
 
-# Import utility decorators and exceptions
-from src.shared.utils import (
-    retry_with_backoff,
-    rate_limit,
-)
-
-from src.shared.exceptions import LLMError
+from src.shared.utils import retry_with_backoff, rate_limit, chunk_text
 
 # Import memory/CPU utilities for statistics
 try:
@@ -558,29 +553,6 @@ class RAGService(BaseService, AsyncComponent):
             self.logger.error(f"Error retrieving context: {e}")
             return [], []
 
-    def _chunk_text(
-        self, text: str, chunk_size: int = 1000, chunk_overlap: int = 200
-    ) -> list[str]:
-        """Split text into overlapping chunks for better retrieval."""
-        if not text or len(text) == 0:
-            return [""]
-
-        chunks = []
-        start = 0
-
-        while start < len(text):
-            end = min(start + chunk_size, len(text))
-            chunk = text[start:end]
-            chunks.append(chunk)
-
-            if end == len(text):
-                break
-
-            # Move start position with overlap
-            start = end - chunk_overlap
-
-        return chunks
-
     @handle_service_errors(
         error_types=[DatabaseError, RAGError], default_message="Context clearing failed"
     )
@@ -654,117 +626,9 @@ class RAGService(BaseService, AsyncComponent):
             f"Updated chunking config: size={chunk_size}, overlap={chunk_overlap}"
         )
 
-    def _get_cache_key(self, texts: list[str]) -> str:
-        """Generate a cache key for a list of texts."""
-        text_hash = hashlib.md5("||".join(texts).encode()).hexdigest()
-        return f"embeddings_{self.config['model']}_{text_hash}"
-
-    def _is_cache_valid(self, cache_key: str) -> bool:
-        """Check if cache entry is valid (not expired)."""
-        if cache_key not in self._cache:
-            return False
-
-        cached_data, timestamp = self._cache[cache_key]
-        current_time = time.time()
-
-        # Check if cache has expired
-        if current_time - timestamp > self.cache.default_ttl:
-            del self._cache[cache_key]
-            del self._cache_access_times[cache_key]
-            return False
-
-        return True
-
-    def _cleanup_cache(self) -> None:
-        """Remove expired cache entries and enforce cache size limit."""
-        current_time = time.time()
-        expired_keys = []
-
-        # Remove expired entries
-        for key, (cached_data, timestamp) in self._cache.items():
-            if current_time - timestamp > self.cache.default_ttl:
-                expired_keys.append(key)
-
-        for key in expired_keys:
-            del self._cache[key]
-            del self._cache_access_times[key]
-
-        # Enforce cache size limit using LRU
-        if len(self._cache) > self.cache.max_size:
-            # Sort by access time and remove oldest entries
-            sorted_keys = sorted(self._cache_access_times.items(), key=lambda x: x[1])
-            keys_to_remove = len(self._cache) - self.cache.max_size
-
-            for key, _ in sorted_keys[:keys_to_remove]:
-                del self._cache[key]
-                del self._cache_access_times[key]
-
-    def generate_embeddings_cached(self, texts: list[str]) -> list[list[float]]:
-        """Generate embeddings with caching for better performance."""
-        if not texts:
-            return []
-
-        cache_key = self._get_cache_key(texts)
-
-        # Check cache first
-        if self._is_cache_valid(cache_key):
-            self._cache_access_times[cache_key] = time.time()
-            cached_embeddings, _ = self._cache[cache_key]
-            self.logger.info(f"Cache hit for embeddings: {len(texts)} texts")
-            return cached_embeddings
-
-        # Generate new embeddings
-        embeddings = asyncio.run(self.generate_embeddings(texts))
-
-        # Cache the result
-        self._cache[cache_key] = (embeddings, time.time())
-        self._cache_access_times[cache_key] = time.time()
-
-        # Cleanup cache if needed
-        self._cleanup_cache()
-
-        return embeddings
-
-    def retrieve_context_cached(
-        self,
-        query: str,
-        n_results: int = 5,
-        min_relevance_score: float = 0.3,
-        filter_metadata: dict[str, Any] | None = None,
-    ) -> tuple[list[str], list[dict[str, Any]]]:
-        """Retrieve context with caching for better performance."""
-        if not query.strip():
-            return [], []
-
-        # Create cache key based on query and parameters
-        cache_params = {
-            "query": query,
-            "n_results": n_results,
-            "min_relevance_score": min_relevance_score,
-            "filter_metadata": filter_metadata or {},
-        }
-        cache_key = hashlib.md5(str(cache_params).encode()).hexdigest()
-
-        # Check cache first
-        if self._is_cache_valid(cache_key):
-            self._cache_access_times[cache_key] = time.time()
-            cached_result, _ = self._cache[cache_key]
-            self.logger.info(f"Cache hit for context retrieval: {query[:50]}...")
-            return cached_result
-
-        # Perform actual retrieval
-        result = self.retrieve_context(
-            query, n_results, min_relevance_score, filter_metadata
-        )
-
-        # Cache the result
-        self._cache[cache_key] = (result, time.time())
-        self._cache_access_times[cache_key] = time.time()
-
-        # Cleanup cache if needed
-        self._cleanup_cache()
-
-        return result
+    # Remove duplicate cache methods - use shared CacheService instead
+    # generate_embeddings_cached and retrieve_context_cached are now deprecated
+    # as they should use the base class cache methods instead
 
     def clear_cache(self) -> None:
         """Clear all cached data."""

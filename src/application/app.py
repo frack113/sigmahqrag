@@ -20,18 +20,8 @@ if current_dir not in sys.path:
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-# Import core services
-# Import Gradio components
-from src.components.chat_interface import ChatInterface
-from src.components.config_management import ConfigManagement
-from src.components.data_management import DataManagement
-from src.components.file_management import FileManagement
-from src.components.github_management import GitHubManagement
-from src.components.logs_viewer import LogsViewer
-from src.models.chat_history_service import get_chat_history_service
-from src.models.config_service import ConfigService
-from src.models.data_service import DataService
-from src.models.logging_service import get_logger
+from src.shared import ConfigService, DataService, get_chat_history_service
+from src.shared.logging_service import get_logger
 
 logger = get_logger(__name__)
 
@@ -49,7 +39,7 @@ class SigmaHQGradioApp:
     """
 
     def __init__(self):
-        # Initialize core services (same as NiceGUI version)
+        # Initialize core services
         self.config_service = ConfigService()
         self.data_service = DataService()
         self.chat_history_service = get_chat_history_service()
@@ -60,7 +50,14 @@ class SigmaHQGradioApp:
         # Initialize RAG services
         self.rag_chat_service = self._initialize_rag_service()
 
-        # Initialize tab components
+        # Initialize tab components - lazy imports to avoid circular dependencies
+        from src.components.chat_interface import ChatInterface
+        from src.components.config_management import ConfigManagement
+        from src.components.data_management import DataManagement
+        from src.components.file_management import FileManagement
+        from src.components.github_management import GitHubManagement
+        from src.components.logs_viewer import LogsViewer
+
         self.chat_interface = ChatInterface(
             self.rag_chat_service, self.chat_history_service
         )
@@ -87,45 +84,45 @@ class SigmaHQGradioApp:
             height: 100vh;
             overflow: hidden;
         }
-        
+
         .gr-column {
             height: 100%;
         }
-        
+
         .gr-tabitem {
             height: 100%;
         }
-        
+
         .gr-chatbot {
             height: 100%;
             overflow-y: auto;
         }
-        
+
         .gr-textbox {
             height: 100%;
         }
-        
+
         /* Responsive design for different screen sizes */
         @media (max-width: 768px) {
             .gr-column {
                 padding: 10px !important;
             }
         }
-        
+
         /* Custom scrollbar styling */
         ::-webkit-scrollbar {
             width: 8px;
         }
-        
+
         ::-webkit-scrollbar-track {
             background: #f1f1f1;
         }
-        
+
         ::-webkit-scrollbar-thumb {
             background: #888;
             border-radius: 4px;
         }
-        
+
         ::-webkit-scrollbar-thumb:hover {
             background: #555;
         }
@@ -142,10 +139,7 @@ class SigmaHQGradioApp:
     def _init_github_data(self):
         """Initialize GitHub management component with data."""
         try:
-            # The new GitHub management component handles its own initialization
-            # in the _init_data_sync method, so we don't need custom initialization here
             logger.info("GitHub management component will initialize itself")
-
         except Exception as e:
             logger.error(f"Error setting up GitHub initialization: {e}")
 
@@ -155,9 +149,6 @@ class SigmaHQGradioApp:
             # Get server configuration
             server_config = self.config.get("server", {})
             base_url = server_config.get("base_url", "http://localhost:1234")
-
-            # Get RAG configuration
-            rag_config = self.config.get("rag", {})
 
             # Import the new optimized RAG service
             from src.core.chat_service import create_chat_service
@@ -186,6 +177,7 @@ class SigmaHQGradioApp:
             )
 
             # Create chat service
+            rag_config = self.config.get("rag", {})
             chat_service = create_chat_service(
                 llm_service=llm_service,
                 rag_service=rag_service,
@@ -213,10 +205,8 @@ class SigmaHQGradioApp:
         """Create the main Gradio interface with tabs."""
         with gr.Blocks() as self.app:
             # Application header
-            gr.Markdown("""
-            # 🤖 SigmaHQ RAG Application
-            **Asynchronous Interface** - Non-blocking operations for slow local LLMs
-            """)
+            gr.Markdown("""# 🤖 SigmaHQ RAG Application
+**Asynchronous Interface** - Non-blocking operations for slow local LLMs""")
 
             # Create tabs for each main functionality
             with gr.Tabs() as tabs:
@@ -246,13 +236,9 @@ class SigmaHQGradioApp:
 
         return self.app
 
-    def launch(
-        self,
-        reload: bool = False,
-        debug: bool = False,
-    ):
+    def launch(self, reload: bool = False, debug: bool = False):
         """Launch the Gradio application with auto-reload support.
-        
+
         Args:
             reload: Enable auto-reload for development mode
             debug: Enable debug mode (only relevant in older Gradio versions)
@@ -260,10 +246,10 @@ class SigmaHQGradioApp:
         # Get port from config or use default
         server_config = self.config.get("server", {})
         port = server_config.get("port", 8002)
-        
+
         # Use reload flag as dev_mode for backward compatibility
         dev_mode = reload
-        
+
         mode_info = "development" if dev_mode else "production"
         logger.info(
             f"Starting SigmaHQ RAG Gradio application on port {port} in {mode_info} mode"
@@ -273,7 +259,6 @@ class SigmaHQGradioApp:
         self.create_interface()
 
         # Configure launch parameters based on mode
-        # In modern Gradio, server_name and server_port are passed via env vars or to Blocks.launch()
         launch_params = {
             "server_port": port,
             "server_name": "0.0.0.0",  # Allow external access
@@ -285,7 +270,6 @@ class SigmaHQGradioApp:
             "css": self.css,  # Use the CSS from create_interface
         }
 
-        # Development mode specific settings (debug parameter may be deprecated in newer Gradio)
         if dev_mode:
             logger.info("Development mode enabled with auto-reload")
         else:
@@ -297,7 +281,6 @@ class SigmaHQGradioApp:
         except OSError as e:
             if "Cannot find empty port" in str(e) or "address already in use" in str(e):
                 logger.warning(f"Port {port} is in use, trying alternative ports")
-                # Try multiple alternative ports
                 for alt_port in range(port + 1, port + 10):
                     try:
                         logger.info(f"Trying port {alt_port}")
@@ -312,7 +295,6 @@ class SigmaHQGradioApp:
                         else:
                             raise
                 else:
-                    # If all ports failed, raise the original error
                     raise OSError(f"Cannot find empty port in range: {port}-{port + 9}")
             else:
                 raise
@@ -343,7 +325,6 @@ def safe_llm_call(func, *args, **kwargs):
 
     async def wrapper():
         try:
-            # Add timeout protection
             result = await asyncio.wait_for(
                 func(*args, **kwargs), timeout=300  # 5 minutes timeout
             )

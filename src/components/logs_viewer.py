@@ -229,13 +229,15 @@ class LogsViewer(AsyncComponent):
             # Get recent logs from file system directly
             import time
             from pathlib import Path
-            
+
             log_file = Path("logs/app.log")
             if not log_file.exists():
                 return []
-            
+
             # Read last N lines from log file
-            log_lines = log_file.read_text(encoding="utf-8", errors="ignore").splitlines()[-limit:]
+            log_lines = log_file.read_text(
+                encoding="utf-8", errors="ignore"
+            ).splitlines()[-limit:]
             return log_lines
 
         except Exception as e:
@@ -411,13 +413,13 @@ class LogsViewer(AsyncComponent):
         try:
             # Clear log file directly using file system operations
             import logging
-            
+
             # Disable logger temporarily to prevent new logs
             handler = None
             for h in logger.handlers[:]:
                 handler = h
                 logger.removeHandler(h)
-            
+
             self.log_lines = []
             self.filtered_lines = []
             self._update_log_display()
@@ -443,25 +445,27 @@ class LogsViewer(AsyncComponent):
         """Download the current log file."""
         try:
             from pathlib import Path
-            
+
             log_file = Path("logs/app.log")
             if not log_file.exists():
                 self.status_text = "No log file to download"
                 return self.status_text
-            
+
             # Create download link (for Gradio)
             content = log_file.read_text(encoding="utf-8", errors="ignore")
             import io
-            
+
             from gradio.routes import CurrentRequest
-            
+
             info = {
                 "exists": True,
                 "log_file": str(log_file),
-                "size_mb": log_file.stat().st_size / (1024 * 1024) if log_file.exists() else 0,
+                "size_mb": (
+                    log_file.stat().st_size / (1024 * 1024) if log_file.exists() else 0
+                ),
                 "rotated_files": [],
             }
-            
+
             self.status_text = f"Log file ready for download: {info['log_file']}"
             return self.status_text
 
@@ -475,9 +479,9 @@ class LogsViewer(AsyncComponent):
         """Generate dynamic log information."""
         try:
             from pathlib import Path
-            
+
             log_file = Path("logs/app.log")
-            
+
             monitoring_status = "Monitoring" if self.is_monitoring else "Ready"
             auto_scroll_status = "Enabled" if self.auto_scroll else "Disabled"
             filter_status = (
@@ -489,11 +493,12 @@ class LogsViewer(AsyncComponent):
             log_file_exists = "Yes" if log_file.exists() else "No"
             log_size = 0.0
             rotated_files_count = 0
-            
+
             if log_file.exists():
                 log_size = round(log_file.stat().st_size / (1024 * 1024), 2)
                 # Find rotated files (app.log.*.txt)
                 import glob
+
                 rotated_files = glob.glob("logs/app.log.*.txt")
                 rotated_files_count = len(rotated_files)
 

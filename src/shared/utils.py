@@ -13,14 +13,14 @@ import re
 import threading
 import time
 import traceback
-from collections.abc import Callable
+from collections.abc import AsyncGenerator, Callable
 from contextlib import asynccontextmanager, contextmanager
 from datetime import datetime
 from functools import wraps
 from pathlib import Path
-from typing import (
-    Any,
-)
+from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 def handle_service_errors(
@@ -45,20 +45,10 @@ def handle_service_errors(
                 return await func(*args, **kwargs)
             except Exception as e:
                 logger = logging.getLogger(func.__module__)
-
-                # Check if this is an expected error type
-                if error_types and any(
-                    isinstance(e, error_type) for error_type in error_types
-                ):
-                    raise
-
-                # Log the error with full traceback
                 logger.error(
                     f"Service error in {func.__name__}: {e}\n"
                     f"Traceback: {traceback.format_exc()}"
                 )
-
-                # Re-raise as ServiceError for consistency
                 from .exceptions import ServiceError
 
                 raise ServiceError(f"{default_message}: {str(e)}")
@@ -101,9 +91,7 @@ def retry_with_backoff(
                     if attempt == max_retries:
                         break
 
-                    # Calculate delay with exponential backoff
                     delay = min(base_delay * (2**attempt), max_delay)
-
                     logger = logging.getLogger(func.__module__)
                     logger.warning(
                         f"Attempt {attempt + 1}/{max_retries + 1} failed for {func.__name__}: {e}. "
@@ -112,7 +100,6 @@ def retry_with_backoff(
 
                     await asyncio.sleep(delay)
 
-            # If we get here, all retries failed
             raise last_exception
 
         return wrapper
@@ -120,7 +107,7 @@ def retry_with_backoff(
     return decorator
 
 
-def rate_limit(max_calls: int, time_window: float):
+def rate_limit(max_calls: int, time_window: float) -> Callable:
     """
     Decorator for rate limiting function calls.
 
@@ -140,19 +127,13 @@ def rate_limit(max_calls: int, time_window: float):
         async def wrapper(*args, **kwargs):
             with lock:
                 now = time.time()
+                calls[:] = [t for t in calls if now - t < time_window]
 
-                # Remove old calls outside the time window
-                calls[:] = [
-                    call_time for call_time in calls if now - call_time < time_window
-                ]
-
-                # Check if we're within the rate limit
                 if len(calls) >= max_calls:
                     raise Exception(
-                        f"Rate limit exceeded: {max_calls} calls per {time_window} seconds"
+                        f"Rate limit exceeded: {max_calls} calls per {time_window}s"
                     )
 
-                # Add current call
                 calls.append(now)
 
             return await func(*args, **kwargs)
@@ -178,15 +159,12 @@ def async_to_sync(async_func: Callable) -> Callable:
         try:
             loop = asyncio.get_event_loop()
         except RuntimeError:
-            # No event loop running, create a new one
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
 
         if loop.is_running():
-            # Event loop is already running, use create_task
             return loop.create_task(async_func(*args, **kwargs))
         else:
-            # Run the async function
             return loop.run_until_complete(async_func(*args, **kwargs))
 
     return wrapper
@@ -213,49 +191,29 @@ def sync_to_async(sync_func: Callable) -> Callable:
 
 @contextmanager
 def timer(operation_name: str):
-    """
-    Context manager for timing operations.
-
-    Args:
-        operation_name: Name of the operation being timed
-
-    Yields:
-        None
-    """
+    """Context manager for timing operations."""
     start_time = time.time()
     try:
         yield
     finally:
-        end_time = time.time()
-        duration = end_time - start_time
-        logger = logging.getLogger(__name__)
-        logger.info(f"{operation_name} completed in {duration:.4f} seconds")
+        duration = time.time() - start_time
+        logger.info(f"{operation_name} completed in {duration:.4f}s")
 
 
 @asynccontextmanager
 async def async_timer(operation_name: str):
-    """
-    Async context manager for timing operations.
-
-    Args:
-        operation_name: Name of the operation being timed
-
-    Yields:
-        None
-    """
+    """Async context manager for timing operations."""
     start_time = time.time()
     try:
         yield
     finally:
-        end_time = time.time()
-        duration = end_time - start_time
-        logger = logging.getLogger(__name__)
-        logger.info(f"{operation_name} completed in {duration:.4f} seconds")
+        duration = time.time() - start_time
+        logger.info(f"{operation_name} completed in {duration:.4f}s")
 
 
 def generate_hash(data: str | bytes | dict | list) -> str:
     """
-    Generate a hash for the given data.
+    Generate a SHA256 hash for the given data.
 
     Args:
         data: Data to hash (string, bytes, dict, or list)
@@ -267,70 +225,10 @@ def generate_hash(data: str | bytes | dict | list) -> str:
         data = json.dumps(data, sort_keys=True).encode()
     elif isinstance(data, str):
         data = data.encode()
-
     return hashlib.sha256(data).hexdigest()
 
 
-def sanitize_filename(filename: str) -> str:
-    """
-    Sanitize filename to prevent path traversal and other security issues.
-
-    Args:
-        filename: Original filename
-
-    Returns:
-        Sanitized filename
-    """
-    # Remove dangerous characters
-    safe_chars = re.sub(r"[^\w\s.-]", "", filename)
-
-    # Remove leading dots and slashes
-    safe_chars = safe_chars.lstrip(".").lstrip("/")
-
-    # Limit length
-    if len(safe_chars) > 255:
-        name, ext = os.path.splitext(safe_chars)
-        safe_chars = name[: 255 - len(ext)] + ext
-
-    return safe_chars
-
-
-def validate_file_upload(
-    file_path: str, allowed_extensions: list[str] | None = None, max_size_mb: int = 10
-) -> bool:
-    """
-    Validate file upload for security.
-
-    Args:
-        file_path: Path to the uploaded file
-        allowed_extensions: List of allowed file extensions
-        max_size_mb: Maximum file size in megabytes
-
-    Returns:
-        True if file is valid, False otherwise
-    """
-    import os
-
-    if not os.path.exists(file_path):
-        return False
-
-    # Check file size
-    file_size_mb = os.path.getsize(file_path) / (1024 * 1024)
-    if file_size_mb > max_size_mb:
-        return False
-
-    # Check file extension
-    if allowed_extensions:
-        file_ext = os.path.splitext(file_path)[1].lower()
-        if file_ext not in allowed_extensions:
-            return False
-
-    return True
-
-
-def chunk_text(
-    text: str, chunk_size: int = 1000, chunk_overlap: int = 200
-) -> list[str]:
+def chunk_text(text: str, chunk_size: int = 1000, chunk_overlap: int = 200) -> list[str]:
     """
     Split text into overlapping chunks.
 
@@ -355,11 +253,60 @@ def chunk_text(
 
         if end == len(text):
             break
-
-        # Move start position with overlap
         start = end - chunk_overlap
 
     return chunks
+
+
+def sanitize_filename(filename: str) -> str:
+    """
+    Sanitize filename to prevent path traversal and other security issues.
+
+    Args:
+        filename: Original filename
+
+    Returns:
+        Sanitized filename
+    """
+    safe_chars = re.sub(r"[^\w\s.-]", "", filename)
+    safe_chars = safe_chars.lstrip(".").lstrip("/")
+
+    if len(safe_chars) > 255:
+        name, ext = os.path.splitext(safe_chars)
+        safe_chars = name[: 255 - len(ext)] + ext
+
+    return safe_chars
+
+
+def validate_file_upload(
+    file_path: str,
+    allowed_extensions: list[str] | None = None,
+    max_size_mb: int = 10,
+) -> bool:
+    """
+    Validate file upload for security.
+
+    Args:
+        file_path: Path to the uploaded file
+        allowed_extensions: List of allowed file extensions
+        max_size_mb: Maximum file size in megabytes
+
+    Returns:
+        True if file is valid, False otherwise
+    """
+    if not os.path.exists(file_path):
+        return False
+
+    file_size_mb = os.path.getsize(file_path) / (1024 * 1024)
+    if file_size_mb > max_size_mb:
+        return False
+
+    if allowed_extensions:
+        file_ext = os.path.splitext(file_path)[1].lower()
+        if file_ext not in allowed_extensions:
+            return False
+
+    return True
 
 
 def format_size(size_bytes: int) -> str:
@@ -394,8 +341,6 @@ def get_file_info(file_path: str) -> dict[str, Any]:
     Returns:
         Dictionary with file information
     """
-    import os
-
     if not os.path.exists(file_path):
         return {"error": "File not found"}
 
@@ -429,7 +374,6 @@ def create_directory_if_not_exists(directory_path: str) -> bool:
         Path(directory_path).mkdir(parents=True, exist_ok=True)
         return True
     except Exception as e:
-        logger = logging.getLogger(__name__)
         logger.error(f"Failed to create directory {directory_path}: {e}")
         return False
 
@@ -452,42 +396,6 @@ def safe_divide(numerator: float, denominator: float, default: float = 0.0) -> f
         return default
 
 
-def get_nested_value(data: dict, keys: list[str], default: Any = None) -> Any:
-    """
-    Get nested value from dictionary using list of keys.
-
-    Args:
-        data: Dictionary to search
-        keys: List of keys to traverse
-        default: Default value if key not found
-
-    Returns:
-        Nested value or default
-    """
-    try:
-        for key in keys:
-            data = data[key]
-        return data
-    except (KeyError, TypeError):
-        return default
-
-
-def set_nested_value(data: dict, keys: list[str], value: Any) -> None:
-    """
-    Set nested value in dictionary using list of keys.
-
-    Args:
-        data: Dictionary to modify
-        keys: List of keys to traverse
-        value: Value to set
-    """
-    for key in keys[:-1]:
-        if key not in data:
-            data[key] = {}
-        data = data[key]
-    data[keys[-1]] = value
-
-
 def deep_merge(dict1: dict, dict2: dict) -> dict:
     """
     Deep merge two dictionaries.
@@ -502,7 +410,11 @@ def deep_merge(dict1: dict, dict2: dict) -> dict:
     result = dict1.copy()
 
     for key, value in dict2.items():
-        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+        if (
+            key in result
+            and isinstance(result[key], dict)
+            and isinstance(value, dict)
+        ):
             result[key] = deep_merge(result[key], value)
         else:
             result[key] = value
@@ -530,6 +442,55 @@ def flatten_dict(d: dict, parent_key: str = "", sep: str = ".") -> dict:
         else:
             items.append((new_key, v))
     return dict(items)
+
+
+def get_nested_value(data: dict, keys: list[str], default: Any = None) -> Any:
+    """
+    Get nested value from dictionary using list of keys.
+
+    Args:
+        data: Dictionary to search
+        keys: List of keys to traverse
+        default: Default value if key not found
+
+    Returns:
+        Nested value or default
+    """
+    current = data
+    for key in keys:
+        if isinstance(current, dict) and key in current:
+            current = current[key]
+        else:
+            return default
+    return current
+
+
+def set_nested_value(data: dict, keys: list[str], value: Any) -> bool:
+    """
+    Set nested value in dictionary using list of keys.
+
+    Args:
+        data: Dictionary to modify
+        keys: List of keys to traverse
+        value: Value to set
+
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        current = data
+        for key in keys[:-1]:
+            if isinstance(current, dict) and key not in current:
+                current[key] = {}
+            elif not isinstance(current, dict):
+                return False
+            current = current[key]
+        if isinstance(current, dict):
+            current[keys[-1]] = value
+            return True
+        return False
+    except Exception:
+        return False
 
 
 def is_valid_email(email: str) -> bool:
@@ -634,13 +595,15 @@ def create_progress_bar(current: int, total: int, width: int = 30) -> str:
 
     percentage = (current / total) * 100
     filled_width = int(width * current // total)
-
     bar = "█" * filled_width + " " * (width - filled_width)
     return f"[{bar}] {current}/{total} ({percentage:.1f}%)"
 
 
 async def batch_process(
-    items: list[Any], process_func: Callable, batch_size: int = 10, delay: float = 0.1
+    items: list[Any],
+    process_func: Callable,
+    batch_size: int = 10,
+    delay: float = 0.1,
 ) -> list[Any]:
     """
     Process items in batches with optional delay.
@@ -716,9 +679,7 @@ def get_app_directory() -> Path:
     Returns:
         Path object representing the application directory
     """
-    # Get the directory where this utils module is located
     current_file = Path(__file__)
-    # Go up to the src directory, then to the root
     app_dir = current_file.parent.parent.parent
     return app_dir
 
@@ -746,10 +707,170 @@ def cleanup_temp_files(directory: str, age_hours: int = 24) -> int:
                     file_path.unlink()
                     deleted_count += 1
                 except Exception as e:
-                    logger = logging.getLogger(__name__)
                     logger.warning(f"Failed to delete {file_path}: {e}")
     except Exception as e:
-        logger = logging.getLogger(__name__)
         logger.error(f"Error cleaning up temp files: {e}")
 
     return deleted_count
+
+
+def calculate_moving_average(values: list[float], window_size: int = 5) -> list[float]:
+    """
+    Calculate moving average for a list of values.
+
+    Args:
+        values: List of numeric values
+        window_size: Size of the moving window
+
+    Returns:
+        List of moving average values
+    """
+    if not values:
+        return []
+
+    result = []
+    for i in range(len(values)):
+        start_idx = max(0, i - window_size + 1)
+        window = values[start_idx : i + 1]
+        result.append(sum(window) / len(window))
+
+    return result
+
+
+def async_execute(func: Callable, *args, **kwargs) -> Any:
+    """
+    Execute a function in the current event loop.
+
+    Args:
+        func: Function to execute
+        *args: Positional arguments
+        **kwargs: Keyword arguments
+
+    Returns:
+        Result of the function execution
+    """
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            return loop.run_until_complete(func(*args, **kwargs))
+        else:
+            return loop.create_task(func(*args, **kwargs)).result()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        return loop.run_until_complete(func(*args, **kwargs))
+
+
+# DUPLICATE REMOVAL - merge_dicts has been replaced by deep_merge above
+
+def truncate_string(text: str, max_length: int, ellipsis: str = "...") -> str:
+    """
+    Truncate a string to a maximum length with an ellipsis.
+
+    Args:
+        text: Text to truncate
+        max_length: Maximum length
+        ellipsis: String to append if truncated
+
+    Returns:
+        Truncated string
+    """
+    if len(text) <= max_length:
+        return text
+    return text[: max_length - len(ellipsis)] + ellipsis
+
+
+def parse_boolean(value: Any) -> bool | None:
+    """
+    Parse a value as boolean.
+
+    Args:
+        value: Value to parse
+
+    Returns:
+        Boolean value or None if parsing fails
+    """
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        return value.lower() in ("true", "yes", "1", "on")
+    if isinstance(value, (int, float)):
+        return bool(value)
+    return None
+
+
+def get_file_extension(filename: str) -> str:
+    """
+    Get the file extension from a filename.
+
+    Args:
+        filename: Filename or path
+
+    Returns:
+        File extension with dot prefix
+    """
+    _, ext = os.path.splitext(filename)
+    return ext.lower()
+
+
+def is_file_extension_allowed(
+    filename: str, allowed_extensions: list[str]
+) -> bool:
+    """
+    Check if a file extension is in the allowed list.
+
+    Args:
+        filename: Filename to check
+        allowed_extensions: List of allowed extensions
+
+    Returns:
+        True if extension is allowed
+    """
+    ext = get_file_extension(filename)
+    return ext in [e.lower() for e in allowed_extensions]
+
+
+def safe_json_loads(json_str: str, default: Any = None) -> Any:
+    """
+    Safely load JSON from a string.
+
+    Args:
+        json_str: JSON string to parse
+        default: Default value if parsing fails
+
+    Returns:
+        Parsed JSON or default value
+    """
+    try:
+        return json.loads(json_str)
+    except (json.JSONDecodeError, TypeError):
+        return default
+
+
+def safe_json_dumps(obj: Any, indent: int = 2) -> str:
+    """
+    Safely dump object to JSON string.
+
+    Args:
+        obj: Object to serialize
+        indent: Indentation level
+
+    Returns:
+        JSON string or empty string if serialization fails
+    """
+    try:
+        return json.dumps(obj, indent=indent, default=str)
+    except (TypeError, ValueError):
+        return ""
+
+
+def get_timezone_name() -> str:
+    """Get the current timezone name."""
+    try:
+        import zoneinfo
+
+        return zoneinfo.ZoneInfo(key="local").key
+    except ImportError:
+        import pytz
+
+        return pytz.timezone("local").name

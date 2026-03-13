@@ -33,6 +33,9 @@ from src.shared import (
     NetworkError,
     get_cpu_usage,
     get_memory_usage,
+)
+
+from src.shared.utils import (
     handle_service_errors,
     rate_limit,
     retry_with_backoff,

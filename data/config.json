@@ -18,9 +18,20 @@
     }
   ],
   "llm": {
-    "model": "mistralai/ministral-3-14b-reasoning",
+    "model": "qwen/qwen3.5-9b",
     "temperature": 0.7,
     "max_tokens": 5000,
     "base_url": "http://127.0.0.1:1234"
+  },
+  "ui_css": {
+    "theme": "soft",
+    "title": "SigmaHQ RAG",
+    "favicon": "favicon.ico",
+    "analytics_enabled": false,
+    "primary_color": "#4f46e5",
+    "secondary_color": "#10b981",
+    "background_color": "#ffffff",
+    "text_color": "#1f2937",
+    "font_family": "Arial, sans-serif"
   }
 }

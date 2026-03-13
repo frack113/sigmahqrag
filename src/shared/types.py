@@ -71,7 +71,7 @@ class EmbeddingConfig:
 
     def update(self, config: dict[str, Any]) -> None:
         """Update configuration from a dictionary.
-        
+
         Args:
             config: Dictionary with configuration values to update
         """
