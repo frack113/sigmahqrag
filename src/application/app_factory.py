@@ -19,6 +19,7 @@ from ..infrastructure import (
 )
 from ..shared import (
     DEFAULT_CONFIG,
+    SERVICE_APPLICATION,
     STATUS_DEGRADED,
     STATUS_HEALTHY,
     STATUS_UNHEALTHY,

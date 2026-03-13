@@ -39,7 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### Removed
 - **Duplicate Documentation**: Removed duplicate content that existed in multiple locations
 - **Outdated References**: Removed references to old NiceGUI-based architecture
-- **Incomplete Documentation**: Removed incomplete or outdated documentation sections
+- **Documentation Cleanup**: Updated documentation to reflect current Gradio-based architecture
 - **Redundant Files**: Cleaned up redundant documentation files
 
 ### 2026-03-09
@@ -179,7 +179,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Basic chat interface with document upload capabilities
 - Configuration management for GitHub repositories
 - Repository addition, removal, and update functionality
-- NiceGUI-based responsive UI
+- Gradio-based responsive UI with async operations
 
 #### Fixed
 - GitHub repository update functionality
@@ -192,7 +192,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial design documents for chat interface and GitHub integration
 
 ### Changed
-- Migration from JavaScript/HTML to Python with NiceGUI framework
+- Migration from JavaScript/HTML to Python with Gradio framework
 
 ## [0.0.0] - 2026-02-22
 - Started project with JavaScript/HTML implementation

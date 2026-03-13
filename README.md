@@ -84,7 +84,7 @@ A comprehensive Retrieval-Augmented Generation (RAG) application with document a
 ### Optimized LLM Service Usage
 
 ```python
-from nicegui_app.models.llm_service_optimized import create_chat_service
+from src.core.llm_service import create_chat_service
 
 # Create optimized LLM service
 llm_service = create_chat_service()
@@ -101,7 +101,7 @@ responses = llm_service.batch_completion(prompts)
 ### RAG with Document Storage
 
 ```python
-from nicegui_app.models.rag_service_optimized import create_rag_service
+from src.core.rag_service import create_rag_service
 
 # Create RAG service
 rag_service = create_rag_service()
@@ -120,8 +120,8 @@ async for chunk in rag_service.generate_streaming_rag_response("Your question?")
 ### Factory Functions for Different Use Cases
 
 ```python
-from nicegui_app.models.llm_service_optimized import (
-    create_chat_service, 
+from src.core.llm_service import (
+    create_chat_service,
     create_completion_service, 
     create_creative_service
 )
@@ -139,7 +139,7 @@ creative_service = create_creative_service()
 ### Specialized RAG Services
 
 ```python
-from nicegui_app.models.rag_service_optimized import (
+from src.core.rag_service import (
     create_document_rag_service,
     create_chat_rag_service
 )
