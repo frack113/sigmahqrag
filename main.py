@@ -3,6 +3,7 @@ import sys
 import signal
 import logging
 import argparse
+import os
 
 # Configure logging
 logging.basicConfig(
@@ -39,13 +40,27 @@ def main():
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
+    # Set environment variables for Gradio configuration
+    server_host = "0.0.0.0" if not args.host else args.host
+    os.environ["GRADIO_SERVER_NAME"] = server_host
+    os.environ["GRADIO_SERVER_PORT"] = str(args.port)
+    
+    if args.reload:
+        os.environ["GRADIO_ALLOW_ORIGIN"] = "*http://*/*"
+
     logger.info(
-        f"Starting application on {args.host or '0.0.0.0'}:{args.port}" +
+        f"Starting application on {server_host}:{args.port}" +
         (" (auto-reload enabled)" if args.reload else "")
     )
 
     app = SigmaHQGradioApp()
-    app.launch(host=args.host, port=args.port, reload=args.reload)
+    
+    try:
+        app.launch(reload=args.reload)
+    except KeyboardInterrupt:
+        logger.info("Application shutdown requested")
+    finally:
+        app.cleanup()
 
 
 if __name__ in {"__main__", "__mp_main__"}:

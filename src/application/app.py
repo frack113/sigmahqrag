@@ -248,12 +248,22 @@ class SigmaHQGradioApp:
 
     def launch(
         self,
-        port: int = 8002,
-        dev_mode: bool = False,
         reload: bool = False,
         debug: bool = False,
     ):
-        """Launch the Gradio application with auto-reload support."""
+        """Launch the Gradio application with auto-reload support.
+        
+        Args:
+            reload: Enable auto-reload for development mode
+            debug: Enable debug mode (only relevant in older Gradio versions)
+        """
+        # Get port from config or use default
+        server_config = self.config.get("server", {})
+        port = server_config.get("port", 8002)
+        
+        # Use reload flag as dev_mode for backward compatibility
+        dev_mode = reload
+        
         mode_info = "development" if dev_mode else "production"
         logger.info(
             f"Starting SigmaHQ RAG Gradio application on port {port} in {mode_info} mode"
@@ -263,6 +273,7 @@ class SigmaHQGradioApp:
         self.create_interface()
 
         # Configure launch parameters based on mode
+        # In modern Gradio, server_name and server_port are passed via env vars or to Blocks.launch()
         launch_params = {
             "server_port": port,
             "server_name": "0.0.0.0",  # Allow external access
@@ -274,24 +285,11 @@ class SigmaHQGradioApp:
             "css": self.css,  # Use the CSS from create_interface
         }
 
-        # Development mode specific settings
+        # Development mode specific settings (debug parameter may be deprecated in newer Gradio)
         if dev_mode:
-            launch_params.update(
-                {
-                    "debug": True,  # Enable debug mode for development
-                    "max_threads": 4,  # Limit threads in development
-                    "prevent_thread_lock": True,  # Allow main thread to continue
-                }
-            )
+            logger.info("Development mode enabled with auto-reload")
         else:
-            # Production mode settings
-            launch_params.update(
-                {
-                    "debug": False,  # Disable debug mode for production
-                    "max_threads": 10,  # More threads for production
-                    "prevent_thread_lock": False,  # Standard behavior
-                }
-            )
+            logger.info("Production mode")
 
         # Launch the application with fallback port
         try:

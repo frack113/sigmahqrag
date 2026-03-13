@@ -69,6 +69,16 @@ class EmbeddingConfig:
         """Convert to dictionary for JSON serialization."""
         return asdict(self)
 
+    def update(self, config: dict[str, Any]) -> None:
+        """Update configuration from a dictionary.
+        
+        Args:
+            config: Dictionary with configuration values to update
+        """
+        for key, value in config.items():
+            if hasattr(self, key):
+                setattr(self, key, value)
+
 
 @dataclass
 class LLMConfig:

@@ -42,6 +42,14 @@ from src.shared import (
     handle_service_errors,
 )
 
+# Import utility decorators and exceptions
+from src.shared.utils import (
+    retry_with_backoff,
+    rate_limit,
+)
+
+from src.shared.exceptions import LLMError
+
 # Import memory/CPU utilities for statistics
 try:
     from psutil import Process, cpu_percent, virtual_memory
