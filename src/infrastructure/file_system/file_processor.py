@@ -26,6 +26,18 @@ from src.shared import (
     validate_file_upload,
 )
 
+# Default allowed file extensions
+DEFAULT_ALLOWED_FILE_EXTENSIONS = [
+    ".txt",
+    ".md",
+    ".pdf",
+    ".docx",
+    ".doc",
+    ".csv",
+    ".json",
+    ".xml",
+]
+
 
 @dataclass
 class FileProcessorStats:

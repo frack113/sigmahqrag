@@ -2,9 +2,12 @@
 Utility functions for SigmaHQ RAG application.
 
 Provides common utility functions used across the application.
+
+Note: All async operations use Gradio's native queue=True support,
+which handles async execution automatically. Manual event loop management
+is not needed and has been removed from utils.py.
 """
 
-import asyncio
 import hashlib
 import json
 import logging
@@ -13,7 +16,7 @@ import re
 import threading
 import time
 import traceback
-from collections.abc import AsyncGenerator, Callable
+from collections.abc import Callable
 from contextlib import asynccontextmanager, contextmanager
 from datetime import datetime
 from functools import wraps
@@ -26,7 +29,7 @@ logger = logging.getLogger(__name__)
 def handle_service_errors(
     error_types: list[type[Exception]] | None = None,
     default_message: str = "Service operation failed",
-) -> Callable:
+) -> Callable[[Callable], Callable]:
     """
     Decorator for standardized error handling in services.
 
@@ -63,9 +66,12 @@ def retry_with_backoff(
     base_delay: float = 1.0,
     max_delay: float = 60.0,
     exceptions: tuple[type[Exception], ...] = (Exception,),
-) -> Callable:
+) -> Callable[[Callable], Callable]:
     """
     Decorator for retrying operations with exponential backoff.
+
+    Note: This decorator is designed for sync functions that run in Gradio's
+    event loop. For async functions, use asyncio.sleep directly within the function.
 
     Args:
         max_retries: Maximum number of retry attempts
@@ -79,12 +85,12 @@ def retry_with_backoff(
 
     def decorator(func: Callable) -> Callable:
         @wraps(func)
-        async def wrapper(*args, **kwargs):
+        def wrapper(*args, **kwargs):
             last_exception = None
 
             for attempt in range(max_retries + 1):
                 try:
-                    return await func(*args, **kwargs)
+                    return func(*args, **kwargs)
                 except exceptions as e:
                     last_exception = e
 
@@ -94,11 +100,11 @@ def retry_with_backoff(
                     delay = min(base_delay * (2**attempt), max_delay)
                     logger = logging.getLogger(func.__module__)
                     logger.warning(
-                        f"Attempt {attempt + 1}/{max_retries + 1} failed for {func.__name__}: {e}. "
-                        f"Retrying in {delay:.2f} seconds..."
+                        f"Attempt {attempt + 1}/{max_retries + 1} failed "
+                        f"for {func.__name__}: {e}. Retrying in {delay:.2f} seconds..."
                     )
 
-                    await asyncio.sleep(delay)
+                    time.sleep(delay)
 
             raise last_exception
 
@@ -107,9 +113,11 @@ def retry_with_backoff(
     return decorator
 
 
-def rate_limit(max_calls: int, time_window: float) -> Callable:
+def rate_limit(max_calls: int, time_window: float) -> Callable[[Callable], Callable]:
     """
     Decorator for rate limiting function calls.
+
+    Note: For async functions in Gradio, use queue=True instead.
 
     Args:
         max_calls: Maximum number of calls allowed
@@ -124,7 +132,7 @@ def rate_limit(max_calls: int, time_window: float) -> Callable:
         lock = threading.Lock()
 
         @wraps(func)
-        async def wrapper(*args, **kwargs):
+        def wrapper(*args, **kwargs):
             with lock:
                 now = time.time()
                 calls[:] = [t for t in calls if now - t < time_window]
@@ -136,57 +144,11 @@ def rate_limit(max_calls: int, time_window: float) -> Callable:
 
                 calls.append(now)
 
-            return await func(*args, **kwargs)
+            return func(*args, **kwargs)
 
         return wrapper
 
     return decorator
-
-
-def async_to_sync(async_func: Callable) -> Callable:
-    """
-    Convert an async function to sync by running it in an event loop.
-
-    Args:
-        async_func: Async function to convert
-
-    Returns:
-        Sync version of the function
-    """
-
-    @wraps(async_func)
-    def wrapper(*args, **kwargs):
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-
-        if loop.is_running():
-            return loop.create_task(async_func(*args, **kwargs))
-        else:
-            return loop.run_until_complete(async_func(*args, **kwargs))
-
-    return wrapper
-
-
-def sync_to_async(sync_func: Callable) -> Callable:
-    """
-    Convert a sync function to async by running it in a thread pool.
-
-    Args:
-        sync_func: Sync function to convert
-
-    Returns:
-        Async version of the function
-    """
-
-    @wraps(sync_func)
-    async def wrapper(*args, **kwargs):
-        loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, sync_func, *args, **kwargs)
-
-    return wrapper
 
 
 @contextmanager
@@ -228,7 +190,9 @@ def generate_hash(data: str | bytes | dict | list) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def chunk_text(text: str, chunk_size: int = 1000, chunk_overlap: int = 200) -> list[str]:
+def chunk_text(
+    text: str, chunk_size: int = 1000, chunk_overlap: int = 200
+) -> list[str]:
     """
     Split text into overlapping chunks.
 
@@ -410,11 +374,7 @@ def deep_merge(dict1: dict, dict2: dict) -> dict:
     result = dict1.copy()
 
     for key, value in dict2.items():
-        if (
-            key in result
-            and isinstance(result[key], dict)
-            and isinstance(value, dict)
-        ):
+        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
             result[key] = deep_merge(result[key], value)
         else:
             result[key] = value
@@ -599,37 +559,6 @@ def create_progress_bar(current: int, total: int, width: int = 30) -> str:
     return f"[{bar}] {current}/{total} ({percentage:.1f}%)"
 
 
-async def batch_process(
-    items: list[Any],
-    process_func: Callable,
-    batch_size: int = 10,
-    delay: float = 0.1,
-) -> list[Any]:
-    """
-    Process items in batches with optional delay.
-
-    Args:
-        items: List of items to process
-        process_func: Function to process each item
-        batch_size: Number of items to process in each batch
-        delay: Delay between batches in seconds
-
-    Returns:
-        List of processed results
-    """
-    results = []
-
-    for i in range(0, len(items), batch_size):
-        batch = items[i : i + batch_size]
-        batch_results = await asyncio.gather(*[process_func(item) for item in batch])
-        results.extend(batch_results)
-
-        if delay > 0 and i + batch_size < len(items):
-            await asyncio.sleep(delay)
-
-    return results
-
-
 def get_memory_usage() -> dict[str, Any]:
     """
     Get current memory usage statistics.
@@ -737,32 +666,6 @@ def calculate_moving_average(values: list[float], window_size: int = 5) -> list[
     return result
 
 
-def async_execute(func: Callable, *args, **kwargs) -> Any:
-    """
-    Execute a function in the current event loop.
-
-    Args:
-        func: Function to execute
-        *args: Positional arguments
-        **kwargs: Keyword arguments
-
-    Returns:
-        Result of the function execution
-    """
-    try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            return loop.run_until_complete(func(*args, **kwargs))
-        else:
-            return loop.create_task(func(*args, **kwargs)).result()
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        return loop.run_until_complete(func(*args, **kwargs))
-
-
-# DUPLICATE REMOVAL - merge_dicts has been replaced by deep_merge above
-
 def truncate_string(text: str, max_length: int, ellipsis: str = "...") -> str:
     """
     Truncate a string to a maximum length with an ellipsis.
@@ -813,9 +716,7 @@ def get_file_extension(filename: str) -> str:
     return ext.lower()
 
 
-def is_file_extension_allowed(
-    filename: str, allowed_extensions: list[str]
-) -> bool:
+def is_file_extension_allowed(filename: str, allowed_extensions: list[str]) -> bool:
     """
     Check if a file extension is in the allowed list.
 
@@ -866,11 +767,6 @@ def safe_json_dumps(obj: Any, indent: int = 2) -> str:
 
 def get_timezone_name() -> str:
     """Get the current timezone name."""
-    try:
-        import zoneinfo
+    import zoneinfo
 
-        return zoneinfo.ZoneInfo(key="local").key
-    except ImportError:
-        import pytz
-
-        return pytz.timezone("local").name
+    return zoneinfo.ZoneInfo(key="local").key

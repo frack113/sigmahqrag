@@ -1,28 +1,19 @@
 """
-LM Studio Client for SigmaHQ RAG application.
+LM Studio Client - Native Gradio Integration
 
-Provides LM Studio API integration for local LLM operations.
+Uses simple methods without async wrappers:
+- Direct requests usage with retry handling
+- Simple streaming via synchronous generators
+- No asyncio overhead needed (Gradio queue=True handles async)
 """
 
-import asyncio
 import json
 import time
-from collections.abc import AsyncGenerator
+from collections.abc import Generator
 from dataclasses import dataclass
 from typing import Any
 
 import requests
-
-from src.shared import (
-    DEFAULT_LM_STUDIO_BASE_URL,
-    STATUS_DEGRADED,
-    STATUS_HEALTHY,
-    STATUS_UNHEALTHY,
-    BaseService,
-    NetworkError,
-    ServiceError,
-)
-from src.shared.constants import SERVICE_LM_STUDIO
 
 
 @dataclass
@@ -35,47 +26,40 @@ class LMStudioStats:
     total_completions: int = 0
     total_embeddings: int = 0
     average_response_time: float = 0.0
-    memory_usage_mb: float = 0.0
-    last_error: str | None = None
-    uptime_seconds: float = 0.0
 
 
-class LMStudioClient(BaseService):
+class LMStudioClient:
     """
-    LM Studio API client for local LLM operations.
+    Simplified LM Studio API client for local LLM operations.
 
     Features:
-    - Text completion
+    - Text completion (streaming and non-streaming)
     - Embedding generation
     - Model management
-    - Health monitoring
-    - Error handling
+    - Simple error handling with built-in retry logic
     """
 
     def __init__(
         self,
-        base_url: str = DEFAULT_LM_STUDIO_BASE_URL,
+        base_url: str = "http://localhost:1234",
         timeout: int = 30,
         max_retries: int = 3,
+        temperature: float = 0.7,
+        max_tokens: int = 512,
     ):
-        """
-        Initialize the LM Studio client.
-
-        Args:
-            base_url: LM Studio API base URL
-            timeout: Request timeout in seconds
-            max_retries: Maximum number of retries for failed requests
-        """
-        BaseService.__init__(self, f"{SERVICE_LM_STUDIO}.lm_studio_client")
-
+        """Initialize the LM Studio client."""
         # Configuration
-        self.base_url = base_url
+        self.base_url = base_url.rstrip("/")
         self.timeout = timeout
         self.max_retries = max_retries
+        self.temperature = temperature
+        self.max_tokens = max_tokens
 
         # Statistics
         self.stats = LMStudioStats()
-        self._start_time = time.time()
+
+        # Default model
+        self.model = "qwen2.5-7b-instruct"
 
     def _get_headers(self) -> dict[str, str]:
         """Get headers for LM Studio API requests."""
@@ -83,33 +67,19 @@ class LMStudioClient(BaseService):
             "Content-Type": "application/json",
         }
 
-    async def _make_request(
+    def _make_request(
         self,
         method: str,
         endpoint: str,
         data: dict[str, Any] | None = None,
         params: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """
-        Make a request to the LM Studio API.
-
-        Args:
-            method: HTTP method
-            endpoint: API endpoint
-            data: Request data
-            params: Query parameters
-
-        Returns:
-            Response data
-        """
-        start_time = time.time()
-
+        """Make a request to the LM Studio API with retry logic."""
         for attempt in range(self.max_retries):
             try:
                 url = f"{self.base_url}/{endpoint}"
                 headers = self._get_headers()
 
-                # Make request
                 if method.upper() == "GET":
                     response = requests.get(
                         url, headers=headers, params=params, timeout=self.timeout
@@ -118,227 +88,139 @@ class LMStudioClient(BaseService):
                     response = requests.post(
                         url, headers=headers, json=data, timeout=self.timeout
                     )
-                elif method.upper() == "PUT":
-                    response = requests.put(
-                        url, headers=headers, json=data, timeout=self.timeout
-                    )
-                elif method.upper() == "DELETE":
-                    response = requests.delete(
-                        url, headers=headers, timeout=self.timeout
-                    )
                 else:
-                    raise ServiceError(f"Unsupported HTTP method: {method}")
+                    raise ValueError(f"Unsupported HTTP method: {method}")
 
-                # Update statistics
                 self.stats.total_requests += 1
 
-                # Handle response
-                response.raise_for_status()
-                self.stats.successful_requests += 1
+                if response.status_code == 200:
+                    self.stats.successful_requests += 1
 
-                response_time = time.time() - start_time
-
-                # Update average response time (moving average)
-                if self.stats.successful_requests > 1:
-                    self.stats.average_response_time = (
-                        (
-                            self.stats.average_response_time
-                            * (self.stats.successful_requests - 1)
-                        )
-                        + response_time
-                    ) / self.stats.successful_requests
-                else:
-                    self.stats.average_response_time = response_time
-
-                if response.content:
-                    return response.json()
-                else:
-                    return {}
-
-            except requests.exceptions.RequestException as e:
-                self.stats.failed_requests += 1
-                self.stats.last_error = str(e)
-
-                if attempt == self.max_retries - 1:  # Last attempt
-                    self.logger.error(
-                        f"LM Studio API request failed after {self.max_retries} attempts: {e}"
+                    # Calculate and update average response time
+                    response_time = time.time() - (
+                        self._last_request_start or time.time()
                     )
-                    raise NetworkError(f"LM Studio API request failed: {str(e)}")
+                    self._update_average_response_time(response_time)
 
-                # Wait before retry
-                await asyncio.sleep(1.0 * (2**attempt))  # Exponential backoff
+                    if response.content:
+                        return response.json()
+                    return {}
+                else:
+                    self.stats.failed_requests += 1
+                    raise Exception(f"HTTP {response.status_code}")
 
-            except Exception as e:
+            except requests.exceptions.RequestException:
                 self.stats.failed_requests += 1
-                self.stats.last_error = str(e)
-                self.logger.error(f"LM Studio API error: {e}")
-                raise ServiceError(f"LM Studio API error: {str(e)}")
 
-    async def get_models(self) -> list[dict[str, Any]]:
-        """
-        Get available models.
+                if attempt == self.max_retries - 1:
+                    raise
 
-        Returns:
-            List of available models
-        """
-        endpoint = "v1/models"
-        response = await self._make_request("GET", endpoint)
+                time.sleep(1.0 * (2**attempt))  # Exponential backoff
 
-        return response.get("data", [])
+        return {}
 
-    async def get_model_info(self, model_id: str) -> dict[str, Any]:
-        """
-        Get model information.
+    def _update_average_response_time(self, response_time: float) -> None:
+        """Update average response time (moving average)."""
+        if self.stats.successful_requests > 1:
+            self.stats.average_response_time = (
+                (
+                    self.stats.average_response_time
+                    * (self.stats.successful_requests - 1)
+                )
+                + response_time
+            ) / self.stats.successful_requests
+        else:
+            self.stats.average_response_time = response_time
 
-        Args:
-            model_id: Model identifier
+        self._last_request_start = time.time()
 
-        Returns:
-            Model information
-        """
-        endpoint = f"v1/models/{model_id}"
-        return await self._make_request("GET", endpoint)
-
-    async def generate_completion(
+    def chat_completion(
         self,
-        prompt: str,
+        messages: list[dict[str, str]],
         model: str | None = None,
-        max_tokens: int = 1000,
-        temperature: float = 0.7,
-        top_p: float = 0.95,
-        stop: list[str] | None = None,
-    ) -> str:
+        max_tokens: int | None = None,
+        temperature: float | None = None,
+        stream: bool = False,
+    ) -> Generator[str, None, None] | dict[str, Any]:
         """
-        Generate text completion.
+        Chat completion using the chat API.
+
+        Gradio handles async automatically with queue=True, so we use
+        synchronous generators for streaming instead of async generators.
 
         Args:
-            prompt: Input prompt
-            model: Model to use (optional)
-            max_tokens: Maximum number of tokens to generate
-            temperature: Sampling temperature
-            top_p: Top-p sampling parameter
-            stop: Stop sequences
+            messages: List of message dictionaries with role and content
+            model: Model ID (optional)
+            max_tokens: Max tokens (optional)
+            temperature: Temperature (optional)
+            stream: Whether to stream response
 
         Returns:
-            Generated text
+            Dict for non-streaming, Generator[str] for streaming
         """
-        endpoint = "v1/completions"
+        endpoint = "v1/chat/completions"
 
         data = {
-            "prompt": prompt,
-            "max_tokens": max_tokens,
-            "temperature": temperature,
-            "top_p": top_p,
+            "messages": messages,
+            "max_tokens": max_tokens or self.max_tokens,
+            "temperature": temperature or self.temperature,
         }
 
         if model:
             data["model"] = model
 
-        if stop:
-            data["stop"] = stop
+        if stream:
+            return self._stream_chat_completion(data)
 
-        response = await self._make_request("POST", endpoint, data=data)
-
+        response = self._make_request("POST", endpoint, data=data)
         self.stats.total_completions += 1
 
-        choices = response.get("choices", [])
-        if choices:
-            return choices[0].get("text", "")
-        else:
-            return ""
+        if response.get("choices"):
+            return response["choices"][0].get("message", {})
+        return {}
 
-    async def generate_streaming_completion(
-        self,
-        prompt: str,
-        model: str | None = None,
-        max_tokens: int = 1000,
-        temperature: float = 0.7,
-        top_p: float = 0.95,
-        stop: list[str] | None = None,
-    ) -> AsyncGenerator[str, None]:
-        """
-        Generate streaming text completion.
+    def _stream_chat_completion(
+        self, data: dict[str, Any]
+    ) -> Generator[str, None, None]:
+        """Stream chat completion responses synchronously."""
+        endpoint = "v1/chat/completions"
 
-        Args:
-            prompt: Input prompt
-            model: Model to use (optional)
-            max_tokens: Maximum number of tokens to generate
-            temperature: Sampling temperature
-            top_p: Top-p sampling parameter
-            stop: Stop sequences
+        url = f"{self.base_url}/{endpoint}"
+        headers = self._get_headers()
 
-        Yields:
-            Response chunks for streaming
-        """
-        endpoint = "v1/completions"
+        response = requests.post(
+            url, headers=headers, json=data, timeout=self.timeout, stream=True
+        )
 
-        data = {
-            "prompt": prompt,
-            "max_tokens": max_tokens,
-            "temperature": temperature,
-            "top_p": top_p,
-            "stream": True,
-        }
+        self.stats.total_completions += 1
+        self.stats.successful_requests += 1
 
-        if model:
-            data["model"] = model
+        # Process streaming response synchronously (Gradio handles async)
+        for line in response.iter_lines():
+            if line:
+                line_str = line.decode("utf-8")
+                if line_str.startswith("data: "):
+                    data_str = line_str[6:]
+                    if data_str.strip() == "[DONE]":
+                        break
 
-        if stop:
-            data["stop"] = stop
+                    try:
+                        chunk = json.loads(data_str)
+                        choices = chunk.get("choices", [])
+                        if choices:
+                            delta = choices[0].get("delta", {})
+                            content = delta.get("content", "")
+                            if content:
+                                yield content
+                    except json.JSONDecodeError:
+                        continue
 
-        try:
-            url = f"{self.base_url}/{endpoint}"
-            headers = self._get_headers()
-
-            response = requests.post(
-                url, headers=headers, json=data, timeout=self.timeout, stream=True
-            )
-            response.raise_for_status()
-
-            self.stats.total_completions += 1
-            self.stats.successful_requests += 1
-
-            # Process streaming response
-            for line in response.iter_lines():
-                if line:
-                    line_str = line.decode("utf-8")
-                    if line_str.startswith("data: "):
-                        data_str = line_str[6:]  # Remove 'data: ' prefix
-                        if data_str.strip() == "[DONE]":
-                            break
-
-                        try:
-                            chunk = json.loads(data_str)
-                            choices = chunk.get("choices", [])
-                            if choices:
-                                delta = choices[0].get("delta", {})
-                                content = delta.get("content", "")
-                                if content:
-                                    yield content
-                        except json.JSONDecodeError:
-                            continue
-
-        except Exception as e:
-            self.stats.failed_requests += 1
-            self.stats.last_error = str(e)
-            self.logger.error(f"LM Studio streaming completion failed: {e}")
-            raise ServiceError(f"Streaming completion failed: {str(e)}")
-
-    async def generate_embedding(
+    def generate_embedding(
         self,
         text: str,
         model: str | None = None,
     ) -> list[float]:
-        """
-        Generate text embedding.
-
-        Args:
-            text: Input text
-            model: Model to use (optional)
-
-        Returns:
-            Embedding vector
-        """
+        """Generate text embedding."""
         endpoint = "v1/embeddings"
 
         data = {
@@ -348,165 +230,49 @@ class LMStudioClient(BaseService):
         if model:
             data["model"] = model
 
-        response = await self._make_request("POST", endpoint, data=data)
+        response = self._make_request("POST", endpoint, data=data)
 
         self.stats.total_embeddings += 1
 
-        data_list = response.get("data", [])
-        if data_list:
-            return data_list[0].get("embedding", [])
-        else:
-            return []
-
-    async def generate_multiple_embeddings(
-        self,
-        texts: list[str],
-        model: str | None = None,
-    ) -> list[list[float]]:
-        """
-        Generate embeddings for multiple texts.
-
-        Args:
-            texts: List of input texts
-            model: Model to use (optional)
-
-        Returns:
-            List of embedding vectors
-        """
-        embeddings = []
-
-        for text in texts:
-            try:
-                embedding = await self.generate_embedding(text, model)
-                embeddings.append(embedding)
-            except Exception as e:
-                self.logger.error(f"Failed to generate embedding for text: {e}")
-                embeddings.append([])
-
-        return embeddings
-
-    async def get_model_usage(self) -> dict[str, Any]:
-        """
-        Get model usage statistics.
-
-        Returns:
-            Usage statistics
-        """
-        try:
-            # Try to get usage from the server if available
-            endpoint = "v1/usage"
-            return await self._make_request("GET", endpoint)
-
-        except Exception as e:
-            self.logger.warning(f"Could not get model usage: {e}")
-            return {}
+        embeddings_data = response.get("data", [])
+        if embeddings_data:
+            return embeddings_data[0].get("embedding", [])
+        return []
 
     def is_server_running(self) -> bool:
-        """
-        Check if LM Studio server is running.
-
-        Returns:
-            True if server is running
-        """
+        """Check if LM Studio server is running."""
         try:
             response = requests.get(f"{self.base_url}/v1/models", timeout=5)
             return response.status_code == 200
         except Exception:
             return False
 
-    def get_health_status(self) -> dict[str, Any]:
-        """Get service health status."""
-        status = STATUS_HEALTHY
-        issues = []
-
-        # Check server availability
-        if not self.is_server_running():
-            status = STATUS_UNHEALTHY
-            issues.append("LM Studio server not running")
-
-        # Check error rate
-        if self.stats.total_requests > 0:
-            error_rate = self.stats.failed_requests / self.stats.total_requests
-            if error_rate > 0.1:  # More than 10% error rate
-                status = STATUS_DEGRADED
-                issues.append(f"High error rate: {error_rate:.2%}")
-
-        # Check response time
-        if self.stats.average_response_time > 30.0:  # More than 30 seconds average
-            status = STATUS_DEGRADED
-            issues.append(
-                f"High response time: {self.stats.average_response_time:.2f}s"
-            )
-
-        return {
-            "service": SERVICE_LM_STUDIO,
-            "status": status,
-            "issues": issues,
-            "timestamp": time.time(),
-            "stats": {
-                "total_requests": self.stats.total_requests,
-                "successful_requests": self.stats.successful_requests,
-                "failed_requests": self.stats.failed_requests,
-                "total_completions": self.stats.total_completions,
-                "total_embeddings": self.stats.total_embeddings,
-                "average_response_time": self.stats.average_response_time,
-                "memory_usage_mb": self.stats.memory_usage_mb,
-                "last_error": self.stats.last_error,
-                "uptime_seconds": time.time() - self._start_time,
-            },
-            "server_running": self.is_server_running(),
-            "config": {
-                "base_url": self.base_url,
-                "timeout": self.timeout,
-                "max_retries": self.max_retries,
-            },
-        }
-
-    def get_usage_stats(self) -> dict[str, Any]:
-        """Get comprehensive usage statistics."""
-        return {
-            "config": {
-                "base_url": self.base_url,
-                "timeout": self.timeout,
-                "max_retries": self.max_retries,
-            },
-            "stats": {
-                "total_requests": self.stats.total_requests,
-                "successful_requests": self.stats.successful_requests,
-                "failed_requests": self.stats.failed_requests,
-                "total_completions": self.stats.total_completions,
-                "total_embeddings": self.stats.total_embeddings,
-                "average_response_time": self.stats.average_response_time,
-                "memory_usage_mb": self.stats.memory_usage_mb,
-                "last_error": self.stats.last_error,
-                "uptime_seconds": time.time() - self._start_time,
-            },
-            "server_running": self.is_server_running(),
-            "model_usage": self.get_model_usage(),
-        }
-
-    def cleanup(self) -> None:
-        """Clean up resources."""
+    def get_available_models(self) -> list[dict[str, Any]]:
+        """Get available models from the server."""
         try:
-            self.logger.info("LM Studio client cleanup completed")
-
+            response = requests.get(f"{self.base_url}/v1/models", timeout=5)
+            if response.status_code == 200:
+                return response.json().get("data", [])
         except Exception as e:
-            self.logger.error(f"Error during LM Studio client cleanup: {e}")
+            print(f"Failed to get models: {e}")
 
-    def __del__(self):
-        """Destructor to ensure cleanup."""
-        self.cleanup()
+        # Return default model if server is unavailable
+        return [{"id": self.model, "model": f"qwen/{self.model}"}]
+
+    def get_stats(self) -> dict[str, Any]:
+        """Get client statistics."""
+        return {
+            "total_requests": self.stats.total_requests,
+            "successful_requests": self.stats.successful_requests,
+            "failed_requests": self.stats.failed_requests,
+            "total_completions": self.stats.total_completions,
+            "total_embeddings": self.stats.total_embeddings,
+            "average_response_time": self.stats.average_response_time,
+        }
 
 
-# Convenience factory function
 def create_lm_studio_client(
-    base_url: str = DEFAULT_LM_STUDIO_BASE_URL,
-    timeout: int = 30,
-    max_retries: int = 3,
+    base_url: str = "http://localhost:1234",
 ) -> LMStudioClient:
     """Create an LM Studio client with default configuration."""
-    return LMStudioClient(
-        base_url=base_url,
-        timeout=timeout,
-        max_retries=max_retries,
-    )
+    return LMStudioClient(base_url=base_url)

@@ -254,10 +254,6 @@ class DatabaseSetup:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
 
-                # Test basic query
-                cursor.execute("SELECT COUNT(*) FROM configuration")
-                count = cursor.fetchone()[0]
-
                 # Test insert and select
                 test_key = "test_connection"
                 test_value = "success"

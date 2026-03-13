@@ -1,0 +1,14 @@
+{
+  "repositories": [
+    {
+      "url": "https://github.com/user/repo1.git",
+      "branch": "main",
+      "enabled": true,
+      "file_extensions": [
+        "py",
+        "js",
+        "ts"
+      ]
+    }
+  ]
+}

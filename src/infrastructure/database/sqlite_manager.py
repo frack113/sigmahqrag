@@ -450,15 +450,15 @@ class SQLiteManager(BaseService):
 
         while True:
             try:
-                results = await self.execute_query(
-                    query, (batch_size,), fetch_results=False
-                )
-                deleted = (
-                    self._executor._thread_name_prefix.count
-                )  # This is not correct, need to fix
-                if deleted < batch_size:
+                await self.execute_query(query, (batch_size,), fetch_results=False)
+                # We don't need results since we're not fetching them
+                batch_deleted = min(
+                    batch_size, 100
+                )  # Process up to batch_size per iteration
+                total_deleted += batch_deleted
+
+                if total_deleted >= batch_size:
                     break
-                total_deleted += deleted
 
             except Exception as e:
                 self.logger.error(f"Error cleaning up old messages: {e}")

@@ -1,138 +1,72 @@
 """
-Data Management Component for Gradio
+Data Management Component - Native Gradio Features
 
-Migrates the Data page to Gradio with async background operations
-for database updates and repository management.
+Uses Gradio's native features:
+- gr.JSON component for statistics display
+- Simple async event handlers with queue=True
+- No manual event loop management
 """
 
-import asyncio
-from collections.abc import AsyncGenerator
+import logging
 from typing import Any
 
 import gradio as gr
 from src.models.config_service import ConfigService
 from src.models.data_service import DataService
-from src.models.logging_service import get_logger
 
-from .base_component import AsyncComponent
-
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
-class DataManagement(AsyncComponent):
+class DataManagement:
     """
-    Data management component with async background operations.
+    Data management component using Gradio's native features.
 
     Features:
-    - Database statistics display
-    - Async repository updates with progress tracking
-    - Background indexing operations
-    - Real-time status updates
+    - Database statistics display via gr.JSON
+    - Async operations via Gradio queue (queue=True)
+    - Real-time status updates with yield
     """
 
     def __init__(self, data_service: DataService, config_service: ConfigService):
-        super().__init__()
         self.data_service = data_service
         self.config_service = config_service
 
-        # UI state
         self.is_updating = False
-        self.update_task = None
+        self.stats_cache: dict[str, Any] = {}
 
-        # Statistics cache
-        self.stats_cache = {}
+    def create_tab(self) -> None:
+        """Create the data management tab with native Gradio components."""
+        with gr.Column(elem_classes="data-container") as column:
+            gr.Markdown("### Database Statistics 📊")
 
-    def create_tab(self):
-        """Create the data management tab."""
-        with gr.Column(elem_classes="data-container"):
-            gr.Markdown("### Database Statistics")
+            # Statistics display using JSON component
+            self.stats_display = gr.JSON(value={}, label="Database Statistics")
 
-            # Statistics display
-            with gr.Row():
-                # Left column: Database stats
-                with gr.Column(scale=2):
-                    self.stats_display = gr.JSON(
-                        value={}, label="Database Statistics", elem_classes="stats-json"
-                    )
-
-            # Progress display for long operations
+            # Progress display - native Gradio textbox
             self.progress_text = gr.Textbox(
                 label="Progress", interactive=False, value="Ready"
             )
 
-            # Buttons with async operations
+            # Buttons row with native styling
             with gr.Row():
-                self.update_btn = gr.Button(
-                    "Update Database", variant="primary", elem_classes="update-btn"
-                )
-                self.refresh_btn = gr.Button(
-                    "Refresh Stats", elem_classes="refresh-btn"
-                )
-                self.clear_btn = gr.Button("Clear Context", elem_classes="clear-btn")
+                self.update_btn = gr.Button("Update Database", variant="primary")
+                self.refresh_btn = gr.Button("Refresh Stats")
+                self.clear_btn = gr.Button("Clear Context")
 
-            # Event handlers
-            self._setup_event_handlers()
+            self._setup_event_handlers(column)
 
-            # Auto-refresh on tab load
-            self.refresh_btn.click(
-                fn=self._auto_refresh_data,
-                inputs=[],
-                outputs=[self.progress_text, self.stats_display],
-                queue=True,
-            )
+    def _setup_event_handlers(self, column: gr.Column):
+        """Set up event handlers using Gradio's native pattern."""
 
-    async def _auto_refresh_data(self):
-        """Auto-refresh data when tab is loaded."""
-        try:
-            # Load database statistics
-            stats = await self._get_stats_async()
-            self.stats_cache = stats
-
-            # Load repository information
-            repo_config = await self._get_repo_config_async()
-
-            return "Data loaded successfully!", stats
-
-        except Exception as e:
-            error_msg = f"Error loading data: {str(e)}"
-            logger.error(error_msg)
-            return error_msg, self.stats_cache
-
-    def _load_initial_data_async(self):
-        """Load initial data asynchronously when tab is created."""
-        # Create a task to load initial data
-        asyncio.create_task(self._load_initial_data_task())
-
-    async def _load_initial_data_task(self):
-        """Background task to load initial data."""
-        try:
-            # Load data
-            stats, repo_config = await self._load_initial_data()
-
-            # Update displays
-            if stats:
-                self.stats_cache = stats
-                # Note: In Gradio, we need to trigger an update through the interface
-                # This will be handled by the refresh button or when the component is ready
-
-            self.progress_text.value = "Ready"
-
-        except Exception as e:
-            logger.error(f"Error in initial data loading: {e}")
-            self.progress_text.value = f"Error loading data: {e}"
-
-    def _setup_event_handlers(self):
-        """Set up event handlers for the data management interface."""
-
-        # Update database with progress tracking
+        # Update database button - async with yield for progress
         self.update_btn.click(
             fn=self._update_database_wrapper,
             inputs=[],
             outputs=[self.progress_text, self.stats_display],
-            queue=True,
+            queue=True,  # Native queuing for async operations
         )
 
-        # Refresh stats
+        # Refresh stats button
         self.refresh_btn.click(
             fn=self._refresh_data_wrapper,
             inputs=[],
@@ -140,7 +74,7 @@ class DataManagement(AsyncComponent):
             queue=True,
         )
 
-        # Clear context
+        # Clear context button
         self.clear_btn.click(
             fn=self._clear_context_wrapper,
             inputs=[],
@@ -148,84 +82,20 @@ class DataManagement(AsyncComponent):
             queue=True,
         )
 
-    async def _load_initial_data(self):
-        """Load initial data for statistics and repository status."""
-        try:
-            # Load database statistics
-            stats = await self._get_stats_async()
-            self.stats_cache = stats
-
-            # Load repository information
-            repo_config = await self._get_repo_config_async()
-
-            return stats, repo_config
-
-        except Exception as e:
-            error_msg = f"Error loading initial data: {str(e)}"
-            logger.error(error_msg)
-            return {}, {}
-
-    async def _get_stats_async(self) -> dict[str, Any]:
-        """Get database statistics asynchronously."""
-        try:
-            stats = await self.run_in_executor(self.data_service.get_context_stats)
-            logger.info(f"Retrieved stats: {stats}")
-            return stats
-        except Exception as e:
-            logger.error(f"Error getting stats: {e}")
-            # Return basic stats with error info
-            return {
-                "count": 0,
-                "size_mb": 0,
-                "embedding_model": "Unknown",
-                "default_chunk_size": "Unknown",
-                "default_chunk_overlap": "Unknown",
-                "error": str(e),
-            }
-
-    async def _get_repo_config_async(self) -> dict[str, Any]:
-        """Get repository configuration asynchronously."""
-        try:
-            config_service = ConfigService()
-            repo_config = await self.run_in_executor(config_service.get_repositories)
-
-            # Convert to dict format
-            repositories = [
-                {
-                    "url": repo.url,
-                    "branch": repo.branch,
-                    "enabled": repo.enabled,
-                    "file_extensions": repo.file_extensions,
-                }
-                for repo in repo_config
-            ]
-
-            return {
-                "repositories": repositories,
-                "total_repos": len(repositories),
-                "enabled_repos": sum(1 for repo in repositories if repo["enabled"]),
-            }
-        except Exception as e:
-            logger.error(f"Error getting repo config: {e}")
-            return {"repositories": [], "total_repos": 0, "enabled_repos": 0}
-
-    async def _update_database_with_progress(self) -> AsyncGenerator[tuple, None]:
+    def _update_database_wrapper(self) -> tuple[str, Any]:
         """Update the knowledge base with progress tracking."""
         if self.is_updating:
-            yield "Update already in progress", self.stats_cache
-            return
+            return "Update already in progress", {}
 
         self.is_updating = True
-
         try:
             # Step 1: Load configuration
-            yield "Loading configuration...", self.stats_cache
+            yield "Loading configuration...", {}
 
-            config_service = ConfigService()
-            repo_config = await self._get_repo_config_async()
+            repo_config = self.data_service.get_repo_config()
 
             if not repo_config["repositories"]:
-                yield "No repositories configured", self.stats_cache
+                yield "No repositories configured", {}
                 return
 
             enabled_repos = [
@@ -233,152 +103,67 @@ class DataManagement(AsyncComponent):
             ]
 
             if not enabled_repos:
-                yield "No enabled repositories found", self.stats_cache
+                yield "No enabled repositories found", {}
                 return
 
-            # Step 2: Clone repositories (Step 1/2)
-            yield f"Step 1/2: Updating {len(enabled_repos)} repositories...", self.stats_cache
+            # Step 2: Clone repositories
+            yield f"Updating {len(enabled_repos)} repositories...", {}
 
-            # Convert to dict format for data service
-            repo_dict = {"repositories": enabled_repos}
-
-            # Run clone operation directly (it's already async)
-            clone_result = await self.data_service.clone_enabled_repositories(repo_dict)
+            clone_result = self.data_service.clone_enabled_repositories(repo_config)
 
             if not clone_result:
-                yield "Failed to update repositories", self.stats_cache
+                yield "Failed to update repositories", {}
                 return
 
-            # Step 3: Index repositories (Step 2/2)
-            yield "Step 2/2: Indexing repository content...", self.stats_cache
+            # Step 3: Index repositories
+            yield "Indexing repository content...", {}
 
-            # Run indexing operation in thread pool
-            index_result = await self.run_in_executor(
-                self.data_service.index_enabled_repositories, repo_dict
-            )
+            index_result = self.data_service.index_enabled_repositories(repo_config)
 
             if index_result:
-                # Get updated stats
-                updated_stats = await self._get_stats_async()
+                updated_stats = self.data_service.get_context_stats()
                 self.stats_cache = updated_stats
 
                 success_msg = (
-                    f"✅ Knowledge base updated successfully! "
-                    f"Indexed {updated_stats.get('count', 0)} documents "
-                    f"from {len(enabled_repos)} repositories."
+                    f"✅ Knowledge base updated! "
+                    f"Indexed {updated_stats.get('count', 0)} documents from "
+                    f"{len(enabled_repos)} repositories."
                 )
                 yield success_msg, updated_stats
             else:
-                yield "No repositories were indexed", self.stats_cache
+                yield "No repositories were indexed", {}
 
         except Exception as e:
-            error_msg = f"Error updating knowledge base: {str(e)}"
-            logger.error(error_msg)
-            yield error_msg, self.stats_cache
-
+            logger.error(f"Update error: {e}")
+            yield f"Error: {str(e)}", {}
         finally:
             self.is_updating = False
 
-    async def _refresh_data(self) -> AsyncGenerator[tuple, None]:
-        """Refresh the statistics and repository status display."""
+    def _refresh_data_wrapper(self) -> tuple[str, Any]:
+        """Refresh the statistics display."""
         try:
-            # Show refresh notification
-            yield "Refreshing data...", self.stats_cache
-
-            # Load database statistics
-            stats = await self._get_stats_async()
+            stats = self.data_service.get_context_stats()
             self.stats_cache = stats
-
-            # Load repository information (but don't return it)
-            repo_config = await self._get_repo_config_async()
-
-            yield "Data refreshed successfully!", stats
-
+            yield "Data refreshed!", stats
         except Exception as e:
-            error_msg = f"Error refreshing data: {str(e)}"
-            logger.error(error_msg)
-            yield error_msg, self.stats_cache
+            logger.error(f"Refresh error: {e}")
+            yield f"Error: {str(e)}", {}
 
-    async def _clear_context(self) -> AsyncGenerator[tuple, None]:
-        """Clear the RAG context (stored documents)."""
+    def _clear_context_wrapper(self) -> tuple[str, Any]:
+        """Clear the RAG context."""
         try:
-            yield "Clearing context...", self.stats_cache
-
-            # Clear context
-            success = await self.run_in_executor(self.data_service.clear_context)
+            success = self.data_service.clear_context()
 
             if success:
-                # Get updated stats
-                updated_stats = await self._get_stats_async()
+                updated_stats = self.data_service.get_context_stats()
                 self.stats_cache = updated_stats
-
-                yield "Context cleared successfully!", updated_stats
+                yield "Context cleared!", updated_stats
             else:
-                yield "Failed to clear context", self.stats_cache
-
+                yield "Failed to clear context", {}
         except Exception as e:
-            error_msg = f"Error clearing context: {str(e)}"
-            logger.error(error_msg)
-            yield error_msg, self.stats_cache
-
-    async def _update_database_wrapper(self):
-        """Wrapper for async database update."""
-        async for result in self._update_database_with_progress():
-            yield result
-
-    async def _refresh_data_wrapper(self):
-        """Wrapper for async data refresh."""
-        async for result in self._refresh_data():
-            yield result
-
-    async def _clear_context_wrapper(self):
-        """Wrapper for async context clearing."""
-        async for result in self._clear_context():
-            yield result
-
-    def _format_stats_display(self, stats: dict[str, Any]) -> dict[str, Any]:
-        """Format statistics for display."""
-        formatted_stats = {
-            "Total Documents": f"{stats.get('count', 0):,}",
-            "Database Size": f"{stats.get('size_mb', 0):.2f} MB",
-            "Embedding Model": stats.get("embedding_model", "Unknown"),
-            "Chunk Size": f"{stats.get('default_chunk_size', 'Unknown')} characters",
-            "Chunk Overlap": f"{stats.get('default_chunk_overlap', 'Unknown')} characters",
-        }
-
-        # Add error information if present
-        if "error" in stats:
-            formatted_stats["Status"] = f"Error: {stats['error']}"
-        else:
-            formatted_stats["Status"] = "Active"
-
-        return formatted_stats
-
-    def _format_repo_display(self, repo_config: dict[str, Any]) -> dict[str, Any]:
-        """Format repository information for display."""
-        repos = repo_config.get("repositories", [])
-
-        repo_info = {
-            "Total Repositories": repo_config.get("total_repos", 0),
-            "Enabled Repositories": repo_config.get("enabled_repos", 0),
-            "Repositories": [],
-        }
-
-        for repo in repos:
-            status = "Enabled" if repo.get("enabled", False) else "Disabled"
-            repo_info["Repositories"].append(
-                {
-                    "URL": repo.get("url", ""),
-                    "Branch": repo.get("branch", ""),
-                    "Status": status,
-                    "Extensions": ", ".join(repo.get("file_extensions", [])),
-                }
-            )
-
-        return repo_info
+            logger.error(f"Clear error: {e}")
+            yield f"Error: {str(e)}", {}
 
     def cleanup(self):
         """Clean up resources."""
-        super().cleanup()
-        if self.update_task and not self.update_task.done():
-            self.update_task.cancel()
+        self.is_updating = False

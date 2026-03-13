@@ -5,19 +5,17 @@ Provides a unified interface for tracking service metrics across all components.
 Eliminates duplicate statistics tracking code in individual services.
 """
 
-import asyncio
 import time
 from dataclasses import dataclass, field
-from datetime import datetime
 from threading import Lock
-from typing import Any, Dict
+from typing import Any
 
 
 @dataclass
 class ServiceStats:
     """
     Base class for service statistics.
-    
+
     Provides common metrics tracking with thread-safe operations.
     Subclasses can extend for service-specific metrics.
     """
@@ -42,7 +40,7 @@ class ServiceStats:
     memory_usage_mb: float = 0.0
     cpu_usage_percent: float = 0.0
     startup_time: float = field(default_factory=time.time)
-    
+
     # Context retrieval (for RAG-specific services)
     total_context_retrievals: int = 0
     successful_retrievals: int = 0
@@ -102,7 +100,9 @@ class ServiceStats:
             # Update performance metrics (exponential moving average)
             alpha = 0.1
             if success:
-                new_avg = alpha * response_time + (1 - alpha) * self.average_response_time
+                new_avg = (
+                    alpha * response_time + (1 - alpha) * self.average_response_time
+                )
                 self.average_response_time = new_avg
 
                 # Track min/max with more samples
@@ -128,7 +128,7 @@ class ServiceStats:
                     self.average_context_retrieval_time = new_context_avg
 
             # Capture system metrics periodically
-    
+
     def record_request_failure(self, error: str) -> None:
         """Record a request failure."""
         with self._lock:
@@ -144,27 +144,29 @@ class ServiceStats:
             self.__init__()
 
     @classmethod
-    def get_health_status(cls, stats: "ServiceStats") -> Dict[str, Any]:
+    def get_health_status(cls, stats: "ServiceStats") -> dict[str, Any]:
         """Generate health status from service stats."""
         return {
             "requests": stats.total_requests,
-            "success_rate": (stats.successful_requests / stats.total_requests * 100)
-            if stats.total_requests > 0
-            else 100.0,
+            "success_rate": (
+                (stats.successful_requests / stats.total_requests * 100)
+                if stats.total_requests > 0
+                else 100.0
+            ),
             "avg_response_time_sec": stats.average_response_time,
             "recent_errors": stats.failed_requests,
             "uptime_sec": stats.uptime_seconds,
         }
 
 
-def _get_thread_metrics() -> Dict[str, Any]:
+def _get_thread_metrics() -> dict[str, Any]:
     """Get system metrics for current thread."""
     try:
         import psutil
 
         process = psutil.Process()
         memory_info = process.memory_info()
-        
+
         return {
             "memory_mb": memory_info.rss / 1024 / 1024,
             "cpu_percent": psutil.cpu_percent(interval=0.1),
@@ -173,7 +175,7 @@ def _get_thread_metrics() -> Dict[str, Any]:
         return {"error": "psutil not available"}
 
 
-def get_system_metrics() -> Dict[str, float]:
+def get_system_metrics() -> dict[str, float]:
     """Get current system metrics."""
     return _get_thread_metrics()
 

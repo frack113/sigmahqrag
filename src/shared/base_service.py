@@ -1,36 +1,21 @@
 """
 Base classes for services and components.
 
-Provides common functionality and interfaces for all services and components
-in the SigmaHQ RAG application.
+Provides common functionality for all services in SigmaHQ RAG.
 """
 
-import asyncio
-import hashlib
 import logging
-import time
 from abc import ABC, abstractmethod
-from collections.abc import AsyncGenerator, Callable
-from concurrent.futures import ThreadPoolExecutor
-from contextlib import asynccontextmanager
-from dataclasses import dataclass
 from typing import Any
 
-
-@dataclass
-class CacheEntry:
-    """Represents a cached value with metadata."""
-
-    value: Any
-    timestamp: float
-    ttl: int
+logger = logging.getLogger(__name__)
 
 
 class BaseService(ABC):
-    """Base class for all services with common functionality."""
+    """Base class for all services."""
 
-    def __init__(self, logger_name: str):
-        self.logger = logging.getLogger(logger_name)
+    def __init__(self):
+        pass
 
     @abstractmethod
     async def initialize(self) -> bool:
@@ -50,146 +35,45 @@ class BaseService(ABC):
         message = f"{operation}: {'SUCCESS' if success else 'FAILED'}"
         if details:
             message += f" - {details}"
-        self.logger.log(level, message)
+        logger.log(level, message)
 
+    def update_response_time(self, response_time: float) -> None:
+        """Update average response time."""
+        pass
 
-class AsyncComponent:
-    """Base class for async Gradio components."""
+    def update_request_count(
+        self, success: bool = True, error: str | None = None
+    ) -> None:
+        """Update request counters."""
+        pass
 
-    def __init__(self):
-        self.executor = ThreadPoolExecutor(max_workers=2)
-        self.is_processing = False
+    def update_memory_usage(self, memory_mb: float) -> None:
+        """Update memory usage."""
+        pass
 
-    async def run_in_executor(self, func: Callable, *args, **kwargs) -> Any:
-        """Run function in thread pool executor."""
-        loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(self.executor, func, *args, **kwargs)
-
-    async def safe_llm_call(self, func: Callable, *args, **kwargs) -> Any:
-        """Safe wrapper for LLM calls with timeout and retry logic."""
-        try:
-            return await asyncio.wait_for(func(*args, **kwargs), timeout=300)
-        except asyncio.TimeoutError:
-            return "Error: LLM response timed out"
-        except Exception as e:
-            return f"Error: {str(e)}"
-
-    def cleanup(self) -> None:
-        """Clean up resources."""
-        if hasattr(self, "executor"):
-            self.executor.shutdown(wait=True)
+    def update_cpu_usage(self, cpu_percent: float) -> None:
+        """Update CPU usage."""
+        pass
 
 
 class CacheService:
-    """Centralized caching service with LRU eviction."""
-
-    def __init__(self, max_size: int = 1000, default_ttl: int = 3600):
-        self.max_size = max_size
-        self.default_ttl = default_ttl
-        self._cache: dict[str, CacheEntry] = {}
-        self._access_times: dict[str, float] = {}
-        self._lock = asyncio.Lock()
-
-    def _generate_key(self, *args: Any, **kwargs: Any) -> str:
-        """Generate cache key from arguments (must be async-compatible)."""
-        import asyncio
-
-        # Make kwargs hashable for caching
-        hash_args = args
-        hash_kwargs = {
-            k: v for k, v in sorted(kwargs.items()) if asyncio.iscoroutine(v)
-        }
-
-        key_data = str(hash_args) + str(sorted(hash_kwargs.items()))
-        return hashlib.md5(key_data.encode()).hexdigest()
-
-    async def get(self, key: str) -> Any | None:
-        """Get value from cache."""
-        async with self._lock:
-            if key not in self._cache:
-                return None
-
-            entry = self._cache[key]
-            current_time = time.time()
-
-            if current_time - entry.timestamp > entry.ttl:
-                del self._cache[key]
-                del self._access_times[key]
-                return None
-
-            self._access_times[key] = current_time
-            return entry.value
-
-    async def set(self, key: str, value: Any, ttl: int | None = None) -> None:
-        """Set value in cache."""
-        async with self._lock:
-            if len(self._cache) >= self.max_size:
-                self._evict_lru()
-
-            entry = CacheEntry(
-                value=value, timestamp=time.time(), ttl=ttl or self.default_ttl
-            )
-            self._cache[key] = entry
-            self._access_times[key] = time.time()
-
-    def _evict_lru(self) -> None:
-        """Evict least recently used entry."""
-        if not self._access_times:
-            return
-
-        lru_key = min(self._access_times.items(), key=lambda x: x[1])[0]
-        del self._cache[lru_key]
-        del self._access_times[lru_key]
-
-    async def clear(self) -> None:
-        """Clear all cache entries."""
-        async with self._lock:
-            self._cache.clear()
-            self._access_times.clear()
-
-    def get_stats(self) -> dict[str, Any]:
-        """Get cache statistics."""
-        current_time = time.time()
-        valid_entries = sum(
-            1
-            for _, timestamp in self._cache.items()
-            if current_time - timestamp.timestamp <= timestamp.ttl
-        )
-
-        return {
-            "total_entries": len(self._cache),
-            "valid_entries": valid_entries,
-            "expired_entries": len(self._cache) - valid_entries,
-            "cache_size_limit": self.max_size,
-            "cache_ttl": self.default_ttl,
-        }
-
-
-class AsyncResourceManager:
-    """Async resource manager for proper cleanup."""
+    """Simple caching service."""
 
     def __init__(self):
-        self._resources = []
+        self._cache: dict[str, Any] = {}
 
-    async def add_resource(self, resource: Any) -> None:
-        """Add resource to cleanup list."""
-        self._resources.append(resource)
+    def get(self, key: str) -> Any | None:
+        """Get value from cache."""
+        return self._cache.get(key)
 
-    async def cleanup(self) -> None:
-        """Clean up all resources."""
-        for resource in self._resources:
-            if hasattr(resource, "cleanup"):
-                await resource.cleanup()
-            elif hasattr(resource, "close"):
-                resource.close()
-        self._resources.clear()
+    def set(self, key: str, value: Any) -> None:
+        """Set value in cache."""
+        self._cache[key] = value
 
+    def clear(self) -> None:
+        """Clear all cache entries."""
+        self._cache.clear()
 
-@asynccontextmanager
-async def async_resource_manager() -> AsyncGenerator[AsyncResourceManager, None]:
-    """Async context manager for resource management."""
-    manager = AsyncResourceManager()
-    try:
-        yield manager
-    finally:
-        await manager.cleanup()
+    def get_stats(self) -> dict[str, int]:
+        """Get cache statistics."""
+        return {"total_entries": len(self._cache)}

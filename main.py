@@ -1,80 +1,53 @@
-# Main Entry Point - Gradio Application
+# Main Entry Point - Gradio Application (Optimized with Native Gradio Features)
+"""
+SigmaHQ RAG - Optimized Gradio Application
+
+This application uses Gradio's native features for async operations:
+- queue=True: Enables built-in request queuing per user
+- concurrency_limit=1: Serializes requests naturally
+- Gradio handles async/await automatically when queue=True
+
+To run: uv run python main.py [--reload]
+"""
+
 import sys
 import signal
 import logging
-import argparse
-import os
 
-# Configure logging
+from src.application.application import create_application, create_default_application
+
+
+# Configure logging to stderr only (not duplicate with Gradio's logs)
 logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    handlers=[logging.StreamHandler(sys.stderr)],
 )
-logger = logging.getLogger(__name__)
 
-from src.application.app import SigmaHQGradioApp
-from src.infrastructure.port_manager import PortManager
+logger = logging.getLogger(__name__)
 
 
 def signal_handler(signum, frame):
     """Handle graceful shutdown on SIGINT/SIGTERM."""
-    logger.info(f"Received signal {signum}, shutting down gracefully...")
+    logger.info("Received shutdown signal, cleaning up...")
     sys.exit(0)
 
 
 def main():
     """Main entry point for Gradio application."""
-    # Parse command line arguments
-    parser = argparse.ArgumentParser(description="SigmaHQ RAG Application")
-    parser.add_argument(
-        "--host", type=str, default=None, help="Host to bind to (overrides config)"
-    )
-    parser.add_argument(
-        "--port", type=int, default=8000, help="Port to bind to"
-    )
-    parser.add_argument(
-        "--reload", action="store_true", help="Enable auto-reload in development mode"
-    )
-
-    args = parser.parse_args()
-
-    # Register signal handlers for graceful shutdown
+    # Register signal handlers
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
-    # Set environment variables for Gradio configuration
-    server_host = "0.0.0.0" if not args.host else args.host
-    os.environ["GRADIO_SERVER_NAME"] = server_host
-    os.environ["GRADIO_SERVER_PORT"] = str(args.port)
-    
-    if args.reload:
-        os.environ["GRADIO_ALLOW_ORIGIN"] = "*http://*/*"
+    logger.info("Starting SigmaHQ RAG")
 
-    # Check if the requested port is available before starting the application
-    port_manager = PortManager()
-    logger.info(f"Checking if port {args.port} is available...")
-    
-    if not port_manager.is_port_available(args.port, server_host):
-        logger.error(
-            f"Port {args.port} is already in use! Please either:\n"
-            f"  1. Stop the application using this port\n"
-            f"  2. Run with --port <different_port> to specify an alternative port\n"
-            f"  3. Use --reload flag to automatically find an available nearby port (e.g., {args.port+1})\n"
-        )
-        sys.exit(1)
+    # Create application (uses native Gradio async support via queue=True)
+    app = create_application()
 
-    logger.info(
-        f"Starting application on {server_host}:{args.port}" +
-        (" (auto-reload enabled)" if args.reload else "")
-    )
-
-    app = SigmaHQGradioApp()
-    
     try:
-        app.launch(reload=args.reload)
+        app.launch()
     except KeyboardInterrupt:
         logger.info("Application shutdown requested")
-    finally:
-        app.cleanup()
 
 
 if __name__ == "__main__":
