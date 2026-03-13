@@ -16,17 +16,17 @@ logger = get_logger(__name__)
 class FileManagement(GradioComponent):
     """
     File management component (Work in Progress).
-    
+
     This component is currently a placeholder and will be implemented
     in future versions to handle local file uploads and management.
     """
-    
+
     def create_tab(self):
         """Create the file management tab."""
         with gr.Column(elem_classes="files-container"):
             # Header
             gr.Markdown("### Local Files Management 📂")
-            
+
             # Main content area - use flex to fill available space
             with gr.Column(elem_classes="files-content"):
                 gr.Markdown("""
@@ -40,14 +40,14 @@ class FileManagement(GradioComponent):
                     - File organization and management
                     - Integration with RAG system
                 """)
-                
+
                 # Placeholder for future file upload functionality
                 with gr.Row():
                     gr.Markdown("""
                         **Current Status:** Development in progress
                         **Next Steps:** Implementation of file upload and processing pipeline
                     """)
-    
+
     def cleanup(self):
         """Clean up resources."""
         super().cleanup()

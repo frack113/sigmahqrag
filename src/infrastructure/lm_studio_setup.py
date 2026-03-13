@@ -16,21 +16,21 @@ logger = logging.getLogger(__name__)
 
 class LMStudioSetup:
     """LM Studio server setup and configuration utilities."""
-    
+
     def __init__(self, base_url: str = "http://localhost:1234"):
         """
         Initialize LM Studio setup.
-        
+
         Args:
             base_url: Base URL for LM Studio server
         """
         self.base_url = base_url
         self.logger = logging.getLogger(__name__)
-    
+
     def check_server_status(self) -> bool:
         """
         Check if LM Studio server is running.
-        
+
         Returns:
             True if server is running, False otherwise
         """
@@ -39,11 +39,11 @@ class LMStudioSetup:
             return response.status_code == 200
         except requests.exceptions.RequestException:
             return False
-    
+
     def get_available_models(self) -> list[dict[str, Any]]:
         """
         Get list of available models in LM Studio.
-        
+
         Returns:
             List of available models
         """
@@ -55,11 +55,11 @@ class LMStudioSetup:
         except requests.exceptions.RequestException as e:
             self.logger.error(f"Error getting models: {e}")
             return []
-    
+
     def get_current_model(self) -> str | None:
         """
         Get the currently loaded model.
-        
+
         Returns:
             Name of current model or None
         """
@@ -72,14 +72,14 @@ class LMStudioSetup:
         except requests.exceptions.RequestException as e:
             self.logger.error(f"Error getting current model: {e}")
             return None
-    
+
     def load_model(self, model_name: str) -> bool:
         """
         Load a model in LM Studio.
-        
+
         Args:
             model_name: Name of the model to load
-            
+
         Returns:
             True if model loaded successfully, False otherwise
         """
@@ -88,7 +88,7 @@ class LMStudioSetup:
             response = requests.post(
                 f"{self.base_url}/v1/models/load",
                 json=payload,
-                timeout=60  # Allow time for model loading
+                timeout=60,  # Allow time for model loading
             )
             success = response.status_code == 200
             if success:
@@ -99,19 +99,16 @@ class LMStudioSetup:
         except requests.exceptions.RequestException as e:
             self.logger.error(f"Error loading model {model_name}: {e}")
             return False
-    
+
     def unload_model(self) -> bool:
         """
         Unload the current model.
-        
+
         Returns:
             True if model unloaded successfully, False otherwise
         """
         try:
-            response = requests.post(
-                f"{self.base_url}/v1/models/unload",
-                timeout=10
-            )
+            response = requests.post(f"{self.base_url}/v1/models/unload", timeout=10)
             success = response.status_code == 200
             if success:
                 self.logger.info("Successfully unloaded model")
@@ -121,14 +118,14 @@ class LMStudioSetup:
         except requests.exceptions.RequestException as e:
             self.logger.error(f"Error unloading model: {e}")
             return False
-    
+
     def test_completion(self, prompt: str = "Hello, world!") -> str | None:
         """
         Test completion with current model.
-        
+
         Args:
             prompt: Test prompt
-            
+
         Returns:
             Generated text or None if failed
         """
@@ -137,12 +134,10 @@ class LMStudioSetup:
                 "model": "current",  # Use current model
                 "messages": [{"role": "user", "content": prompt}],
                 "max_tokens": 50,
-                "temperature": 0.7
+                "temperature": 0.7,
             }
             response = requests.post(
-                f"{self.base_url}/v1/chat/completions",
-                json=payload,
-                timeout=30
+                f"{self.base_url}/v1/chat/completions", json=payload, timeout=30
             )
             if response.status_code == 200:
                 data = response.json()
@@ -153,11 +148,11 @@ class LMStudioSetup:
         except requests.exceptions.RequestException as e:
             self.logger.error(f"Error testing completion: {e}")
             return None
-    
+
     def get_server_info(self) -> dict[str, Any]:
         """
         Get server information.
-        
+
         Returns:
             Dictionary with server information
         """
@@ -166,53 +161,56 @@ class LMStudioSetup:
             "server_running": self.check_server_status(),
             "current_model": None,
             "available_models": [],
-            "test_completion": None
+            "test_completion": None,
         }
-        
+
         if info["server_running"]:
             info["current_model"] = self.get_current_model()
             info["available_models"] = self.get_available_models()
             info["test_completion"] = self.test_completion()
-        
+
         return info
-    
-    def create_lm_studio_config(self, config_path: str = "data/config/lm_studio.json") -> bool:
+
+    def create_lm_studio_config(
+        self, config_path: str = "data/config/lm_studio.json"
+    ) -> bool:
         """
         Create LM Studio configuration file.
-        
+
         Args:
             config_path: Path to configuration file
-            
+
         Returns:
             True if config created successfully, False otherwise
         """
         config_dir = Path(config_path).parent
         config_dir.mkdir(parents=True, exist_ok=True)
-        
+
         config = {
             "server_url": self.base_url,
-            "default_model": "mistralai/ministral-3-14b-reasoning",
+            "default_model": "qwen/qwen3.5-9b",
             "embedding_model": "text-embedding-all-minilm-l6-v2-embedding",
             "timeout": 30,
             "max_tokens": 1000,
             "temperature": 0.7,
-            "auto_start": True
+            "auto_start": True,
         }
-        
+
         try:
-            with open(config_path, 'w') as f:
+            with open(config_path, "w") as f:
                 import json
+
                 json.dump(config, f, indent=2)
             self.logger.info(f"LM Studio config created at: {config_path}")
             return True
         except Exception as e:
             self.logger.error(f"Error creating LM Studio config: {e}")
             return False
-    
+
     def setup_lm_studio(self) -> dict[str, Any]:
         """
         Complete LM Studio setup process.
-        
+
         Returns:
             Dictionary with setup results
         """
@@ -220,20 +218,22 @@ class LMStudioSetup:
             "server_status": False,
             "models_available": False,
             "test_completion": False,
-            "config_created": False
+            "config_created": False,
         }
-        
+
         self.logger.info("Starting LM Studio setup...")
-        
+
         # Check server status
         results["server_status"] = self.check_server_status()
         if not results["server_status"]:
-            self.logger.warning("LM Studio server is not running. Please start LM Studio manually.")
+            self.logger.warning(
+                "LM Studio server is not running. Please start LM Studio manually."
+            )
             self.logger.info("1. Download LM Studio from https://lmstudio.ai/")
             self.logger.info("2. Install and start LM Studio")
-            self.logger.info("3. Load a model (e.g., mistralai/ministral-3-14b-reasoning)")
+            self.logger.info("3. Load a model (e.g., qwen/qwen3.5-9b)")
             self.logger.info("4. Ensure the server is running on http://localhost:1234")
-        
+
         # Check models
         if results["server_status"]:
             models = self.get_available_models()
@@ -243,8 +243,10 @@ class LMStudioSetup:
                 for model in models:
                     self.logger.info(f"  - {model.get('id', 'Unknown')}")
             else:
-                self.logger.warning("No models available. Please load a model in LM Studio.")
-        
+                self.logger.warning(
+                    "No models available. Please load a model in LM Studio."
+                )
+
         # Test completion
         if results["server_status"] and results["models_available"]:
             test_result = self.test_completion()
@@ -253,10 +255,10 @@ class LMStudioSetup:
                 self.logger.info("LM Studio completion test successful")
             else:
                 self.logger.warning("LM Studio completion test failed")
-        
+
         # Create config
         results["config_created"] = self.create_lm_studio_config()
-        
+
         self.logger.info("LM Studio setup completed")
         return results
 
@@ -264,7 +266,7 @@ class LMStudioSetup:
 def setup_lm_studio_server() -> dict[str, Any]:
     """
     Convenience function to set up LM Studio server.
-    
+
     Returns:
         Dictionary with setup results
     """

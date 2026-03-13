@@ -23,7 +23,7 @@ except ImportError as e:
     embedding_functions = None
     logging.warning(f"chromadb not available: {e}. RAG functionality disabled.")
 
-from ..shared import (
+from src.shared import (
     DEFAULT_CHUNK_OVERLAP,
     DEFAULT_CHUNK_SIZE,
     DEFAULT_EMBEDDING_MODEL,
@@ -38,21 +38,25 @@ from ..shared import (
     DatabaseConfig,
     DatabaseError,
     EmbeddingConfig,
-    LLMError,
-    NetworkError,
     RAGError,
-    get_cpu_usage,
-    get_memory_usage,
     handle_service_errors,
-    rate_limit,
-    retry_with_backoff,
 )
-from .llm_service import LLMService
+
+# Import memory/CPU utilities for statistics
+try:
+    from psutil import Process, cpu_percent, virtual_memory
+except ImportError:
+    Process = None
+    cpu_percent = None
+    virtual_memory = None
+from src.core.llm_service import LLMService
+from src.core.local_embedding_service import LocalEmbeddingService
 
 
 @dataclass
 class RAGStats:
     """Statistics for RAG service."""
+
     total_queries: int = 0
     successful_queries: int = 0
     failed_queries: int = 0
@@ -69,7 +73,7 @@ class RAGStats:
 class RAGService(BaseService, AsyncComponent):
     """
     RAG service for SigmaHQ RAG application.
-    
+
     Provides optimized RAG functionality with:
     - Direct ChromaDB integration
     - Better error handling and fallback mechanisms
@@ -87,7 +91,7 @@ class RAGService(BaseService, AsyncComponent):
     ):
         """
         Initialize the RAG service.
-        
+
         Args:
             llm_service: Pre-configured LLM service
             config: RAG configuration
@@ -95,55 +99,57 @@ class RAGService(BaseService, AsyncComponent):
         """
         BaseService.__init__(self, f"{SERVICE_RAG}.rag_service")
         AsyncComponent.__init__(self)
-        
+
         # Configuration
         self.config = config or self._get_default_config()
         self.database_config = database_config or self._get_default_database_config()
-        
+
         # Services
         self.llm_service = llm_service
-        self.local_embedding_service = None
-        
+        self.local_embedding_service: LocalEmbeddingService | None = None
+
         # Service state
         self.client = None
         self.collection = None
         self._initialized = False
         self._start_time = datetime.now()
-        
+
         # Statistics
         self.stats = RAGStats()
-        
+
         # Caching
-        self.cache = CacheService(
-            max_size=1000,
-            default_ttl=3600
-        )
-        
+        self.cache = CacheService(max_size=1000, default_ttl=3600)
+
         # Initialize RAG components
         self._initialize_rag()
         self._initialize_local_embedding_service()
 
-    def _initialize_local_embedding_service(self) -> None:
-        """Initialize the local embedding service with CPU-only configuration."""
+    async def _initialize_local_embedding_service(self) -> bool:
+        """Initialize the local embedding service with CPU-only safetensors model."""
         try:
-            from .local_embedding_service import LocalEmbeddingService
-            
-            # Ensure CPU-only configuration for embeddings
-            cpu_config = self.config.copy() if hasattr(self.config, 'copy') else dict(self.config)
-            cpu_config['model'] = "all-MiniLM-L6-v2"  # Use sentence-transformers model
-            
-            self.local_embedding_service = LocalEmbeddingService(config=cpu_config)
-            self.logger.info("Local CPU-only embedding service initialized")
+            # Initialize local embedding service with direct safetensors path
+            self.local_embedding_service = LocalEmbeddingService(
+                config={
+                    "model_path": str(
+                        LocalEmbeddingService.DEFAULT_MODEL_PATH
+                    ),  # Direct to safetensors file
+                    "chunk_size": DEFAULT_CHUNK_SIZE,
+                    "chunk_overlap": DEFAULT_CHUNK_OVERLAP,
+                }
+            )
+            self.logger.info(
+                "Local CPU embedding service initialized with all-MiniLM-L6-v2 (safetensors)"
+            )
+            return True
         except Exception as e:
             self.logger.warning(f"Failed to initialize local embedding service: {e}")
             self.local_embedding_service = None
+            return False
 
     def _get_default_config(self) -> EmbeddingConfig:
-        """Get default RAG configuration."""
+        """Get default RAG configuration with CPU model."""
         return EmbeddingConfig(
-            model=DEFAULT_EMBEDDING_MODEL,
-            base_url="http://localhost:1234",
-            api_key="lm-studio",
+            model=DEFAULT_EMBEDDING_MODEL,  # Already set to all-MiniLM-L6-v2 in shared constants
             chunk_size=DEFAULT_CHUNK_SIZE,
             chunk_overlap=DEFAULT_CHUNK_OVERLAP,
         )
@@ -159,23 +165,25 @@ class RAGService(BaseService, AsyncComponent):
     async def initialize(self) -> bool:
         """
         Initialize the RAG service.
-        
+
         Returns:
             True if initialization successful, False otherwise
         """
         if self._initialized:
             return True
-            
+
         try:
             success = self._initialize_rag()
             if success:
                 self._initialized = True
                 self._log_operation("RAG service initialization", True)
-                self.logger.info(f"RAG service initialized with collection: {self.config['collection_name']}")
+                self.logger.info(
+                    f"RAG service initialized with collection: {self.config['collection_name']}"
+                )
             else:
                 self._log_operation("RAG service initialization", False)
                 self.logger.error("RAG service initialization failed")
-            
+
             return success
         except Exception as e:
             self._log_operation("RAG service initialization", False, {"error": str(e)})
@@ -191,7 +199,7 @@ class RAGService(BaseService, AsyncComponent):
 
             self._initialized = False
             self._log_operation("RAG service cleanup", True)
-            
+
         except Exception as e:
             self._log_operation("RAG service cleanup", False, {"error": str(e)})
             self.logger.error(f"Error during RAG service cleanup: {e}")
@@ -204,11 +212,11 @@ class RAGService(BaseService, AsyncComponent):
 
         try:
             # Initialize ChromaDB client
-            self.client = chromadb.PersistentClient(path=self.database_config['path'])
+            self.client = chromadb.PersistentClient(path=self.database_config["path"])
 
             # Create or get collection with custom embedding function
             self.collection = self.client.get_or_create_collection(
-                name=self.config['collection_name'],
+                name=self.config["collection_name"],
                 metadata={"description": "RAG vector store for document retrieval"},
             )
 
@@ -236,7 +244,7 @@ class RAGService(BaseService, AsyncComponent):
             }
 
             # LM Studio expects the input as a string or array of strings
-            payload = {"model": self.config['model'], "input": texts}
+            payload = {"model": self.config["model"], "input": texts}
 
             response = requests.post(
                 f"{self.config['base_url']}/v1/embeddings",
@@ -277,44 +285,62 @@ class RAGService(BaseService, AsyncComponent):
             # Return empty embeddings instead of raising error to prevent disconnection
             return [[] for _ in texts]
 
-    @handle_service_errors(error_types=[NetworkError, RAGError], default_message="Embedding generation failed")
-    @retry_with_backoff(max_retries=3, base_delay=1.0, max_delay=10.0)
-    @rate_limit(max_calls=50, time_window=60)  # 50 calls per minute
+    @handle_service_errors(
+        error_types=[RAGError], default_message="Embedding generation failed"
+    )
     async def generate_embeddings(self, texts: list[str]) -> list[list[float]]:
         """
-        Generate embeddings for a list of text strings with fallback mechanism.
-        
+        Generate embeddings using local CPU model.
+
+        Uses sentence-transformers/all-MiniLM-L6-v2 loaded from safetensors file.
+
         Args:
             texts: List of text strings to embed
-            
+
         Returns:
-            List of embedding vectors
+            List of embedding vectors (384-dimensional)
         """
         if not texts:
             return []
 
         try:
-            # Try local embeddings first
+            # Use local CPU embeddings directly - no API needed
             if self.local_embedding_service:
-                try:
-                    embeddings = await self.local_embedding_service.generate_embeddings(texts)
-                    self.logger.info(f"Generated {len(texts)} embeddings using local service")
-                    return embeddings
-                except Exception as e:
-                    self.logger.warning(f"Local embedding failed, falling back to API: {e}")
-            
-            # Fallback to LM Studio API
-            loop = asyncio.get_event_loop()
-            embeddings = await loop.run_in_executor(
-                self.executor, self._generate_embeddings_sync, texts
-            )
-            return embeddings
-            
+                embeddings = await self.local_embedding_service.generate_embeddings(
+                    texts
+                )
+                self.logger.debug(f"Generated {len(texts)} embeddings locally")
+                return embeddings
+            else:
+                raise RAGError("Local embedding service not available")
+
         except Exception as e:
             self.logger.error(f"Error generating embeddings: {e}")
             raise RAGError(f"Failed to generate embeddings: {str(e)}")
 
-    @handle_service_errors(error_types=[DatabaseError, RAGError], default_message="Context storage failed")
+    def _generate_embeddings_sync_single(self, query: str) -> list[float]:
+        """Generate embedding for single text (sync fallback - uses remote API)."""
+        if not query:
+            return []
+
+        try:
+            # This is only used when local_embedding_service is unavailable
+            # as an absolute last resort fallback
+            embeddings = self._generate_embeddings_sync([query])
+            return embeddings[0] if embeddings else []
+        except Exception as e:
+            self.logger.error(f"Fallback embedding generation failed: {e}")
+            return []
+
+    async def _generate_embeddings_sync(self, texts: list[str]) -> list[list[float]]:
+        """Synchronous embedding generation fallback (should not be used - deprecated)."""
+        raise RAGError(
+            "Sync embedding generation is deprecated. Use local CPU embeddings instead."
+        )
+
+    @handle_service_errors(
+        error_types=[DatabaseError, RAGError], default_message="Context storage failed"
+    )
     async def store_context(
         self,
         document_id: str,
@@ -325,14 +351,14 @@ class RAGService(BaseService, AsyncComponent):
     ) -> bool:
         """
         Store document context in the vector database.
-        
+
         Args:
             document_id: Unique identifier for the document
             text_content: Text content to store and index
             metadata: Additional metadata about the document
             chunk_size: Size of each chunk in characters
             chunk_overlap: Overlap between chunks in characters
-            
+
         Returns:
             True if context was stored successfully
         """
@@ -344,8 +370,8 @@ class RAGService(BaseService, AsyncComponent):
 
         try:
             # Use provided chunking parameters or defaults
-            actual_chunk_size = chunk_size or self.config['chunk_size']
-            actual_chunk_overlap = chunk_overlap or self.config['chunk_overlap']
+            actual_chunk_size = chunk_size or self.config["chunk_size"]
+            actual_chunk_overlap = chunk_overlap or self.config["chunk_overlap"]
 
             # Generate chunks
             chunks = self._chunk_text(
@@ -356,24 +382,8 @@ class RAGService(BaseService, AsyncComponent):
                 self.logger.warning(f"No chunks generated for document {document_id}")
                 return False
 
-            # Generate embeddings
-            try:
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    # If we're already in an event loop, run in executor
-                    import concurrent.futures
-
-                    with concurrent.futures.ThreadPoolExecutor() as executor:
-                        future = executor.submit(self._generate_embeddings_sync, chunks)
-                        embeddings = future.result()
-                else:
-                    embeddings = loop.run_until_complete(
-                        self.generate_embeddings(chunks)
-                    )
-            except RuntimeError:
-                # No event loop available, use sync method
-                embeddings = self._generate_embeddings_sync(chunks)
-
+            # Generate embeddings using async local service
+            embeddings = await self.generate_embeddings(chunks)
             # Prepare data for ChromaDB
             ids = [f"{document_id}_{i}" for i in range(len(chunks))]
             metadatas = [
@@ -407,7 +417,10 @@ class RAGService(BaseService, AsyncComponent):
             self.logger.error(f"Error storing context for document {document_id}: {e}")
             return False
 
-    @handle_service_errors(error_types=[DatabaseError, RAGError], default_message="Context retrieval failed")
+    @handle_service_errors(
+        error_types=[DatabaseError, RAGError],
+        default_message="Context retrieval failed",
+    )
     @retry_with_backoff(max_retries=3, base_delay=1.0, max_delay=10.0)
     @rate_limit(max_calls=100, time_window=60)  # 100 calls per minute
     async def retrieve_context(
@@ -419,13 +432,13 @@ class RAGService(BaseService, AsyncComponent):
     ) -> tuple[list[str], list[dict[str, Any]]]:
         """
         Retrieve relevant context using similarity search.
-        
+
         Args:
             query: The search query
             n_results: Maximum number of results to return
             min_relevance_score: Minimum relevance score threshold (0.0 to 1.0)
             filter_metadata: Optional metadata filter for more targeted search
-            
+
         Returns:
             Tuple of (relevant document chunks, metadata for each chunk)
         """
@@ -437,7 +450,13 @@ class RAGService(BaseService, AsyncComponent):
 
         try:
             # Check cache first
-            cache_key = self._generate_cache_key("retrieve_context", query, n_results, min_relevance_score, filter_metadata)
+            cache_key = self._generate_cache_key(
+                "retrieve_context",
+                query,
+                n_results,
+                min_relevance_score,
+                filter_metadata,
+            )
             cached_result = await self.cache.get(cache_key)
             if cached_result:
                 self.stats.total_queries += 1
@@ -449,16 +468,26 @@ class RAGService(BaseService, AsyncComponent):
             # Generate embedding for query
             try:
                 loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    # If we're already in an event loop, use sync method
-                    query_embedding = self._generate_embeddings_sync([query])[0]
+
+                if self.local_embedding_service:
+                    # Run the blocking encode operation in executor
+                    def _get_query_embedding_sync():
+                        return self.local_embedding_service._embed_sync([query])[0]
+
+                    query_embedding = loop.run_in_executor(
+                        None, _get_query_embedding_sync
+                    )
+                    if asyncio.iscoroutine(query_embedding):
+                        query_embedding = await query_embedding
                 else:
-                    query_embedding = loop.run_until_complete(
-                        self.generate_embeddings([query])
-                    )[0]
-            except RuntimeError:
-                # No event loop available, use sync method
-                query_embedding = self._generate_embeddings_sync([query])[0]
+                    # Fallback: use sync API call via executor
+                    query_embedding = loop.run_in_executor(
+                        None, self._generate_embeddings_sync_single, query
+                    )
+
+            except Exception as e:
+                self.logger.warning(f"Error generating query embedding: {e}")
+                query_embedding = []
 
             # Query the collection
             results = self.collection.query(
@@ -503,7 +532,11 @@ class RAGService(BaseService, AsyncComponent):
             if filtered_docs:
                 avg_similarity = total_similarity / len(filtered_docs)
                 self.stats.average_similarity_score = (
-                    (self.stats.average_similarity_score * (self.stats.successful_queries - 1)) + avg_similarity
+                    (
+                        self.stats.average_similarity_score
+                        * (self.stats.successful_queries - 1)
+                    )
+                    + avg_similarity
                 ) / self.stats.successful_queries
             self._update_stats()
 
@@ -540,7 +573,9 @@ class RAGService(BaseService, AsyncComponent):
 
         return chunks
 
-    @handle_service_errors(error_types=[DatabaseError, RAGError], default_message="Context clearing failed")
+    @handle_service_errors(
+        error_types=[DatabaseError, RAGError], default_message="Context clearing failed"
+    )
     async def clear_context(self) -> bool:
         """Clear all stored context from the vector database."""
         try:
@@ -560,9 +595,9 @@ class RAGService(BaseService, AsyncComponent):
         """Get statistics about the stored context."""
         stats = {
             "count": 0,
-            "embedding_model": self.config['model'],
-            "persist_directory": self.database_config['path'],
-            "collection_name": self.config['collection_name'],
+            "embedding_model": self.config["model"],
+            "persist_directory": self.database_config["path"],
+            "collection_name": self.config["collection_name"],
         }
 
         try:
@@ -570,13 +605,16 @@ class RAGService(BaseService, AsyncComponent):
                 # Get collection count
                 collection_stats = self.collection.count()
                 stats["count"] = collection_stats
-                
+
                 # Calculate approximate size
                 try:
                     import os
-                    if os.path.exists(self.database_config['path']):
+
+                    if os.path.exists(self.database_config["path"]):
                         total_size = 0
-                        for dirpath, dirnames, filenames in os.walk(self.database_config['path']):
+                        for dirpath, dirnames, filenames in os.walk(
+                            self.database_config["path"]
+                        ):
                             for f in filenames:
                                 fp = os.path.join(dirpath, f)
                                 total_size += os.path.getsize(fp)
@@ -584,12 +622,14 @@ class RAGService(BaseService, AsyncComponent):
                     else:
                         stats["size_mb"] = 0
                 except Exception as size_error:
-                    self.logger.warning(f"Could not calculate database size: {size_error}")
+                    self.logger.warning(
+                        f"Could not calculate database size: {size_error}"
+                    )
                     stats["size_mb"] = 0
 
                 # Add chunking configuration
-                stats["default_chunk_size"] = self.config['chunk_size']
-                stats["default_chunk_overlap"] = self.config['chunk_overlap']
+                stats["default_chunk_size"] = self.config["chunk_size"]
+                stats["default_chunk_overlap"] = self.config["chunk_overlap"]
 
         except Exception as e:
             self.logger.error(f"Error getting context stats: {e}")
@@ -600,8 +640,8 @@ class RAGService(BaseService, AsyncComponent):
 
     def update_chunking_config(self, chunk_size: int, chunk_overlap: int) -> None:
         """Update the default chunking configuration."""
-        self.config['chunk_size'] = chunk_size
-        self.config['chunk_overlap'] = chunk_overlap
+        self.config["chunk_size"] = chunk_size
+        self.config["chunk_overlap"] = chunk_overlap
         self.logger.info(
             f"Updated chunking config: size={chunk_size}, overlap={chunk_overlap}"
         )
@@ -740,7 +780,10 @@ class RAGService(BaseService, AsyncComponent):
             "cache_ttl": self.cache.default_ttl,
         }
 
-    @handle_service_errors(error_types=[RAGError, LLMError], default_message="RAG response generation failed")
+    @handle_service_errors(
+        error_types=[RAGError, LLMError],
+        default_message="RAG response generation failed",
+    )
     async def generate_rag_response(
         self,
         query: str,
@@ -750,13 +793,13 @@ class RAGService(BaseService, AsyncComponent):
     ) -> str:
         """
         Generate a RAG response by combining retrieval and generation.
-        
+
         Args:
             query: The user's query
             system_prompt: Optional system prompt for the LLM
             n_results: Number of documents to retrieve
             min_relevance_score: Minimum similarity threshold
-            
+
         Returns:
             Generated response text
         """
@@ -795,7 +838,9 @@ Answer concisely and accurately based on the provided context."""
                 )
             else:
                 # Fallback to simple completion
-                response = "Error: LLM service not available for RAG response generation"
+                response = (
+                    "Error: LLM service not available for RAG response generation"
+                )
 
             return response
 
@@ -804,7 +849,10 @@ Answer concisely and accurately based on the provided context."""
             # Fallback to simple completion
             return f"Error: {str(e)}"
 
-    @handle_service_errors(error_types=[RAGError, LLMError], default_message="RAG streaming response generation failed")
+    @handle_service_errors(
+        error_types=[RAGError, LLMError],
+        default_message="RAG streaming response generation failed",
+    )
     async def generate_streaming_rag_response(
         self,
         query: str,
@@ -814,13 +862,13 @@ Answer concisely and accurately based on the provided context."""
     ) -> AsyncGenerator[str, None]:
         """
         Generate a streaming RAG response.
-        
+
         Args:
             query: The user's query
             system_prompt: Optional system prompt for the LLM
             n_results: Number of documents to retrieve
             min_relevance_score: Minimum similarity threshold
-            
+
         Yields:
             Response chunks for streaming
         """
@@ -828,6 +876,7 @@ Answer concisely and accurately based on the provided context."""
             # Retrieve relevant context with timeout
             try:
                 import asyncio
+
                 context_task = asyncio.create_task(
                     self.retrieve_context(
                         query=query,
@@ -836,13 +885,19 @@ Answer concisely and accurately based on the provided context."""
                     )
                 )
                 # Set timeout for RAG operations (25 seconds)
-                relevant_docs, metadata = await asyncio.wait_for(context_task, timeout=25.0)
+                relevant_docs, metadata = await asyncio.wait_for(
+                    context_task, timeout=25.0
+                )
             except asyncio.TimeoutError:
-                self.logger.warning("RAG context retrieval timed out, using original query")
+                self.logger.warning(
+                    "RAG context retrieval timed out, using original query"
+                )
                 relevant_docs = []
                 metadata = []
             except Exception as context_error:
-                self.logger.error(f"RAG context retrieval failed: {context_error}, using original query")
+                self.logger.error(
+                    f"RAG context retrieval failed: {context_error}, using original query"
+                )
                 relevant_docs = []
                 metadata = []
 
@@ -872,9 +927,9 @@ Answer concisely and accurately based on the provided context."""
                     response_generator = self.llm_service.streaming_completion(
                         prompt=enhanced_prompt, system_prompt=system_prompt
                     )
-                    
+
                     # Check if it's an async generator
-                    if hasattr(response_generator, '__aiter__'):
+                    if hasattr(response_generator, "__aiter__"):
                         # It's an async generator, use async for
                         async for chunk in response_generator:
                             yield chunk
@@ -884,10 +939,14 @@ Answer concisely and accurately based on the provided context."""
                         yield response
                     else:
                         # Unknown type, handle gracefully
-                        self.logger.error(f"Unknown response type from LLM service: {type(response_generator)}")
+                        self.logger.error(
+                            f"Unknown response type from LLM service: {type(response_generator)}"
+                        )
                         yield "Error: Invalid response type from LLM service"
                 except Exception as llm_error:
-                    self.logger.error(f"LLM streaming failed: {llm_error}, falling back to simple completion")
+                    self.logger.error(
+                        f"LLM streaming failed: {llm_error}, falling back to simple completion"
+                    )
                     # Fallback to simple completion
                     try:
                         response = await self.llm_service.simple_completion(
@@ -923,7 +982,7 @@ Answer concisely and accurately based on the provided context."""
         memory_info = get_memory_usage()
         self.stats.memory_usage_mb = memory_info.get("rss_mb", 0)
         self.stats.cpu_usage_percent = get_cpu_usage()
-        
+
         # Update uptime
         self.stats.uptime_seconds = (datetime.now() - self._start_time).total_seconds()
 
@@ -931,34 +990,36 @@ Answer concisely and accurately based on the provided context."""
         """Get service health status."""
         status = STATUS_HEALTHY
         issues = []
-        
+
         # Check client availability
         if self.client is None:
             status = STATUS_UNHEALTHY
             issues.append("ChromaDB client not initialized")
-        
+
         # Check collection availability
         if self.collection is None:
             status = STATUS_UNHEALTHY
             issues.append("Collection not available")
-        
+
         # Check error rate
         if self.stats.total_queries > 0:
             error_rate = self.stats.failed_queries / self.stats.total_queries
             if error_rate > 0.1:  # More than 10% error rate
                 status = STATUS_DEGRADED
                 issues.append(f"High error rate: {error_rate:.2%}")
-        
+
         # Check response time
         if self.stats.average_retrieval_time > 10.0:  # More than 10 seconds average
             status = STATUS_DEGRADED
-            issues.append(f"High retrieval time: {self.stats.average_retrieval_time:.2f}s")
-        
+            issues.append(
+                f"High retrieval time: {self.stats.average_retrieval_time:.2f}s"
+            )
+
         # Check memory usage
         if self.stats.memory_usage_mb > 1024.0:  # More than 1GB
             status = STATUS_DEGRADED
             issues.append(f"High memory usage: {self.stats.memory_usage_mb:.2f}MB")
-        
+
         return {
             "service": SERVICE_RAG,
             "status": status,
@@ -1028,18 +1089,18 @@ def create_rag_service(
         chunk_size=DEFAULT_CHUNK_SIZE,
         chunk_overlap=DEFAULT_CHUNK_OVERLAP,
     )
-    
+
     default_database_config = DatabaseConfig(
         path=DEFAULT_RAG_PERSIST_DIRECTORY,
         max_connections=5,
         timeout=30,
     )
-    
+
     if config:
         default_config.update(config)
     if database_config:
         default_database_config.update(database_config)
-    
+
     return RAGService(
         llm_service=llm_service,
         config=default_config,
@@ -1059,16 +1120,16 @@ def create_document_rag_service(
         chunk_size=1000,  # Larger chunks for documents
         chunk_overlap=200,
     )
-    
+
     default_database_config = DatabaseConfig(
         path=DEFAULT_RAG_PERSIST_DIRECTORY,
         max_connections=5,
         timeout=30,
     )
-    
+
     if database_config:
         default_database_config.update(database_config)
-    
+
     return RAGService(
         llm_service=llm_service,
         config=default_config,
@@ -1088,16 +1149,16 @@ def create_chat_rag_service(
         chunk_size=300,  # Smaller chunks for chat
         chunk_overlap=50,
     )
-    
+
     default_database_config = DatabaseConfig(
         path=DEFAULT_RAG_PERSIST_DIRECTORY,
         max_connections=5,
         timeout=30,
     )
-    
+
     if database_config:
         default_database_config.update(database_config)
-    
+
     return RAGService(
         llm_service=llm_service,
         config=default_config,

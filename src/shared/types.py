@@ -6,7 +6,7 @@ and IDE support.
 """
 
 from collections.abc import AsyncGenerator
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from datetime import datetime
 from typing import Any, Literal, TypedDict
 
@@ -14,6 +14,7 @@ from typing import Any, Literal, TypedDict
 # Chat-related types
 class ChatMessage(TypedDict):
     """Type definition for chat messages."""
+
     role: Literal["user", "assistant", "system"]
     content: str
     timestamp: datetime
@@ -22,6 +23,7 @@ class ChatMessage(TypedDict):
 
 class ChatCompletionRequest(TypedDict):
     """OpenAI-compatible chat completion request."""
+
     messages: list[ChatMessage]
     model: str
     temperature: float | None
@@ -37,6 +39,7 @@ class ChatCompletionRequest(TypedDict):
 # RAG-related types
 class RAGResult(TypedDict):
     """Type definition for RAG results."""
+
     documents: list[str]
     metadata: list[dict[str, Any]]
     scores: list[float]
@@ -44,35 +47,45 @@ class RAGResult(TypedDict):
 
 class RAGContext(TypedDict):
     """Type definition for RAG context."""
+
     query: str
     relevant_documents: list[str]
     metadata: list[dict[str, Any]]
     similarity_scores: list[float]
 
 
-# LLM configuration types
-class LLMConfig(TypedDict):
-    """Type definition for LLM configuration."""
-    model: str
-    temperature: float
-    max_tokens: int
-    base_url: str
-    api_key: str
-    enable_streaming: bool
+# Configuration dataclasses - used for type hints and serialization
+@dataclass
+class EmbeddingConfig:
+    """Embedding configuration for RAG services."""
+
+    model: str = "text-embedding-ada-002"
+    base_url: str = "http://localhost:1234"
+    api_key: str = "lm-studio"
+    chunk_size: int = 1000
+    chunk_overlap: int = 200
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        return asdict(self)
 
 
-class EmbeddingConfig(TypedDict):
-    """Type definition for embedding configuration."""
-    model: str
-    base_url: str
-    api_key: str
-    chunk_size: int
-    chunk_overlap: int
+@dataclass
+class LLMConfig:
+    """LLM configuration for RAG services."""
+
+    model: str = "gpt-3.5-turbo"
+    temperature: float = 0.7
+    max_tokens: int | None = None
+    base_url: str = "http://localhost:1234"
+    api_key: str = ""
+    enable_streaming: bool = True
 
 
 # Database types
 class DatabaseConfig(TypedDict):
     """Type definition for database configuration."""
+
     path: str
     max_connections: int
     timeout: int
@@ -81,6 +94,7 @@ class DatabaseConfig(TypedDict):
 # Service status types
 class ServiceStatus(TypedDict):
     """Type definition for service status."""
+
     name: str
     status: Literal["healthy", "unhealthy", "degraded"]
     uptime: float
@@ -89,7 +103,8 @@ class ServiceStatus(TypedDict):
 
 
 class CacheStats(TypedDict):
-    """Type definition for cache statistics."""
+    """Cache statistics."""
+
     total_entries: int
     valid_entries: int
     expired_entries: int
@@ -100,6 +115,7 @@ class CacheStats(TypedDict):
 # File processing types
 class FileMetadata(TypedDict):
     """Type definition for file metadata."""
+
     filename: str
     file_size: int
     file_type: str
@@ -109,7 +125,8 @@ class FileMetadata(TypedDict):
 
 
 class ProcessingResult(TypedDict):
-    """Type definition for processing results."""
+    """Processing results."""
+
     success: bool
     message: str
     processed_items: int
@@ -118,7 +135,8 @@ class ProcessingResult(TypedDict):
 
 # Configuration types
 class AppConfig(TypedDict):
-    """Type definition for application configuration."""
+    """Application configuration structure."""
+
     llm: LLMConfig
     rag: EmbeddingConfig
     database: DatabaseConfig
@@ -129,6 +147,7 @@ class AppConfig(TypedDict):
 # Async operation types
 class AsyncOperation(TypedDict):
     """Type definition for async operations."""
+
     operation_id: str
     status: Literal["pending", "running", "completed", "failed"]
     progress: float
@@ -140,7 +159,8 @@ class AsyncOperation(TypedDict):
 
 # Performance metrics types
 class PerformanceMetrics(TypedDict):
-    """Type definition for performance metrics."""
+    """Performance metrics."""
+
     response_time: float
     throughput: float
     error_rate: float
@@ -151,7 +171,8 @@ class PerformanceMetrics(TypedDict):
 
 # Error handling types
 class ErrorDetails(TypedDict):
-    """Type definition for error details."""
+    """Error details structure."""
+
     error_type: str
     error_message: str
     error_code: str | None
@@ -162,6 +183,7 @@ class ErrorDetails(TypedDict):
 # Generic response types
 class ApiResponse(TypedDict, total=False):
     """Type definition for API responses."""
+
     success: bool
     data: Any | None
     message: str | None
@@ -170,7 +192,8 @@ class ApiResponse(TypedDict, total=False):
 
 
 class PaginatedResponse(TypedDict, total=False):
-    """Type definition for paginated API responses."""
+    """Paginated API responses."""
+
     items: list[Any]
     total: int
     page: int
@@ -183,7 +206,8 @@ class PaginatedResponse(TypedDict, total=False):
 
 # Streaming types
 class StreamingChunk(TypedDict):
-    """Type definition for streaming response chunks."""
+    """Streaming response chunk."""
+
     chunk_id: str
     content: str
     timestamp: datetime
@@ -192,7 +216,8 @@ class StreamingChunk(TypedDict):
 
 # Component types
 class ComponentConfig(TypedDict):
-    """Type definition for component configuration."""
+    """Component configuration."""
+
     name: str
     enabled: bool
     config: dict[str, Any]
@@ -201,7 +226,8 @@ class ComponentConfig(TypedDict):
 
 # Event types
 class EventData(TypedDict):
-    """Type definition for event data."""
+    """Event data structure."""
+
     event_type: str
     timestamp: datetime
     source: str
@@ -210,7 +236,8 @@ class EventData(TypedDict):
 
 # Validation types
 class ValidationResult(TypedDict):
-    """Type definition for validation results."""
+    """Validation results."""
+
     is_valid: bool
     errors: list[str]
     warnings: list[str]
@@ -220,12 +247,14 @@ class ValidationResult(TypedDict):
 # Utility types
 class ProgressCallback:
     """Type definition for progress callback functions."""
+
     def __call__(self, progress: float, message: str) -> None:
         pass
 
 
 class AsyncGeneratorFunction:
     """Type definition for async generator functions."""
+
     def __call__(self, *args, **kwargs) -> AsyncGenerator[Any, None]:
         pass
 
@@ -234,6 +263,7 @@ class AsyncGeneratorFunction:
 @dataclass
 class DocumentChunk:
     """Represents a chunk of a document."""
+
     content: str
     metadata: dict[str, Any]
     embedding: list[float] | None = None
@@ -242,7 +272,8 @@ class DocumentChunk:
 
 @dataclass
 class SearchResult:
-    """Represents a search result."""
+    """Search result structure."""
+
     document_id: str
     content: str
     metadata: dict[str, Any]
@@ -252,7 +283,8 @@ class SearchResult:
 
 @dataclass
 class ConversationContext:
-    """Represents conversation context."""
+    """Conversation context structure."""
+
     history: list[ChatMessage]
     current_topic: str | None
     user_preferences: dict[str, Any]

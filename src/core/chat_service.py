@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from ..shared import (
+from src.shared import (
     DEFAULT_CONVERSATION_HISTORY_LIMIT,
     SERVICE_CHAT,
     STATUS_DEGRADED,
@@ -28,13 +28,14 @@ from ..shared import (
     handle_service_errors,
     retry_with_backoff,
 )
-from .llm_service import LLMService
-from .rag_service import RAGService
+from src.core.llm_service import LLMService
+from src.core.rag_service import RAGService
 
 
 @dataclass
 class ChatStats:
     """Statistics for chat service."""
+
     total_conversations: int = 0
     active_conversations: int = 0
     total_messages: int = 0
@@ -51,10 +52,10 @@ class ChatStats:
 class ChatService(BaseService, AsyncComponent):
     """
     RAG-enhanced chat service for SigmaHQ RAG application.
-    
+
     This service combines the RAG system with the chat interface to provide
     context-aware responses based on stored documents and conversation history.
-    
+
     Features:
     - RAG-enhanced responses
     - Conversation history management
@@ -71,7 +72,7 @@ class ChatService(BaseService, AsyncComponent):
     ):
         """
         Initialize the chat service.
-        
+
         Args:
             llm_service: Pre-configured LLM service
             rag_service: Pre-configured RAG service
@@ -79,50 +80,50 @@ class ChatService(BaseService, AsyncComponent):
         """
         BaseService.__init__(self, f"{SERVICE_CHAT}.chat_service")
         AsyncComponent.__init__(self)
-        
+
         # Services
         self.llm_service = llm_service
         self.rag_service = rag_service
-        
+
         # Configuration
         self.conversation_history_limit = conversation_history_limit
-        
+
         # Conversation history
         self.conversations: dict[str, list[ChatMessage]] = {}
-        
+
         # Statistics
         self.stats = ChatStats()
         self._start_time = datetime.now()
-        
+
         # Service state
         self._initialized = False
 
     async def initialize(self) -> bool:
         """
         Initialize the chat service.
-        
+
         Returns:
             True if initialization successful, False otherwise
         """
         if self._initialized:
             return True
-            
+
         try:
             # Initialize LLM service if not provided
             if self.llm_service is None:
                 self.llm_service = LLMService()
                 await self.llm_service.initialize()
-            
+
             # Initialize RAG service if not provided
             if self.rag_service is None:
                 self.rag_service = RAGService(llm_service=self.llm_service)
                 await self.rag_service.initialize()
-            
+
             self._initialized = True
             self._log_operation("Chat service initialization", True)
             self.logger.info("Chat service initialized successfully")
             return True
-            
+
         except Exception as e:
             self._log_operation("Chat service initialization", False, {"error": str(e)})
             self.logger.error(f"Chat service initialization failed: {e}")
@@ -133,16 +134,16 @@ class ChatService(BaseService, AsyncComponent):
         try:
             # Clean up conversations
             self.conversations.clear()
-            
+
             # Clean up services
             if self.llm_service:
                 self.llm_service.cleanup()
             if self.rag_service:
                 self.rag_service.cleanup()
-            
+
             self._initialized = False
             self._log_operation("Chat service cleanup", True)
-            
+
         except Exception as e:
             self._log_operation("Chat service cleanup", False, {"error": str(e)})
             self.logger.error(f"Error during chat service cleanup: {e}")
@@ -150,7 +151,7 @@ class ChatService(BaseService, AsyncComponent):
     def add_message_to_history(self, session_id: str, role: str, content: str) -> None:
         """
         Add a message to the conversation history.
-        
+
         Args:
             session_id: Session identifier
             role: Role of the message (user or assistant)
@@ -158,32 +159,33 @@ class ChatService(BaseService, AsyncComponent):
         """
         if session_id not in self.conversations:
             self.conversations[session_id] = []
-        
+
         message = ChatMessage(
-            role=role,
-            content=content,
-            timestamp=datetime.now(),
-            metadata={}
+            role=role, content=content, timestamp=datetime.now(), metadata={}
         )
-        
+
         self.conversations[session_id].append(message)
-        
+
         # Limit conversation history size
         if len(self.conversations[session_id]) > self.conversation_history_limit:
             # Remove oldest messages, but keep at least the last few
-            self.conversations[session_id] = self.conversations[session_id][-self.conversation_history_limit:]
+            self.conversations[session_id] = self.conversations[session_id][
+                -self.conversation_history_limit :
+            ]
 
     def clear_conversation_history(self, session_id: str | None = None) -> None:
         """
         Clear the conversation history.
-        
+
         Args:
             session_id: Session identifier (if None, clears all conversations)
         """
         if session_id:
             if session_id in self.conversations:
                 del self.conversations[session_id]
-                self.logger.info(f"Conversation history cleared for session: {session_id}")
+                self.logger.info(
+                    f"Conversation history cleared for session: {session_id}"
+                )
         else:
             self.conversations.clear()
             self.logger.info("All conversation history cleared")
@@ -191,22 +193,22 @@ class ChatService(BaseService, AsyncComponent):
     def get_conversation_history(self, session_id: str) -> list[dict[str, str]]:
         """
         Get the current conversation history.
-        
+
         Args:
             session_id: Session identifier
-            
+
         Returns:
             List of conversation messages
         """
         if session_id not in self.conversations:
             return []
-        
+
         return [
             {
                 "role": msg["role"],
                 "content": msg["content"],
                 "timestamp": msg["timestamp"].isoformat(),
-                "metadata": msg.get("metadata", {})
+                "metadata": msg.get("metadata", {}),
             }
             for msg in self.conversations[session_id]
         ]
@@ -219,7 +221,10 @@ class ChatService(BaseService, AsyncComponent):
         """Get the number of messages in a session."""
         return len(self.conversations.get(session_id, []))
 
-    @handle_service_errors(error_types=[RAGError, LLMError, ChatError], default_message="Chat response generation failed")
+    @handle_service_errors(
+        error_types=[RAGError, LLMError, ChatError],
+        default_message="Chat response generation failed",
+    )
     @retry_with_backoff(max_retries=3, base_delay=1.0, max_delay=10.0)
     async def generate_response(
         self,
@@ -232,7 +237,7 @@ class ChatService(BaseService, AsyncComponent):
     ) -> str:
         """
         Generate a response to a user message with improved timeout handling and fallbacks.
-        
+
         Args:
             user_message: The user's message
             session_id: Session identifier
@@ -240,19 +245,21 @@ class ChatService(BaseService, AsyncComponent):
             use_rag: Whether to use RAG (overrides default setting)
             rag_n_results: Number of RAG results to retrieve
             rag_min_score: Minimum similarity score for RAG results
-            
+
         Returns:
             The generated response
         """
         start_time = time.time()
-        
+
         try:
             # Determine if RAG should be used
-            should_use_rag = use_rag if use_rag is not None else (self.rag_service is not None)
-            
+            should_use_rag = (
+                use_rag if use_rag is not None else (self.rag_service is not None)
+            )
+
             # Add user message to history
             self.add_message_to_history(session_id, "user", user_message)
-            
+
             if should_use_rag and self.rag_service:
                 # Use RAG-enhanced response generation with timeout
                 try:
@@ -264,10 +271,10 @@ class ChatService(BaseService, AsyncComponent):
                             n_results=rag_n_results,
                             min_relevance_score=rag_min_score,
                         ),
-                        timeout=25.0  # 25 seconds timeout for RAG operations
+                        timeout=25.0,  # 25 seconds timeout for RAG operations
                     )
                     context_time = time.time() - context_start
-                    
+
                     # Build context string
                     if relevant_docs:
                         context_text = "\n\n".join(relevant_docs)
@@ -294,44 +301,54 @@ Answer concisely and accurately based on the provided context."""
                             self.llm_service.simple_completion(
                                 prompt=enhanced_prompt, system_prompt=system_prompt
                             ),
-                            timeout=30.0  # 30 seconds timeout for LLM completion
+                            timeout=30.0,  # 30 seconds timeout for LLM completion
                         )
                     except asyncio.TimeoutError:
-                        self.logger.warning("LLM response timed out, using simple completion")
+                        self.logger.warning(
+                            "LLM response timed out, using simple completion"
+                        )
                         # Fallback to simple completion without context
                         response = await self.llm_service.simple_completion(
                             prompt=user_message, system_prompt=system_prompt
                         )
-                    
+
                     # Update context retrieval time statistics
                     if self.stats.total_conversations > 0:
                         self.stats.average_context_retrieval_time = (
-                            (self.stats.average_context_retrieval_time * (self.stats.total_conversations - 1)) + context_time
+                            (
+                                self.stats.average_context_retrieval_time
+                                * (self.stats.total_conversations - 1)
+                            )
+                            + context_time
                         ) / self.stats.total_conversations
                     else:
                         self.stats.average_context_retrieval_time = context_time
 
                 except asyncio.TimeoutError:
-                    self.logger.warning("RAG context retrieval timed out, falling back to standard LLM")
+                    self.logger.warning(
+                        "RAG context retrieval timed out, falling back to standard LLM"
+                    )
                     # Fallback to standard LLM response
                     try:
                         response = await asyncio.wait_for(
                             self.llm_service.simple_completion(
                                 prompt=user_message, system_prompt=system_prompt
                             ),
-                            timeout=30.0
+                            timeout=30.0,
                         )
                     except asyncio.TimeoutError:
                         response = "I apologize, but I'm experiencing technical difficulties. Please try again in a moment."
                 except Exception as rag_error:
-                    self.logger.error(f"RAG response failed: {rag_error}, falling back to standard LLM")
+                    self.logger.error(
+                        f"RAG response failed: {rag_error}, falling back to standard LLM"
+                    )
                     # Fallback to standard LLM response
                     try:
                         response = await asyncio.wait_for(
                             self.llm_service.simple_completion(
                                 prompt=user_message, system_prompt=system_prompt
                             ),
-                            timeout=30.0
+                            timeout=30.0,
                         )
                     except asyncio.TimeoutError:
                         response = "I apologize, but I'm experiencing technical difficulties. Please try again in a moment."
@@ -342,7 +359,7 @@ Answer concisely and accurately based on the provided context."""
                         self.llm_service.simple_completion(
                             prompt=user_message, system_prompt=system_prompt
                         ),
-                        timeout=30.0
+                        timeout=30.0,
                     )
                 except asyncio.TimeoutError:
                     response = "I apologize, but I'm experiencing technical difficulties. Please try again in a moment."
@@ -355,13 +372,17 @@ Answer concisely and accurately based on the provided context."""
             self.stats.active_conversations = len(self.conversations)
             self.stats.total_messages += 2  # User + assistant message
             self.stats.successful_responses += 1
-            
+
             response_time = time.time() - start_time
-            
+
             # Update average response time (moving average)
             if self.stats.successful_responses > 1:
                 self.stats.average_response_time = (
-                    (self.stats.average_response_time * (self.stats.successful_responses - 1)) + response_time
+                    (
+                        self.stats.average_response_time
+                        * (self.stats.successful_responses - 1)
+                    )
+                    + response_time
                 ) / self.stats.successful_responses
             else:
                 self.stats.average_response_time = response_time
@@ -387,7 +408,7 @@ Answer concisely and accurately based on the provided context."""
     ) -> AsyncGenerator[str, None]:
         """
         Generate a streaming response to a user message.
-        
+
         Args:
             user_message: The user's message
             session_id: Session identifier
@@ -395,19 +416,21 @@ Answer concisely and accurately based on the provided context."""
             use_rag: Whether to use RAG (overrides default setting)
             rag_n_results: Number of RAG results to retrieve
             rag_min_score: Minimum similarity score for RAG results
-            
+
         Yields:
             Response chunks for streaming
         """
         start_time = time.time()
-        
+
         try:
             # Determine if RAG should be used
-            should_use_rag = use_rag if use_rag is not None else (self.rag_service is not None)
-            
+            should_use_rag = (
+                use_rag if use_rag is not None else (self.rag_service is not None)
+            )
+
             # Add user message to history
             self.add_message_to_history(session_id, "user", user_message)
-            
+
             if should_use_rag and self.rag_service:
                 # Use RAG-enhanced streaming response generation
                 response_generator = self.rag_service.generate_streaming_rag_response(
@@ -416,9 +439,9 @@ Answer concisely and accurately based on the provided context."""
                     n_results=rag_n_results,
                     min_relevance_score=rag_min_score,
                 )
-                
+
                 # Always treat it as an async generator and use async for
-                if hasattr(response_generator, '__aiter__'):
+                if hasattr(response_generator, "__aiter__"):
                     async for chunk in response_generator:
                         yield chunk
                 else:
@@ -439,9 +462,9 @@ Answer concisely and accurately based on the provided context."""
                 response_generator = self.llm_service.streaming_completion(
                     prompt=user_message, system_prompt=system_prompt
                 )
-                
+
                 # Always treat it as an async generator and use async for
-                if hasattr(response_generator, '__aiter__'):
+                if hasattr(response_generator, "__aiter__"):
                     async for chunk in response_generator:
                         yield chunk
                 else:
@@ -463,13 +486,17 @@ Answer concisely and accurately based on the provided context."""
             self.stats.active_conversations = len(self.conversations)
             self.stats.total_messages += 2  # User + assistant message
             self.stats.successful_responses += 1
-            
+
             response_time = time.time() - start_time
-            
+
             # Update average response time (moving average)
             if self.stats.successful_responses > 1:
                 self.stats.average_response_time = (
-                    (self.stats.average_response_time * (self.stats.successful_responses - 1)) + response_time
+                    (
+                        self.stats.average_response_time
+                        * (self.stats.successful_responses - 1)
+                    )
+                    + response_time
                 ) / self.stats.successful_responses
             else:
                 self.stats.average_response_time = response_time
@@ -485,7 +512,7 @@ Answer concisely and accurately based on the provided context."""
     def get_rag_status(self) -> dict[str, Any]:
         """
         Get the status of the RAG system.
-        
+
         Returns:
             Dictionary with RAG status information
         """
@@ -512,7 +539,7 @@ Answer concisely and accurately based on the provided context."""
     async def clear_rag_context(self) -> bool:
         """
         Clear the RAG context (stored documents).
-        
+
         Returns:
             True if successful, False otherwise
         """
@@ -530,7 +557,7 @@ Answer concisely and accurately based on the provided context."""
     def get_rag_stats(self) -> dict[str, Any]:
         """
         Get RAG statistics.
-        
+
         Returns:
             Dictionary with RAG statistics
         """
@@ -555,7 +582,7 @@ Answer concisely and accurately based on the provided context."""
         """Get service health status."""
         status = STATUS_HEALTHY
         issues = []
-        
+
         # Check LLM service availability
         if self.llm_service:
             llm_status = self.llm_service.get_health_status()
@@ -565,31 +592,33 @@ Answer concisely and accurately based on the provided context."""
         else:
             status = STATUS_UNHEALTHY
             issues.append("LLM service not available")
-        
+
         # Check RAG service availability
         if self.rag_service:
             rag_status = self.rag_service.get_health_status()
             if rag_status["status"] != STATUS_HEALTHY:
                 status = STATUS_DEGRADED
                 issues.append(f"RAG service degraded: {rag_status.get('issues', [])}")
-        
+
         # Check error rate
         if self.stats.total_conversations > 0:
             error_rate = self.stats.failed_responses / self.stats.total_conversations
             if error_rate > 0.1:  # More than 10% error rate
                 status = STATUS_DEGRADED
                 issues.append(f"High error rate: {error_rate:.2%}")
-        
+
         # Check response time
         if self.stats.average_response_time > 30.0:  # More than 30 seconds average
             status = STATUS_DEGRADED
-            issues.append(f"High response time: {self.stats.average_response_time:.2f}s")
-        
+            issues.append(
+                f"High response time: {self.stats.average_response_time:.2f}s"
+            )
+
         # Check memory usage
         if self.stats.memory_usage_mb > 1024.0:  # More than 1GB
             status = STATUS_DEGRADED
             issues.append(f"High memory usage: {self.stats.memory_usage_mb:.2f}MB")
-        
+
         return {
             "service": SERVICE_CHAT,
             "status": status,
@@ -616,7 +645,9 @@ Answer concisely and accurately based on the provided context."""
         return {
             "conversation_history_limit": self.conversation_history_limit,
             "active_sessions": len(self.conversations),
-            "total_messages": sum(len(history) for history in self.conversations.values()),
+            "total_messages": sum(
+                len(history) for history in self.conversations.values()
+            ),
             "stats": {
                 "total_conversations": self.stats.total_conversations,
                 "active_conversations": self.stats.active_conversations,
@@ -636,49 +667,44 @@ Answer concisely and accurately based on the provided context."""
     def validate_session_id(self, session_id: str) -> ValidationResult:
         """
         Validate a session ID.
-        
+
         Args:
             session_id: Session identifier to validate
-            
+
         Returns:
             Validation result
         """
         if not session_id or not session_id.strip():
             return ValidationResult(
-                is_valid=False,
-                errors=["Session ID cannot be empty"],
-                warnings=[]
+                is_valid=False, errors=["Session ID cannot be empty"], warnings=[]
             )
-        
+
         if len(session_id) > 100:
             return ValidationResult(
                 is_valid=False,
                 errors=["Session ID too long (max 100 characters)"],
-                warnings=[]
+                warnings=[],
             )
-        
+
         # Check for valid characters (alphanumeric, hyphens, underscores)
         import re
-        if not re.match(r'^[a-zA-Z0-9_-]+$', session_id):
+
+        if not re.match(r"^[a-zA-Z0-9_-]+$", session_id):
             return ValidationResult(
                 is_valid=False,
                 errors=["Session ID contains invalid characters"],
-                warnings=["Use only letters, numbers, hyphens, and underscores"]
+                warnings=["Use only letters, numbers, hyphens, and underscores"],
             )
-        
-        return ValidationResult(
-            is_valid=True,
-            errors=[],
-            warnings=[]
-        )
+
+        return ValidationResult(is_valid=True, errors=[], warnings=[])
 
     def get_session_summary(self, session_id: str) -> dict[str, Any]:
         """
         Get a summary of a session.
-        
+
         Args:
             session_id: Session identifier
-            
+
         Returns:
             Session summary
         """
@@ -691,9 +717,9 @@ Answer concisely and accurately based on the provided context."""
                 "first_message": None,
                 "last_message": None,
             }
-        
+
         messages = self.conversations[session_id]
-        
+
         if not messages:
             return {
                 "session_id": session_id,
@@ -703,11 +729,13 @@ Answer concisely and accurately based on the provided context."""
                 "first_message": None,
                 "last_message": None,
             }
-        
+
         first_message = messages[0]
         last_message = messages[-1]
-        duration = (last_message["timestamp"] - first_message["timestamp"]).total_seconds()
-        
+        duration = (
+            last_message["timestamp"] - first_message["timestamp"]
+        ).total_seconds()
+
         return {
             "session_id": session_id,
             "exists": True,
@@ -715,12 +743,20 @@ Answer concisely and accurately based on the provided context."""
             "duration": duration,
             "first_message": {
                 "role": first_message["role"],
-                "content": first_message["content"][:100] + "..." if len(first_message["content"]) > 100 else first_message["content"],
+                "content": (
+                    first_message["content"][:100] + "..."
+                    if len(first_message["content"]) > 100
+                    else first_message["content"]
+                ),
                 "timestamp": first_message["timestamp"].isoformat(),
             },
             "last_message": {
                 "role": last_message["role"],
-                "content": last_message["content"][:100] + "..." if len(last_message["content"]) > 100 else last_message["content"],
+                "content": (
+                    last_message["content"][:100] + "..."
+                    if len(last_message["content"]) > 100
+                    else last_message["content"]
+                ),
                 "timestamp": last_message["timestamp"].isoformat(),
             },
         }
@@ -729,8 +765,10 @@ Answer concisely and accurately based on the provided context."""
         """Update chat service configuration."""
         try:
             if "conversation_history_limit" in new_config:
-                self.conversation_history_limit = new_config["conversation_history_limit"]
-            
+                self.conversation_history_limit = new_config[
+                    "conversation_history_limit"
+                ]
+
             self.logger.info(f"Chat service configuration updated: {new_config}")
             return True
         except Exception as e:

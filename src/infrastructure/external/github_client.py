@@ -11,7 +11,7 @@ from typing import Any
 
 import requests
 
-from ...shared import (
+from src.shared import (
     DEFAULT_GITHUB_API_BASE_URL,
     SERVICE_GITHUB,
     STATUS_DEGRADED,
@@ -25,6 +25,7 @@ from ...shared import (
 @dataclass
 class GitHubStats:
     """Statistics for GitHub client."""
+
     total_requests: int = 0
     successful_requests: int = 0
     failed_requests: int = 0
@@ -39,7 +40,7 @@ class GitHubStats:
 class GitHubClient(BaseService):
     """
     GitHub API client for repository operations.
-    
+
     Features:
     - Repository management
     - File operations
@@ -56,23 +57,23 @@ class GitHubClient(BaseService):
     ):
         """
         Initialize the GitHub client.
-        
+
         Args:
             api_base_url: GitHub API base URL
             token: GitHub API token
             rate_limit_delay: Delay between requests to avoid rate limiting
         """
         BaseService.__init__(self, f"{SERVICE_GITHUB}.github_client")
-        
+
         # Configuration
         self.api_base_url = api_base_url
         self.token = token
         self.rate_limit_delay = rate_limit_delay
-        
+
         # Statistics
         self.stats = GitHubStats()
         self._start_time = time.time()
-        
+
         # Rate limiting
         self._last_request_time = 0
 
@@ -82,10 +83,10 @@ class GitHubClient(BaseService):
             "Accept": "application/vnd.github.v3+json",
             "User-Agent": "SigmaHQ-RAG",
         }
-        
+
         if self.token:
             headers["Authorization"] = f"token {self.token}"
-        
+
         return headers
 
     async def _make_request(
@@ -97,29 +98,29 @@ class GitHubClient(BaseService):
     ) -> dict[str, Any]:
         """
         Make a request to the GitHub API.
-        
+
         Args:
             method: HTTP method
             endpoint: API endpoint
             data: Request data
             params: Query parameters
-            
+
         Returns:
             Response data
         """
         # Rate limiting
         current_time = time.time()
         time_since_last_request = current_time - self._last_request_time
-        
+
         if time_since_last_request < self.rate_limit_delay:
             await asyncio.sleep(self.rate_limit_delay - time_since_last_request)
-        
+
         self._last_request_time = time.time()
-        
+
         try:
             url = f"{self.api_base_url}/{endpoint}"
             headers = self._get_headers()
-            
+
             # Make request
             if method.upper() == "GET":
                 response = requests.get(url, headers=headers, params=params)
@@ -131,27 +132,31 @@ class GitHubClient(BaseService):
                 response = requests.delete(url, headers=headers)
             else:
                 raise ServiceError(f"Unsupported HTTP method: {method}")
-            
+
             # Update statistics
             self.stats.total_requests += 1
             self.stats.total_api_calls += 1
-            
+
             # Check rate limiting
-            if 'X-RateLimit-Remaining' in response.headers:
-                self.stats.rate_limit_remaining = int(response.headers['X-RateLimit-Remaining'])
-            
-            if 'X-RateLimit-Reset' in response.headers:
-                self.stats.rate_limit_reset_time = float(response.headers['X-RateLimit-Reset'])
-            
+            if "X-RateLimit-Remaining" in response.headers:
+                self.stats.rate_limit_remaining = int(
+                    response.headers["X-RateLimit-Remaining"]
+                )
+
+            if "X-RateLimit-Reset" in response.headers:
+                self.stats.rate_limit_reset_time = float(
+                    response.headers["X-RateLimit-Reset"]
+                )
+
             # Handle response
             response.raise_for_status()
             self.stats.successful_requests += 1
-            
+
             if response.content:
                 return response.json()
             else:
                 return {}
-            
+
         except requests.exceptions.RequestException as e:
             self.stats.failed_requests += 1
             self.stats.last_error = str(e)
@@ -166,11 +171,11 @@ class GitHubClient(BaseService):
     async def get_repository(self, owner: str, repo: str) -> dict[str, Any]:
         """
         Get repository information.
-        
+
         Args:
             owner: Repository owner
             repo: Repository name
-            
+
         Returns:
             Repository information
         """
@@ -186,30 +191,30 @@ class GitHubClient(BaseService):
     ) -> list[dict[str, Any]]:
         """
         List files in a repository.
-        
+
         Args:
             owner: Repository owner
             repo: Repository name
             path: Path to list files from
             branch: Branch to list files from
-            
+
         Returns:
             List of file information
         """
         endpoint = f"repos/{owner}/{repo}/contents/{path}"
         params = {}
-        
+
         if branch:
             params["ref"] = branch
-        
+
         response = await self._make_request("GET", endpoint, params=params)
-        
+
         # Filter out directories and non-text files
         files = []
         for item in response:
             if item["type"] == "file" and self._is_text_file(item["name"]):
                 files.append(item)
-        
+
         return files
 
     async def get_file_content(
@@ -221,28 +226,29 @@ class GitHubClient(BaseService):
     ) -> str:
         """
         Get file content from a repository.
-        
+
         Args:
             owner: Repository owner
             repo: Repository name
             path: File path
             branch: Branch to get file from
-            
+
         Returns:
             File content as string
         """
         endpoint = f"repos/{owner}/{repo}/contents/{path}"
         params = {}
-        
+
         if branch:
             params["ref"] = branch
-        
+
         response = await self._make_request("GET", endpoint, params=params)
-        
+
         # Decode base64 content
         import base64
+
         content = base64.b64decode(response["content"]).decode("utf-8")
-        
+
         return content
 
     async def search_files(
@@ -254,35 +260,35 @@ class GitHubClient(BaseService):
     ) -> list[dict[str, Any]]:
         """
         Search for files in repositories.
-        
+
         Args:
             query: Search query
             owner: Repository owner (optional)
             repo: Repository name (optional)
             file_type: File type to search for (optional)
-            
+
         Returns:
             List of search results
         """
         search_query = query
-        
+
         if owner:
             search_query += f" user:{owner}"
-        
+
         if repo:
             search_query += f" repo:{owner}/{repo}"
-        
+
         if file_type:
             search_query += f" extension:{file_type}"
-        
+
         endpoint = "search/code"
         params = {
             "q": search_query,
             "per_page": 100,
         }
-        
+
         response = await self._make_request("GET", endpoint, params=params)
-        
+
         return response.get("items", [])
 
     async def get_repository_commits(
@@ -295,14 +301,14 @@ class GitHubClient(BaseService):
     ) -> list[dict[str, Any]]:
         """
         Get repository commits.
-        
+
         Args:
             owner: Repository owner
             repo: Repository name
             since: Start date for commits
             until: End date for commits
             per_page: Number of commits per page
-            
+
         Returns:
             List of commit information
         """
@@ -310,15 +316,15 @@ class GitHubClient(BaseService):
         params = {
             "per_page": per_page,
         }
-        
+
         if since:
             params["since"] = since
-        
+
         if until:
             params["until"] = until
-        
+
         response = await self._make_request("GET", endpoint, params=params)
-        
+
         return response
 
     async def get_repository_branches(
@@ -328,17 +334,17 @@ class GitHubClient(BaseService):
     ) -> list[dict[str, Any]]:
         """
         Get repository branches.
-        
+
         Args:
             owner: Repository owner
             repo: Repository name
-            
+
         Returns:
             List of branch information
         """
         endpoint = f"repos/{owner}/{repo}/branches"
         response = await self._make_request("GET", endpoint)
-        
+
         return response
 
     async def get_repository_tags(
@@ -348,55 +354,87 @@ class GitHubClient(BaseService):
     ) -> list[dict[str, Any]]:
         """
         Get repository tags.
-        
+
         Args:
             owner: Repository owner
             repo: Repository name
-            
+
         Returns:
             List of tag information
         """
         endpoint = f"repos/{owner}/{repo}/tags"
         response = await self._make_request("GET", endpoint)
-        
+
         return response
 
     def _is_text_file(self, filename: str) -> bool:
         """
         Check if a file is likely to be a text file.
-        
+
         Args:
             filename: Name of the file
-            
+
         Returns:
             True if file is likely text
         """
         text_extensions = [
-            '.txt', '.md', '.py', '.js', '.html', '.css', '.json', '.xml',
-            '.yaml', '.yml', '.csv', '.log', '.rst', '.tex', '.sh', '.bat',
-            '.ps1', '.ini', '.conf', '.config', '.env', '.sql', '.php',
-            '.java', '.c', '.cpp', '.h', '.hpp', '.go', '.rust', '.rs',
-            '.swift', '.kt', '.scala', '.r', '.matlab', '.m', '.vb',
+            ".txt",
+            ".md",
+            ".py",
+            ".js",
+            ".html",
+            ".css",
+            ".json",
+            ".xml",
+            ".yaml",
+            ".yml",
+            ".csv",
+            ".log",
+            ".rst",
+            ".tex",
+            ".sh",
+            ".bat",
+            ".ps1",
+            ".ini",
+            ".conf",
+            ".config",
+            ".env",
+            ".sql",
+            ".php",
+            ".java",
+            ".c",
+            ".cpp",
+            ".h",
+            ".hpp",
+            ".go",
+            ".rust",
+            ".rs",
+            ".swift",
+            ".kt",
+            ".scala",
+            ".r",
+            ".matlab",
+            ".m",
+            ".vb",
         ]
-        
+
         return any(filename.lower().endswith(ext) for ext in text_extensions)
 
     def get_rate_limit_status(self) -> dict[str, Any]:
         """
         Get current rate limit status.
-        
+
         Returns:
             Rate limit information
         """
         try:
             response = requests.get(
-                f"{self.api_base_url}/rate_limit",
-                headers=self._get_headers()
+                f"{self.api_base_url}/rate_limit", headers=self._get_headers()
             )
             response.raise_for_status()
-            
+
             return response.json()
-            
+
         except Exception as e:
             self.logger.error(f"Error getting rate limit status: {e}")
             return {}
@@ -404,20 +442,19 @@ class GitHubClient(BaseService):
     def is_authenticated(self) -> bool:
         """
         Check if the client is authenticated.
-        
+
         Returns:
             True if authenticated
         """
         if not self.token:
             return False
-        
+
         try:
             response = requests.get(
-                f"{self.api_base_url}/user",
-                headers=self._get_headers()
+                f"{self.api_base_url}/user", headers=self._get_headers()
             )
             return response.status_code == 200
-            
+
         except Exception:
             return False
 
@@ -425,19 +462,19 @@ class GitHubClient(BaseService):
         """Get service health status."""
         status = STATUS_HEALTHY
         issues = []
-        
+
         # Check authentication
         if not self.is_authenticated():
             status = STATUS_DEGRADED
             issues.append("Not authenticated")
-        
+
         # Check error rate
         if self.stats.total_requests > 0:
             error_rate = self.stats.failed_requests / self.stats.total_requests
             if error_rate > 0.1:  # More than 10% error rate
                 status = STATUS_DEGRADED
                 issues.append(f"High error rate: {error_rate:.2%}")
-        
+
         # Check rate limit
         rate_limit_status = self.get_rate_limit_status()
         if rate_limit_status:
@@ -446,7 +483,7 @@ class GitHubClient(BaseService):
             if remaining < 100:  # Less than 100 requests remaining
                 status = STATUS_DEGRADED
                 issues.append(f"Low rate limit: {remaining} requests remaining")
-        
+
         return {
             "service": SERVICE_GITHUB,
             "status": status,
@@ -497,7 +534,7 @@ class GitHubClient(BaseService):
         """Clean up resources."""
         try:
             self.logger.info("GitHub client cleanup completed")
-            
+
         except Exception as e:
             self.logger.error(f"Error during GitHub client cleanup: {e}")
 

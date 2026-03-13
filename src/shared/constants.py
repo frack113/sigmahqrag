@@ -12,7 +12,7 @@ APP_VERSION = "2026.02.27"
 APP_DESCRIPTION = "SigmaHQ RAG application with document processing and LLM integration"
 
 # Default configuration values
-DEFAULT_LLM_MODEL = "mistralai/ministral-3-14b-reasoning"
+DEFAULT_LLM_MODEL = "qwen/qwen3.5-9b"
 DEFAULT_LLM_BASE_URL = "http://localhost:1234"
 DEFAULT_LLM_API_KEY = "lm-studio"
 DEFAULT_LLM_TEMPERATURE = 0.7
@@ -41,7 +41,14 @@ DEFAULT_CACHE_ENABLED = True
 # File processing configuration
 DEFAULT_MAX_FILE_SIZE_MB = 50
 DEFAULT_ALLOWED_FILE_EXTENSIONS = [
-    ".txt", ".md", ".pdf", ".docx", ".doc", ".csv", ".json", ".xml"
+    ".txt",
+    ".md",
+    ".pdf",
+    ".docx",
+    ".doc",
+    ".csv",
+    ".json",
+    ".xml",
 ]
 DEFAULT_TEMP_DIR = "temp/"
 DEFAULT_UPLOAD_DIR = "uploads/"
@@ -66,22 +73,26 @@ DEFAULT_RATE_LIMIT_WINDOW = 60  # 1 minute
 DEFAULT_MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10MB
 DEFAULT_ALLOWED_MIME_TYPES = [
     "text/plain",
-    "text/markdown", 
+    "text/markdown",
     "application/pdf",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     "application/msword",
     "text/csv",
     "application/json",
-    "application/xml"
+    "application/xml",
 ]
 
 # Chat configuration
 DEFAULT_CONVERSATION_HISTORY_LIMIT = 10
-DEFAULT_SYSTEM_PROMPT = "You are a helpful assistant. Provide clear, concise, and accurate responses."
+DEFAULT_SYSTEM_PROMPT = (
+    "You are a helpful assistant. Provide clear, concise, and accurate responses."
+)
 DEFAULT_STREAMING_ENABLED = True
 
 # Error handling configuration
-DEFAULT_ERROR_MESSAGE = "An error occurred while processing your request. Please try again."
+DEFAULT_ERROR_MESSAGE = (
+    "An error occurred while processing your request. Please try again."
+)
 DEFAULT_TIMEOUT_MESSAGE = "The request timed out. Please try again."
 DEFAULT_RETRY_MESSAGE = "Retrying request..."
 
@@ -140,9 +151,9 @@ TIME_FORMAT = "%H:%M:%S"
 LOG_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 # Validation patterns
-EMAIL_PATTERN = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-URL_PATTERN = r'^https?://[^\s/$.?#].[^\s]*$'
-UUID_PATTERN = r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+EMAIL_PATTERN = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+URL_PATTERN = r"^https?://[^\s/$.?#].[^\s]*$"
+UUID_PATTERN = r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
 
 # Performance thresholds
 MAX_RESPONSE_TIME = 30.0  # seconds
@@ -419,7 +430,7 @@ FEATURE_LOGGING_ENABLED = "logging_enabled"
 # Configuration validation
 REQUIRED_CONFIG_KEYS = [
     "llm.model",
-    "llm.base_url", 
+    "llm.base_url",
     "llm.api_key",
     "database.path",
     "logging.level",

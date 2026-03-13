@@ -16,11 +16,14 @@ import pytest
 @pytest.fixture
 def mock_environment():
     """Mock environment variables for testing."""
-    with patch.dict(os.environ, {
-        'LM_STUDIO_BASE_URL': 'http://localhost:1234',
-        'LM_STUDIO_API_KEY': 'test-key',
-        'CHROMADB_PATH': './test_data/chromadb',
-    }):
+    with patch.dict(
+        os.environ,
+        {
+            "LM_STUDIO_BASE_URL": "http://localhost:1234",
+            "LM_STUDIO_API_KEY": "test-key",
+            "CHROMADB_PATH": "./test_data/chromadb",
+        },
+    ):
         yield
 
 
@@ -40,9 +43,11 @@ def mock_rag_service():
     """Create a mock RAG service for testing."""
     mock_service = Mock()
     mock_service.is_initialized = True
-    mock_service.query = AsyncMock(return_value=[
-        {"text": "Relevant document content", "score": 0.9, "metadata": {}}
-    ])
+    mock_service.query = AsyncMock(
+        return_value=[
+            {"text": "Relevant document content", "score": 0.9, "metadata": {}}
+        ]
+    )
     mock_service.add_documents = AsyncMock(return_value=True)
     mock_service.cleanup = Mock()
     return mock_service
@@ -51,12 +56,14 @@ def mock_rag_service():
 @pytest.fixture
 def sample_text_file():
     """Create a temporary text file for testing."""
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
-        f.write("This is a test document.\nIt contains multiple lines.\nAnd some content for testing.")
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+        f.write(
+            "This is a test document.\nIt contains multiple lines.\nAnd some content for testing."
+        )
         temp_path = f.name
-    
+
     yield Path(temp_path)
-    
+
     # Cleanup
     if Path(temp_path).exists():
         Path(temp_path).unlink()
@@ -115,13 +122,13 @@ trailer
 startxref
 398
 %%EOF"""
-    
-    with tempfile.NamedTemporaryFile(mode='wb', suffix='.pdf', delete=False) as f:
+
+    with tempfile.NamedTemporaryFile(mode="wb", suffix=".pdf", delete=False) as f:
         f.write(pdf_content)
         temp_path = f.name
-    
+
     yield Path(temp_path)
-    
+
     # Cleanup
     if Path(temp_path).exists():
         Path(temp_path).unlink()
@@ -137,15 +144,17 @@ def temp_directory():
 @pytest.fixture
 def mock_chromadb():
     """Mock ChromaDB for testing."""
-    with patch('chromadb.Client') as mock_chroma:
+    with patch("chromadb.Client") as mock_chroma:
         mock_client = Mock()
         mock_collection = Mock()
         mock_collection.add = Mock()
-        mock_collection.query = Mock(return_value={
-            'documents': [['Test document content']],
-            'distances': [[0.1]],
-            'metadatas': [[{'source': 'test.txt'}]]
-        })
+        mock_collection.query = Mock(
+            return_value={
+                "documents": [["Test document content"]],
+                "distances": [[0.1]],
+                "metadatas": [[{"source": "test.txt"}]],
+            }
+        )
         mock_client.get_or_create_collection.return_value = mock_collection
         mock_chroma.return_value = mock_client
         yield mock_chroma
@@ -154,11 +163,11 @@ def mock_chromadb():
 @pytest.fixture
 def mock_aiohttp():
     """Mock aiohttp for testing."""
-    with patch('aiohttp.ClientSession') as mock_session:
+    with patch("aiohttp.ClientSession") as mock_session:
         mock_response = Mock()
-        mock_response.json = AsyncMock(return_value={
-            "choices": [{"message": {"content": "Test response"}}]
-        })
+        mock_response.json = AsyncMock(
+            return_value={"choices": [{"message": {"content": "Test response"}}]}
+        )
         mock_response.raise_for_status = Mock()
         mock_session.return_value.__aenter__ = AsyncMock(return_value=mock_response)
         mock_session.return_value.__aexit__ = AsyncMock(return_value=None)
@@ -169,48 +178,48 @@ def mock_aiohttp():
 def test_config():
     """Test configuration that doesn't require external services."""
     return {
-        'llm': {
-            'model': 'test-model',
-            'base_url': 'http://test:1234',
-            'api_key': 'test-key',
-            'timeout': 10,
-            'max_retries': 2,
+        "llm": {
+            "model": "test-model",
+            "base_url": "http://test:1234",
+            "api_key": "test-key",
+            "timeout": 10,
+            "max_retries": 2,
         },
-        'rag': {
-            'model': 'test-embedding-model',
-            'base_url': 'http://test:1234',
-            'api_key': 'test-key',
-            'chunk_size': 1000,
-            'chunk_overlap': 200,
-            'collection_name': 'test_collection',
+        "rag": {
+            "model": "test-embedding-model",
+            "base_url": "http://test:1234",
+            "api_key": "test-key",
+            "chunk_size": 1000,
+            "chunk_overlap": 200,
+            "collection_name": "test_collection",
         },
-        'database': {
-            'path': './test_data/app.db',
-            'max_connections': 5,
-            'timeout': 30,
+        "database": {
+            "path": "./test_data/app.db",
+            "max_connections": 5,
+            "timeout": 30,
         },
-        'file_processor': {
-            'allowed_extensions': ['.txt', '.md', '.pdf'],
-            'max_file_size_mb': 10,
-            'temp_dir': './test_temp',
-            'chunk_size': 1000,
-            'chunk_overlap': 200,
+        "file_processor": {
+            "allowed_extensions": [".txt", ".md", ".pdf"],
+            "max_file_size_mb": 10,
+            "temp_dir": "./test_temp",
+            "chunk_size": 1000,
+            "chunk_overlap": 200,
         },
-        'file_storage': {
-            'upload_dir': './test_uploads',
-            'allowed_extensions': ['.txt', '.md', '.pdf'],
-            'max_file_size_mb': 10,
-            'max_storage_size_gb': 1,
+        "file_storage": {
+            "upload_dir": "./test_uploads",
+            "allowed_extensions": [".txt", ".md", ".pdf"],
+            "max_file_size_mb": 10,
+            "max_storage_size_gb": 1,
         },
-        'github_client': {
-            'api_base_url': 'https://api.github.com',
-            'token': 'test-token',
-            'rate_limit_delay': 1.0,
+        "github_client": {
+            "api_base_url": "https://api.github.com",
+            "token": "test-token",
+            "rate_limit_delay": 1.0,
         },
-        'lm_studio_client': {
-            'base_url': 'http://test:1234',
-            'timeout': 10,
-            'max_retries': 2,
+        "lm_studio_client": {
+            "base_url": "http://test:1234",
+            "timeout": 10,
+            "max_retries": 2,
         },
     }
 
@@ -223,15 +232,9 @@ pytest.mark.slow = pytest.mark.slow
 
 def pytest_configure(config):
     """Configure pytest with custom markers."""
-    config.addinivalue_line(
-        "markers", "unit: mark test as a unit test"
-    )
-    config.addinivalue_line(
-        "markers", "integration: mark test as an integration test"
-    )
-    config.addinivalue_line(
-        "markers", "slow: mark test as slow running"
-    )
+    config.addinivalue_line("markers", "unit: mark test as a unit test")
+    config.addinivalue_line("markers", "integration: mark test as an integration test")
+    config.addinivalue_line("markers", "slow: mark test as slow running")
 
 
 def pytest_collection_modifyitems(config, items):
@@ -246,6 +249,5 @@ def pytest_collection_modifyitems(config, items):
 def pytest_addoption(parser):
     """Add custom command line options."""
     parser.addoption(
-        "--run-slow", action="store_true", default=False,
-        help="run slow tests"
+        "--run-slow", action="store_true", default=False, help="run slow tests"
     )

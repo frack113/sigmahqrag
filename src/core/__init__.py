@@ -29,16 +29,14 @@ __all__ = [
     "LLMService",
     "LLMStats",
     "create_chat_service",
-    "create_completion_service", 
+    "create_completion_service",
     "create_creative_service",
-    
     # RAG Service
     "RAGService",
     "RAGStats",
     "create_rag_service",
     "create_document_rag_service",
     "create_chat_rag_service",
-    
     # Chat Service
     "ChatService",
     "ChatStats",

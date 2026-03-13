@@ -16,21 +16,21 @@ logger = get_logger(__name__)
 class ConfigManagement(GradioComponent):
     """
     Configuration management component (Work in Progress).
-    
+
     This component is currently a placeholder and will be implemented
     in future versions to handle application configuration settings.
     """
-    
+
     def __init__(self, config_service):
         super().__init__()
         self.config_service = config_service
-    
+
     def create_tab(self):
         """Create the configuration management tab."""
         with gr.Column(elem_classes="config-container"):
             # Header
             gr.Markdown("### Configuration Settings ⚙️")
-            
+
             # Main content area - use flex to fill available space
             with gr.Column(elem_classes="config-content"):
                 gr.Markdown("""
@@ -45,14 +45,14 @@ class ConfigManagement(GradioComponent):
                     - Logging preferences
                     - Application behavior settings
                 """)
-                
+
                 # Placeholder for future configuration functionality
                 with gr.Row():
                     gr.Markdown("""
                         **Current Status:** Development in progress
                         **Next Steps:** Implementation of configuration management system
                     """)
-    
+
     def cleanup(self):
         """Clean up resources."""
         super().cleanup()

@@ -14,7 +14,7 @@ from typing import Any, Literal
 
 from openai import OpenAI
 
-from ..shared import (
+from src.shared import (
     DEFAULT_LLM_API_KEY,
     DEFAULT_LLM_BASE_URL,
     DEFAULT_LLM_ENABLE_STREAMING,
@@ -48,6 +48,7 @@ FinishReason = Literal[
 @dataclass
 class LLMStats:
     """Statistics for LLM service."""
+
     total_requests: int = 0
     successful_requests: int = 0
     failed_requests: int = 0
@@ -62,7 +63,7 @@ class LLMStats:
 class LLMService(BaseService, AsyncComponent):
     """
     LLM service for SigmaHQ RAG application.
-    
+
     Provides optimized LLM functionality with:
     - OpenAI compatibility
     - Performance optimizations
@@ -75,31 +76,28 @@ class LLMService(BaseService, AsyncComponent):
     def __init__(self, config: LLMConfig | None = None):
         """
         Initialize the LLM service.
-        
+
         Args:
             config: LLM configuration
         """
         BaseService.__init__(self, f"{SERVICE_LLM}.llm_service")
         AsyncComponent.__init__(self)
-        
+
         # Configuration
         self.config = config or self._get_default_config()
-        
+
         # Service state
         self.client: OpenAI | None = None
         self._client_lock = Lock()
         self._initialized = False
         self._start_time = datetime.now()
-        
+
         # Statistics
         self.stats = LLMStats()
-        
+
         # Caching
-        self.cache = CacheService(
-            max_size=1000,
-            default_ttl=3600
-        )
-        
+        self.cache = CacheService(max_size=1000, default_ttl=3600)
+
         # Initialize service
         self._initialize_client_with_retry()
 
@@ -117,23 +115,25 @@ class LLMService(BaseService, AsyncComponent):
     async def initialize(self) -> bool:
         """
         Initialize the LLM service.
-        
+
         Returns:
             True if initialization successful, False otherwise
         """
         if self._initialized:
             return True
-            
+
         try:
             success = self._initialize_client_with_retry()
             if success:
                 self._initialized = True
                 self._log_operation("LLM service initialization", True)
-                self.logger.info(f"LLM service initialized with model: {self.config['model']}")
+                self.logger.info(
+                    f"LLM service initialized with model: {self.config['model']}"
+                )
             else:
                 self._log_operation("LLM service initialization", False)
                 self.logger.error("LLM service initialization failed")
-            
+
             return success
         except Exception as e:
             self._log_operation("LLM service initialization", False, {"error": str(e)})
@@ -156,7 +156,7 @@ class LLMService(BaseService, AsyncComponent):
 
             self._initialized = False
             self._log_operation("LLM service cleanup", True)
-            
+
         except Exception as e:
             self._log_operation("LLM service cleanup", False, {"error": str(e)})
             self.logger.error(f"Error during LLM service cleanup: {e}")
@@ -167,7 +167,7 @@ class LLMService(BaseService, AsyncComponent):
             try:
                 self.client = OpenAI(
                     base_url=f"{self.config['base_url']}/v1",
-                    api_key=self.config['api_key'],
+                    api_key=self.config["api_key"],
                 )
                 self.logger.info(
                     f"LLM client initialized with model: {self.config['model']} "
@@ -196,7 +196,9 @@ class LLMService(BaseService, AsyncComponent):
         # Add system prompt if provided
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
-        elif self.config['temperature'] < 1.0:  # Only add default for non-creative tasks
+        elif (
+            self.config["temperature"] < 1.0
+        ):  # Only add default for non-creative tasks
             messages.append(
                 {
                     "role": "system",
@@ -209,7 +211,9 @@ class LLMService(BaseService, AsyncComponent):
 
         return messages
 
-    @handle_service_errors(error_types=[NetworkError, LLMError], default_message="LLM completion failed")
+    @handle_service_errors(
+        error_types=[NetworkError, LLMError], default_message="LLM completion failed"
+    )
     @retry_with_backoff(max_retries=3, base_delay=1.0, max_delay=10.0)
     @rate_limit(max_calls=100, time_window=60)  # 100 calls per minute
     async def simple_completion(
@@ -217,21 +221,23 @@ class LLMService(BaseService, AsyncComponent):
     ) -> str:
         """
         Optimized simple completion function.
-        
+
         This is the primary interface for most use cases.
-        
+
         Args:
             prompt: The user input prompt
             system_prompt: Optional system prompt to set context
-            
+
         Returns:
             The LLM's response text
         """
         start_time = time.time()
-        
+
         try:
             # Check cache first
-            cache_key = self._generate_cache_key("simple_completion", prompt, system_prompt)
+            cache_key = self._generate_cache_key(
+                "simple_completion", prompt, system_prompt
+            )
             cached_result = await self.cache.get(cache_key)
             if cached_result:
                 self.stats.total_requests += 1
@@ -243,7 +249,9 @@ class LLMService(BaseService, AsyncComponent):
             # Lazy client initialization with better error handling
             if self.client is None:
                 if not self._initialize_client_with_retry():
-                    error_msg = "Failed to initialize LLM client after multiple attempts"
+                    error_msg = (
+                        "Failed to initialize LLM client after multiple attempts"
+                    )
                     self._update_stats(start_time, error=error_msg)
                     return error_msg
 
@@ -252,10 +260,10 @@ class LLMService(BaseService, AsyncComponent):
 
             # Create optimized parameters
             params = {
-                "model": self.config['model'],
+                "model": self.config["model"],
                 "messages": messages,
-                "temperature": self.config['temperature'],
-                "max_tokens": self.config['max_tokens'],
+                "temperature": self.config["temperature"],
+                "max_tokens": self.config["max_tokens"],
                 "stream": False,
             }
 
@@ -276,9 +284,11 @@ class LLMService(BaseService, AsyncComponent):
 
                 self.stats.total_requests += 1
                 self.stats.successful_requests += 1
-                self.stats.total_tokens_used += response.usage.total_tokens if response.usage else 0
+                self.stats.total_tokens_used += (
+                    response.usage.total_tokens if response.usage else 0
+                )
                 self._update_stats(start_time)
-                
+
                 return result
 
             except Exception as api_error:
@@ -291,17 +301,20 @@ class LLMService(BaseService, AsyncComponent):
             self._update_stats(start_time, error=error_msg)
             raise LLMError(error_msg)
 
-    @handle_service_errors(error_types=[NetworkError, LLMError], default_message="LLM batch completion failed")
+    @handle_service_errors(
+        error_types=[NetworkError, LLMError],
+        default_message="LLM batch completion failed",
+    )
     async def batch_completion(
         self, prompts: list[str], system_prompt: str | None = None
     ) -> list[str]:
         """
         Process multiple prompts efficiently.
-        
+
         Args:
             prompts: List of prompts to process
             system_prompt: Optional system prompt for all prompts
-            
+
         Returns:
             List of responses corresponding to each prompt
         """
@@ -311,23 +324,25 @@ class LLMService(BaseService, AsyncComponent):
             responses.append(response)
         return responses
 
-    @handle_service_errors(error_types=[NetworkError, LLMError], default_message="LLM streaming failed")
+    @handle_service_errors(
+        error_types=[NetworkError, LLMError], default_message="LLM streaming failed"
+    )
     @retry_with_backoff(max_retries=3, base_delay=1.0, max_delay=10.0)
     async def streaming_completion(
         self, prompt: str, system_prompt: str | None = None
     ) -> AsyncGenerator[str, None]:
         """
         Stream completion responses for real-time applications.
-        
+
         Args:
             prompt: The user input prompt
             system_prompt: Optional system prompt to set context
-            
+
         Yields:
             Response chunks for streaming
         """
         start_time = time.time()
-        
+
         try:
             if self.client is None:
                 if not self._initialize_client_with_retry():
@@ -337,27 +352,27 @@ class LLMService(BaseService, AsyncComponent):
             messages = self._build_simple_messages(prompt, system_prompt)
 
             params = {
-                "model": self.config['model'],
+                "model": self.config["model"],
                 "messages": messages,
-                "temperature": self.config['temperature'],
-                "max_tokens": self.config['max_tokens'],
+                "temperature": self.config["temperature"],
+                "max_tokens": self.config["max_tokens"],
                 "stream": True,
             }
 
             try:
-                # Use asyncio to run the streaming in a thread
-                def _stream_sync():
+                # Create async generator for streaming
+                async def _stream_async():
                     stream = self.client.chat.completions.create(**params)
-                    for chunk in stream:
+                    async for chunk in stream:
                         if chunk.choices and chunk.choices[0].delta.content:
                             yield chunk.choices[0].delta.content
 
-                # Convert sync generator to async generator using executor
+                # Run async generator in executor
                 loop = asyncio.get_event_loop()
-                sync_generator = _stream_sync()
-                
-                # Process chunks one by one in the executor
-                for chunk in sync_generator:
+                sync_generator = _stream_async()
+
+                # Process chunks one by one
+                async for chunk in sync_generator:
                     yield chunk
 
                 self.stats.total_requests += 1
@@ -390,12 +405,12 @@ class LLMService(BaseService, AsyncComponent):
     def get_usage_stats(self) -> dict[str, Any]:
         """Get basic usage statistics."""
         return {
-            "model_name": self.config['model'],
-            "base_url": self.config['base_url'],
-            "temperature": self.config['temperature'],
-            "max_tokens": self.config['max_tokens'],
+            "model_name": self.config["model"],
+            "base_url": self.config["base_url"],
+            "temperature": self.config["temperature"],
+            "max_tokens": self.config["max_tokens"],
             "client_initialized": self.client is not None,
-            "enable_streaming": self.config['enable_streaming'],
+            "enable_streaming": self.config["enable_streaming"],
             "service_stats": {
                 "total_requests": self.stats.total_requests,
                 "successful_requests": self.stats.successful_requests,
@@ -414,23 +429,24 @@ class LLMService(BaseService, AsyncComponent):
         """Update service statistics."""
         end_time = time.time()
         response_time = end_time - start_time
-        
+
         # Update response time (moving average)
         if self.stats.total_requests > 0:
             self.stats.average_response_time = (
-                (self.stats.average_response_time * (self.stats.total_requests - 1)) + response_time
+                (self.stats.average_response_time * (self.stats.total_requests - 1))
+                + response_time
             ) / self.stats.total_requests
         else:
             self.stats.average_response_time = response_time
-        
+
         # Update memory and CPU usage
         memory_info = get_memory_usage()
         self.stats.memory_usage_mb = memory_info.get("rss_mb", 0)
         self.stats.cpu_usage_percent = get_cpu_usage()
-        
+
         # Update uptime
         self.stats.uptime_seconds = (datetime.now() - self._start_time).total_seconds()
-        
+
         # Update error stats
         if error:
             self.stats.failed_requests += 1
@@ -442,29 +458,31 @@ class LLMService(BaseService, AsyncComponent):
         """Get service health status."""
         status = STATUS_HEALTHY
         issues = []
-        
+
         # Check client availability
         if self.client is None:
             status = STATUS_UNHEALTHY
             issues.append("LLM client not initialized")
-        
+
         # Check error rate
         if self.stats.total_requests > 0:
             error_rate = self.stats.failed_requests / self.stats.total_requests
             if error_rate > 0.1:  # More than 10% error rate
                 status = STATUS_DEGRADED
                 issues.append(f"High error rate: {error_rate:.2%}")
-        
+
         # Check response time
         if self.stats.average_response_time > 30.0:  # More than 30 seconds average
             status = STATUS_DEGRADED
-            issues.append(f"High response time: {self.stats.average_response_time:.2f}s")
-        
+            issues.append(
+                f"High response time: {self.stats.average_response_time:.2f}s"
+            )
+
         # Check memory usage
         if self.stats.memory_usage_mb > 1024.0:  # More than 1GB
             status = STATUS_DEGRADED
             issues.append(f"High memory usage: {self.stats.memory_usage_mb:.2f}MB")
-        
+
         return {
             "service": SERVICE_LLM,
             "status": status,
@@ -489,7 +507,7 @@ class LLMService(BaseService, AsyncComponent):
             # Reinitialize client with new config
             if not self._initialize_client_with_retry():
                 raise LLMError("Failed to reinitialize LLM client with new config")
-            
+
             self.logger.info(f"LLM configuration updated: {new_config['model']}")
             return True
         except Exception as e:
@@ -510,10 +528,10 @@ def create_chat_service(
         max_tokens=512,
         enable_streaming=True,
     )
-    
+
     if config:
         default_config.update(config)
-    
+
     return LLMService(default_config)
 
 
@@ -529,10 +547,10 @@ def create_completion_service(
         max_tokens=1024,
         enable_streaming=False,
     )
-    
+
     if config:
         default_config.update(config)
-    
+
     return LLMService(default_config)
 
 
@@ -548,10 +566,10 @@ def create_creative_service(
         max_tokens=2048,
         enable_streaming=True,
     )
-    
+
     if config:
         default_config.update(config)
-    
+
     return LLMService(default_config)
 
 

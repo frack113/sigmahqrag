@@ -19,13 +19,11 @@ __all__ = [
     # Database
     "SQLiteManager",
     "create_sqlite_manager",
-    
     # File System
     "FileProcessor",
     "create_file_processor",
-    "FileStorage", 
+    "FileStorage",
     "create_file_storage",
-    
     # External
     "GitHubClient",
     "create_github_client",

@@ -170,7 +170,7 @@ from .utils import (
 __all__ = [
     # Exceptions
     "SigmaHQError",
-    "ConfigurationError", 
+    "ConfigurationError",
     "ServiceError",
     "DatabaseError",
     "RAGError",
@@ -184,14 +184,12 @@ __all__ = [
     "AuthorizationError",
     "RateLimitError",
     "EmbeddingError",
-    
     # Base classes
     "BaseService",
-    "AsyncComponent", 
+    "AsyncComponent",
     "CacheService",
     "AsyncResourceManager",
     "async_resource_manager",
-    
     # Types
     "ChatMessage",
     "ChatCompletionRequest",
@@ -210,7 +208,6 @@ __all__ = [
     "DocumentChunk",
     "SearchResult",
     "ConversationContext",
-    
     # Utilities
     "handle_service_errors",
     "retry_with_backoff",
@@ -241,10 +238,9 @@ __all__ = [
     "get_memory_usage",
     "get_cpu_usage",
     "cleanup_temp_files",
-    
     # Constants
     "APP_NAME",
-    "APP_VERSION", 
+    "APP_VERSION",
     "APP_DESCRIPTION",
     "DEFAULT_LLM_MODEL",
     "DEFAULT_LLM_BASE_URL",

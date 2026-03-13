@@ -52,12 +52,12 @@ class RAGChatService:
         # Initialize LLM service
         self.llm_service = llm_service or LLMService(
             config={
-                'model': 'mistralai/ministral-3-14b-reasoning',
-                'base_url': base_url,
-                'api_key': 'lm-studio',
-                'temperature': 0.7,
-                'max_tokens': 512,
-                'enable_streaming': True,
+                "model": "qwen/qwen3.5-9b",
+                "base_url": base_url,
+                "api_key": "lm-studio",
+                "temperature": 0.7,
+                "max_tokens": 512,
+                "enable_streaming": True,
             }
         )
 
@@ -66,18 +66,18 @@ class RAGChatService:
             self.rag_service = rag_service or RAGService(
                 llm_service=self.llm_service,
                 config={
-                    'model': 'text-embedding-all-minilm-l6-v2-embedding',
-                    'base_url': base_url,
-                    'api_key': 'lm-studio',
-                    'chunk_size': 1000,
-                    'chunk_overlap': 200,
-                    'collection_name': 'chat_collection',
+                    "model": "text-embedding-all-minilm-l6-v2-embedding",
+                    "base_url": base_url,
+                    "api_key": "lm-studio",
+                    "chunk_size": 1000,
+                    "chunk_overlap": 200,
+                    "collection_name": "chat_collection",
                 },
                 database_config={
-                    'path': './data/.chromadb',
-                    'max_connections': 5,
-                    'timeout': 30,
-                }
+                    "path": "./data/.chromadb",
+                    "max_connections": 5,
+                    "timeout": 30,
+                },
             )
         else:
             self.rag_service = None
@@ -98,7 +98,9 @@ class RAGChatService:
         # Limit conversation history size
         if len(self.conversation_history) > self.conversation_history_limit:
             # Remove oldest messages, but keep at least the last few
-            self.conversation_history = self.conversation_history[-self.conversation_history_limit:]
+            self.conversation_history = self.conversation_history[
+                -self.conversation_history_limit :
+            ]
 
     def clear_conversation_history(self) -> None:
         """Clear the conversation history."""
@@ -139,6 +141,7 @@ class RAGChatService:
                 # Use RAG-enhanced response generation with timeout
                 try:
                     import asyncio
+
                     response_task = asyncio.create_task(
                         self.rag_service.generate_rag_response(
                             query=user_message,
@@ -150,13 +153,17 @@ class RAGChatService:
                     # Set timeout for RAG operations (25 seconds)
                     response = await asyncio.wait_for(response_task, timeout=25.0)
                 except asyncio.TimeoutError:
-                    self.logger.warning("RAG response timed out, falling back to standard LLM")
+                    self.logger.warning(
+                        "RAG response timed out, falling back to standard LLM"
+                    )
                     # Fallback to standard LLM response
                     response = self.llm_service.simple_completion(
                         prompt=user_message, system_prompt=system_prompt
                     )
                 except Exception as rag_error:
-                    self.logger.error(f"RAG response failed: {rag_error}, falling back to standard LLM")
+                    self.logger.error(
+                        f"RAG response failed: {rag_error}, falling back to standard LLM"
+                    )
                     # Fallback to standard LLM response
                     response = self.llm_service.simple_completion(
                         prompt=user_message, system_prompt=system_prompt
