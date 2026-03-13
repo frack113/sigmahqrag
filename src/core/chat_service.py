@@ -231,7 +231,7 @@ class ChatService(BaseService, AsyncComponent):
         rag_min_score: float = 0.1,
     ) -> str:
         """
-        Generate a response to a user message with improved timeout handling.
+        Generate a response to a user message with improved timeout handling and fallbacks.
         
         Args:
             user_message: The user's message
@@ -288,10 +288,20 @@ Answer concisely and accurately based on the provided context."""
                         # No relevant context found, use original query
                         enhanced_prompt = user_message
 
-                    # Generate response using LLM service
-                    response = await self.llm_service.simple_completion(
-                        prompt=enhanced_prompt, system_prompt=system_prompt
-                    )
+                    # Generate response using LLM service with timeout
+                    try:
+                        response = await asyncio.wait_for(
+                            self.llm_service.simple_completion(
+                                prompt=enhanced_prompt, system_prompt=system_prompt
+                            ),
+                            timeout=30.0  # 30 seconds timeout for LLM completion
+                        )
+                    except asyncio.TimeoutError:
+                        self.logger.warning("LLM response timed out, using simple completion")
+                        # Fallback to simple completion without context
+                        response = await self.llm_service.simple_completion(
+                            prompt=user_message, system_prompt=system_prompt
+                        )
                     
                     # Update context retrieval time statistics
                     if self.stats.total_conversations > 0:
@@ -302,22 +312,40 @@ Answer concisely and accurately based on the provided context."""
                         self.stats.average_context_retrieval_time = context_time
 
                 except asyncio.TimeoutError:
-                    self.logger.warning("RAG response timed out, falling back to standard LLM")
+                    self.logger.warning("RAG context retrieval timed out, falling back to standard LLM")
                     # Fallback to standard LLM response
-                    response = await self.llm_service.simple_completion(
-                        prompt=user_message, system_prompt=system_prompt
-                    )
+                    try:
+                        response = await asyncio.wait_for(
+                            self.llm_service.simple_completion(
+                                prompt=user_message, system_prompt=system_prompt
+                            ),
+                            timeout=30.0
+                        )
+                    except asyncio.TimeoutError:
+                        response = "I apologize, but I'm experiencing technical difficulties. Please try again in a moment."
                 except Exception as rag_error:
                     self.logger.error(f"RAG response failed: {rag_error}, falling back to standard LLM")
                     # Fallback to standard LLM response
-                    response = await self.llm_service.simple_completion(
-                        prompt=user_message, system_prompt=system_prompt
-                    )
+                    try:
+                        response = await asyncio.wait_for(
+                            self.llm_service.simple_completion(
+                                prompt=user_message, system_prompt=system_prompt
+                            ),
+                            timeout=30.0
+                        )
+                    except asyncio.TimeoutError:
+                        response = "I apologize, but I'm experiencing technical difficulties. Please try again in a moment."
             else:
                 # Use standard LLM response generation
-                response = await self.llm_service.simple_completion(
-                    prompt=user_message, system_prompt=system_prompt
-                )
+                try:
+                    response = await asyncio.wait_for(
+                        self.llm_service.simple_completion(
+                            prompt=user_message, system_prompt=system_prompt
+                        ),
+                        timeout=30.0
+                    )
+                except asyncio.TimeoutError:
+                    response = "I apologize, but I'm experiencing technical difficulties. Please try again in a moment."
 
             # Add assistant response to history
             self.add_message_to_history(session_id, "assistant", response)
@@ -348,7 +376,6 @@ Answer concisely and accurately based on the provided context."""
             self.stats.last_error = str(e)
             return error_response
 
-    @handle_service_errors(error_types=[RAGError, LLMError, ChatError], default_message="Chat streaming response generation failed")
     async def generate_streaming_response(
         self,
         user_message: str,
@@ -383,19 +410,53 @@ Answer concisely and accurately based on the provided context."""
             
             if should_use_rag and self.rag_service:
                 # Use RAG-enhanced streaming response generation
-                async for chunk in self.rag_service.generate_streaming_rag_response(
+                response_generator = self.rag_service.generate_streaming_rag_response(
                     query=user_message,
                     system_prompt=system_prompt,
                     n_results=rag_n_results,
                     min_relevance_score=rag_min_score,
-                ):
-                    yield chunk
+                )
+                
+                # Always treat it as an async generator and use async for
+                if hasattr(response_generator, '__aiter__'):
+                    async for chunk in response_generator:
+                        yield chunk
+                else:
+                    # Fallback: if it's not an async generator, it should be a coroutine
+                    try:
+                        # This should be a coroutine, so we can await it
+                        if asyncio.iscoroutine(response_generator):
+                            response = await response_generator
+                            yield response
+                        else:
+                            # If it's neither async generator nor coroutine, handle gracefully
+                            yield "Error: Invalid response type from RAG service"
+                    except TypeError as e:
+                        # If it's neither, handle gracefully
+                        yield f"Error: {str(e)}"
             else:
                 # Use standard LLM streaming response generation
-                async for chunk in self.llm_service.streaming_completion(
+                response_generator = self.llm_service.streaming_completion(
                     prompt=user_message, system_prompt=system_prompt
-                ):
-                    yield chunk
+                )
+                
+                # Always treat it as an async generator and use async for
+                if hasattr(response_generator, '__aiter__'):
+                    async for chunk in response_generator:
+                        yield chunk
+                else:
+                    # Fallback: if it's not an async generator, it should be a coroutine
+                    try:
+                        # This should be a coroutine, so we can await it
+                        if asyncio.iscoroutine(response_generator):
+                            response = await response_generator
+                            yield response
+                        else:
+                            # If it's neither async generator nor coroutine, handle gracefully
+                            yield "Error: Invalid response type from LLM service"
+                    except TypeError as e:
+                        # If it's neither, handle gracefully
+                        yield f"Error: {str(e)}"
 
             # Update statistics
             self.stats.total_conversations += 1

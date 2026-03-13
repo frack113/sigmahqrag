@@ -263,7 +263,7 @@ class ChatInterface(AsyncComponent):
                         rag_min_score=self.min_score,
                     )
                     
-                    # Now we can use async for on the async generator
+                    # Always use async for on the async generator
                     async for chunk in async_gen:
                         if chunk:  # Only process non-empty chunks
                             chunks.append(chunk)

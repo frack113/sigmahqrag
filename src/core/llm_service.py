@@ -5,6 +5,7 @@ Provides LLM functionality with OpenAI compatibility, optimized for performance
 and ease of use. Integrates with the new service architecture.
 """
 
+import time
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 from datetime import datetime
@@ -351,8 +352,12 @@ class LLMService(BaseService, AsyncComponent):
                         if chunk.choices and chunk.choices[0].delta.content:
                             yield chunk.choices[0].delta.content
 
-                # Convert sync generator to async generator
-                for chunk in _stream_sync():
+                # Convert sync generator to async generator using executor
+                loop = asyncio.get_event_loop()
+                sync_generator = _stream_sync()
+                
+                # Process chunks one by one in the executor
+                for chunk in sync_generator:
                     yield chunk
 
                 self.stats.total_requests += 1

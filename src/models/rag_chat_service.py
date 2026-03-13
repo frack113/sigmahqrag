@@ -9,8 +9,8 @@ import logging
 from collections.abc import AsyncGenerator
 from typing import Any
 
-from .llm_service_optimized import OptimizedLLMService
-from .rag_service_optimized import OptimizedRAGService
+from .llm_service import LLMService
+from .rag_service import RAGService
 
 
 class RAGChatService:
@@ -23,8 +23,8 @@ class RAGChatService:
 
     def __init__(
         self,
-        llm_service: OptimizedLLMService | None = None,
-        rag_service: OptimizedRAGService | None = None,
+        llm_service: LLMService | None = None,
+        rag_service: RAGService | None = None,
         base_url: str = "http://localhost:1234",
         rag_enabled: bool = True,
         rag_n_results: int = 3,
@@ -50,16 +50,34 @@ class RAGChatService:
         self.conversation_history_limit = conversation_history_limit
 
         # Initialize LLM service
-        self.llm_service = llm_service or OptimizedLLMService(
-            base_url=base_url, enable_streaming=True
+        self.llm_service = llm_service or LLMService(
+            config={
+                'model': 'mistralai/ministral-3-14b-reasoning',
+                'base_url': base_url,
+                'api_key': 'lm-studio',
+                'temperature': 0.7,
+                'max_tokens': 512,
+                'enable_streaming': True,
+            }
         )
 
         # Initialize RAG service
         if rag_enabled:
-            self.rag_service = rag_service or OptimizedRAGService(
+            self.rag_service = rag_service or RAGService(
                 llm_service=self.llm_service,
-                base_url=base_url,
-                collection_name="chat_collection",
+                config={
+                    'model': 'text-embedding-all-minilm-l6-v2-embedding',
+                    'base_url': base_url,
+                    'api_key': 'lm-studio',
+                    'chunk_size': 1000,
+                    'chunk_overlap': 200,
+                    'collection_name': 'chat_collection',
+                },
+                database_config={
+                    'path': './data/.chromadb',
+                    'max_connections': 5,
+                    'timeout': 30,
+                }
             )
         else:
             self.rag_service = None

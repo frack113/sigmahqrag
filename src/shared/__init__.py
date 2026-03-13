@@ -5,6 +5,24 @@ This module provides common functionality used across all layers of the applicat
 """
 
 # Export exceptions
+from .exceptions import (
+    AuthenticationError,
+    AuthorizationError,
+    CacheError,
+    ChatError,
+    ConfigurationError,
+    DatabaseError,
+    EmbeddingError,
+    FileError,
+    LLMError,
+    NetworkError,
+    RAGError,
+    RateLimitError,
+    ServiceError,
+    SigmaHQError,
+    ValidationError,
+)
+
 # Export base classes
 from .base_service import (
     AsyncComponent,
@@ -86,22 +104,6 @@ from .constants import (
     STATUS_STOPPED,
     STATUS_STOPPING,
     STATUS_UNHEALTHY,
-)
-from .exceptions import (
-    AuthenticationError,
-    AuthorizationError,
-    CacheError,
-    ChatError,
-    ConfigurationError,
-    DatabaseError,
-    FileError,
-    LLMError,
-    NetworkError,
-    RAGError,
-    RateLimitError,
-    ServiceError,
-    SigmaHQError,
-    ValidationError,
 )
 
 # Export types

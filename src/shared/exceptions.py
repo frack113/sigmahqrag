@@ -90,3 +90,23 @@ class RateLimitError(ServiceError):
 class EmbeddingError(ServiceError):
     """Raised when embedding operations fail."""
     pass
+
+
+class AsyncOperationError(ServiceError):
+    """Error in async operation with fallback available."""
+    pass
+
+
+class OperationTimeoutError(ServiceError):
+    """Operation timed out with no fallback available."""
+    pass
+
+
+class AsyncManagerError(ServiceError):
+    """Error in async manager operations."""
+    pass
+
+
+class ResourceCleanupError(ServiceError):
+    """Error during resource cleanup."""
+    pass

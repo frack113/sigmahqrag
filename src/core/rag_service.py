@@ -124,11 +124,16 @@ class RAGService(BaseService, AsyncComponent):
         self._initialize_local_embedding_service()
 
     def _initialize_local_embedding_service(self) -> None:
-        """Initialize the local embedding service with fallback capabilities."""
+        """Initialize the local embedding service with CPU-only configuration."""
         try:
             from .local_embedding_service import LocalEmbeddingService
-            self.local_embedding_service = LocalEmbeddingService(config=self.config)
-            self.logger.info("Local embedding service initialized")
+            
+            # Ensure CPU-only configuration for embeddings
+            cpu_config = self.config.copy() if hasattr(self.config, 'copy') else dict(self.config)
+            cpu_config['model'] = "all-MiniLM-L6-v2"  # Use sentence-transformers model
+            
+            self.local_embedding_service = LocalEmbeddingService(config=cpu_config)
+            self.logger.info("Local CPU-only embedding service initialized")
         except Exception as e:
             self.logger.warning(f"Failed to initialize local embedding service: {e}")
             self.local_embedding_service = None
@@ -820,12 +825,26 @@ Answer concisely and accurately based on the provided context."""
             Response chunks for streaming
         """
         try:
-            # Retrieve relevant context
-            relevant_docs, metadata = await self.retrieve_context(
-                query=query,
-                n_results=n_results,
-                min_relevance_score=min_relevance_score,
-            )
+            # Retrieve relevant context with timeout
+            try:
+                import asyncio
+                context_task = asyncio.create_task(
+                    self.retrieve_context(
+                        query=query,
+                        n_results=n_results,
+                        min_relevance_score=min_relevance_score,
+                    )
+                )
+                # Set timeout for RAG operations (25 seconds)
+                relevant_docs, metadata = await asyncio.wait_for(context_task, timeout=25.0)
+            except asyncio.TimeoutError:
+                self.logger.warning("RAG context retrieval timed out, using original query")
+                relevant_docs = []
+                metadata = []
+            except Exception as context_error:
+                self.logger.error(f"RAG context retrieval failed: {context_error}, using original query")
+                relevant_docs = []
+                metadata = []
 
             # Build context string
             if relevant_docs:
@@ -849,10 +868,34 @@ Answer concisely and accurately based on the provided context."""
 
             # Generate streaming response using LLM service
             if self.llm_service:
-                async for chunk in self.llm_service.streaming_completion(
-                    prompt=enhanced_prompt, system_prompt=system_prompt
-                ):
-                    yield chunk
+                try:
+                    response_generator = self.llm_service.streaming_completion(
+                        prompt=enhanced_prompt, system_prompt=system_prompt
+                    )
+                    
+                    # Check if it's an async generator
+                    if hasattr(response_generator, '__aiter__'):
+                        # It's an async generator, use async for
+                        async for chunk in response_generator:
+                            yield chunk
+                    elif asyncio.iscoroutine(response_generator):
+                        # It's a coroutine, await it and yield the result
+                        response = await response_generator
+                        yield response
+                    else:
+                        # Unknown type, handle gracefully
+                        self.logger.error(f"Unknown response type from LLM service: {type(response_generator)}")
+                        yield "Error: Invalid response type from LLM service"
+                except Exception as llm_error:
+                    self.logger.error(f"LLM streaming failed: {llm_error}, falling back to simple completion")
+                    # Fallback to simple completion
+                    try:
+                        response = await self.llm_service.simple_completion(
+                            prompt=enhanced_prompt, system_prompt=system_prompt
+                        )
+                        yield response
+                    except Exception as fallback_error:
+                        yield f"Error: {str(fallback_error)}"
             else:
                 # Fallback to simple streaming completion
                 yield "Error: LLM service not available for RAG streaming response generation"

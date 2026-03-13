@@ -694,6 +694,20 @@ def get_cpu_usage(interval: float = 1.0) -> float:
         return 0.0
 
 
+def get_app_directory() -> Path:
+    """
+    Get the application directory path.
+    
+    Returns:
+        Path object representing the application directory
+    """
+    # Get the directory where this utils module is located
+    current_file = Path(__file__)
+    # Go up to the src directory, then to the root
+    app_dir = current_file.parent.parent.parent
+    return app_dir
+
+
 def cleanup_temp_files(directory: str, age_hours: int = 24) -> int:
     """
     Clean up temporary files older than specified age.
