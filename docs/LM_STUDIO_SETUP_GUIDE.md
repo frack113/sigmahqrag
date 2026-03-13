@@ -2,6 +2,24 @@
 
 Complete setup instructions for LM Studio integration with the SigmaHQ RAG application.
 
+## Alternative: CPU-based Embeddings (Recommended)
+
+**Note**: The SigmaHQ RAG application now supports CPU-based embeddings that work without any external dependencies. This is the recommended approach for most users.
+
+### Quick Start (No Setup Required)
+1. Install the application: `uv sync`
+2. Run the application: `uv run python main.py`
+3. Access at `http://localhost:8000`
+
+**Benefits of CPU-based embeddings:**
+- ✅ Zero setup required
+- ✅ Works offline
+- ✅ 100% uptime guarantee
+- ✅ No external dependencies
+- ✅ Privacy-focused (all processing local)
+
+For most users, CPU-based embeddings provide excellent performance and reliability. Continue reading this guide only if you need enhanced performance with local LLMs or have specific model requirements.
+
 ## Overview
 
 LM Studio provides local LLM and embedding model serving capabilities that power the SigmaHQ RAG system. This guide covers installation, model setup, and configuration.

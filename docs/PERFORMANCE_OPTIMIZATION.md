@@ -1,7 +1,7 @@
 # SigmaHQ RAG - Performance Optimization Guide
 
 ## Overview
-This guide provides comprehensive strategies for optimizing the performance of the SigmaHQ RAG application.
+This guide provides comprehensive strategies for optimizing the performance of the SigmaHQ RAG application, including both CPU-based embeddings and LM Studio integration.
 
 ## Table of Contents
 1. [System Requirements](#system-requirements)
@@ -16,19 +16,35 @@ This guide provides comprehensive strategies for optimizing the performance of t
 
 ## System Requirements
 
-### Minimum Requirements
+### CPU-based Embeddings (Recommended)
+
+#### Minimum Requirements
+- **CPU**: 2 cores with AVX2 support
+- **RAM**: 4GB (8GB+ recommended)
+- **Storage**: 10GB SSD (for vector database)
+- **Network**: Not required (offline capable)
+
+#### Recommended Requirements
+- **CPU**: 4+ cores with AVX2 support
+- **RAM**: 16GB+ (32GB for large document collections)
+- **Storage**: 100GB+ SSD
+- **Network**: Not required
+
+### LM Studio Integration (Optional)
+
+#### Minimum Requirements
 - **CPU**: 4 cores (8+ recommended)
 - **RAM**: 8GB (16GB+ recommended)
 - **Storage**: 50GB SSD (100GB+ recommended)
 - **Network**: 100Mbps bandwidth
 
-### Recommended Requirements
+#### Recommended Requirements
 - **CPU**: 8+ cores with AVX2 support
 - **RAM**: 32GB+ (64GB for large document collections)
 - **Storage**: 500GB+ NVMe SSD
 - **Network**: 1Gbps bandwidth
 
-### GPU Requirements (Optional)
+#### GPU Requirements (Optional)
 - **NVIDIA GPU**: RTX 3080 or better
 - **VRAM**: 12GB+ recommended
 - **CUDA**: Version 11.8 or higher
