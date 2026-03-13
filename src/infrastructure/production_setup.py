@@ -3,29 +3,20 @@ Production deployment setup and configuration for SigmaHQ RAG application.
 Provides production-ready configuration, monitoring, and deployment utilities.
 """
 
-import os
-import logging
 import json
-import time
-from pathlib import Path
-from typing import Dict, Any, Optional, List
-from dataclasses import dataclass, asdict
-from datetime import datetime
-import psutil
+import logging
+import os
 import threading
-from contextlib import contextmanager
+import time
+from dataclasses import asdict, dataclass
+from datetime import datetime
+from typing import Any
 
-from src.shared.constants import (
-    DEFAULT_LOG_LEVEL, 
-    DEFAULT_LOG_FILE, 
-    DEFAULT_LOG_FORMAT,
-    DEFAULT_SERVER_PORT,
-    DEFAULT_SERVER_HOST
-)
-from src.shared.utils import get_app_directory
+import psutil
 from src.infrastructure.port_manager import PortManager
 from src.infrastructure.service_lifecycle import ServiceLifecycleManager
 from src.models.logging_service import LoggingService
+from src.shared.utils import get_app_directory
 
 
 @dataclass
@@ -39,7 +30,7 @@ class ProductionConfig:
     
     # Security settings
     enable_cors: bool = True
-    allowed_origins: List[str] = None
+    allowed_origins: list[str] = None
     rate_limit_enabled: bool = True
     rate_limit_requests: int = 100
     rate_limit_window: int = 60
@@ -260,12 +251,12 @@ class ProductionSetup:
     def get_production_config(self) -> ProductionConfig:
         """Get current production configuration."""
         if self.prod_config_path.exists():
-            with open(self.prod_config_path, 'r') as f:
+            with open(self.prod_config_path) as f:
                 config_data = json.load(f)
             return ProductionConfig(**config_data)
         return self.config
     
-    def update_production_config(self, updates: Dict[str, Any]) -> bool:
+    def update_production_config(self, updates: dict[str, Any]) -> bool:
         """Update production configuration."""
         try:
             current_config = self.get_production_config()
@@ -291,7 +282,7 @@ class ProductionSetup:
             )
             return False
     
-    def get_system_health(self) -> Dict[str, Any]:
+    def get_system_health(self) -> dict[str, Any]:
         """Get current system health status."""
         try:
             # Get current system metrics
@@ -450,7 +441,7 @@ LimitNPROC=4096
 WantedBy=multi-user.target
 '''
         
-        service_path = f"/etc/systemd/system/sigmahqrag.service"
+        service_path = "/etc/systemd/system/sigmahqrag.service"
         
         # Note: This would typically require sudo privileges
         self.logging_service.log_info(
@@ -577,7 +568,7 @@ class ProductionDeploymentManager:
             )
             return False
     
-    def get_deployment_status(self) -> Dict[str, Any]:
+    def get_deployment_status(self) -> dict[str, Any]:
         """Get current deployment status."""
         return {
             'current_deployment': self.deployment_history[-1] if self.deployment_history else None,

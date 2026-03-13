@@ -1,19 +1,15 @@
 """
 Performance tests and optimization validation.
 """
-import pytest
 import asyncio
 import time
-import psutil
-import threading
-from unittest.mock import Mock, AsyncMock, patch
-from pathlib import Path
-import tempfile
-import shutil
+from unittest.mock import AsyncMock, Mock, patch
 
+import psutil
+import pytest
+from src.core.chat_service import ChatService
 from src.core.llm_service import LLMService
 from src.core.rag_service import RAGService
-from src.core.chat_service import ChatService
 from src.models.data_service import DataService
 from src.models.file_processor import FileProcessor
 
@@ -91,7 +87,6 @@ class TestPerformanceBaselines:
     @pytest.mark.asyncio
     async def test_rag_query_time_baseline(self, mock_llm_service):
         """Test RAG query time baseline."""
-        from src.core.rag_service import RAGService
         
         rag_service = RAGService(
             llm_service=mock_llm_service,
@@ -192,7 +187,6 @@ class TestConcurrentPerformance:
     @pytest.mark.asyncio
     async def test_concurrent_rag_queries(self, mock_llm_service):
         """Test concurrent RAG queries."""
-        from src.core.rag_service import RAGService
         
         rag_service = RAGService(
             llm_service=mock_llm_service,
@@ -269,7 +263,6 @@ class TestMemoryUsage:
         process = psutil.Process()
         initial_memory = process.memory_info().rss / 1024 / 1024  # MB
         
-        from src.core.rag_service import RAGService
         
         rag_service = RAGService(
             llm_service=mock_llm_service,
@@ -317,7 +310,6 @@ class TestMemoryUsage:
         process = psutil.Process()
         initial_memory = process.memory_info().rss / 1024 / 1024  # MB
         
-        from src.models.file_processor import FileProcessor
         
         file_processor = FileProcessor()
         
@@ -388,7 +380,7 @@ class TestScalability:
         
         for size in file_sizes:
             test_file = temp_dir / f"scalability_test_{size}.txt"
-            content = f"Test content word " * size
+            content = "Test content word " * size
             test_file.write_text(content)
             
             start_time = time.time()
@@ -407,7 +399,6 @@ class TestScalability:
     @pytest.mark.asyncio
     async def test_rag_service_scalability(self, mock_llm_service):
         """Test RAG service scalability with increasing document collection size."""
-        from src.core.rag_service import RAGService
         
         rag_service = RAGService(
             llm_service=mock_llm_service,
@@ -481,7 +472,6 @@ class TestOptimizationValidation:
     @pytest.mark.asyncio
     async def test_rag_service_caching(self, mock_llm_service):
         """Test that RAG service implements caching effectively."""
-        from src.core.rag_service import RAGService
         
         rag_service = RAGService(
             llm_service=mock_llm_service,
@@ -519,7 +509,6 @@ class TestOptimizationValidation:
     
     def test_file_processor_chunking_optimization(self):
         """Test that file processor chunking is optimized."""
-        from src.models.file_processor import FileProcessor
         
         file_processor = FileProcessor()
         
@@ -545,7 +534,6 @@ class TestOptimizationValidation:
     @pytest.mark.asyncio
     async def test_chat_service_history_optimization(self, mock_llm_service, mock_rag_service):
         """Test that chat service history management is optimized."""
-        from src.core.chat_service import ChatService
         
         chat_service = ChatService(
             llm_service=mock_llm_service,
@@ -602,7 +590,6 @@ class TestResourceManagement:
     @pytest.mark.asyncio
     async def test_rag_service_resource_cleanup(self, mock_llm_service):
         """Test that RAG service properly cleans up resources."""
-        from src.core.rag_service import RAGService
         
         rag_service = RAGService(
             llm_service=mock_llm_service,
@@ -632,7 +619,6 @@ class TestResourceManagement:
     
     def test_file_processor_memory_cleanup(self, temp_dir):
         """Test that file processor properly cleans up memory."""
-        from src.models.file_processor import FileProcessor
         
         file_processor = FileProcessor()
         
@@ -687,7 +673,6 @@ class TestPerformanceMonitoring:
     @pytest.mark.asyncio
     async def test_rag_service_performance_metrics(self, mock_llm_service):
         """Test that RAG service collects performance metrics."""
-        from src.core.rag_service import RAGService
         
         rag_service = RAGService(
             llm_service=mock_llm_service,
@@ -723,8 +708,6 @@ class TestPerformanceMonitoring:
     
     def test_data_service_performance_metrics(self, temp_dir):
         """Test that data service collects performance metrics."""
-        from src.models.data_service import DataService
-        
         data_service = DataService(data_dir=str(temp_dir))
         
         # Create test file

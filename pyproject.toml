@@ -14,6 +14,9 @@ dependencies = [
     "pillow>=12.1.1",
     "gradio>=6.9.0",
     "watchdog>=6.0.0",
+    "black>=26.1.0",
+    "aiohttp>=3.13.3",
+    "psutil>=7.2.2",
 ]
 
 [project.optional-dependencies]
@@ -22,6 +25,8 @@ dev = [
     "pytest-cov>=7.0.0",
     "mypy>=1.19.1",
     "pyflakes>=3.4.0",
+    "black>=26.1.0",
+    "ruff>=0.15.4",
 ]
 
 [project.scripts]

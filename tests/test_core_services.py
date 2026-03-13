@@ -1,14 +1,13 @@
 """
 Unit tests for core services (LLM, RAG, Chat).
 """
-import pytest
 import asyncio
-from unittest.mock import Mock, AsyncMock, patch
-from pathlib import Path
+from unittest.mock import AsyncMock, Mock, patch
 
+import pytest
+from src.core.chat_service import ChatService
 from src.core.llm_service import LLMService
 from src.core.rag_service import RAGService
-from src.core.chat_service import ChatService
 
 
 class TestLLMService:

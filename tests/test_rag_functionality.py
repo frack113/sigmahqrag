@@ -1,15 +1,12 @@
 """
 Tests for RAG functionality validation and document processing.
 """
-import pytest
 import asyncio
-from unittest.mock import Mock, AsyncMock, patch, MagicMock
-from pathlib import Path
-import tempfile
-import shutil
+from unittest.mock import AsyncMock, Mock, patch
 
-from src.core.rag_service import RAGService
+import pytest
 from src.core.chat_service import ChatService
+from src.core.rag_service import RAGService
 from src.models.data_service import DataService
 from src.models.file_processor import FileProcessor
 

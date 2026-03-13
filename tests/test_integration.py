@@ -1,18 +1,14 @@
 """
 Integration tests for component interactions.
 """
-import pytest
 import asyncio
-from unittest.mock import Mock, AsyncMock, patch
-from pathlib import Path
+from unittest.mock import AsyncMock, Mock, patch
 
+import pytest
 from src.application.app import SigmaHQGradioApp
 from src.components.chat_interface import ChatInterface
-from src.components.data_management import DataManagement
-from src.components.github_management import GitHubManagement
-from src.components.file_management import FileManagement
 from src.components.config_management import ConfigManagement
-from src.components.logs_viewer import LogsViewer
+from src.components.data_management import DataManagement
 
 
 class TestGradioAppIntegration:
@@ -245,7 +241,6 @@ class TestPerformanceIntegration:
     @pytest.mark.asyncio
     async def test_concurrent_document_processing(self, mock_data_service, temp_dir):
         """Test concurrent document processing."""
-        import asyncio
         from src.models.data_service import DataService
         
         data_service = DataService(data_dir=str(temp_dir))
@@ -268,7 +263,6 @@ class TestPerformanceIntegration:
     @pytest.mark.asyncio
     async def test_concurrent_chat_requests(self, mock_chat_service):
         """Test handling concurrent chat requests."""
-        import asyncio
         
         # Mock chat service to simulate processing time
         async def mock_chat(message):

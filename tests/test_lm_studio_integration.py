@@ -1,14 +1,13 @@
 """
 Tests for LM Studio integration and API calls.
 """
-import pytest
 import asyncio
-from unittest.mock import Mock, AsyncMock, patch
-from pathlib import Path
-import aiohttp
+from unittest.mock import AsyncMock, Mock, patch
 
-from src.infrastructure.external.lm_studio_client import LMStudioClient
+import aiohttp
+import pytest
 from src.core.llm_service import LLMService
+from src.infrastructure.external.lm_studio_client import LMStudioClient
 
 
 class TestLMStudioClient:

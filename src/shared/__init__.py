@@ -77,6 +77,8 @@ from .constants import (
     SERVICE_LLM,
     SERVICE_LOGGING,
     SERVICE_RAG,
+    SERVICE_EMBEDDING,
+    SERVICE_APPLICATION,
     STATUS_DEGRADED,
     # Status codes
     STATUS_HEALTHY,
@@ -179,6 +181,7 @@ __all__ = [
     "AuthenticationError",
     "AuthorizationError",
     "RateLimitError",
+    "EmbeddingError",
     
     # Base classes
     "BaseService",
@@ -273,6 +276,7 @@ __all__ = [
     "SERVICE_FILE_STORAGE",
     "SERVICE_GITHUB",
     "SERVICE_LM_STUDIO",
+    "SERVICE_EMBEDDING",
     "DEFAULT_GITHUB_API_BASE_URL",
     "DEFAULT_GITHUB_RATE_LIMIT_DELAY",
     "ERROR_CODE_SERVICE_UNAVAILABLE",

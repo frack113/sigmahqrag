@@ -85,3 +85,8 @@ class AuthorizationError(SigmaHQError):
 class RateLimitError(ServiceError):
     """Raised when rate limits are exceeded."""
     pass
+
+
+class EmbeddingError(ServiceError):
+    """Raised when embedding operations fail."""
+    pass

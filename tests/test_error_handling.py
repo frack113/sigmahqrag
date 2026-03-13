@@ -1,18 +1,16 @@
 """
 Tests for error handling and fallback mechanisms.
 """
-import pytest
 import asyncio
-from unittest.mock import Mock, AsyncMock, patch
-from pathlib import Path
+from unittest.mock import AsyncMock, Mock, patch
 
+import pytest
 from src.application.app import SigmaHQGradioApp
+from src.core.chat_service import ChatService
 from src.core.llm_service import LLMService
 from src.core.rag_service import RAGService
-from src.core.chat_service import ChatService
 from src.models.config_service import ConfigService
 from src.models.data_service import DataService
-from src.models.logging_service import LoggingService
 
 
 class TestApplicationErrorHandling:
@@ -114,7 +112,6 @@ class TestServiceErrorHandling:
     @pytest.mark.asyncio
     async def test_rag_service_initialization_failure(self, mock_llm_service):
         """Test RAG service initialization failure handling."""
-        from src.core.rag_service import RAGService
         
         # Mock chromadb failure
         with patch('chromadb.Client', side_effect=Exception("Database error")):
@@ -135,7 +132,6 @@ class TestServiceErrorHandling:
     @pytest.mark.asyncio
     async def test_rag_service_query_failure(self, mock_llm_service):
         """Test RAG service query failure handling."""
-        from src.core.rag_service import RAGService
         
         rag_service = RAGService(
             llm_service=mock_llm_service,
@@ -155,7 +151,6 @@ class TestServiceErrorHandling:
     @pytest.mark.asyncio
     async def test_chat_service_fallback_on_rag_failure(self, mock_llm_service):
         """Test chat service fallback when RAG fails."""
-        from src.core.chat_service import ChatService
         
         chat_service = ChatService(
             llm_service=mock_llm_service,
@@ -177,7 +172,6 @@ class TestServiceErrorHandling:
     
     def test_config_service_file_access_failure(self, temp_dir):
         """Test config service handling of file access failures."""
-        from src.models.config_service import ConfigService
         
         # Try to access a file in a non-existent directory
         config_service = ConfigService(config_path=str(temp_dir / "nonexistent" / "config.json"))
@@ -192,7 +186,6 @@ class TestServiceErrorHandling:
     @pytest.mark.asyncio
     async def test_data_service_processing_failure(self, temp_dir):
         """Test data service handling of processing failures."""
-        from src.models.data_service import DataService
         
         data_service = DataService(data_dir=str(temp_dir))
         
@@ -281,7 +274,6 @@ class TestFallbackMechanisms:
     @pytest.mark.asyncio
     async def test_rag_fallback_to_non_rag_mode(self, mock_llm_service):
         """Test RAG fallback to non-RAG mode."""
-        from src.core.chat_service import ChatService
         
         chat_service = ChatService(
             llm_service=mock_llm_service,
@@ -301,7 +293,6 @@ class TestFallbackMechanisms:
     
     def test_config_fallback_to_defaults(self, temp_dir):
         """Test config fallback to default values."""
-        from src.models.config_service import ConfigService
         
         config_service = ConfigService(config_path=str(temp_dir / "missing_config.json"))
         
@@ -315,7 +306,6 @@ class TestFallbackMechanisms:
     @pytest.mark.asyncio
     async def test_data_service_fallback_to_text_extraction(self, temp_dir):
         """Test data service fallback to text extraction for unsupported formats."""
-        from src.models.data_service import DataService
         from src.models.file_processor import FileProcessor
         
         data_service = DataService(data_dir=str(temp_dir))
@@ -358,7 +348,6 @@ class TestErrorRecovery:
     @pytest.mark.asyncio
     async def test_rag_service_recovery_after_failure(self, mock_llm_service):
         """Test RAG service recovery after failure."""
-        from src.core.rag_service import RAGService
         
         rag_service = RAGService(
             llm_service=mock_llm_service,
@@ -385,7 +374,6 @@ class TestErrorRecovery:
     @pytest.mark.asyncio
     async def test_chat_service_recovery_with_history(self, mock_llm_service, mock_rag_service):
         """Test chat service recovery while maintaining conversation history."""
-        from src.core.chat_service import ChatService
         
         chat_service = ChatService(
             llm_service=mock_llm_service,
@@ -424,7 +412,6 @@ class TestErrorLoggingAndMonitoring:
     
     def test_error_logging_in_config_service(self, mock_logging_service):
         """Test error logging in config service."""
-        from src.models.config_service import ConfigService
         
         config_service = ConfigService()
         config_service.logger = mock_logging_service.get_logger("config")
@@ -456,7 +443,6 @@ class TestErrorLoggingAndMonitoring:
     
     def test_error_logging_in_data_service(self, mock_logging_service):
         """Test error logging in data service."""
-        from src.models.data_service import DataService
         
         data_service = DataService(data_dir="test_dir")
         data_service.logger = mock_logging_service.get_logger("data")

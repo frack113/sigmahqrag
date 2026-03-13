@@ -1,19 +1,16 @@
 """
 Unit tests for model services.
 """
-import pytest
 import asyncio
-from unittest.mock import Mock, AsyncMock, patch, MagicMock
-from pathlib import Path
-import tempfile
-import shutil
+from unittest.mock import Mock, patch
 
+import pytest
+from src.models.chat_history_service import ChatHistoryService
 from src.models.config_service import ConfigService
 from src.models.data_service import DataService
-from src.models.logging_service import LoggingService
-from src.models.chat_history_service import ChatHistoryService
-from src.models.repository_service import RepositoryService
 from src.models.file_processor import FileProcessor
+from src.models.logging_service import LoggingService
+from src.models.repository_service import RepositoryService
 
 
 class TestConfigService:
@@ -109,7 +106,6 @@ class TestDataService:
     def test_get_documents(self, data_service, sample_text_file):
         """Test getting list of processed documents."""
         # Process a document first
-        import asyncio
         asyncio.run(data_service.process_document(str(sample_text_file)))
         
         documents = data_service.get_documents()
@@ -121,7 +117,6 @@ class TestDataService:
     def test_delete_document(self, data_service, sample_text_file):
         """Test deleting a processed document."""
         # Process a document first
-        import asyncio
         asyncio.run(data_service.process_document(str(sample_text_file)))
         
         # Delete the document

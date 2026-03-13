@@ -21,18 +21,17 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 # Import core services
+# Import Gradio components
+from src.components.chat_interface import ChatInterface
+from src.components.config_management import ConfigManagement
+from src.components.data_management import DataManagement
+from src.components.file_management import FileManagement
+from src.components.github_management import GitHubManagement
+from src.components.logs_viewer import LogsViewer
+from src.models.chat_history_service import get_chat_history_service
 from src.models.config_service import ConfigService
 from src.models.data_service import DataService
 from src.models.logging_service import get_logger
-from src.models.chat_history_service import get_chat_history_service
-
-# Import Gradio components
-from src.components.chat_interface import ChatInterface
-from src.components.data_management import DataManagement
-from src.components.github_management import GitHubManagement
-from src.components.file_management import FileManagement
-from src.components.config_management import ConfigManagement
-from src.components.logs_viewer import LogsViewer
 
 logger = get_logger(__name__)
 

@@ -102,6 +102,7 @@ class RAGService(BaseService, AsyncComponent):
         
         # Services
         self.llm_service = llm_service
+        self.local_embedding_service = None
         
         # Service state
         self.client = None
@@ -120,6 +121,17 @@ class RAGService(BaseService, AsyncComponent):
         
         # Initialize RAG components
         self._initialize_rag()
+        self._initialize_local_embedding_service()
+
+    def _initialize_local_embedding_service(self) -> None:
+        """Initialize the local embedding service with fallback capabilities."""
+        try:
+            from .local_embedding_service import LocalEmbeddingService
+            self.local_embedding_service = LocalEmbeddingService(config=self.config)
+            self.logger.info("Local embedding service initialized")
+        except Exception as e:
+            self.logger.warning(f"Failed to initialize local embedding service: {e}")
+            self.local_embedding_service = None
 
     def _get_default_config(self) -> EmbeddingConfig:
         """Get default RAG configuration."""
@@ -265,7 +277,7 @@ class RAGService(BaseService, AsyncComponent):
     @rate_limit(max_calls=50, time_window=60)  # 50 calls per minute
     async def generate_embeddings(self, texts: list[str]) -> list[list[float]]:
         """
-        Generate embeddings for a list of text strings.
+        Generate embeddings for a list of text strings with fallback mechanism.
         
         Args:
             texts: List of text strings to embed
@@ -277,11 +289,22 @@ class RAGService(BaseService, AsyncComponent):
             return []
 
         try:
+            # Try local embeddings first
+            if self.local_embedding_service:
+                try:
+                    embeddings = await self.local_embedding_service.generate_embeddings(texts)
+                    self.logger.info(f"Generated {len(texts)} embeddings using local service")
+                    return embeddings
+                except Exception as e:
+                    self.logger.warning(f"Local embedding failed, falling back to API: {e}")
+            
+            # Fallback to LM Studio API
             loop = asyncio.get_event_loop()
             embeddings = await loop.run_in_executor(
                 self.executor, self._generate_embeddings_sync, texts
             )
             return embeddings
+            
         except Exception as e:
             self.logger.error(f"Error generating embeddings: {e}")
             raise RAGError(f"Failed to generate embeddings: {str(e)}")

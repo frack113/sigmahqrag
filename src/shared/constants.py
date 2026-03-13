@@ -167,6 +167,8 @@ SERVICE_FILE_PROCESSOR = "file_processor"
 SERVICE_FILE_STORAGE = "file_storage"
 SERVICE_GITHUB = "github_service"
 SERVICE_LM_STUDIO = "lm_studio_service"
+SERVICE_EMBEDDING = "embedding_service"
+SERVICE_APPLICATION = "application_service"
 
 # GitHub configuration
 DEFAULT_GITHUB_API_BASE_URL = "https://api.github.com"
