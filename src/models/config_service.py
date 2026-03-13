@@ -11,9 +11,9 @@ import logging
 import os
 import time
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -42,10 +42,10 @@ class LLMConfig:
 class AppConfig:
     """Complete application configuration."""
 
-    repositories: List[RepositoryConfig]
+    repositories: list[RepositoryConfig]
     llm: LLMConfig
-    rag: Dict[str, Any]
-    performance: Dict[str, Any]
+    rag: dict[str, Any]
+    performance: dict[str, Any]
 
 
 class ConfigService:
@@ -74,7 +74,7 @@ class ConfigService:
         self.executor = ThreadPoolExecutor(max_workers=2)
 
         # Configuration cache
-        self._config_cache: Optional[Dict[str, Any]] = None
+        self._config_cache: dict[str, Any] | None = None
         self._cache_timestamp: float = 0
         self._cache_ttl: int = 30  # 30 seconds cache
 
@@ -376,7 +376,7 @@ class ConfigService:
             logger.error(f"Error saving config asynchronously: {e}")
             return False
 
-    def get_config_with_defaults(self) -> Dict[str, Any]:
+    def get_config_with_defaults(self) -> dict[str, Any]:
         """
         Get configuration with environment variable overrides and defaults.
 
@@ -451,7 +451,7 @@ class ConfigService:
 
         return config
 
-    def validate_config(self) -> List[str]:
+    def validate_config(self) -> list[str]:
         """
         Validate the current configuration.
 
@@ -494,7 +494,7 @@ class ConfigService:
             logger.error(f"Error resetting to defaults: {e}")
             return False
 
-    def export_config(self) -> Dict[str, Any]:
+    def export_config(self) -> dict[str, Any]:
         """
         Export complete configuration for backup or sharing.
 
@@ -511,7 +511,7 @@ class ConfigService:
             },
         }
 
-    def import_config(self, config_data: Dict[str, Any]) -> bool:
+    def import_config(self, config_data: dict[str, Any]) -> bool:
         """
         Import configuration from exported data.
 

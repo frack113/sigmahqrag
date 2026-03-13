@@ -5,7 +5,48 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [WIP] 
+## [WIP] - 2026-03-10
+
+#### Added
+- **Gradio Web Interface**: Complete migration from NiceGUI to Gradio with modern, responsive design
+- **Tabbed Interface**: Organized application into logical tabs (Chat, Data Management, Logs, Configuration)
+- **Async Component Architecture**: Enhanced base component with async operation support and proper resource cleanup
+- **Chat Interface Component**: Full-featured RAG chat with async streaming responses for slow local LLMs
+- **Data Management Component**: Document upload and management with drag-and-drop support
+- **Logs Viewer Component**: Real-time log monitoring with filtering and export capabilities
+- **Configuration Management**: System configuration and settings management
+- **File Management**: File operations and document processing
+- **GitHub Management**: Repository management for code analysis
+- **Enhanced Error Handling**: Comprehensive error handling with graceful fallbacks
+- **Performance Monitoring**: Real-time performance metrics and system statistics
+- **Modern UI Design**: Clean, professional interface with responsive layout
+
+#### Fixed
+- **NiceUI Dependencies**: Completely removed NiceUI dependencies and replaced with Gradio
+- **Import Issues**: Resolved all import errors from NiceUI to Gradio migration
+- **UI Inconsistencies**: Fixed UI inconsistencies and improved visual design
+- **Component Architecture**: Enhanced component architecture for better maintainability
+- **Event Handling**: Improved event handling with proper async support
+- **Resource Management**: Enhanced resource cleanup and memory management
+- **Error Recovery**: Improved error recovery with user-friendly error messages
+
+#### Changed
+- **Technology Stack**: Migrated from NiceGUI to Gradio for better performance and modern UI
+- **Project Structure**: Reorganized project structure to support Gradio components
+- **Component Design**: Updated component design patterns for Gradio compatibility
+- **Event System**: Implemented Gradio-compatible event handling
+- **UI Patterns**: Updated UI patterns to follow Gradio best practices
+- **Documentation**: Updated all documentation to reflect Gradio-based architecture
+- **Dependencies**: Updated pyproject.toml to use Gradio instead of NiceUI
+- **Application Entry Point**: Updated main.py to use Gradio app instead of NiceGUI
+- **Component Imports**: Updated all component imports to use new Gradio-based structure
+
+#### Removed
+- **NiceUI Dependencies**: Completely removed NiceUI and all related dependencies
+- **NiceUI Components**: Removed all NiceUI-specific components and replaced with Gradio equivalents
+- **NiceGUI Pages**: Removed NiceGUI page structure and replaced with Gradio tabs
+- **Legacy Code**: Removed all NiceUI-specific code and configurations
+- **Unused Dependencies**: Cleaned up all dependencies no longer needed after migration
 
 ### 2026-03-09
 
@@ -134,14 +175,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Duplicate Prevention**: Added validation to prevent adding the same repository with the same branch multiple times
 - **Import Error**: Fixed module import issue that was causing 500 error by moving `shutil` import to top level
 
-#### Fixed
- Changed
+#### Changed
 - Updated README.md TODO list to reflect completed fixes and new pending tasks
 
 ### 2026-03-01
 
-#### Fixed
- Added
+#### Added
 - Initial implementation of GitHub Repository Management page
 - Basic chat interface with document upload capabilities
 - Configuration management for GitHub repositories
@@ -149,7 +188,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - NiceGUI-based responsive UI
 
 #### Fixed
- Fixed
 - GitHub repository update functionality
 
 ## [0.0.1] - 2026-02-22
@@ -160,7 +198,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial design documents for chat interface and GitHub integration
 
 ### Changed
-- use of nicegui
+- Migration from JavaScript/HTML to Python with NiceGUI framework
 
 ## [0.0.0] - 2026-02-22
-- Start the projet with js html 
+- Started project with JavaScript/HTML implementation

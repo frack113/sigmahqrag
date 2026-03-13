@@ -1,13 +1,9 @@
-# Repository Service for NiceGUI - GitHub repository management
+# Repository Service for Gradio - GitHub repository management
 import asyncio
 import logging
-import os
-import shutil
-import subprocess
-import tempfile
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import requests
 from git import Repo
@@ -87,7 +83,7 @@ class RepositoryService:
 
     async def _fetch_single_repository(
         self, repo: dict[str, Any]
-    ) -> Optional[dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Fetch a single repository asynchronously."""
         try:
             url = repo.get("url")
@@ -339,7 +335,7 @@ class RepositoryService:
             return False
 
     def _process_repository_files(
-        self, repo_dir: Path, file_extensions: List[str]
+        self, repo_dir: Path, file_extensions: list[str]
     ) -> bool:
         """Process files in a repository for indexing."""
         try:

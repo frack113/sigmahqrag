@@ -1,15 +1,15 @@
 """
-RAG Chat Service for NiceGUI
+RAG Chat Service for Gradio
 
 Integrates RAG functionality with the chat interface to provide context-aware responses.
 Uses the optimized RAG service and LLM service for enhanced chat capabilities.
 """
 
-import asyncio
 import logging
-from typing import Any, AsyncGenerator, Dict, List, Optional
+from collections.abc import AsyncGenerator
+from typing import Any
 
-from .llm_service_optimized import OptimizedLLMService, ChatMessage, ChatCompletionRequest
+from .llm_service_optimized import OptimizedLLMService
 from .rag_service_optimized import OptimizedRAGService
 
 
@@ -23,8 +23,8 @@ class RAGChatService:
 
     def __init__(
         self,
-        llm_service: Optional[OptimizedLLMService] = None,
-        rag_service: Optional[OptimizedRAGService] = None,
+        llm_service: OptimizedLLMService | None = None,
+        rag_service: OptimizedRAGService | None = None,
         base_url: str = "http://localhost:1234",
         rag_enabled: bool = True,
         rag_n_results: int = 3,
@@ -65,7 +65,7 @@ class RAGChatService:
             self.rag_service = None
 
         # Conversation history
-        self.conversation_history: List[Dict[str, str]] = []
+        self.conversation_history: list[dict[str, str]] = []
 
     def add_message_to_history(self, role: str, content: str) -> None:
         """
@@ -87,7 +87,7 @@ class RAGChatService:
         self.conversation_history.clear()
         self.logger.info("Conversation history cleared")
 
-    def get_conversation_history(self) -> List[Dict[str, str]]:
+    def get_conversation_history(self) -> list[dict[str, str]]:
         """
         Get the current conversation history.
 
@@ -99,8 +99,8 @@ class RAGChatService:
     async def generate_response(
         self,
         user_message: str,
-        system_prompt: Optional[str] = None,
-        use_rag: Optional[bool] = None,
+        system_prompt: str | None = None,
+        use_rag: bool | None = None,
     ) -> str:
         """
         Generate a response to a user message with improved timeout handling.
@@ -165,8 +165,8 @@ class RAGChatService:
     async def generate_streaming_response(
         self,
         user_message: str,
-        system_prompt: Optional[str] = None,
-        use_rag: Optional[bool] = None,
+        system_prompt: str | None = None,
+        use_rag: bool | None = None,
     ) -> AsyncGenerator[str, None]:
         """
         Generate a streaming response to a user message.
@@ -204,7 +204,7 @@ class RAGChatService:
             error_message = "I apologize, but I encountered an error while processing your request. Please try again."
             yield error_message
 
-    def get_rag_status(self) -> Dict[str, Any]:
+    def get_rag_status(self) -> dict[str, Any]:
         """
         Get the status of the RAG system.
 
@@ -248,7 +248,7 @@ class RAGChatService:
                 return False
         return False
 
-    def get_rag_stats(self) -> Dict[str, Any]:
+    def get_rag_stats(self) -> dict[str, Any]:
         """
         Get RAG statistics.
 
@@ -272,7 +272,7 @@ class RAGChatService:
 
         return stats
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """
         Get comprehensive statistics (alias for get_rag_stats for backward compatibility).
 

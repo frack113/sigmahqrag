@@ -7,13 +7,11 @@ Provides both database and browser-based storage options.
 
 import json
 import logging
-import os
 import sqlite3
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 from uuid import uuid4
-
 
 logger = logging.getLogger(__name__)
 
@@ -97,7 +95,7 @@ class ChatHistoryService:
             # Try to get existing session from a temporary file
             session_file = self.db_path.parent / ".current_session"
             if session_file.exists():
-                with open(session_file, 'r') as f:
+                with open(session_file) as f:
                     self.session_id = f.read().strip()
             else:
                 # Create new session
@@ -127,7 +125,7 @@ class ChatHistoryService:
         except Exception as e:
             logger.error(f"Failed to register session: {e}")
     
-    def save_message(self, role: str, content: str, metadata: Optional[Dict] = None) -> bool:
+    def save_message(self, role: str, content: str, metadata: dict | None = None) -> bool:
         """
         Save a message to the chat history.
         
@@ -169,7 +167,7 @@ class ChatHistoryService:
             logger.error(f"Failed to save message: {e}")
             return False
     
-    def get_session_history(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+    def get_session_history(self, limit: int | None = None) -> list[dict[str, Any]]:
         """
         Get chat history for the current session.
         
@@ -213,7 +211,7 @@ class ChatHistoryService:
             logger.error(f"Failed to get session history: {e}")
             return []
     
-    def get_all_sessions(self) -> List[Dict[str, Any]]:
+    def get_all_sessions(self) -> list[dict[str, Any]]:
         """
         Get information about all sessions.
         
@@ -342,7 +340,7 @@ class ChatHistoryService:
         except Exception as e:
             logger.error(f"Failed to cleanup old messages: {e}")
     
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """
         Get statistics about chat history.
         
@@ -392,7 +390,7 @@ class ChatHistoryService:
                 "error": str(e)
             }
     
-    def export_history(self, session_id: Optional[str] = None) -> Dict[str, Any]:
+    def export_history(self, session_id: str | None = None) -> dict[str, Any]:
         """
         Export chat history to JSON format.
         
@@ -422,7 +420,7 @@ class ChatHistoryService:
             logger.error(f"Failed to export history: {e}")
             return {"error": str(e)}
     
-    def import_history(self, data: Dict[str, Any]) -> bool:
+    def import_history(self, data: dict[str, Any]) -> bool:
         """
         Import chat history from JSON format.
         
@@ -463,18 +461,18 @@ class ChatHistoryService:
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
-                cursor.execute("""
+                cursor.execute(f"""
                     DELETE FROM messages 
                     WHERE session_id IN (
                         SELECT id FROM sessions 
-                        WHERE last_used < datetime('now', '-{} days')
+                        WHERE last_used < datetime('now', '-{days_to_keep} days')
                     )
-                """.format(days_to_keep))
+                """)
                 
-                cursor.execute("""
+                cursor.execute(f"""
                     DELETE FROM sessions 
-                    WHERE last_used < datetime('now', '-{} days')
-                """.format(days_to_keep))
+                    WHERE last_used < datetime('now', '-{days_to_keep} days')
+                """)
                 
                 conn.commit()
                 

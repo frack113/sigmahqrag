@@ -8,7 +8,7 @@ A comprehensive Retrieval-Augmented Generation (RAG) application with document a
 - [Installation](#installation)
 - [Prerequisites](#prerequisites)
 - [Usage](#usage)
-- [GitHub Repository Management](#github-repository-management)
+- [Data Management](#data-management)
 - [Development](#development)
 - [Documentation](#documentation)
 - [Contributing](#contributing)
@@ -19,10 +19,10 @@ A comprehensive Retrieval-Augmented Generation (RAG) application with document a
 - **LM Studio Integration**: Generate embeddings using LM Studio with custom API compatibility
 - **Document analysis**: Extract text from uploaded documents and answer questions about content
 - **Conversation history**: Maintain context across multiple messages
-- **Responsive UI**: Modern, user-friendly interface built with NiceGUI 3.x
+- **Responsive UI**: Modern, user-friendly interface built with Gradio
 - **Drag-and-drop uploads**: Easy document uploading experience
 - **Real-time updates**: Typing indicators and instant message display
-- **GitHub Repository Management**: Add, edit, and manage GitHub repositories for indexing and analysis
+- **Data Management**: Upload, organize, and manage documents for RAG processing
 - **Vector database**: Semantic search using ChromaDB for document retrieval
 - **Privacy-focused**: All processing runs locally on your machine
 - **Optimized LLM Service**: Factory functions for different use cases (chat, completion, creative)
@@ -151,21 +151,20 @@ doc_rag_service = create_document_rag_service()
 chat_rag_service = create_chat_rag_service()
 ```
 
-### GitHub Repository Management
+### Data Management
 
-Navigate to `/github-repo` to manage GitHub repositories:
+Navigate to the Data Management tab in the application to upload and organize documents:
 
-- **Add Repositories**: Enter the repository URL, branch name, and file extensions to include
-- **Enable/Disable**: Use the toggle switch to enable or disable repositories
-- **Update All**: Update all enabled repositories at once
-- **Add/Edit/Delete**: Add new repositories, edit existing ones, or delete them permanently
-- **Save Changes**: Click the Save button to persist your configuration
+- **Upload Documents**: Drag and drop or select files (PDF, TXT, DOCX, images)
+- **Document Organization**: View and manage uploaded documents
+- **RAG Processing**: Documents are automatically processed and indexed for semantic search
+- **File Management**: View document metadata and processing status
 
-All repository configurations are stored in `data/config.json`.
+All uploaded documents are stored in the `data/` directory and indexed in the vector database.
 
-## GitHub Repository Management
+## Data Management
 
-The application includes a dedicated page for managing GitHub repositories that can be indexed and analyzed:
+The application includes a dedicated page for managing documents that can be indexed and analyzed:
 
 ### Key Features:
 - **LM Studio Integration**: All embeddings are generated using the LM Studio server running at `http://localhost:1234`
@@ -175,11 +174,11 @@ The application includes a dedicated page for managing GitHub repositories that 
 - **Retry logic**: 3 attempts with exponential backoff when connecting to LM Studio server
 - **Optimized RAG Service**: Direct ChromaDB integration for high-performance document storage and retrieval
 
-### Repository Configuration:
-- **URL**: GitHub repository URL (e.g., `https://github.com/user/repo`)
-- **Branch**: Git branch to clone (default: `main`)
-- **Extensions**: File extensions to include (e.g., `.py,.md,.txt`)
-- **Enabled**: Toggle to enable/disable repository indexing
+### Document Processing:
+- **File Types**: PDF, TXT, DOCX, and image files with OCR support
+- **Text Extraction**: Automatic text extraction from all supported file formats
+- **Chunking**: Documents are split into optimal chunks for RAG processing
+- **Indexing**: Automatic indexing in the vector database for semantic search
 
 ### Requirements:
 - LM Studio server running locally at `http://localhost:1234`
@@ -197,22 +196,25 @@ The application includes a dedicated page for managing GitHub repositories that 
 
 The project follows a modular architecture:
 
-- **Components**: UI elements like chat messages and file uploaders
-  - `card.py`: Card component (currently incomplete)
-  - `chat_message.py`: Chat message display component
-  - `file_upload.py`: Document upload with drag-and-drop
-  - `notification.py`: Notification component
+- **Gradio App**: Modern web interface built with Gradio
+  - `app.py`: Main application entry point with tabbed interface
+  - `components/`: UI components for different functionality
+    - `chat_interface.py`: RAG chat interface with async streaming
+    - `data_management.py`: Document upload and management
+    - `logs_viewer.py`: Application logs monitoring
+    - `config_management.py`: Configuration management
+    - `file_management.py`: File operations
+    - `github_management.py`: GitHub repository management
 
 - **Models**: Business logic for chat processing and data services
   - `llm_service_optimized.py`: ✨ **NEW** Optimized LLM service with factory functions
   - `rag_service_optimized.py`: ✨ **NEW** Optimized RAG service with direct ChromaDB integration
+  - `rag_chat_service.py`: RAG chat service with conversation history
   - `chat_service.py`: Conversation state and document processing
   - `data_service.py`: Embedding generation and vector store
   - `repository_service.py`: GitHub repository operations
-
-- **Pages**: Main application pages with routing
-  - `chat_page_simple.py`: ✨ **UPDATED** Main chat interface with optimized services
-  - `github_repo_page.py`: GitHub repository management page
+  - `logging_service.py`: Application logging
+  - `file_processor.py`: Document processing pipeline
 
 - **Services**: Core functionality for embeddings, RAG, and conversation management
 
@@ -220,7 +222,7 @@ The project follows a modular architecture:
 
 The project uses the following main dependencies:
 
-- **NiceGUI 3.x**: UI framework
+- **Gradio**: Modern web interface framework
 - **LM Studio**: Local LLM and embedding model server
 - **ChromaDB**: Vector database for RAG
 - **PyPDF2**: PDF document processing
@@ -229,7 +231,7 @@ The project uses the following main dependencies:
 - **easyocr**: OCR for image text extraction
 - **PySigma**: Sigma rule parsing (optional)
 - **GitPython**: GitHub repository operations (optional)
-- **AG Grid**: Data grid for GitHub repository management
+- **uv**: Python package management
 
 ### Key Optimizations
 
@@ -282,7 +284,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## Acknowledgments
 
-- [NiceGUI](https://nicegui.io) - UI Framework
+- [Gradio](https://gradio.app) - Modern web interface framework
 - [LM Studio](https://lmstudio.ai) - Local LLM and embedding models
 - [SigmaHQ/pySigma](https://github.com/SigmaHQ/pySigma) - Sigma rule parsing
 - [ChromaDB](https://www.trychroma.com) - Vector database

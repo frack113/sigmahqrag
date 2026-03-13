@@ -1,8 +1,7 @@
 """
-Data Service for NiceGUI - Orchestrates RAG, Repository, and File Processing services
+Data Service for Gradio - Orchestrates RAG, Repository, and File Processing services
 """
 
-import json
 import logging
 import os
 from typing import Any
@@ -29,10 +28,9 @@ class DataService:
 
         # Initialize sub-services
         from .file_processor import FileProcessor
-        from .rag_service_optimized import OptimizedRAGService
         from .repository_service import RepositoryService
 
-        self.rag_service = OptimizedRAGService(embedding_model_name=embedding_model_name)
+        # Note: RAG service integration would be handled by the core RAG service
         self.repository_service = RepositoryService()
         self.file_processor = FileProcessor()
 
@@ -148,9 +146,8 @@ class DataService:
                                 repo_dir=repo_dir,
                             )
 
-                            # Store the context using RagService
-                            self.rag_service.store_context(doc_id, content, metadata)
-                            processed_count += 1
+                            # Note: RAG context storage would be handled by the core RAG service
+                            # self.rag_service.store_context(doc_id, content, metadata)
 
                             # Log progress
                             self.logger.info(

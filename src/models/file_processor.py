@@ -1,16 +1,16 @@
 """
-File Processor for NiceGUI - Handles processing of different file formats for RAG indexing
+File Processor for Gradio - Handles processing of different file formats for RAG indexing
 
 This module provides functionality to process various file formats commonly found in
 code repositories and documentation, extracting text content for RAG indexing.
 """
 
-import os
-import logging
 import json
+import logging
+import os
 import re
-from typing import Optional, Dict, Any, List
 from datetime import datetime
+from typing import Any
 
 
 class FileProcessor:
@@ -73,7 +73,7 @@ class FileProcessor:
             '.sql': self._process_sql_file,
         }
 
-    def process_file(self, file_path: str) -> Optional[str]:
+    def process_file(self, file_path: str) -> str | None:
         """
         Process a file and extract its text content.
 
@@ -99,7 +99,7 @@ class FileProcessor:
             
             # Read file content
             try:
-                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                with open(file_path, encoding='utf-8', errors='ignore') as f:
                     content = f.read()
             except Exception as e:
                 self.logger.warning(f"Could not read file {file_path}: {e}")
@@ -119,7 +119,7 @@ class FileProcessor:
             self.logger.error(f"Error processing file {file_path}: {e}")
             return None
 
-    def _process_text_file(self, content: str, file_path: str) -> Optional[str]:
+    def _process_text_file(self, content: str, file_path: str) -> str | None:
         """Process plain text files."""
         if not content or not content.strip():
             return None
@@ -128,7 +128,7 @@ class FileProcessor:
         cleaned = re.sub(r'\n\s*\n', '\n\n', content)
         return cleaned.strip()
 
-    def _process_markdown_file(self, content: str, file_path: str) -> Optional[str]:
+    def _process_markdown_file(self, content: str, file_path: str) -> str | None:
         """Process Markdown files, preserving structure but removing formatting."""
         if not content:
             return None
@@ -160,7 +160,7 @@ class FileProcessor:
         cleaned = re.sub(r'\n\s*\n', '\n\n', content)
         return cleaned.strip()
 
-    def _process_code_file(self, content: str, file_path: str) -> Optional[str]:
+    def _process_code_file(self, content: str, file_path: str) -> str | None:
         """Process code files, extracting meaningful content."""
         if not content:
             return None
@@ -202,7 +202,7 @@ class FileProcessor:
         result = '\n'.join(meaningful_content)
         return result if result.strip() else None
 
-    def _process_json_file(self, content: str, file_path: str) -> Optional[str]:
+    def _process_json_file(self, content: str, file_path: str) -> str | None:
         """Process JSON files."""
         if not content:
             return None
@@ -215,7 +215,7 @@ class FileProcessor:
             # If not valid JSON, treat as text
             return self._process_text_file(content, file_path)
 
-    def _process_yaml_file(self, content: str, file_path: str) -> Optional[str]:
+    def _process_yaml_file(self, content: str, file_path: str) -> str | None:
         """Process YAML files."""
         if not content:
             return None
@@ -231,7 +231,7 @@ class FileProcessor:
         
         return '\n'.join(meaningful_lines) if meaningful_lines else None
 
-    def _process_xml_file(self, content: str, file_path: str) -> Optional[str]:
+    def _process_xml_file(self, content: str, file_path: str) -> str | None:
         """Process XML files."""
         if not content:
             return None
@@ -244,7 +244,7 @@ class FileProcessor:
         cleaned = re.sub(r'\s+', ' ', text_content)
         return cleaned.strip()
 
-    def _process_html_file(self, content: str, file_path: str) -> Optional[str]:
+    def _process_html_file(self, content: str, file_path: str) -> str | None:
         """Process HTML files."""
         if not content:
             return None
@@ -260,7 +260,7 @@ class FileProcessor:
         cleaned = re.sub(r'\s+', ' ', text_content)
         return cleaned.strip()
 
-    def _process_toml_file(self, content: str, file_path: str) -> Optional[str]:
+    def _process_toml_file(self, content: str, file_path: str) -> str | None:
         """Process TOML files."""
         if not content:
             return None
@@ -276,7 +276,7 @@ class FileProcessor:
         
         return '\n'.join(meaningful_lines) if meaningful_lines else None
 
-    def _process_csv_file(self, content: str, file_path: str) -> Optional[str]:
+    def _process_csv_file(self, content: str, file_path: str) -> str | None:
         """Process CSV files."""
         if not content:
             return None
@@ -285,7 +285,7 @@ class FileProcessor:
         lines = content.split('\n')[:10]  # Limit to first 10 lines
         return '\n'.join(lines).strip()
 
-    def _process_tsv_file(self, content: str, file_path: str) -> Optional[str]:
+    def _process_tsv_file(self, content: str, file_path: str) -> str | None:
         """Process TSV files."""
         if not content:
             return None
@@ -294,7 +294,7 @@ class FileProcessor:
         lines = content.split('\n')[:10]  # Limit to first 10 lines
         return '\n'.join(lines).strip()
 
-    def _process_sql_file(self, content: str, file_path: str) -> Optional[str]:
+    def _process_sql_file(self, content: str, file_path: str) -> str | None:
         """Process SQL files."""
         if not content:
             return None
@@ -337,7 +337,7 @@ class FileProcessor:
         file_hash = hashlib.md5(file_path.encode()).hexdigest()
         return f"file_{file_hash}"
 
-    def create_metadata(self, file_path: str, repo_name: str, branch: str, repo_dir: str) -> Dict[str, Any]:
+    def create_metadata(self, file_path: str, repo_name: str, branch: str, repo_dir: str) -> dict[str, Any]:
         """
         Create metadata for a processed file.
 
@@ -409,7 +409,7 @@ class FileProcessor:
         
         return file_type_map.get(file_extension, 'Unknown')
 
-    def get_supported_extensions(self) -> List[str]:
+    def get_supported_extensions(self) -> list[str]:
         """Get list of supported file extensions."""
         return list(self.supported_extensions.keys())
 

@@ -13,6 +13,7 @@ dependencies = [
     "colorama>=0.4.6",
     "pillow>=12.1.1",
     "gradio>=6.9.0",
+    "watchdog>=6.0.0",
 ]
 
 [project.optional-dependencies]

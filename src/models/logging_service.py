@@ -2,17 +2,15 @@
 Logging Service for SigmaHQ RAG Application
 
 This module provides centralized logging functionality with rotation support
-and real-time log viewing capabilities for the NiceGUI application.
+and real-time log viewing capabilities for the Gradio application.
 """
 
 import logging
 import logging.handlers
-import os
 import threading
 import time
+from collections.abc import Callable
 from pathlib import Path
-from typing import List, Optional, Callable
-from datetime import datetime
 
 
 class LoggingService:
@@ -105,7 +103,7 @@ class LoggingService:
         """
         return logging.getLogger(name)
 
-    def get_recent_logs(self, lines: int = 100) -> List[str]:
+    def get_recent_logs(self, lines: int = 100) -> list[str]:
         """
         Get recent log entries from the log file.
 
@@ -119,7 +117,7 @@ class LoggingService:
             return ["No log file found."]
 
         try:
-            with open(self.log_file, "r", encoding="utf-8") as f:
+            with open(self.log_file, encoding="utf-8") as f:
                 all_lines = f.readlines()
                 return all_lines[-lines:] if len(all_lines) >= lines else all_lines
         except Exception as e:
@@ -209,14 +207,14 @@ class LoggingService:
         def monitor_logs():
             last_position = 0
             if self.log_file.exists():
-                with open(self.log_file, "r", encoding="utf-8") as f:
+                with open(self.log_file, encoding="utf-8") as f:
                     f.seek(0, 2)  # Go to end of file
                     last_position = f.tell()
 
             while not threading.current_thread().stopped():
                 try:
                     if self.log_file.exists():
-                        with open(self.log_file, "r", encoding="utf-8") as f:
+                        with open(self.log_file, encoding="utf-8") as f:
                             f.seek(last_position)
                             new_lines = f.readlines()
                             last_position = f.tell()
