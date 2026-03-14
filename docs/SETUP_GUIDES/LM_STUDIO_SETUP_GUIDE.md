@@ -92,15 +92,21 @@ OPENAI_BASE_URL=http://localhost:1234/v1
 For optimal performance with the SigmaHQ RAG system:
 
 #### Chat Model Settings
-- **Temperature**: 0.7 (for chat service), 0.3 (for completion service), 1.2 (for creative service)
-- **Max Tokens**: 2048
+- **Temperature**: 0.7 (for chat service)
+- **Max Tokens**: 5000
 - **Top P**: 0.9
-- **Frequency Penalty**: 0.0
 
-#### Embedding Model Settings
-- **Batch Size**: 32
-- **Precision**: fp16 (if available)
-- **Memory Usage**: Monitor RAM usage during embedding generation
+#### Application Configuration (`data/config.json`)
+```json
+{
+  "llm": {
+    "base_url": "http://localhost:1234",
+    "model": "qwen/qwen3.5-9b",
+    "temperature": 0.7,
+    "max_tokens": 5000
+  }
+}
+```
 
 ## Troubleshooting
 
@@ -126,38 +132,6 @@ For optimal performance with the SigmaHQ RAG system:
 #### Memory Management
 - **Close Other Applications**: Free up RAM before loading models
 - **Model Quantization**: Consider using quantized versions if available
-- **Batch Processing**: Process documents in smaller batches
-
-#### Speed Optimization
-- **GPU Acceleration**: Enable GPU if available
-- **Model Caching**: Keep frequently used models loaded
-- **Network**: Use wired connection if possible
-
-## Advanced Configuration
-
-### Custom Model Paths
-
-If you have models stored locally:
-
-1. Go to Settings → Models
-2. Add custom model paths
-3. Restart LM Studio
-
-### Multiple Model Instances
-
-For advanced users who need multiple model instances:
-
-1. Configure different ports for each instance
-2. Update environment variables accordingly
-3. Use model routing in your application
-
-### SSL/TLS Configuration
-
-For production environments requiring SSL:
-
-1. Generate SSL certificates
-2. Configure SSL settings in LM Studio
-3. Update base URL to use `https://`
 
 ## Verification
 
@@ -190,15 +164,13 @@ print(f"Embedding dimension: {len(embedding.data[0].embedding)}")
 ```
 
 ### Expected Output
-
 - Chat completion should return a response
-- Embedding should return a vector with 384 dimensions
+- Embedding should return a vector with appropriate dimensions
 - No connection errors should occur
 
 ## Support
 
 For additional support:
-
 - [LM Studio Documentation](https://docs.lmstudio.ai/)
 - [LM Studio Community](https://community.lmstudio.ai/)
 - [SigmaHQ RAG Issues](https://github.com/frack113/sigmahqrag/issues)
