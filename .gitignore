@@ -21,9 +21,8 @@ __pycache__/
 logs/
 *.log.*
 
-# RAG Data
+# RAG Data (old files removed)
 .chromadb/
-data/github/
 data/local/
 data/*.db
 data/*.db-db-journal
@@ -81,5 +80,10 @@ docs/build/
 # AGENTS.md (keep for development)
 AGENTS.md
 
-# Local CLI rules
+# Local CLI rules (not committed)
 .clinerules/
+
+# Infrastructure files (obsolete, now direct Python operations)
+src/infrastructure/port_manager.py
+src/infrastructure/service_lifecycle.py
+src/infrastructure/file_storage_setup.py

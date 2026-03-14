@@ -1,3 +1,4 @@
-# SigmaHQ RAG Application
-__version__ = "2026.2.27"
-__author__ = "SigmaHQ Team"
+# SigmaHQ RAG - Simple Package Structure
+
+Simplified package that re-exports main application module.
+Provides clean imports from src.app for the main entry point.

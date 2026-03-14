@@ -21,8 +21,6 @@ ENV_LLM_MODEL = "LLM_MODEL"
 ENV_LLM_BASE_URL = "LLM_BASE_URL"
 ENV_LLM_TEMPERATURE = "LLM_TEMPERATURE"
 ENV_LLM_MAX_TOKENS = "LLM_MAX_TOKENS"
-ENV_GITHUB_TOKEN = "GITHUB_TOKEN"
-ENV_GITHUB_API_BASE_URL = "GITHUB_API_BASE_URL"
 
 # === File Patterns ===
 LOG_FILE_PATTERN = "*.log"
@@ -52,11 +50,6 @@ DATE_FORMAT = "%Y-%m-%d"
 TIME_FORMAT = "%H:%M:%S"
 LOG_FORMAT = "%Y-%m-%d %H:%M:%S"
 
-# === Validation Patterns (regex) ===
-EMAIL_PATTERN = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
-URL_PATTERN = r"^https?://[^\s/$.?#].[^\s]*$"
-UUID_PATTERN = r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
-
 # === Processing States ===
 PROCESSING_STATE_PENDING = "pending"
 PROCESSING_STATE_PROCESSING = "processing"
@@ -82,17 +75,10 @@ VECTOR_STORE_TYPE_PINECONE = "pinecone"
 VECTOR_STORE_TYPE_WEAVIATE = "weaviate"
 VECTOR_STORE_TYPE_QDRANT = "qdrant"
 
-# === Embedding Types ===
-EMBEDDING_TYPE_OPENAI = "openai"
-EMBEDDING_TYPE_HUGGINGFACE = "huggingface"
-EMBEDDING_TYPE_CUSTOM = "custom"
-
 # === LLM Providers ===
 LLM_PROVIDER_OPENAI = "openai"
-LLM_PROVIDER_ANTHROPIC = "anthropic"
 LLM_PROVIDER_HUGGINGFACE = "huggingface"
 LLM_PROVIDER_CUSTOM = "custom"
-LLM_PROVIDER_LM_STUDIO = "lm_studio"
 
 # === Authentication Types ===
 AUTH_TYPE_NONE = "none"
@@ -259,12 +245,10 @@ SERVICE_LOGGING = "logging_service"
 SERVICE_DATABASE = "database_service"
 SERVICE_FILE_PROCESSOR = "file_processor"
 SERVICE_GITHUB = "github_service"
-SERVICE_LM_STUDIO = "lm_studio_service"
 
 # === Configuration Sections ===
 CONFIG_SECTION_NETWORK = "network"
 CONFIG_SECTION_LLM = "llm"
-CONFIG_SECTION_RAG = "rag"
 CONFIG_SECTION_REPOSITORIES = "repositories"
 CONFIG_SECTION_UI_CSS = "ui_css"
 

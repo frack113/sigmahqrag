@@ -77,19 +77,22 @@ The application follows a clear separation of concerns with four distinct layers
 │  │   SQLite DB      │  │ ChromaDB Vector  │                 │
 │  └──────────────────┘  └──────────────────┘                 │
 └─────────────────────────────────────────────────────────────┘
+
+**Note:** Port management uses Gradio's built-in auto_reload feature with `launch(reload=True)`. No external port manager is required.
 ```
 
 ### Entry Points
 
-#### `main.py`
-- **Purpose**: Application entry point with validation
+#### `main.py` - Application Entry Point
+- **Purpose**: Entry point that calls application layer
+- **Import**: `from src.app import create_application, SigmaHQApplication`
 - **Responsibilities**:
   - Validate `data/config.json` exists before starting (critical)
   - Create and configure the application instance
   - Handle graceful shutdown signals (SIGINT/SIGTERM)
 - **Entry Function**: `main()` - called when running `uv run python main.py`
 
-#### `src/application/application.py`
+#### `src/app.py` - Application Core
 - **Purpose**: Core application orchestration using Gradio
 - **Key Class**: `SigmaHQApplication`
 - **Factory Function**: `create_application(config_path)` - creates app instance
@@ -100,7 +103,7 @@ The application follows a clear separation of concerns with four distinct layers
 
 ### Application Layer
 
-#### SigmaHQApplication (`src/application/application.py`)
+#### SigmaHQApplication (`src/app.py`)
 The main orchestrator that ties everything together with Gradio UI.
 
 **Key Responsibilities:**
@@ -125,14 +128,23 @@ theme = self.config["ui_css"]["theme"]
 ```
 
 #### ConfigManager (`src/shared/config_manager.py`)
-Handles configuration loading, validation, and manipulation with strict no-defaults policy.
+Centralized Configuration Manager using simple JSON operations.
 
 **Key Features:**
-- Loads from `data/config.json` (path is REQUIRED - no defaults)
-- Validates all required fields are present before allowing any operations
-- Provides typed access to nested config values via dot notation: `config.get("network.port")`
-- Supports environment variable overrides for `network.ip` and `network.port` only
+- Direct file-based config storage with `data/config.json` (path is REQUIRED - no defaults)
+- Environment variable support for `network.ip` and `network.port` only
+- Validation helpers for CLI handlers
+- Thread-safe read/write operations
 - Raises `MissingConfigError` if file is missing, invalid JSON, or lacks required fields
+
+**Configuration Access (NO fallbacks!):**
+```python
+# All values come from config.json - direct access raises KeyError if missing!
+port = self.config_manager.get("network.port")
+model = self.config_manager.get("llm.model")
+base_url = self.config_manager.get("llm.base_url")
+theme = self.config_manager.get("ui_css.theme")
+```
 
 **Required Config Sections (all mandatory):**
 | Section | Required Fields | Purpose |
@@ -163,8 +175,15 @@ OpenAI-compatible interface for the configured LLM model.
 - Streaming response support for real-time chat
 - Temperature control for output randomness
 - Token limit management (configurable via config.json)
-- Caching support for improved performance
-- Rate limiting prevention
+- Integration with RAGService for context-aware responses
+
+#### Local Embedding Service (`src/core/local_embedding_service.py`)
+CPU-compatible embedding generation service.
+
+**Key Features:**
+- Uses `all-MiniLM-L6-v2` model
+- No GPU required - optimized for CPU execution
+- Loads model from `data/models/all-MiniLM-L6-v2.safetensors`
 
 #### Chat Service (`src/core/chat_service.py`)
 Integrates RAG functionality with conversational chat interface.
@@ -198,15 +217,14 @@ All UI components use Gradio exclusively - no other frameworks allowed.
 - Location: `data/history/rag_history.db`
 - Manages conversation history persistence
 
-#### ChromaDB Vector Storage (`data/models/chroma_db/`)
-- Stores document embeddings for RAG retrieval
+#### ChromaDB Vector Storage (`data/chroma_db/`)
+- Stores document embeddings for RAG retrieval in SQLite vector store
 - Uses `all-MiniLM-L6-v2` embedding model (CPU-compatible)
 - Model file: `data/models/all-MiniLM-L6-v2.safetensors`
 
-#### LM Studio Integration (`src/infrastructure/lm_studio_setup.py`)
-- Optional local LLM server integration
-- Server detection and API validation
-- Model availability checking
+#### Logging (`data/logs/`)
+- Application log files
+- Location: `data/logs/app.log`
 
 ---
 
@@ -261,201 +279,30 @@ model = llm_config.get("model", "gpt-3.5")     # ❌ FORBIDDEN!
 
 ```
 sigmahqrag/
-├── main.py                          # Entry point - validates config.json exists
-├── pyproject.toml                   # Project dependencies (uv package manager)
-├── data/
-│   ├── config.json                  # REQUIRED: Main configuration (NO fallbacks allowed)
-│   ├── history/                     # Chat history database
-│   │   └── rag_history.db           # SQLite file
-│   ├── models/                      # ML models & vector storage
-│   │   ├── all-MiniLM-L6-v2.safetensors  # Embedding model
-│   │   └── chroma_db/               # Vector database (ChromaDB)
-│   ├── github.json                  # Cached GitHub repository data
-│   └── local/                       # Local file storage
-├── src/
-│   ├── application/                 # Application orchestration layer
-│   │   ├── __init__.py
-│   │   └── application.py           # SigmaHQApplication class (Gradio app)
-│   ├── components/                  # Gradio UI components (presentation layer)
-│   │   ├── __init__.py
-│   │   ├── base_component.py        # Base class for UI components
-│   │   ├── chat_interface.py        # Main chat interface
-│   │   ├── config_management.py     # Config editor UI
-│   │   ├── data_management.py       # Document management UI
-│   │   ├── file_management.py       # File browser UI
-│   │   ├── github_management.py     # GitHub repo management UI
-│   │   └── logs_viewer.py           # Logs display UI
-│   ├── core/                        # Core business services layer
-│   │   ├── __init__.py
-│   │   ├── chat_service.py          # Chat + RAG integration
-│   │   ├── llm_service.py           # LLM interface (OpenAI-compatible)
-│   │   ├── local_embedding_service.py # CPU embedding model
-│   │   └── rag_service.py           # RAG pipeline service
-│   ├── infrastructure/              # Infrastructure setup layer
-│   │   ├── __init__.py
-│   │   ├── database_setup.py        # SQLite initialization
-│   │   ├── environment_setup.py     # Environment configuration
-│   │   ├── file_storage_setup.py    # File storage setup
-│   │   ├── lm_studio_setup.py       # LM Studio integration
-│   │   ├── port_manager.py          # Port conflict detection
-│   │   └── service_lifecycle.py     # Service start/stop management
-│   │   ├── database/                # Database utilities
-│   │   │   ├── __init__.py
-│   │   │   └── sqlite_manager.py    # SQLite operations
-│   │   └── external/                # External service clients
-│   │       ├── __init__.py
-│   │       ├── github_client.py     # GitHub API client
-│   │       └── lm_studio_client.py  # LM Studio API client
-│   ├── models/                      # Domain models layer
-│   │   ├── __init__.py
-│   │   ├── config_service.py        # Configuration service wrapper
-│   │   ├── data_service.py          # Document processing service
-│   │   ├── logging_service.py       # Log management service
-│   │   └── rag_chat_service.py      # RAG-enhanced chat service
-│   └── shared/                      # Shared utilities layer
-│       ├── __init__.py
-│       ├── base_service.py          # Base service class
-│       ├── config_manager.py        # Configuration management (REQUIRED at startup)
-│       ├── constants.py             # Application constants
-│       ├── exceptions.py            # Custom exceptions (MissingConfigError, etc.)
-│       ├── statistics.py            # Statistics tracking
-│       ├── stats_manager.py         # Stats management
-│       ├── types.py                 # Type definitions
-│       └── utils.py                 # Utility functions
-├── tests/                           # Test suite with pytest
+├── main.py                                    # Entry point - validates config.json, calls src.app
+├── pyproject.toml                             # Project dependencies (uv package manager)
+├── data/                                     # Data directory (root location)
+│   ├── chroma_db/                             # ChromaDB vector database
+│   │   └── chroma.sqlite3                     # SQLite vector store
+│   ├── config.json                            # REQUIRED: Main configuration
+│   ├── github/                                # Git repositories for cloning
+│   ├── history/                               # Chat history database
+│   │   └── rag_history.db                     # SQLite file
+│   ├── local/                                 # Local file storage
+│   └── logs/                                  # Application log files
+│       └── app.log                            # Main application log
+├── src/                                      # Source code directory
+│   ├── __init__.py                            # Package init
+│   └── app.py                                 # Main application - SigmaHQApplication class
+├── tests/                                    # Test suite with pytest
 │   ├── __init__.py
-│   ├── conftest.py                  # Test fixtures
-│   ├── run_tests.py                 # Test runner script
-│   ├── test_integration.py          # Integration tests
-│   ├── test_lm_studio_integration.py # LM Studio tests
-│   └── files/                       # Test data files
-├── logs/                            # Application log files
-├── .coveragerc                      # Coverage configuration
-├── .gitignore                       # Git ignore rules
-├── .python-version                 # Python version (uv)
-├── LICENSE                          # MIT license
-├── README.md                        # Project documentation
-└── uv.lock                          # Dependency lock file
-```
-
----
-
-## Quick Reference
-
-| Concept | Location | Purpose |
-|---------|----------|---------|
-| Configuration file | `data/config.json` | All application configuration (REQUIRED) |
-| Application entry | `main.py` | Entry point with config validation |
-| Main application class | `src/application/application.py` | Gradio app orchestration |
-| Config manager | `src/shared/config_manager.py` | Configuration loading/validation |
-| Gradio components | `src/components/*.py` | UI tabs and features |
-| RAG service | `src/core/rag_service.py` | RAG pipeline implementation |
-| LLM service | `src/core/llm_service.py` | LLM interface |
-| Database setup | `src/infrastructure/database_setup.py` | SQLite initialization |
-
----
-
-## Configuration Validation Flow
-
-```
-┌─────────────────────────────────────┐
-│  Application Start (main.py)        │
-└──────────────┬──────────────────────┘
-               ▼
-┌─────────────────────────────────────┐
-│  Validate data/config.json exists   │ ← MISSING → Exit with error
-└──────────────┬──────────────────────┘
-               ▼
-┌─────────────────────────────────────┐
-│  Load and parse JSON                │ ← INVALID → Exit with error
-└──────────────┬──────────────────────┘
-               ▼
-┌─────────────────────────────────────┐
-│  Validate required fields present   │ ← MISSING → Exit with error
-│  • network.ip, port, auto_reload    │
-│  • llm.model, base_url, etc.        │
-│  • repositories[]                   │
-│  • ui_css.theme                     │
-└──────────────┬──────────────────────┘
-               ▼
-┌─────────────────────────────────────┐
-│  Create SigmaHQApplication          │
-└──────────────┬──────────────────────┘
-               ▼
-┌─────────────────────────────────────┐
-│  Launch Gradio Server               │
-└─────────────────────────────────────┘
-```
-
----
-
-## Error Handling Guidelines
-
-### Missing Configuration Error
-When `data/config.json` is missing or invalid:
-```python
-from src.shared.config_manager import MissingConfigError
-
-try:
-    app = SigmaHQApplication(config_path="data/config.json")
-except MissingConfigError as e:
-    print(f"Configuration error: {e}")
-    sys.exit(1)  # Do not start application
-```
-
-### Configuration Access Error
-When accessing a missing config field (should never happen if validation passes):
-```python
-# This raises KeyError - should be caught during development/CI
-port = config["network"]["port"]  # Raises KeyError if 'network' or 'port' missing
-```
-
----
-
-## Testing with Tests
-
-Run the test suite:
-```bash
-uv run pytest tests/
-```
-
-Required test dependencies (install via uv):
-```bash
-uv add pytest pytest-asyncio httpx chromadb
-```
-
----
-
-## Development Workflow
-
-### 1. Start Development Server
-```bash
-uv run python main.py
-```
-
-### 2. Run Linters and Type Checkers
-```bash
-uvx black src/ tests/
-uvx ruff check src/ tests/
-uvx mypy src/
-```
-
-### 3. Run Tests
-```bash
-uv run pytest tests/ -v
-```
-
-### 4. Check Coverage
-```bash
-uv run pytest --cov=src tests/
-```
-
----
-
-## Resources
-
-- **Main Documentation**: See `docs/` directory for user and deployment guides
-- **Configuration Reference**: This document (`docs/TECHNICAL_DOCS/structure.md`)
-- **Code Rules**: See `.clinerules/` directory for coding standards
-- **Configuration Manager**: `src/shared/config_manager.py`
-- **Main Entry Point**: `main.py`
+│   ├── conftest.py                            # Test fixtures
+│   ├── run_tests.py                           # Test runner script
+│   ├── test_integration.py                    # Integration tests
+│   └── files/                                 # Test data files
+├── .coveragerc                               # Coverage configuration
+├── .gitignore                                # Git ignore rules
+├── .python-version                           # Python version (uv)
+├── LICENSE                                   # MIT license
+├── README.md                                 # Project documentation
+└── uv.lock                                   # Dependency lock file

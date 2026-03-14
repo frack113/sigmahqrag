@@ -22,7 +22,7 @@ class RAGService:
     def __init__(self, collection_name: str = "documents", persist_path: str | None = None):
         """Initialize RAG service."""
         self.collection_name = collection_name
-        self.persist_path = Path(persist_path or "data/models/chroma_db")
+        self.persist_path = Path(persist_path or "data/chroma_db")
         self.persist_path.mkdir(parents=True, exist_ok=True)
 
         # Initialize ChromaDB client

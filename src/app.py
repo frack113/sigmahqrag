@@ -84,7 +84,7 @@ class SigmaHQApplication:
         
         rag_service = RAGService(
             collection_name="documents",
-            persist_path="data/models/chroma_db",
+            persist_path="data/chroma_db",
             model=llm_config["model"],
             base_url=llm_config["base_url"],
             temperature=llm_config["temperature"],

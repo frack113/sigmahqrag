@@ -23,8 +23,6 @@ from .constants import (
     ENV_LLM_BASE_URL,
     ENV_LLM_TEMPERATURE,
     ENV_LLM_MAX_TOKENS,
-    ENV_GITHUB_TOKEN,
-    ENV_GITHUB_API_BASE_URL,
     # Service identifiers
     SERVICE_CHAT,
     SERVICE_CONFIG,
@@ -34,7 +32,6 @@ from .constants import (
     SERVICE_FILE_PROCESSOR,
     SERVICE_GITHUB,
     SERVICE_LLM,
-    SERVICE_LM_STUDIO,
     SERVICE_RAG,
     # Status codes (only status values)
     STATUS_HEALTHY,
@@ -48,7 +45,6 @@ from .exceptions import (
     ConfigurationError,
     DatabaseError,
     DataError,
-    EmbeddingError,
     FileError,
     LLMError,
     NetworkError,
@@ -120,8 +116,6 @@ __all__ = [
     "ENV_LLM_BASE_URL",
     "ENV_LLM_TEMPERATURE",
     "ENV_LLM_MAX_TOKENS",
-    "ENV_GITHUB_TOKEN",
-    "ENV_GITHUB_API_BASE_URL",
     # Service identifiers
     "SERVICE_CHAT",
     "SERVICE_CONFIG",
@@ -131,7 +125,6 @@ __all__ = [
     "SERVICE_FILE_PROCESSOR",
     "SERVICE_GITHUB",
     "SERVICE_LLM",
-    "SERVICE_LM_STUDIO",
     "SERVICE_RAG",
     # Status codes
     "STATUS_HEALTHY",

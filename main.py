@@ -20,7 +20,7 @@ os.environ["HF_HUB_DISABLE_TELEMETRY"] = "1"
 
 from pathlib import Path
 from src.shared.config_manager import MissingConfigError
-from src.application.application import create_application, SigmaHQApplication
+from src.app import create_application, SigmaHQApplication
 
 
 # Configure logging to stderr only (not duplicate with Gradio's logs)
