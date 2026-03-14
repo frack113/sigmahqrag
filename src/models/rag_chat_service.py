@@ -10,6 +10,7 @@ Uses native Gradio features:
 import logging
 from collections.abc import Generator
 from pathlib import Path
+from src.shared.constants import DATA_MODELS_PATH
 from typing import Any
 
 from src.core.llm_service import create_llm_service
@@ -71,9 +72,9 @@ class RAGChatService:
             
             self.rag_client = create_local_embedding_service()
             
-            # Create ChromaDB collection directly
+            # Create ChromaDB collection directly using constant
             from chromadb import PersistentClient
-            persist_dir = Path("data/models/chroma_db")
+            persist_dir = DATA_MODELS_PATH / "chroma_db"
             persist_dir.mkdir(parents=True, exist_ok=True)
             
             client = PersistentClient(str(persist_dir))

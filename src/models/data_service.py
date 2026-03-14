@@ -11,95 +11,96 @@ import json
 from pathlib import Path
 from typing import Any
 
+from src.shared.constants import (
+    DATA_CHROMA_PATH,
+    DATA_GITHUB_PATH,
+    TEMP_DIR_PATH,
+)
+
 
 class DataService:
     """
     Data service using simple file operations.
 
     Features:
-    - Repository cloning and indexing
+    - Repository/local path indexing
     - Context management for RAG
     - Simple synchronous methods (Gradio queue=True handles async)
     """
 
     def __init__(self):
-        self.data_dir = Path("data/github")
-        self.temp_dir = Path("temp")
+        import os
+        
+        # Use DATA_* constants directly - they already include "data/" prefix
+        self.github_path = Path(DATA_GITHUB_PATH)
+        self.chroma_db_path = Path(DATA_CHROMA_PATH)
+        self.temp_dir = Path(TEMP_DIR_PATH)
 
         # Ensure directories exist
-        self.data_dir.mkdir(parents=True, exist_ok=True)
+        self.github_path.mkdir(parents=True, exist_ok=True)
+        self.chroma_db_path.mkdir(parents=True, exist_ok=True)
         self.temp_dir.mkdir(parents=True, exist_ok=True)
 
-    def clone_repository(self, repo_url: str, branch: str | None = None) -> bool:
-        """Clone a repository."""
+    def index_repository(self, repo_config: dict[str, Any]) -> bool:
+        """Index a repository or local path.
+        
+        Args:
+            repo_config: Dictionary containing 'url' (path to scan) and 
+                        'file_extensions' list of extensions to index.
+        """
         try:
-            # Clone in temp directory first
-            temp_path = self.temp_dir / Path(repo_url).name
+            url = repo_config.get("url", "")
+            file_extensions = repo_config.get("file_extensions", [])
 
-            # Run git clone with subprocess (simple call, no async needed)
-            cmd = ["git", "clone"]
-            if branch:
-                cmd.extend(["--branch", branch])
-            cmd.extend([repo_url, str(temp_path)])
+            # Determine the path to index
+            if not Path(url).is_absolute():
+                # Convert relative path like 'docs/USER_DOCUMENTATION' to absolute
+                import os
+                base_dir = Path(DATA_GITHUB_PATH)  # Use constant with "data/" prefix
+                url = str(Path(base_dir) / Path(url))
 
-            import subprocess
+            path_to_index = Path(url)
 
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=300,  # 5 minute timeout for clone
-            )
-
-            if result.returncode == 0:
-                # Move to data directory
-                dest_path = self.data_dir / Path(repo_url).name
-
-                if not dest_path.exists():
-                    import shutil
-
-                    shutil.move(str(temp_path), str(dest_path))
-
-                return True
-
-        except Exception as e:
-            print(f"Clone failed: {e}")
-
-        return False
-
-    def clone_enabled_repositories(self, repo_config: dict[str, Any]) -> bool:
-        """Clone all enabled repositories."""
-        repos = repo_config.get("repositories", [])
-
-        for repo in repos:
-            if not repo.get("enabled", True):
-                continue
-
-            url = repo["url"]
-            branch = repo.get("branch", "main")
-
-            success = self.clone_repository(url, branch)
-
-            if not success:
-                print(f"Failed to clone {url}")
+            if not path_to_index.exists():
+                print(f"Path does not exist: {url}")
                 return False
 
-        return True
+            print(f"Indexing repository: {url}")
 
-    def index_repositories(self, file_extensions: list[str] | None = None) -> bool:
-        """Index repository contents for RAG."""
-        try:
-            # Find files to index
+            # Collect files to index based on extensions
             files_to_index = []
 
-            if file_extensions is None:
-                file_extensions = ["py", "js", "ts", "html", "css", "json"]
+            # If no specific extensions, use defaults
+            if not file_extensions:
+                file_extensions = ["py", "md", "yml", "yaml", "json", "toml", "txt", "sh"]
 
             for ext in file_extensions:
-                files_to_index.extend(self.data_dir.glob(f"*/*.{ext}"))
+                # Find files recursively
+                files = list(path_to_index.rglob(f"*.{ext}"))
+                files_to_index.extend(files)
 
-            # Build collection (would use actual embedding here)
-            print(f"Indexing {len(files_to_index)} files...")
+            print(f"Found {len(files_to_index)} files to index")
+
+            # Copy files to github directory for unified indexing
+            import shutil
+            repo_name = Path(url).name if url else "repo"
+            dest_path = self.github_path / repo_name
+            
+            dest_path.mkdir(exist_ok=True)
+
+            for src_file in files_to_index:
+                try:
+                    # Create destination path preserving relative structure
+                    rel_path = src_file.relative_to(path_to_index)
+                    dest_file = dest_path / rel_path
+                    
+                    # Ensure parent directory exists
+                    dest_file.parent.mkdir(parents=True, exist_ok=True)
+                    
+                    # Copy file content
+                    shutil.copy2(str(src_file), str(dest_file))
+                except Exception as e:
+                    print(f"Error copying {src_file}: {e}")
 
             return True
 
@@ -110,28 +111,64 @@ class DataService:
     def index_enabled_repositories(self, repo_config: dict[str, Any]) -> bool:
         """Index all enabled repositories."""
         repos = repo_config.get("repositories", [])
+        indexed_count = 0
 
         for repo in repos:
-            if not repo.get("enabled", True):
+            if not repo.get("enabled", False):
                 continue
 
-            success = self.index_repositories(repo.get("file_extensions"))
+            print(f"Processing repository: {repo['url']}")
 
-            if not success:
-                return False
+            success = self.index_repository(repo)
 
-        return True
+            if success:
+                indexed_count += 1
+
+        print(f"Indexed {indexed_count} repositories")
+        return indexed_count > 0
+
+    def reset_database(self) -> bool:
+        """Reset database by clearing ONLY the ChromaDB vector database (NOT indexed files)."""
+        try:
+            # Clear ChromaDB collection ONLY - indexed files in github_path are preserved
+            try:
+                from chromadb import PersistentClient
+                from chromadb.errors import NotFoundError
+
+                if self.chroma_db_path.exists():
+                    client = PersistentClient(path=str(self.chroma_db_path))
+                    try:
+                        # Delete the collection without removing the database file
+                        client.delete_collection(name="documents")
+                        print("ChromaDB collection 'documents' cleared")
+                        return True
+                    except NotFoundError:
+                        # Collection doesn't exist yet (first run) - nothing to clear
+                        print("ChromaDB collection 'documents' not found - this is expected on first run")
+                        return True
+            except Exception as e:
+                print(f"Could not clear ChromaDB collection: {e}")
+            
+            return False
+        except Exception as e:
+            print(f"Reset failed: {e}")
+            return False
 
     def get_context_stats(self) -> dict[str, Any]:
-        """Get context statistics."""
+        """Get context statistics from indexed files."""
         try:
+            # Use the github_path that was set in __init__ (same path as index_repository uses)
             count = 0
             total_size = 0
+            
+            extensions = {"py", "md", "yml", "yaml", "json", "toml"}
 
-            for ext in ["py", "js", "ts", "html", "css", "json"]:
-                files = list(self.data_dir.glob(f"*/*.{ext}"))
-                count += len(files)
-                total_size += sum(f.stat().st_size for f in files)
+            for repo_dir in self.github_path.iterdir():
+                if repo_dir.is_dir():
+                    for ext in sorted(extensions):
+                        files = list(repo_dir.glob(f"**/*.{ext}"))
+                        count += len(files)
+                        total_size += sum(f.stat().st_size for f in files)
 
             return {
                 "count": count,
@@ -146,19 +183,17 @@ class DataService:
                 "count": 0,
                 "size_mb": 0,
                 "embedding_model": "Unknown",
-                "default_chunk_size": "Unknown",
-                "default_chunk_overlap": "Unknown",
-                "error": str(e),
+                "default_chunk_size": 1000,
+                "default_chunk_overlap": 200,
             }
 
     def get_repo_config(self) -> dict[str, Any]:
-        """Load repository configuration from data/config.json.
-        
-        Returns repositories in format expected by DataManagement component.
-        Reads from the same config file used by GitHubManagement.
-        """
+        """Load repository configuration from data/config.json."""
         try:
-            config_path = Path("data") / "config.json"
+            import os
+            
+            # Get absolute path to data/config.json
+            config_path = Path("data/config.json")
             
             if not config_path.exists():
                 return {"repositories": []}
@@ -184,10 +219,141 @@ class DataService:
             print(f"Error loading repo config: {e}")
             return {"repositories": []}
 
+    def reindex_vector_db(self) -> bool:
+        """Re-index existing files in github_path to update ChromaDB vector database only.
+        
+        This reads the already-indexed files from data/github/ and updates the 
+        ChromaDB collection with their embeddings. Does NOT clone repositories.
+        """
+        try:
+            # Get all files in github_path
+            extensions = {"py", "md", "yml", "yaml", "json", "toml"}
+            file_contents = {}  # Store content: [(relative_path, text), ...]
+            
+            for repo_dir in self.github_path.iterdir():
+                if repo_dir.is_dir():
+                    for ext in extensions:
+                        files = list(repo_dir.rglob(f"*.{ext}"))
+                        for file_path in files:
+                            try:
+                                relative_path = str(file_path.relative_to(self.github_path))
+                                text = file_path.read_text(encoding="utf-8", errors="ignore")
+                                if text.strip():  # Only store non-empty files
+                                    file_contents[(repo_dir.name, relative_path)] = text
+                            except Exception as e:
+                                print(f"Error reading {file_path}: {e}")
+            
+            if not file_contents:
+                print("No content found to index in github_path")
+                return False
+            
+            # Get all texts to process
+            texts_list = []
+            for (repo_name, relative_path), text in sorted(file_contents.items()):
+                chunks = self._chunk_text(text, 1000, 200)
+                for chunk in chunks:
+                    if chunk.strip():
+                        texts_list.append(chunk)
+            
+            print(f"Processing {len(texts_list)} chunks from {len(file_contents)} files...")
+            
+            # Load embedding model using sentence-transformers from HuggingFace repo
+            try:
+                import numpy as np
+                
+                from sentence_transformers import SentenceTransformer
+                
+                # Use HuggingFace repo ID - sentence-transformers will cache locally
+                model_id = "sentence-transformers/all-MiniLM-L6-v2"
+                
+                embedding_model = SentenceTransformer(model_id)
+                print(f"Loaded embedding model: {model_id}")
+            except Exception as e:
+                print(f"Error loading model from HuggingFace: {e}")
+                return False
+            
+            # Generate all embeddings at once (more efficient)
+            print("Generating embeddings...")
+            embeddings = embedding_model.encode(texts_list, convert_to_numpy=True, normalize_embeddings=True)
+            
+            # Set up ChromaDB client and collection
+            try:
+                from chromadb import PersistentClient
+                
+                client = PersistentClient(path=str(self.chroma_db_path))
+                
+                # Clear existing collection
+                if client.list_collections():
+                    client.delete_collection(name="documents")
+                    print("Deleted existing collection 'documents'")
+                
+                # Create new collection  
+                embedding_service_collection = client.get_or_create_collection(
+                    name="documents",
+                    metadata={"hnsw:space": "cosine"}
+                )
+            except Exception as e:
+                print(f"Error managing ChromaDB collection: {e}")
+                return False
+            
+            # Prepare data for insertion
+            ids = []
+            metadatas = []
+            
+            index = 0
+            for (repo_name, relative_path), text in sorted(file_contents.items()):
+                chunks = self._chunk_text(text, 1000, 200)
+                for chunk in chunks:
+                    if not chunk.strip():
+                        continue
+                    
+                    chunk_id = f"{repo_name}_{relative_path}_chunk_{index}"
+                    
+                    ids.append(chunk_id)
+                    metadatas.append({
+                        "repository": repo_name,
+                        "path": relative_path,
+                        "index": index,
+                    })
+                    index += 1
+            
+            # Add to ChromaDB collection
+            if ids:
+                print(f"Adding {len(ids)} chunks to vector DB...")
+                embedding_service_collection.add(
+                    ids=ids,
+                    embeddings=embeddings.tolist(),
+                    documents=texts_list,
+                    metadatas=metadatas,
+                )
+                print(f"Successfully indexed {len(ids)} chunks")
+            
+            return True
+            
+        except Exception as e:
+            print(f"Reindex error: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+    
+    def _chunk_text(self, text: str, chunk_size: int = 1000, overlap: int = 200) -> list[str]:
+        """Split text into overlapping chunks."""
+        if len(text) <= chunk_size:
+            return [text]
+        
+        chunks = []
+        start = 0
+        
+        while start < len(text):
+            end = start + chunk_size
+            chunks.append(text[start:end])
+            start = end - overlap if end < len(text) else len(text)
+        
+        return chunks
+    
     def clear_context(self) -> bool:
         """Clear the RAG context."""
         try:
-            # Just track that context was cleared - files remain intact
             return True
         except Exception as e:
             print(f"Clear context failed: {e}")

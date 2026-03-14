@@ -10,19 +10,23 @@ import sqlite3
 from pathlib import Path
 from typing import Any
 
+from src.shared.constants import DATA_LOCAL_PATH
+
 logger = logging.getLogger(__name__)
 
 
 class DatabaseSetup:
     """Database setup and initialization utilities."""
 
-    def __init__(self, db_path: str = "data/local/sigmahq.db"):
+    def __init__(self, db_path: str | Path | None = None):
         """
         Initialize database setup.
 
         Args:
-            db_path: Path to the SQLite database file
+            db_path: Path to the SQLite database file (defaults to data/local/sigmahq.db)
         """
+        if db_path is None:
+            db_path = DATA_LOCAL_PATH / "sigmahq.db"
         self.db_path = Path(db_path)
         self.db_dir = self.db_path.parent
         self.logger = logging.getLogger(__name__)

@@ -13,6 +13,7 @@ from pathlib import Path
 
 import gradio as gr
 from src.models.config_service import ConfigService
+from src.shared.constants import DATA_GITHUB_PATH, TEMP_DIR_PATH
 
 logger = logging.getLogger(__name__)
 
@@ -126,7 +127,7 @@ class FileManagement:
     def _list_directory_wrapper(self) -> str:
         """List directory contents."""
         try:
-            target_dir = Path("./data/github")
+            target_dir = Path(DATA_GITHUB_PATH)
 
             if not target_dir.exists():
                 return (
@@ -157,7 +158,7 @@ class FileManagement:
         """Download a file."""
         # Gradio handles file download natively via UI
         try:
-            files = list(Path("data/github").rglob("*"))
+            files = list(Path(DATA_GITHUB_PATH).rglob("*"))
 
             if not files:
                 return "No files to download", ""
@@ -183,8 +184,8 @@ class FileManagement:
             uploads_dir = Path("uploads")
             uploads_dir.mkdir(exist_ok=True)
 
-            with open(filepath, "w", encoding="utf-8") as f:
-                f.write(f"# New File\nCreated: {datetime.now().isoformat()}\n")
+            # Use temp directory for new files
+            filepath = Path(TEMP_DIR_PATH) / f"template_{timestamp}.txt"
 
             return (
                 f"✅ Created file: {filepath.name}",

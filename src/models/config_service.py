@@ -10,6 +10,11 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from src.shared.constants import (
+    DATA_CHROMA_PATH,
+    DATA_GITHUB_PATH,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -151,10 +156,24 @@ class ConfigService:
                         url = repo["url"]
                         branch = repo.get("branch", "main").replace(" ", "_")
                         
-                        # Check if already cloned (skip existing)
-                        clone_dir = f"data/github/{repo.get('name', 'unknown')}"
-                        import os
-                        if os.path.exists(clone_dir):
+                        # Extract repo name from URL (without .git suffix)
+                        import urllib.parse
+                        parsed_url = urllib.parse.urlparse(url)
+                        path_parts = Path(parsed_url.path.lstrip('/')).parts
+                        if path_parts and path_parts[-1]:
+                            repo_name = path_parts[-1]
+                        else:
+                            repo_name = "unknown"
+                        
+                        # Remove .git suffix if present
+                        if repo_name.endswith(".git"):
+                            repo_name = repo_name[:-4]
+                        
+                        clone_dir = Path(DATA_GITHUB_PATH) / repo_name
+                        
+                        # Check if already cloned (case-insensitive check for Windows)
+                        if clone_dir.exists() or (clone_dir.parent.exists() and 
+                                                   any(clone_dir.name.lower() in f.name.lower() for f in clone_dir.parent.iterdir())):
                             logger.info(f"Skipping already cloned repo: {url}")
                             continue
                         
@@ -166,7 +185,7 @@ class ConfigService:
                         )
                         
                         if result.returncode == 0:
-                            logger.info(f"Successfully cloned: {url}")
+                            logger.info(f"Successfully cloned: {url} -> {clone_dir}")
                             cloned_count += 1
                         else:
                             failed_repos.append({

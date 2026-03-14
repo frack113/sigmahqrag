@@ -269,6 +269,15 @@ DEFAULT_DB_MAX_CONNECTIONS = 10
 DEFAULT_DB_PATH = "data/history/chat_history.db"
 DEFAULT_DB_TIMEOUT = 5
 
+# === Data Directory Paths ===
+DATA_GITHUB_PATH = "data/github"
+DATA_CHROMA_PATH = "data/chroma_db"
+DATA_HISTORY_PATH = "data/history"
+DATA_LOCAL_PATH = "data/local"
+DATA_LOGS_PATH = "data/logs"
+DATA_MODELS_PATH = "data/models"
+TEMP_DIR_PATH = "temp"
+
 # === Application Cache Keys ===
 CACHE_KEY_EMBEDDINGS = "embeddings"
 CACHE_KEY_RAG_RESULTS = "rag_results"

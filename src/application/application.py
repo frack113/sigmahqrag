@@ -12,6 +12,7 @@ from typing import Any
 import gradio as gr
 
 from src.shared.config_manager import create_config_manager
+from src.shared.constants import DATA_CHROMA_PATH
 from src.shared.css import get_css
 from src.core.rag_service import RAGService
 from src.models.data_service import DataService
@@ -50,7 +51,7 @@ class SigmaHQApplication:
 
         self.rag_chat_service = RAGService(
             collection_name="documents",
-            persist_path="data/chroma_db",
+            persist_path=DATA_CHROMA_PATH,
         )
 
         self.data_service = DataService()

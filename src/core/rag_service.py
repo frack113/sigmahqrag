@@ -15,6 +15,8 @@ from pathlib import Path
 import asyncio
 import chromadb
 
+from src.shared.constants import DATA_CHROMA_PATH
+
 
 class RAGService:
     """High-performance RAG service with direct ChromaDB integration."""
@@ -22,7 +24,7 @@ class RAGService:
     def __init__(self, collection_name: str = "documents", persist_path: str | None = None):
         """Initialize RAG service."""
         self.collection_name = collection_name
-        self.persist_path = Path(persist_path or "data/chroma_db")
+        self.persist_path = Path(persist_path or DATA_CHROMA_PATH)
         self.persist_path.mkdir(parents=True, exist_ok=True)
 
         # Initialize ChromaDB client

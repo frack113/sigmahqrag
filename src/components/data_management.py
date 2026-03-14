@@ -11,6 +11,7 @@ import logging
 from typing import Any
 
 import gradio as gr
+from pathlib import Path
 from src.models.config_service import ConfigService
 from src.models.data_service import DataService
 
@@ -50,9 +51,10 @@ class DataManagement:
             # Buttons row with native styling
             with gr.Row():
                 self.update_btn = gr.Button("Update Database", variant="primary")
-                self.refresh_btn = gr.Button("Refresh Stats")
-                self.clear_btn = gr.Button("Clear Context")
+                self.refresh_btn = gr.Button("Refresh Statistics")
+                self.reset_btn = gr.Button("Reset Database")
 
+            # Set up event handlers
             self._setup_event_handlers(column)
 
     def _setup_event_handlers(self, column: gr.Column):
@@ -74,64 +76,37 @@ class DataManagement:
             queue=True,
         )
 
-        # Clear context button
-        self.clear_btn.click(
-            fn=self._clear_context_wrapper,
+        # Reset database button - clears ONLY ChromaDB vector DB (indexed files are preserved)
+        self.reset_btn.click(
+            fn=self._reset_database_wrapper,
             inputs=[],
             outputs=[self.progress_text, self.stats_display],
             queue=True,
         )
 
     def _update_database_wrapper(self) -> tuple[str, Any]:
-        """Update the knowledge base with progress tracking."""
+        """Re-index existing files to update the vector database only."""
         if self.is_updating:
             return "Update already in progress", {}
 
         self.is_updating = True
         try:
-            # Step 1: Load configuration
-            yield "Loading configuration...", {}
+            yield "Updating vector database...", {}
 
-            repo_config = self.data_service.get_repo_config()
+            # Re-index existing files from github_path to ChromaDB (vector DB only)
+            reindex_result = self.data_service.reindex_vector_db()
 
-            if not repo_config["repositories"]:
-                yield "No repositories configured", {}
-                return
-
-            enabled_repos = [
-                repo for repo in repo_config["repositories"] if repo["enabled"]
-            ]
-
-            if not enabled_repos:
-                yield "No enabled repositories found", {}
-                return
-
-            # Step 2: Clone repositories
-            yield f"Updating {len(enabled_repos)} repositories...", {}
-
-            clone_result = self.data_service.clone_enabled_repositories(repo_config)
-
-            if not clone_result:
-                yield "Failed to update repositories", {}
-                return
-
-            # Step 3: Index repositories
-            yield "Indexing repository content...", {}
-
-            index_result = self.data_service.index_enabled_repositories(repo_config)
-
-            if index_result:
+            if reindex_result:
                 updated_stats = self.data_service.get_context_stats()
                 self.stats_cache = updated_stats
 
                 success_msg = (
-                    f"✅ Knowledge base updated! "
-                    f"Indexed {updated_stats.get('count', 0)} documents from "
-                    f"{len(enabled_repos)} repositories."
+                    f"✅ Vector database updated! "
+                    f"Re-indexed {updated_stats.get('count', 0)} documents."
                 )
                 yield success_msg, updated_stats
             else:
-                yield "No repositories were indexed", {}
+                yield "Failed to update vector database", {}
 
         except Exception as e:
             logger.error(f"Update error: {e}")
@@ -149,21 +124,34 @@ class DataManagement:
             logger.error(f"Refresh error: {e}")
             yield f"Error: {str(e)}", {}
 
-    def _clear_context_wrapper(self) -> tuple[str, Any]:
-        """Clear the RAG context."""
+    def _reset_database_wrapper(self) -> tuple[str, Any]:
+        """Reset the database - clears ONLY ChromaDB collection (indexed files are preserved)."""
         try:
-            success = self.data_service.clear_context()
+            yield "Clearing vector database...", {}
 
-            if success:
-                updated_stats = self.data_service.get_context_stats()
-                self.stats_cache = updated_stats
-                yield "Context cleared!", updated_stats
+            # Clear only ChromaDB vector DB (indexed files in DATA_GITHUB_PATH are preserved)
+            reset_result = self.data_service.reset_database()
+
+            if not reset_result:
+                yield "Failed to clear the database", {}
+                return
+
+            logger.info("ChromaDB collection 'documents' cleared")
+            yield "Database cleared (vector DB only. Run 'Update Database' to re-index)...", {}
+            # Update statistics after clearing - should be 0 now
+            updated_stats = self.data_service.get_context_stats()
+            self.stats_cache = updated_stats
+
+            # Statistics should remain unchanged since indexed files are NOT cleared
+            stats_count = updated_stats.get("count", 0)
+            if stats_count > 0:
+                yield f"Vector DB cleared. {stats_count} indexed files preserved. Run 'Update Database' to re-index.", updated_stats
             else:
-                yield "Failed to clear context", {}
+                yield "Database cleared (vector DB only). Statistics refreshed.", updated_stats
         except Exception as e:
-            logger.error(f"Clear error: {e}")
+            logger.error(f"Reset error: {e}")
             yield f"Error: {str(e)}", {}
-
+    
     def cleanup(self):
         """Clean up resources."""
         self.is_updating = False
