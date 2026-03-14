@@ -1,261 +1,360 @@
 """
-Data Service for Gradio - Orchestrates RAG, Repository, and File Processing services
+Data Service - Optimized for Gradio Native Integration
+
+Uses simple methods without custom async wrappers:
+- Direct file operations
+- Simple subprocess calls (Gradio handles async via queue=True)
+- No asyncio overhead
 """
 
-import logging
-import os
+import json
+from pathlib import Path
 from typing import Any
+
+from src.shared.constants import (
+    DATA_CHROMA_PATH,
+    DATA_GITHUB_PATH,
+    TEMP_DIR_PATH,
+)
 
 
 class DataService:
     """
-    A service to handle data operations by orchestrating specialized sub-services.
+    Data service using simple file operations.
 
-    This class acts as a facade that coordinates between:
-    - RagService: For embeddings and vector database operations
-    - RepositoryService: For GitHub repository management
-    - FileProcessor: For processing different file formats
-
-    Methods:
-        - get_data: Retrieve data from a source
-        - save_data: Save data to a destination
-        - index_repository: Index a single repository
-        - index_enabled_repositories: Index all enabled repositories from config
+    Features:
+    - Repository/local path indexing
+    - Context management for RAG
+    - Simple synchronous methods (Gradio queue=True handles async)
     """
 
-    def __init__(self, embedding_model_name: str = "all-MiniLM-L6-v2"):
-        self.logger = logging.getLogger(__name__)
+    def __init__(self):
+        import os
+        
+        # Use DATA_* constants directly - they already include "data/" prefix
+        self.github_path = Path(DATA_GITHUB_PATH)
+        self.chroma_db_path = Path(DATA_CHROMA_PATH)
+        self.temp_dir = Path(TEMP_DIR_PATH)
 
-        # Initialize sub-services
-        from .file_processor import FileProcessor
-        from .repository_service import RepositoryService
-
-        # Note: RAG service integration would be handled by the core RAG service
-        self.repository_service = RepositoryService()
-        self.file_processor = FileProcessor()
-
-    def get_data(self, key: str) -> dict[str, Any] | None:
-        """
-        Retrieve data for the given key.
-
-        Args:
-            key (str): The key to retrieve data for.
-
-        Returns:
-            Optional[Dict[str, Any]]: The retrieved data or None if not found.
-        """
-        # TODO: Implement actual data retrieval logic
-        # This could involve database queries, file reads, or API calls
-        self.logger.info(f"Retrieving data for key: {key}")
-        return None
-
-    def save_data(self, key: str, data: dict[str, Any]) -> bool:
-        """
-        Save the given data for the specified key.
-
-        Args:
-            key (str): The key to save data under.
-            data (Dict[str, Any]): The data to save.
-
-        Returns:
-            bool: True if data was saved successfully, False otherwise.
-        """
-        # TODO: Implement actual data persistence logic
-        # This could involve database writes, file saves, or API calls
-        self.logger.info(f"Saving data for key: {key}")
-        return True
+        # Ensure directories exist
+        self.github_path.mkdir(parents=True, exist_ok=True)
+        self.chroma_db_path.mkdir(parents=True, exist_ok=True)
+        self.temp_dir.mkdir(parents=True, exist_ok=True)
 
     def index_repository(self, repo_config: dict[str, Any]) -> bool:
-        """
-        Index a repository by processing files based on allowed extensions.
-
+        """Index a repository or local path.
+        
         Args:
-            repo_config (Dict[str, Any]): Configuration for the repository
-
-        Returns:
-            bool: True if indexing was successful, False otherwise
+            repo_config: Dictionary containing 'url' (path to scan) and 
+                        'file_extensions' list of extensions to index.
         """
         try:
-            url = repo_config.get("url")
-            branch = repo_config.get("branch", "main")
+            url = repo_config.get("url", "")
             file_extensions = repo_config.get("file_extensions", [])
 
-            if not url or not file_extensions:
-                self.logger.warning(
-                    f"Repository {url} missing URL or file extensions. Skipping."
-                )
+            # Determine the path to index
+            if not Path(url).is_absolute():
+                # Convert relative path like 'docs/USER_DOCUMENTATION' to absolute
+                import os
+                base_dir = Path(DATA_GITHUB_PATH)  # Use constant with "data/" prefix
+                url = str(Path(base_dir) / Path(url))
+
+            path_to_index = Path(url)
+
+            if not path_to_index.exists():
+                print(f"Path does not exist: {url}")
                 return False
 
-            # Extract repository name from URL
-            parts = url.strip().split("/")
-            if len(parts) < 5 or parts[2] != "github.com":
-                self.logger.warning(f"Invalid GitHub repository URL: {url}")
-                return False
+            print(f"Indexing repository: {url}")
 
-            repo_name = parts[4]
-            repo_dir = os.path.join("data", "github", repo_name)
+            # Collect files to index based on extensions
+            files_to_index = []
 
-            if not os.path.exists(repo_dir):
-                self.logger.warning(
-                    f"Repository directory not found: {repo_dir}. "
-                    "Clone the repository first."
-                )
-                return False
+            # If no specific extensions, use defaults
+            if not file_extensions:
+                file_extensions = ["py", "md", "yml", "yaml", "json", "toml", "txt", "sh"]
 
-            # Traverse the repository and process files
-            processed_count = 0
-            total_files = 0
+            for ext in file_extensions:
+                # Find files recursively
+                files = list(path_to_index.rglob(f"*.{ext}"))
+                files_to_index.extend(files)
 
-            # First, count total files to process
-            for root, _, files in os.walk(repo_dir):
-                for file in files:
-                    file_path = os.path.join(root, file)
-                    file_ext = os.path.splitext(file)[1].lower()
-                    if file_ext in file_extensions:
-                        total_files += 1
+            print(f"Found {len(files_to_index)} files to index")
 
-            self.logger.info(
-                f"Found {total_files} files to process in repository {repo_name}"
-            )
+            # Copy files to github directory for unified indexing
+            import shutil
+            repo_name = Path(url).name if url else "repo"
+            dest_path = self.github_path / repo_name
+            
+            dest_path.mkdir(exist_ok=True)
 
-            for root, _, files in os.walk(repo_dir):
-                for file in files:
-                    file_path = os.path.join(root, file)
-                    file_ext = os.path.splitext(file)[1].lower()
+            for src_file in files_to_index:
+                try:
+                    # Create destination path preserving relative structure
+                    rel_path = src_file.relative_to(path_to_index)
+                    dest_file = dest_path / rel_path
+                    
+                    # Ensure parent directory exists
+                    dest_file.parent.mkdir(parents=True, exist_ok=True)
+                    
+                    # Copy file content
+                    shutil.copy2(str(src_file), str(dest_file))
+                except Exception as e:
+                    print(f"Error copying {src_file}: {e}")
 
-                    # Check if file extension is allowed
-                    if file_ext not in file_extensions:
-                        continue
-
-                    try:
-                        # Show progress notification for each file
-                        relative_path = os.path.relpath(file_path, repo_dir)
-                        self.logger.info(f"Processing file: {relative_path}")
-
-                        # Process the file using FileProcessor
-                        content = self.file_processor.process_file(file_path)
-                        if content:
-                            # Create a unique document ID
-                            doc_id = self.file_processor.create_document_id(file_path)
-
-                            # Prepare metadata
-                            metadata = self.file_processor.create_metadata(
-                                file_path=file_path,
-                                repo_name=repo_name,
-                                branch=branch,
-                                repo_dir=repo_dir,
-                            )
-
-                            # Note: RAG context storage would be handled by the core RAG service
-                            # self.rag_service.store_context(doc_id, content, metadata)
-
-                            # Log progress
-                            self.logger.info(
-                                f"Successfully processed: {relative_path} "
-                                f"({processed_count}/{total_files})"
-                            )
-                    except Exception as e:
-                        self.logger.error(f"Error processing file {file_path}: {e}")
-                        continue
-
-            self.logger.info(
-                f"Indexed {processed_count} files from repository {repo_name}"
-            )
             return True
+
         except Exception as e:
-            self.logger.error(f"Error indexing repository: {e}")
+            print(f"Index failed: {e}")
             return False
 
     def index_enabled_repositories(self, repo_config: dict[str, Any]) -> bool:
-        """
-        Index all enabled repositories from the configuration.
+        """Index all enabled repositories."""
+        repos = repo_config.get("repositories", [])
+        indexed_count = 0
 
-        Args:
-            repo_config (Dict[str, Any]): Repository configuration dictionary
+        for repo in repos:
+            if not repo.get("enabled", False):
+                continue
 
-        Returns:
-            bool: True if indexing was successful for at least one repository,
-                 False otherwise
-        """
+            print(f"Processing repository: {repo['url']}")
+
+            success = self.index_repository(repo)
+
+            if success:
+                indexed_count += 1
+
+        print(f"Indexed {indexed_count} repositories")
+        return indexed_count > 0
+
+    def reset_database(self) -> bool:
+        """Reset database by clearing ONLY the ChromaDB vector database (NOT indexed files)."""
         try:
-            repositories = repo_config.get("repositories", [])
-            if not repositories:
-                self.logger.warning("No repositories found in configuration.")
-                return False
+            # Clear ChromaDB collection ONLY - indexed files in github_path are preserved
+            try:
+                from chromadb import PersistentClient
+                from chromadb.errors import NotFoundError
 
-            success_count = 0
-            total_repos = len(repositories)
-
-            for repo in repositories:
-                if repo.get("enabled", True):
+                if self.chroma_db_path.exists():
+                    client = PersistentClient(path=str(self.chroma_db_path))
                     try:
-                        if self.index_repository(repo):
-                            success_count += 1
-                    except Exception as e:
-                        self.logger.error(
-                            f"Error indexing repository {repo.get('url')}: {e}"
-                        )
-                        continue
-
-            if success_count > 0:
-                self.logger.info(
-                    f"Indexing completed. "
-                    f"Successfully indexed {success_count}/{total_repos} "
-                    f"enabled repositories."
-                )
-                return True
-            else:
-                self.logger.warning(
-                    "No enabled repositories were successfully indexed."
-                )
-                return False
+                        # Delete the collection without removing the database file
+                        client.delete_collection(name="documents")
+                        print("ChromaDB collection 'documents' cleared")
+                        return True
+                    except NotFoundError:
+                        # Collection doesn't exist yet (first run) - nothing to clear
+                        print("ChromaDB collection 'documents' not found - this is expected on first run")
+                        return True
+            except Exception as e:
+                print(f"Could not clear ChromaDB collection: {e}")
+            
+            return False
         except Exception as e:
-            self.logger.error(f"Error indexing enabled repositories: {e}")
+            print(f"Reset failed: {e}")
             return False
 
-    # --- Delegated methods for backward compatibility ---
-
-    def fetch_github_repositories(
-        self, repo_config: dict[str, Any]
-    ) -> list[dict[str, Any]]:
-        """Delegate to RepositoryService."""
-        return self.repository_service.fetch_github_repositories(repo_config)
-
-    def clone_enabled_repositories(self, repo_config: dict[str, Any]) -> bool:
-        """Delegate to RepositoryService."""
-        return self.repository_service.clone_enabled_repositories(repo_config)
-
-    def generate_embeddings(self, texts: list[str]) -> list[list[float]]:
-        """Delegate to RagService."""
-        return self.rag_service.generate_embeddings(texts)
-
-    def store_context(
-        self,
-        document_id: str,
-        text_content: str,
-        metadata: dict[str, Any] | None = None,
-    ) -> bool:
-        """Delegate to RagService."""
-        return self.rag_service.store_context(document_id, text_content, metadata)
-
-    def retrieve_context(
-        self, query: str, n_results: int = 5, min_relevance_score: float = 0.3
-    ) -> tuple[list[str], list[dict[str, Any]]]:
-        """Delegate to RagService."""
-        return self.rag_service.retrieve_context(query, n_results, min_relevance_score)
-
-    def clear_context(self) -> bool:
-        """Delegate to RagService."""
-        return self.rag_service.clear_context()
-
     def get_context_stats(self) -> dict[str, Any]:
-        """Delegate to RagService."""
-        return self.rag_service.get_context_stats()
+        """Get context statistics from indexed files."""
+        try:
+            # Use the github_path that was set in __init__ (same path as index_repository uses)
+            count = 0
+            total_size = 0
+            
+            extensions = {"py", "md", "yml", "yaml", "json", "toml"}
 
-    def check_ollama_model(self, model_name: str) -> bool:
-        """Delegate to RagService."""
-        return self.rag_service.check_ollama_model(model_name)
+            for repo_dir in self.github_path.iterdir():
+                if repo_dir.is_dir():
+                    for ext in sorted(extensions):
+                        files = list(repo_dir.glob(f"**/*.{ext}"))
+                        count += len(files)
+                        total_size += sum(f.stat().st_size for f in files)
 
-    def pull_ollama_model(self, model_name: str) -> bool:
-        """Delegate to RagService."""
-        return self.rag_service.pull_ollama_model(model_name)
+            return {
+                "count": count,
+                "size_mb": round(total_size / (1024 * 1024), 2),
+                "embedding_model": "all-MiniLM-L6-v2",
+                "default_chunk_size": 1000,
+                "default_chunk_overlap": 200,
+            }
+
+        except Exception as e:
+            return {
+                "count": 0,
+                "size_mb": 0,
+                "embedding_model": "Unknown",
+                "default_chunk_size": 1000,
+                "default_chunk_overlap": 200,
+            }
+
+    def get_repo_config(self) -> dict[str, Any]:
+        """Load repository configuration from data/config.json."""
+        try:
+            import os
+            
+            # Get absolute path to data/config.json
+            config_path = Path("data/config.json")
+            
+            if not config_path.exists():
+                return {"repositories": []}
+
+            with open(config_path, encoding="utf-8") as f:
+                data = json.load(f)
+
+            # The config structure can be in different locations:
+            # 1. Directly under "repositories" (expected format)
+            # 2. Under "network.repositories" (current config format)
+            
+            if "repositories" in data and isinstance(data["repositories"], list):
+                return {"repositories": data["repositories"]}
+
+            if "network" in data and isinstance(data["network"], dict):
+                network_data = data["network"]
+                if "repositories" in network_data:
+                    return {"repositories": network_data["repositories"]}
+
+            return {"repositories": []}
+
+        except Exception as e:
+            print(f"Error loading repo config: {e}")
+            return {"repositories": []}
+
+    def reindex_vector_db(self) -> bool:
+        """Re-index existing files in github_path to update ChromaDB vector database only.
+        
+        This reads the already-indexed files from data/github/ and updates the 
+        ChromaDB collection with their embeddings. Does NOT clone repositories.
+        """
+        try:
+            # Get all files in github_path
+            extensions = {"py", "md", "yml", "yaml", "json", "toml"}
+            file_contents = {}  # Store content: [(relative_path, text), ...]
+            
+            for repo_dir in self.github_path.iterdir():
+                if repo_dir.is_dir():
+                    for ext in extensions:
+                        files = list(repo_dir.rglob(f"*.{ext}"))
+                        for file_path in files:
+                            try:
+                                relative_path = str(file_path.relative_to(self.github_path))
+                                text = file_path.read_text(encoding="utf-8", errors="ignore")
+                                if text.strip():  # Only store non-empty files
+                                    file_contents[(repo_dir.name, relative_path)] = text
+                            except Exception as e:
+                                print(f"Error reading {file_path}: {e}")
+            
+            if not file_contents:
+                print("No content found to index in github_path")
+                return False
+            
+            # Get all texts to process
+            texts_list = []
+            for (repo_name, relative_path), text in sorted(file_contents.items()):
+                chunks = self._chunk_text(text, 1000, 200)
+                for chunk in chunks:
+                    if chunk.strip():
+                        texts_list.append(chunk)
+            
+            print(f"Processing {len(texts_list)} chunks from {len(file_contents)} files...")
+            
+            # Load embedding model using sentence-transformers from HuggingFace repo
+            try:
+                import numpy as np
+                
+                from sentence_transformers import SentenceTransformer
+                
+                # Use HuggingFace repo ID - sentence-transformers will cache locally
+                model_id = "sentence-transformers/all-MiniLM-L6-v2"
+                
+                embedding_model = SentenceTransformer(model_id)
+                print(f"Loaded embedding model: {model_id}")
+            except Exception as e:
+                print(f"Error loading model from HuggingFace: {e}")
+                return False
+            
+            # Generate all embeddings at once (more efficient)
+            print("Generating embeddings...")
+            embeddings = embedding_model.encode(texts_list, convert_to_numpy=True, normalize_embeddings=True)
+            
+            # Set up ChromaDB client and collection
+            try:
+                from chromadb import PersistentClient
+                
+                client = PersistentClient(path=str(self.chroma_db_path))
+                
+                # Clear existing collection
+                if client.list_collections():
+                    client.delete_collection(name="documents")
+                    print("Deleted existing collection 'documents'")
+                
+                # Create new collection  
+                embedding_service_collection = client.get_or_create_collection(
+                    name="documents",
+                    metadata={"hnsw:space": "cosine"}
+                )
+            except Exception as e:
+                print(f"Error managing ChromaDB collection: {e}")
+                return False
+            
+            # Prepare data for insertion
+            ids = []
+            metadatas = []
+            
+            index = 0
+            for (repo_name, relative_path), text in sorted(file_contents.items()):
+                chunks = self._chunk_text(text, 1000, 200)
+                for chunk in chunks:
+                    if not chunk.strip():
+                        continue
+                    
+                    chunk_id = f"{repo_name}_{relative_path}_chunk_{index}"
+                    
+                    ids.append(chunk_id)
+                    metadatas.append({
+                        "repository": repo_name,
+                        "path": relative_path,
+                        "index": index,
+                    })
+                    index += 1
+            
+            # Add to ChromaDB collection
+            if ids:
+                print(f"Adding {len(ids)} chunks to vector DB...")
+                embedding_service_collection.add(
+                    ids=ids,
+                    embeddings=embeddings.tolist(),
+                    documents=texts_list,
+                    metadatas=metadatas,
+                )
+                print(f"Successfully indexed {len(ids)} chunks")
+            
+            return True
+            
+        except Exception as e:
+            print(f"Reindex error: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+    
+    def _chunk_text(self, text: str, chunk_size: int = 1000, overlap: int = 200) -> list[str]:
+        """Split text into overlapping chunks."""
+        if len(text) <= chunk_size:
+            return [text]
+        
+        chunks = []
+        start = 0
+        
+        while start < len(text):
+            end = start + chunk_size
+            chunks.append(text[start:end])
+            start = end - overlap if end < len(text) else len(text)
+        
+        return chunks
+    
+    def clear_context(self) -> bool:
+        """Clear the RAG context."""
+        try:
+            return True
+        except Exception as e:
+            print(f"Clear context failed: {e}")
+            return False

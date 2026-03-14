@@ -1,570 +1,216 @@
 """
-Configuration Service
+Configuration Service - Simplified for Gradio Native Integration
 
-Centralized configuration management for the SigmaHQ RAG application.
-Handles loading, saving, and updating configuration from a single source of truth.
+Uses data/config.json as the single source of truth.
+No fallbacks or DEFAULT_* values - all settings come from config.json.
+Requires data/config.json to exist at startup.
 """
 
-import asyncio
-import json
 import logging
-import os
-import time
-from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+from src.shared.constants import (
+    DATA_CHROMA_PATH,
+    DATA_GITHUB_PATH,
+)
 
 logger = logging.getLogger(__name__)
 
 
-@dataclass
 class RepositoryConfig:
-    """Configuration for a single repository."""
+    """Repository configuration data class."""
 
-    url: str
-    branch: str
-    enabled: bool
-    file_extensions: list[str]
-
-
-@dataclass
-class LLMConfig:
-    """Configuration for LLM settings."""
-
-    model: str
-    temperature: float
-    max_tokens: int
-    base_url: str
-
-
-@dataclass
-class AppConfig:
-    """Complete application configuration."""
-
-    repositories: list[RepositoryConfig]
-    llm: LLMConfig
-    rag: dict[str, Any]
-    performance: dict[str, Any]
-
-
-class ConfigService:
-    """
-    Service for managing application configuration.
-
-    Features:
-        - Async configuration loading and saving
-        - Configuration validation and defaults
-        - Environment variable overrides
-        - Configuration caching for performance
-        - Thread-safe operations
-    """
-
-    def __init__(self, config_path: str = "data/config.json"):
-        """
-        Initialize the configuration service.
-
-        Args:
-            config_path: Path to the configuration file
-        """
-        self.config_path = Path(config_path)
-        self.repositories: list[RepositoryConfig] = []
-        self.llm_config: LLMConfig | None = None
-        self.app_config: AppConfig | None = None
-        self.executor = ThreadPoolExecutor(max_workers=2)
-
-        # Configuration cache
-        self._config_cache: dict[str, Any] | None = None
-        self._cache_timestamp: float = 0
-        self._cache_ttl: int = 30  # 30 seconds cache
-
-        # Load configuration
-        self._load_config()
-
-    def _load_config(self) -> None:
-        """Load configuration from file."""
-        if not self.config_path.exists():
-            # Create default config if it doesn't exist
-            self._create_default_config()
-            return
-
-        try:
-            with open(self.config_path, encoding="utf-8") as f:
-                config_data = json.load(f)
-
-            # Load repositories
-            if "repositories" in config_data:
-                self.repositories = [
-                    RepositoryConfig(
-                        url=repo["url"],
-                        branch=repo["branch"],
-                        enabled=repo.get("enabled", True),
-                        file_extensions=repo.get("file_extensions", []),
-                    )
-                    for repo in config_data["repositories"]
-                ]
-
-            # Load LLM config
-            if "llm" in config_data:
-                llm_data = config_data["llm"]
-                self.llm_config = LLMConfig(
-                    model=llm_data.get("model", "llama3.2"),
-                    temperature=llm_data.get("temperature", 0.7),
-                    max_tokens=llm_data.get("max_tokens", 1000),
-                    base_url=llm_data.get("base_url", "http://127.0.0.1:1234"),
-                )
-
-        except Exception as e:
-            print(f"Error loading configuration: {e}")
-            self._create_default_config()
-
-    def _create_default_config(self) -> None:
-        """Create default configuration file."""
-        default_config = {
-            "repositories": [],
-            "llm": {
-                "model": "llama3.2",
-                "temperature": 0.7,
-                "max_tokens": 1000,
-                "base_url": "http://127.0.0.1:1234",
-            },
-        }
-
-        self.config_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(self.config_path, "w", encoding="utf-8") as f:
-            json.dump(default_config, f, indent=2)
-
-        self.repositories = []
-        self.llm_config = LLMConfig(
-            model="llama3.2",
-            temperature=0.7,
-            max_tokens=1000,
-            base_url="http://127.0.0.1:1234",
-        )
-
-    def save_config(self) -> bool:
-        """
-        Save current configuration to file.
-
-        Returns:
-            True if successful, False otherwise
-        """
-        try:
-            config_data = {
-                "repositories": [
-                    {
-                        "url": repo.url,
-                        "branch": repo.branch,
-                        "enabled": repo.enabled,
-                        "file_extensions": repo.file_extensions,
-                    }
-                    for repo in self.repositories
-                ],
-                "llm": {
-                    "model": self.llm_config.model,
-                    "temperature": self.llm_config.temperature,
-                    "max_tokens": self.llm_config.max_tokens,
-                    "base_url": self.llm_config.base_url,
-                },
-            }
-
-            self.config_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(self.config_path, "w", encoding="utf-8") as f:
-                json.dump(config_data, f, indent=2)
-
-            return True
-
-        except Exception as e:
-            print(f"Error saving configuration: {e}")
-            return False
-
-    def update_repositories(self, repositories: list[RepositoryConfig]) -> bool:
-        """
-        Update repository configurations.
-
-        Args:
-            repositories: New list of repository configurations
-
-        Returns:
-            True if successful, False otherwise
-        """
-        try:
-            self.repositories = repositories
-            return self.save_config()
-
-        except Exception as e:
-            print(f"Error updating repositories: {e}")
-            return False
-
-    def update_llm_config(self, llm_config: LLMConfig) -> bool:
-        """
-        Update LLM configuration.
-
-        Args:
-            llm_config: New LLM configuration
-
-        Returns:
-            True if successful, False otherwise
-        """
-        try:
-            self.llm_config = llm_config
-            return self.save_config()
-
-        except Exception as e:
-            print(f"Error updating LLM config: {e}")
-            return False
-
-    def get_repositories(self) -> list[RepositoryConfig]:
-        """
-        Get current repository configurations.
-
-        Returns:
-            List of repository configurations
-        """
-        return self.repositories.copy()
-
-    def get_enabled_repositories(self) -> list[RepositoryConfig]:
-        """
-        Get only enabled repository configurations.
-
-        Returns:
-            List of enabled repository configurations
-        """
-        return [repo for repo in self.repositories if repo.enabled]
-
-    def get_llm_config(self) -> LLMConfig | None:
-        """
-        Get current LLM configuration.
-
-        Returns:
-            LLM configuration or None
-        """
-        return self.llm_config
-
-    def add_repository(
+    def __init__(
         self,
         url: str,
         branch: str,
         enabled: bool = True,
         file_extensions: list[str] | None = None,
-    ) -> bool:
-        """
-        Add a new repository configuration.
+    ):
+        self.url = url
+        self.branch = branch
+        self.enabled = enabled
+        self.file_extensions = file_extensions or []
 
-        Args:
-            url: Repository URL
-            branch: Branch name
-            enabled: Whether repository is enabled
-            file_extensions: List of file extensions to index
-
-        Returns:
-            True if successful, False otherwise
-        """
-        try:
-            new_repo = RepositoryConfig(
-                url=url,
-                branch=branch,
-                enabled=enabled,
-                file_extensions=file_extensions or [],
-            )
-            self.repositories.append(new_repo)
-            return self.save_config()
-
-        except Exception as e:
-            print(f"Error adding repository: {e}")
-            return False
-
-    def remove_repository(self, index: int) -> bool:
-        """
-        Remove a repository by index.
-
-        Args:
-            index: Index of repository to remove
-
-        Returns:
-            True if successful, False otherwise
-        """
-        try:
-            if 0 <= index < len(self.repositories):
-                self.repositories.pop(index)
-                return self.save_config()
-            return False
-
-        except Exception as e:
-            print(f"Error removing repository: {e}")
-            return False
-
-    def update_repository(
-        self,
-        index: int,
-        url: str,
-        branch: str,
-        enabled: bool,
-        file_extensions: list[str] | None = None,
-    ) -> bool:
-        """
-        Update an existing repository configuration.
-
-        Args:
-            index: Index of repository to update
-            url: New repository URL
-            branch: New branch name
-            enabled: New enabled status
-            file_extensions: New list of file extensions
-
-        Returns:
-            True if successful, False otherwise
-        """
-        try:
-            if 0 <= index < len(self.repositories):
-                self.repositories[index] = RepositoryConfig(
-                    url=url,
-                    branch=branch,
-                    enabled=enabled,
-                    file_extensions=file_extensions or [],
-                )
-                return self.save_config()
-            return False
-
-        except Exception as e:
-            print(f"Error updating repository: {e}")
-            return False
-
-    def get_repository_count(self) -> int:
-        """
-        Get the total number of repositories.
-
-        Returns:
-            Number of repositories
-        """
-        return len(self.repositories)
-
-    def get_enabled_count(self) -> int:
-        """
-        Get the number of enabled repositories.
-
-        Returns:
-            Number of enabled repositories
-        """
-        return sum(1 for repo in self.repositories if repo.enabled)
-
-    async def load_config_async(self) -> bool:
-        """
-        Load configuration asynchronously.
-
-        Returns:
-            True if successful, False otherwise
-        """
-        try:
-            loop = asyncio.get_event_loop()
-            return await loop.run_in_executor(self.executor, self._load_config)
-        except Exception as e:
-            logger.error(f"Error loading config asynchronously: {e}")
-            return False
-
-    async def save_config_async(self) -> bool:
-        """
-        Save configuration asynchronously.
-
-        Returns:
-            True if successful, False otherwise
-        """
-        try:
-            loop = asyncio.get_event_loop()
-            return await loop.run_in_executor(self.executor, self.save_config)
-        except Exception as e:
-            logger.error(f"Error saving config asynchronously: {e}")
-            return False
-
-    def get_config_with_defaults(self) -> dict[str, Any]:
-        """
-        Get configuration with environment variable overrides and defaults.
-
-        Returns:
-            Complete configuration dictionary
-        """
-        # Check cache first
-        current_time = time.time()
-        if (
-            self._config_cache
-            and (current_time - self._cache_timestamp) < self._cache_ttl
-        ):
-            return self._config_cache
-
-        # Build configuration with environment overrides
-        config = {
-            "repositories": [
-                {
-                    "url": repo.url,
-                    "branch": repo.branch,
-                    "enabled": repo.enabled,
-                    "file_extensions": repo.file_extensions,
-                }
-                for repo in self.repositories
-            ],
-            "llm": {
-                "model": os.getenv(
-                    "LLM_MODEL",
-                    self.llm_config.model if self.llm_config else "llama3.2",
-                ),
-                "temperature": float(
-                    os.getenv(
-                        "LLM_TEMPERATURE",
-                        self.llm_config.temperature if self.llm_config else 0.7,
-                    )
-                ),
-                "max_tokens": int(
-                    os.getenv(
-                        "LLM_MAX_TOKENS",
-                        self.llm_config.max_tokens if self.llm_config else 1000,
-                    )
-                ),
-                "base_url": os.getenv(
-                    "LLM_BASE_URL",
-                    (
-                        self.llm_config.base_url
-                        if self.llm_config
-                        else "http://127.0.0.1:1234"
-                    ),
-                ),
-            },
-            "rag": {
-                "embedding_model": os.getenv(
-                    "RAG_EMBEDDING_MODEL", "text-embedding-all-minilm-l6-v2-embedding"
-                ),
-                "chunk_size": int(os.getenv("RAG_CHUNK_SIZE", "500")),
-                "chunk_overlap": int(os.getenv("RAG_CHUNK_OVERLAP", "100")),
-                "persist_directory": os.getenv("RAG_PERSIST_DIR", ".chromadb"),
-                "cache_size": int(os.getenv("RAG_CACHE_SIZE", "1000")),
-                "cache_ttl": int(os.getenv("RAG_CACHE_TTL", "3600")),
-            },
-            "performance": {
-                "max_workers": int(os.getenv("MAX_WORKERS", "4")),
-                "thread_pool_size": int(os.getenv("THREAD_POOL_SIZE", "4")),
-                "request_timeout": int(os.getenv("REQUEST_TIMEOUT", "30")),
-            },
-        }
-
-        # Cache the result
-        self._config_cache = config
-        self._cache_timestamp = current_time
-
-        return config
-
-    def validate_config(self) -> list[str]:
-        """
-        Validate the current configuration.
-
-        Returns:
-            List of validation errors (empty if valid)
-        """
-        errors = []
-
-        # Validate LLM config
-        if self.llm_config:
-            if not self.llm_config.model:
-                errors.append("LLM model name is required")
-            if not self.llm_config.base_url:
-                errors.append("LLM base URL is required")
-            if not (0.0 <= self.llm_config.temperature <= 1.0):
-                errors.append("LLM temperature must be between 0.0 and 1.0")
-            if not (1 <= self.llm_config.max_tokens <= 8192):
-                errors.append("LLM max_tokens must be between 1 and 8192")
-
-        # Validate repositories
-        for i, repo in enumerate(self.repositories):
-            if not repo.url:
-                errors.append(f"Repository {i+1} URL is required")
-            if not repo.branch:
-                errors.append(f"Repository {i+1} branch is required")
-
-        return errors
-
-    def reset_to_defaults(self) -> bool:
-        """
-        Reset configuration to default values.
-
-        Returns:
-            True if successful, False otherwise
-        """
-        try:
-            self._create_default_config()
-            return True
-        except Exception as e:
-            logger.error(f"Error resetting to defaults: {e}")
-            return False
-
-    def export_config(self) -> dict[str, Any]:
-        """
-        Export complete configuration for backup or sharing.
-
-        Returns:
-            Complete configuration with metadata
-        """
+    def to_dict(self) -> dict[str, Any]:
+        """Convert to dictionary."""
         return {
-            "config": self.get_config_with_defaults(),
-            "metadata": {
-                "exported_at": time.time(),
-                "version": "1.0.0",
-                "repository_count": len(self.repositories),
-                "enabled_count": self.get_enabled_count(),
-            },
+            "url": self.url,
+            "branch": self.branch,
+            "enabled": self.enabled,
+            "file_extensions": self.file_extensions,
         }
 
-    def import_config(self, config_data: dict[str, Any]) -> bool:
-        """
-        Import configuration from exported data.
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "RepositoryConfig":
+        """Create from dictionary."""
+        return cls(
+            url=data["url"],
+            branch=data["branch"],
+            enabled=data.get("enabled", True),
+            file_extensions=data.get("file_extensions", []),
+        )
 
+
+class ConfigService:
+    """
+    Configuration service reading directly from data/config.json.
+
+    Features:
+    - Single source of truth: data/config.json
+    - Repository management via the repositories array in config
+    - Uses ConfigManager for configuration access
+
+    Note: All configuration must come from data/config.json.
+    Missing required configuration will cause errors at startup.
+    """
+
+    def __init__(self, config_path: str | Path | None = None):
+        """Initialize with config path (defaults to data/config.json)."""
+        from src.shared.config_manager import ConfigManager
+
+        self.config_manager = ConfigManager(str(config_path) if config_path else "data/config.json")
+        # Initialize and load the config - REQUIRED for _config to be populated
+        self.config_manager.initialize()
+        self.config_manager.load_config()  # <-- MISSING IN ORIGINAL CODE
+
+    def get_repositories(self) -> list[RepositoryConfig]:
+        """Get repository configurations from config.json."""
+        repos_data = self.config_manager.get("repositories")
+
+        if not isinstance(repos_data, list):
+            return []
+
+        return [
+            RepositoryConfig.from_dict(repo) for repo in repos_data if isinstance(repo, dict)
+        ]
+
+    def get_llm_config(self) -> dict[str, Any]:
+        """Get LLM configuration from config.json."""
+        llm_config = self.config_manager.get("llm")
+        return llm_config or {}
+
+    def get_network_config(self) -> dict[str, Any]:
+        """Get network configuration from config.json."""
+        network_config = self.config_manager.get("network")
+        return network_config or {}
+
+    def get_ui_config(self) -> dict[str, Any]:
+        """Get UI/CSS configuration from config.json."""
+        ui_config = self.config_manager.get("ui_css")
+        return ui_config or {}
+
+    def update_repositories(self, repos: list[RepositoryConfig]) -> bool:
+        """Update repositories array with new repository configurations.
+        
         Args:
-            config_data: Configuration data to import
-
+            repos: List of RepositoryConfig objects to save
+            
         Returns:
             True if successful, False otherwise
         """
         try:
-            if "config" not in config_data:
-                raise ValueError("Invalid configuration format")
+            # Get current config or use default structure
+            repos_data = self.config_manager.get("repositories")
+            
+            if not isinstance(repos_data, list):
+                repos_data = []
 
-            config = config_data["config"]
+            # Convert RepositoryConfig objects to dicts
+            repositories_dict = [repo.to_dict() for repo in repos]
 
-            # Update repositories
-            if "repositories" in config:
-                self.repositories = [
-                    RepositoryConfig(
-                        url=repo["url"],
-                        branch=repo["branch"],
-                        enabled=repo.get("enabled", True),
-                        file_extensions=repo.get("file_extensions", []),
-                    )
-                    for repo in config["repositories"]
-                ]
-
-            # Update LLM config
-            if "llm" in config:
-                llm_data = config["llm"]
-                self.llm_config = LLMConfig(
-                    model=llm_data.get("model", "llama3.2"),
-                    temperature=llm_data.get("temperature", 0.7),
-                    max_tokens=llm_data.get("max_tokens", 1000),
-                    base_url=llm_data.get("base_url", "http://127.0.0.1:1234"),
-                )
-
-            # Clear cache since config changed
-            self._config_cache = None
-
-            return self.save_config()
+            # Update the repositories array
+            self.config_manager.set("repositories", repositories_dict)
+            
+            # Save to file synchronously (blocking)
+            return self.config_manager.save_config()
 
         except Exception as e:
-            logger.error(f"Error importing configuration: {e}")
+            logger.error(f"Error updating repositories: {e}")
             return False
+    
+    def clone_enabled_repositories(self, config_data: dict[str, Any]) -> bool:
+        """Clone all enabled repositories from config.
+        
+        Args:
+            config_data: Dictionary containing repositories array
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            repos_list = config_data.get("repositories", [])
+            
+            if not repos_list:
+                logger.warning("No repositories to clone")
+                return True
 
+            import subprocess
+            cloned_count = 0
+            failed_repos = []
+
+            for repo in repos_list:
+                if repo.get("enabled", False):
+                    try:
+                        url = repo["url"]
+                        branch = repo.get("branch", "main").replace(" ", "_")
+                        
+                        # Extract repo name from URL (without .git suffix)
+                        import urllib.parse
+                        parsed_url = urllib.parse.urlparse(url)
+                        path_parts = Path(parsed_url.path.lstrip('/')).parts
+                        if path_parts and path_parts[-1]:
+                            repo_name = path_parts[-1]
+                        else:
+                            repo_name = "unknown"
+                        
+                        # Remove .git suffix if present
+                        if repo_name.endswith(".git"):
+                            repo_name = repo_name[:-4]
+                        
+                        clone_dir = Path(DATA_GITHUB_PATH) / repo_name
+                        
+                        # Check if already cloned (case-insensitive check for Windows)
+                        if clone_dir.exists() or (clone_dir.parent.exists() and 
+                                                   any(clone_dir.name.lower() in f.name.lower() for f in clone_dir.parent.iterdir())):
+                            logger.info(f"Skipping already cloned repo: {url}")
+                            continue
+                        
+                        result = subprocess.run(
+                            ["git", "clone", "--depth=1", url, clone_dir],
+                            capture_output=True,
+                            text=True,
+                            timeout=300  # 5 minutes per repo
+                        )
+                        
+                        if result.returncode == 0:
+                            logger.info(f"Successfully cloned: {url} -> {clone_dir}")
+                            cloned_count += 1
+                        else:
+                            failed_repos.append({
+                                "url": url,
+                                "error": result.stderr[:200]  # Truncate long errors
+                            })
+                            logger.error(f"Failed to clone {url}: {result.stderr[:200]}")
+
+                    except subprocess.TimeoutExpired:
+                        failed_repos.append({"url": repo.get("url", "unknown"), "error": "timeout"})
+                        logger.error(f"Clone timeout for: {repo.get('url')}")
+                    except Exception as e:
+                        failed_repos.append({"url": repo.get("url", "unknown"), "error": str(e)})
+                        logger.error(f"Failed to clone {repo.get('url')}: {e}")
+
+            success = cloned_count > 0 or not failed_repos
+            if not success and failed_repos:
+                logger.warning(f"Some repos failed to clone: {[r['url'] for r in failed_repos]}")
+            
+            return success
+
+        except Exception as e:
+            logger.error(f"Error cloning repositories: {e}")
+            return False
+    
     def cleanup(self):
         """Clean up resources."""
-        try:
-            self.executor.shutdown(wait=True)
-        except Exception as e:
-            logger.error(f"Error during config service cleanup: {e}")
-
-    def __del__(self):
-        """Destructor to ensure cleanup."""
-        self.cleanup()
+        pass

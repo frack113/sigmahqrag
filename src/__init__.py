@@ -1,1 +1,1 @@
-# Initialize the src package
+# SigmaHQ RAG - Simple Package Structure

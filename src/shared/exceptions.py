@@ -9,12 +9,12 @@ from typing import Any
 
 class SigmaHQError(Exception):
     """Base exception for SigmaHQ RAG application."""
-    
+
     def __init__(self, message: str, details: dict[str, Any] | None = None):
         super().__init__(message)
         self.message = message
         self.details = details or {}
-    
+
     def __str__(self) -> str:
         if self.details:
             details_str = ", ".join([f"{k}={v}" for k, v in self.details.items()])
@@ -24,64 +24,138 @@ class SigmaHQError(Exception):
 
 class ConfigurationError(SigmaHQError):
     """Raised when configuration is invalid or missing."""
+
     pass
 
 
-class ServiceError(SigmaHQError):
+class MissingConfigError(ConfigurationError):
+    """Raised when required configuration is not found."""
+
+    pass
+
+
+class BaseServiceError(SigmaHQError):
+    """Base exception for base service operations."""
+
+    pass
+
+
+class BaseServiceNotInitializedError(BaseServiceError):
+    """Raised when a service is not properly initialized."""
+
+    pass
+
+
+# Service exceptions inherit from BaseServiceError as the primary service exception class
+class ServiceError(BaseServiceError):
     """Raised when a service operation fails."""
-    pass
 
-
-class DatabaseError(ServiceError):
-    """Raised when database operations fail."""
     pass
 
 
 class RAGError(ServiceError):
     """Raised when RAG operations fail."""
+
     pass
 
 
 class LLMError(ServiceError):
     """Raised when LLM operations fail."""
+
     pass
 
 
 class ChatError(ServiceError):
     """Raised when chat operations fail."""
+
     pass
 
 
-class ValidationError(SigmaHQError):
-    """Raised when input validation fails."""
+class DatabaseError(BaseServiceError):
+    """Raised when database operations fail."""
+
+    pass
+
+
+class DataError(DatabaseError):
+    """Data error for data layer operations."""
+
     pass
 
 
 class CacheError(ServiceError):
     """Raised when cache operations fail."""
+
     pass
 
 
 class NetworkError(ServiceError):
     """Raised when network operations fail."""
+
     pass
 
 
 class FileError(ServiceError):
     """Raised when file operations fail."""
+
     pass
 
 
 class AuthenticationError(SigmaHQError):
     """Raised when authentication fails."""
+
     pass
 
 
 class AuthorizationError(SigmaHQError):
     """Raised when authorization fails."""
+
+    pass
+
+
+class ValidationError(SigmaHQError):
+    """Raised when input validation fails."""
+
     pass
 
 
 class RateLimitError(ServiceError):
     """Raised when rate limits are exceeded."""
+
+    pass
+
+
+class EmbeddingError(SigmaHQError):
+    """Raised when embedding operations fail."""
+
+    pass
+
+
+class AsyncOperationError(ServiceError):
+    """Error in async operation with fallback available."""
+
+    pass
+
+
+class OperationTimeoutError(ServiceError):
+    """Operation timed out with no fallback available."""
+
+    pass
+
+
+class AsyncManagerError(ServiceError):
+    """Error in async manager operations."""
+
+    pass
+
+
+class ResourceCleanupError(ServiceError):
+    """Error during resource cleanup."""
+
+    pass
+
+
+class RepoServiceError(BaseServiceError):
+    """Raised when repository operations fail."""
+
     pass

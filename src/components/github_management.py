@@ -1,506 +1,415 @@
 """
-GitHub Repository Management Component
+GitHub Repository Management Component - Native Gradio Features
 
-Modern GitHub repository management using Gradio's Code component for JSON editing.
-Provides a clean, intuitive interface for managing multiple repositories with validation.
+Uses Gradio's native features:
+- gr.Code for JSON editing (syntax highlighting)
+- Simple click handlers with queue=True
+- No manual event loop management
 """
 
 import json
-from datetime import datetime
+import logging
 from typing import Any
 
 import gradio as gr
+import requests
 from src.models.config_service import ConfigService, RepositoryConfig
-from src.models.data_service import DataService
-from src.models.logging_service import get_logger
 
-from .base_component import AsyncComponent
-
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
-class GitHubManagement(AsyncComponent):
+class GitHubManagement:
     """
-    Modern GitHub repository management component using JSON editor.
-    
+    GitHub repository management using Gradio's native JSON editor.
+
     Features:
-    - JSON editor for repository configuration
-    - Real-time validation with syntax highlighting
-    - Template loading for quick setup
-    - Comprehensive validation with clear error messages
-    - All existing functionality (save, update, status display)
+    - Syntax-highlighted JSON editing
+    - Real-time validation
+    - Simple click handlers (queue=True for async)
+    - SigmaHQ repository auto-add from GitHub API
     """
-    
+
     def __init__(self):
-        super().__init__()
-        self.config_service = ConfigService()
-        self.data_service = DataService()
+        # Initialize config_service with lazy loading to avoid errors during API init test
+        self.config_service: ConfigService | None = None
+        self.current_config: dict[str, Any] | None = None
+
+        # Use Gradio state for UI state management - always start with template
+        self.json_state = gr.State(
+            value=json.dumps(self._get_default_template(), indent=2)
+        )
+        self.status_state = gr.State(value="Ready - Edit the JSON above to get started")
         
-        # UI state
-        self.is_updating = False
-        self.current_config = {}
-    
-    def create_tab(self):
-        """Create the GitHub management tab with JSON editor."""
-        with gr.Column(elem_classes="github-container"):
+        # Load config on first use (lazy initialization)
+        try:
+            from src.models.config_service import ConfigService
+            self.config_service = ConfigService()
+        except Exception as e:
+            logger.error(f"Failed to initialize ConfigService: {e}")
+
+    def create_tab(self) -> None:
+        """Create the GitHub management tab using native Gradio features (no CSS needed)."""
+        with gr.Column(variant="compact"):  # Native compact variant = less padding
             gr.Markdown("### 📁 GitHub Repository Management")
-            gr.Markdown("Edit repository configuration using JSON format. Use the template button for a quick start.")
-            
-            # JSON Editor
-            with gr.Row():
-                with gr.Column(scale=3):
+            gr.Markdown(
+                "Edit repository configuration using JSON format. "
+                "**💡 Quick tips:** Click to edit • `Ctrl+Enter` to format"
+            )
+
+            # Use native Gradio Row with scale parameter (no CSS needed)
+            with gr.Row(equal_height=False):  # Native equal_height=False = no vertical scrollbar on empty rows
+                # Left: JSON editor column with native scrolling
+                with gr.Column(scale=2, min_width=500):
                     self.json_editor = gr.Code(
-                        label="Repository Configuration (JSON)",
-                        value=self._get_default_json_template(),
+                        value=json.dumps(self._get_default_template(), indent=2),
                         language="json",
-                        lines=20,
+                        lines=12,
                         interactive=True,
-                        show_line_numbers=True
+                        show_line_numbers=False,
                     )
-                
-                with gr.Column(scale=1):
-                    # Action buttons
-                    with gr.Row():
-                        self.load_template_btn = gr.Button(
-                            "📄 Load Template",
-                            variant="secondary"
-                        )
-                    
-                    with gr.Row():
-                        self.load_config_btn = gr.Button(
-                            "📂 Load Configuration",
-                            variant="secondary"
-                        )
-                    
-                    with gr.Row():
-                        self.validate_btn = gr.Button(
-                            "✅ Validate JSON",
-                            variant="primary"
-                        )
-                    
-                    with gr.Row():
-                        self.save_btn = gr.Button(
-                            "💾 Save Configuration",
-                            variant="primary"
-                        )
-                    
-                    with gr.Row():
-                        self.update_all_btn = gr.Button(
-                            "🔄 Update All Repos",
-                            variant="secondary"
-                        )
-            
-            # Validation and status
-            with gr.Row():
-                self.validation_status = gr.Textbox(
-                    label="Validation Status",
-                    interactive=False,
-                    value="Ready - Edit the JSON above to get started",
-                    lines=3
-                )
-            
-            
-            # Event handlers
+
+                # Right: Buttons column - wider to fit button text (min_width=160)
+                with gr.Column(scale=0, min_width=160):
+                    self.load_template_btn = gr.Button("📄 Load Template", variant="secondary")
+                    self.load_config_btn = gr.Button("📂 Load Configuration", variant="secondary")
+                    self.validate_btn = gr.Button("✅ Validate JSON", variant="primary")
+                    self.save_btn = gr.Button("💾 Save Configuration", variant="primary")
+                    self.update_all_btn = gr.Button("🔄 Update All Repos", variant="secondary")
+                    self.sigmahq_btn = gr.Button("🔍 Add SigmaHQ Repos", variant="secondary")
+
+            # Status textbox using native compact styling
+            self.validation_status = gr.Textbox(
+                label="",
+                value="Ready - Edit the JSON above to get started",
+                interactive=False,
+                lines=2,
+                container=False,
+            )
+
             self._setup_event_handlers()
-            
-            # Initialize data
-            self._init_data_sync()
-    
-    def _init_data_sync(self):
-        """Synchronously initialize the component with data from config."""
+
+    def _setup_event_handlers(self):
+        """Set up event handlers using Gradio's native pattern."""
+
+        self.load_template_btn.click(
+            fn=self._load_template, inputs=[], outputs=[self.json_editor], queue=True
+        )
+
+        self.load_config_btn.click(
+            fn=self._load_current_config,
+            inputs=[],
+            outputs=[self.json_editor],
+            queue=True,
+        )
+
+        self.validate_btn.click(
+            fn=self._validate_json,
+            inputs=[self.json_editor],
+            outputs=[self.validation_status],
+            queue=True,
+        )
+
+        self.save_btn.click(
+            fn=self._save_configuration,
+            inputs=[self.json_editor],
+            outputs=[self.validation_status],
+            queue=True,
+        )
+
+        self.update_all_btn.click(
+            fn=self._update_all_repositories,
+            inputs=[],
+            outputs=[self.validation_status],
+            queue=True,
+        )
+
+        self.sigmahq_btn.click(
+            fn=self._add_sigmahq_repos,
+            inputs=[self.json_editor],
+            outputs=[self.json_editor, self.validation_status],
+            queue=True,
+        )
+
+    def _load_template(self) -> str:
+        """Load the default JSON template."""
+        return json.dumps(self._get_default_template(), indent=2)
+
+    def _load_current_config(self) -> str:
+        """Load current configuration from data/config.json.
+        
+        Returns template if config service is unavailable to prevent Gradio API test errors.
+        NEVER returns None - always returns valid JSON string.
+        """
+        # Always return a valid JSON string - Gradio tests all handlers on init
         try:
-            # Load current configuration
-            current_config = self._get_current_config_sync()
-            self.current_config = current_config
-            
-            # Format as JSON string for editor
-            json_string = self._format_config_for_editor(current_config)
-            
-            # Update the JSON editor directly
-            if hasattr(self.json_editor, 'value'):
-                self.json_editor.value = json_string
-            
-            # Update validation status
-            validation_msg = f"Loaded {len(current_config.get('repositories', []))} repositories"
-            if hasattr(self.validation_status, 'value'):
-                self.validation_status.value = validation_msg
-            
-            logger.info(f"GitHub management initialized with {len(current_config.get('repositories', []))} repositories")
-            
-        except Exception as e:
-            error_msg = f"Error initializing data: {str(e)}"
-            logger.error(error_msg)
-            if hasattr(self.validation_status, 'value'):
-                self.validation_status.value = error_msg
-    
-    async def _load_initial_data(self):
-        """Load initial data for the GitHub management component."""
-        try:
-            # Load current configuration
-            current_config = self._get_current_config_sync()
-            self.current_config = current_config
-            
-            # Format as JSON string for editor
-            json_string = self._format_config_for_editor(current_config)
-            
-            return json_string, current_config
-            
-        except Exception as e:
-            error_msg = f"Error loading initial data: {str(e)}"
-            logger.error(error_msg)
-            return self._get_default_json_template(), {}
-    
-    def _get_current_config_sync(self) -> dict[str, Any]:
-        """Get current configuration synchronously."""
-        try:
-            # Get repositories from config service
-            repo_config = self.config_service.get_repositories()
-            
-            # Convert to our JSON format
+            # Lazy initialize config_service
+            if self.config_service is None:
+                self.config_service = ConfigService()
+
+            # Get repositories data from config service (lazy init ensures file exists)
+            repos_data = self.config_service.get_repositories()
+
             repositories = [
                 {
                     "url": repo.url,
                     "branch": repo.branch,
                     "enabled": repo.enabled,
-                    "file_extensions": repo.file_extensions,
-                    "description": f"Repository {i+1}"  # Add description field
+                    "file_extensions": list(repo.file_extensions),
                 }
-                for i, repo in enumerate(repo_config)
+                for repo in repos_data
             ]
-            
-            return {
+
+            config = {
                 "repositories": repositories,
                 "metadata": {
                     "version": "1.0.0",
-                    "last_updated": datetime.now().isoformat(),
                     "total_repos": len(repositories),
-                    "enabled_repos": sum(1 for repo in repositories if repo.get("enabled", True))
-                }
+                    "enabled_repos": sum(1 for repo in repositories if repo.get("enabled")),
+                },
             }
+
+            self.current_config = config
+            return json.dumps(config, indent=2)
+
+        except KeyError:
+            # Config file missing required keys - fall back to template
+            logger.error("Config file has missing or invalid structure")
+            return json.dumps(self._get_default_template(), indent=2)
         except Exception as e:
-            logger.error(f"Error getting current config: {e}")
-            return {"repositories": [], "metadata": {"version": "1.0.0"}}
-    
-    def _format_config_for_editor(self, config: dict[str, Any]) -> str:
-        """Format configuration as pretty JSON string for editor."""
+            logger.error(f"Error loading config: {e}")
+            # Always return template on error - NEVER return None
+            # This prevents Gradio API test failures
+            return json.dumps(self._get_default_template(), indent=2)
+
+    def _fetch_sigmahq_repos(self) -> list[dict] | None:
+        """Fetch up to 100 SigmaHQ repos from GitHub API (public + org members)."""
         try:
-            return json.dumps(config, indent=2, ensure_ascii=False)
+            # Use query parameter 'per_page=100' for max results in single request
+            url = "https://api.github.com/orgs/SigmaHQ/repos"
+            params = {
+                "sort": "updated",
+                "direction": "desc",
+                "per_page": 100,
+            }
+
+            response = requests.get(url, params=params, timeout=30)
+            response.raise_for_status()
+
+            repos = []
+            for repo_data in response.json():
+                # Extract key info from API response
+                repos.append({
+                    "name": repo_data["name"],
+                    "full_name": repo_data["full_name"],
+                    "html_url": repo_data["html_url"],
+                    "default_branch": repo_data.get("default_branch", "main"),
+                    "description": repo_data.get("description", ""),
+                })
+
+            logger.info(f"Fetched {len(repos)} SigmaHQ repositories from GitHub API")
+            return repos if repos else None
+
+        except requests.RequestException as e:
+            logger.error(f"Failed to fetch SigmaHQ repos: {e}")
+            return None
         except Exception as e:
-            logger.error(f"Error formatting config for editor: {e}")
-            return json.dumps({"repositories": [], "metadata": {"version": "1.0.0"}}, indent=2)
-    
-    def _get_default_json_template(self) -> str:
+            logger.error(f"Unexpected error fetching SigmaHQ repos: {e}")
+            return None
+
+    def _add_sigmahq_repos(self, json_string: str) -> tuple[str, str]:
+        """Add missing SigmaHQ repositories to the configuration.
+        
+        Returns tuple of (updated_json_string, status_message)
+        """
+        if not json_string or not json_string.strip():
+            return (json_string, "❌ Error: Empty configuration")
+
+        try:
+            # Parse current config
+            config = json.loads(json_string)
+            
+            if "repositories" not in config:
+                return (json_string, "❌ Cannot add SigmaHQ repos: missing 'repositories' key")
+
+            # Get list of already existing repo URLs (to avoid duplicates)
+            existing_urls = {
+                r["url"] for r in config["repositories"]
+                if r.get("url")
+            }
+
+            # Fetch new repos from API
+            sigmahq_repos = self._fetch_sigmahq_repos()
+            
+            if not sigmahq_repos:
+                return (json_string, "⚠️ Could not fetch SigmaHQ repos from GitHub API (check network)")
+
+            # Add only the missing repos that aren't already in config
+            added_count = 0
+            for api_repo in sigmahq_repos:
+                repo_url = f"{api_repo['html_url']}.git"
+                if repo_url not in existing_urls:
+                    config["repositories"].append({
+                        "url": repo_url,
+                        "branch": api_repo.get("default_branch", "main"),
+                        "enabled": False,  # Disabled by default
+                        "file_extensions": [],  # Empty array = use defaults
+                        "description": api_repo.get("description", ""),
+                    })
+                    added_count += 1
+
+            if added_count > 0:
+                status_msg = f"✅ Added {added_count} SigmaHQ repositories (disabled)\n💾 Click 'Save Configuration' to persist changes"
+                return (json.dumps(config, indent=2), status_msg)
+            else:
+                return (json_string, "ℹ️ No new SigmaHQ repos to add (already in config)")
+
+        except json.JSONDecodeError as e:
+            return (json_string, f"❌ JSON syntax error: {str(e)}")
+        except Exception as e:
+            return (json_string, f"❌ Error adding SigmaHQ repos: {str(e)}")
+
+    def _validate_json(self, json_string: str) -> str:
+        """Validate JSON configuration."""
+        if not json_string or not json_string.strip():
+            return "❌ Error: Empty configuration"
+
+        try:
+            # Parse JSON
+            config = json.loads(json_string)
+
+            # Validate structure
+            validation_result = self._validate_config_structure(config)
+
+            if validation_result["is_valid"]:
+                return f"✅ Valid configuration: {validation_result['summary']}"
+            else:
+                return f"❌ Validation errors: {validation_result['errors']}"
+
+        except json.JSONDecodeError as e:
+            return f"❌ JSON syntax error: {str(e)}"
+        except Exception as e:
+            return f"❌ Validation error: {str(e)}"
+
+    def _validate_config_structure(self, config: dict[str, Any]) -> dict[str, Any]:
+        """Validate the configuration structure."""
+        errors = []
+
+        if "repositories" not in config:
+            errors.append("Missing 'repositories' key")
+            return {"is_valid": False, "errors": "; ".join(errors), "summary": ""}
+
+        repositories = config["repositories"]
+
+        if not isinstance(repositories, list):
+            errors.append("'repositories' must be a list")
+            return {"is_valid": False, "errors": "; ".join(errors), "summary": ""}
+
+        # Validate each repository
+        for i, repo in enumerate(repositories):
+            if not isinstance(repo, dict):
+                errors.append(f"Repository {i+1} must be an object")
+                continue
+
+            if not repo.get("url"):
+                errors.append(f"Repository {i+1}: URL is required")
+            if not repo.get("branch"):
+                errors.append(f"Repository {i+1}: Branch is required")
+
+        total_repos = len(repositories)
+        enabled_repos = sum(1 for repo in repositories if repo.get("enabled", True))
+
+        return {
+            "is_valid": len(errors) == 0,
+            "errors": "; ".join(errors),
+            "summary": f"{total_repos} total, {enabled_repos} enabled, {total_repos - enabled_repos} disabled",
+        }
+
+    def _save_configuration(self, json_string: str) -> str:
+        """Save the JSON configuration."""
+        if not json_string or not json_string.strip():
+            return "❌ Error: Empty configuration"
+
+        try:
+            config = json.loads(json_string)
+            validation_result = self._validate_config_structure(config)
+
+            if not validation_result["is_valid"]:
+                return f"❌ Cannot save: {validation_result['errors']}"
+
+            # Initialize config_service lazily (needed for handler tests)
+            if self.config_service is None:
+                self.config_service = ConfigService()
+
+            # Convert to RepositoryConfig objects
+            repositories = [
+                RepositoryConfig(
+                    url=repo_data["url"],
+                    branch=repo_data["branch"],
+                    enabled=repo_data.get("enabled", True),
+                    file_extensions=repo_data.get("file_extensions", []),
+                )
+                for repo_data in config["repositories"]
+            ]
+
+            # Save to config service (synchronous method)
+            result = self.config_service.update_repositories(repositories)
+
+            if result:
+                self.current_config = config
+                return "✅ Configuration saved successfully"
+            else:
+                return "❌ Error: Failed to save configuration"
+
+        except json.JSONDecodeError as e:
+            return f"❌ JSON syntax error: {str(e)}"
+        except Exception as e:
+            return f"❌ Save error: {str(e)}"
+
+    def _update_all_repositories(self) -> str:
+        """Update all enabled repositories."""
+        if not self.current_config or not self.current_config.get("repositories"):
+            return "❌ No repositories configured"
+
+        enabled_repos = [
+            repo
+            for repo in self.current_config["repositories"]
+            if repo.get("enabled", True)
+        ]
+
+        if not enabled_repos:
+            return "⚠️ No enabled repositories found"
+
+        try:
+            update_result = self.config_service.clone_enabled_repositories(
+                {"repositories": enabled_repos}
+            )
+
+            if update_result:
+                return f"✅ Update completed successfully: {len(enabled_repos)} repositories updated"
+            else:
+                return "❌ Update failed"
+
+        except Exception as e:
+            return f"❌ Update error: {str(e)}"
+
+    def _get_default_template(self) -> dict[str, Any]:
         """Get default JSON template for the editor."""
-        template = {
+        return {
             "repositories": [
                 {
                     "url": "https://github.com/user/repository.git",
                     "branch": "main",
                     "enabled": True,
                     "file_extensions": ["py", "js", "ts", "html", "css"],
-                    "description": "Example repository"
+                    "description": "Example repository",
                 }
             ],
             "metadata": {
                 "version": "1.0.0",
-                "description": "GitHub repository configuration for SigmaHQ RAG"
-            }
+                "description": "GitHub repository configuration for SigmaHQ RAG",
+            },
         }
-        return json.dumps(template, indent=2, ensure_ascii=False)
-    
-    def _get_empty_status(self) -> dict[str, Any]:
-        """Get empty status summary."""
-        return {
-            "total_repositories": 0,
-            "enabled_repositories": 0,
-            "disabled_repositories": 0,
-            "last_updated": "Never",
-            "validation_status": "No configuration loaded"
-        }
-    
-    def _setup_event_handlers(self):
-        """Set up event handlers for the GitHub management interface."""
-        
-        # Load template
-        self.load_template_btn.click(
-            fn=self._load_template,
-            inputs=[],
-            outputs=[self.json_editor, self.validation_status],
-            queue=True
-        )
-        
-        # Load configuration
-        self.load_config_btn.click(
-            fn=self._load_current_config,
-            inputs=[],
-            outputs=[self.json_editor, self.validation_status],
-            queue=True
-        )
-        
-        # Validate JSON
-        self.validate_btn.click(
-            fn=self._validate_json,
-            inputs=[self.json_editor],
-            outputs=[self.validation_status],
-            queue=True
-        )
-        
-        # Save configuration
-        self.save_btn.click(
-            fn=self._save_configuration,
-            inputs=[self.json_editor],
-            outputs=[self.validation_status],
-            queue=True
-        )
-        
-        # Update all repositories
-        self.update_all_btn.click(
-            fn=self._update_all_repositories,
-            inputs=[],
-            outputs=[self.validation_status],
-            queue=True
-        )
-    
-    async def _load_template(self) -> tuple:
-        """Load the default JSON template."""
-        try:
-            template = self._get_default_json_template()
-            status_msg = "Template loaded successfully"
-            
-            return template, status_msg
-            
-        except Exception as e:
-            error_msg = f"Error loading template: {str(e)}"
-            logger.error(error_msg)
-            return self._get_default_json_template(), error_msg
-    
-    async def _load_current_config(self) -> tuple:
-        """Load the current configuration from config service."""
-        try:
-            # Get current configuration
-            current_config = self._get_current_config_sync()
-            self.current_config = current_config
-            
-            # Format as JSON string for editor
-            json_string = self._format_config_for_editor(current_config)
-            
-            status_msg = f"Loaded current configuration: {len(current_config.get('repositories', []))} repositories"
-            
-            return json_string, status_msg
-            
-        except Exception as e:
-            error_msg = f"Error loading configuration: {str(e)}"
-            logger.error(error_msg)
-            return self._get_default_json_template(), error_msg
-    
-    async def _validate_json(self, json_string: str) -> str:
-        """Validate JSON configuration."""
-        try:
-            if not json_string or not json_string.strip():
-                return "❌ Error: Empty configuration"
-            
-            # Parse JSON
-            config = json.loads(json_string)
-            
-            # Validate structure
-            validation_result = self._validate_config_structure(config)
-            
-            if validation_result["is_valid"]:
-                status_msg = f"✅ Valid configuration: {validation_result['summary']}"
-            else:
-                status_msg = f"❌ Validation errors: {validation_result['errors']}"
-            
-            return status_msg
-            
-        except json.JSONDecodeError as e:
-            error_msg = f"❌ JSON syntax error: {str(e)}"
-            return error_msg
-        except Exception as e:
-            error_msg = f"❌ Validation error: {str(e)}"
-            logger.error(error_msg)
-            return error_msg
-    
-    def _validate_config_structure(self, config: dict[str, Any]) -> dict[str, Any]:
-        """Validate the configuration structure."""
-        errors = []
-        
-        # Check if repositories key exists
-        if "repositories" not in config:
-            errors.append("Missing 'repositories' key")
-            return {"is_valid": False, "errors": errors, "summary": ""}
-        
-        repositories = config["repositories"]
-        
-        # Check if repositories is a list
-        if not isinstance(repositories, list):
-            errors.append("'repositories' must be a list")
-            return {"is_valid": False, "errors": errors, "summary": ""}
-        
-        # Validate each repository
-        for i, repo in enumerate(repositories):
-            if not isinstance(repo, dict):
-                errors.append(f"Repository {i+1} must be an object")
-                continue
-            
-            # Check required fields
-            if not repo.get("url"):
-                errors.append(f"Repository {i+1}: URL is required")
-            if not repo.get("branch"):
-                errors.append(f"Repository {i+1}: Branch is required")
-            
-            # Validate enabled field
-            if "enabled" in repo and not isinstance(repo["enabled"], bool):
-                errors.append(f"Repository {i+1}: 'enabled' must be boolean")
-            
-            # Validate file_extensions
-            if "file_extensions" in repo:
-                if not isinstance(repo["file_extensions"], list):
-                    errors.append(f"Repository {i+1}: 'file_extensions' must be a list")
-                else:
-                    for ext in repo["file_extensions"]:
-                        if not isinstance(ext, str):
-                            errors.append(f"Repository {i+1}: file extensions must be strings")
-        
-        # Generate summary
-        total_repos = len(repositories)
-        enabled_repos = sum(1 for repo in repositories if repo.get("enabled", True))
-        disabled_repos = total_repos - enabled_repos
-        
-        summary = f"{total_repos} total, {enabled_repos} enabled, {disabled_repos} disabled"
-        
-        return {
-            "is_valid": len(errors) == 0,
-            "errors": "; ".join(errors) if errors else "",
-            "summary": summary
-        }
-    
-    async def _save_configuration(self, json_string: str) -> str:
-        """Save the JSON configuration."""
-        try:
-            if not json_string or not json_string.strip():
-                return "❌ Error: Empty configuration"
-            
-            # Parse and validate JSON
-            config = json.loads(json_string)
-            validation_result = self._validate_config_structure(config)
-            
-            if not validation_result["is_valid"]:
-                error_msg = f"❌ Cannot save: {validation_result['errors']}"
-                return error_msg
-            
-            # Convert to RepositoryConfig objects
-            repositories = []
-            for repo_data in config["repositories"]:
-                repo_config = RepositoryConfig(
-                    url=repo_data["url"],
-                    branch=repo_data["branch"],
-                    enabled=repo_data.get("enabled", True),
-                    file_extensions=repo_data.get("file_extensions", [])
-                )
-                repositories.append(repo_config)
-            
-            # Save to config service
-            success = await self.run_in_executor(
-                self.config_service.update_repositories,
-                repositories
-            )
-            
-            if success:
-                # Update current config
-                self.current_config = config
-                
-                # Generate status
-                status_info = self._generate_status_summary(config)
-                status_msg = f"✅ Configuration saved successfully: {validation_result['summary']}"
-                
-                return status_msg
-            else:
-                return "❌ Error: Failed to save configuration"
-            
-        except json.JSONDecodeError as e:
-            error_msg = f"❌ JSON syntax error: {str(e)}"
-            return error_msg
-        except Exception as e:
-            error_msg = f"❌ Save error: {str(e)}"
-            logger.error(error_msg)
-            return error_msg
-    
-    async def _update_all_repositories(self) -> str:
-        """Update all enabled repositories."""
-        if self.is_updating:
-            return "⚠️ Update already in progress"
-        
-        self.is_updating = True
-        
-        try:
-            # Get current configuration
-            if not self.current_config or not self.current_config.get("repositories"):
-                return "❌ No repositories configured"
-            
-            # Get enabled repositories
-            enabled_repos = [
-                repo for repo in self.current_config["repositories"]
-                if repo.get("enabled", True)
-            ]
-            
-            if not enabled_repos:
-                return "⚠️ No enabled repositories found"
-            
-            # Update status
-            status_msg = f"🔄 Updating {len(enabled_repos)} repositories..."
-            
-            # Run update operation
-            update_result = await self.data_service.clone_enabled_repositories(
-                {"repositories": enabled_repos}
-            )
-            
-            if update_result:
-                # Refresh configuration after update
-                refreshed_config = self._get_current_config_sync()
-                self.current_config = refreshed_config
-                
-                status_msg = f"✅ Update completed successfully: {len(enabled_repos)} repositories updated"
-                
-                return status_msg
-            else:
-                return "❌ Update failed"
-                
-        except Exception as e:
-            error_msg = f"❌ Update error: {str(e)}"
-            logger.error(error_msg)
-            return error_msg
-            
-        finally:
-            self.is_updating = False
-    
-    def _generate_status_summary(self, config: dict[str, Any]) -> dict[str, Any]:
-        """Generate status summary from configuration."""
-        repositories = config.get("repositories", [])
-        
-        total_repos = len(repositories)
-        enabled_repos = sum(1 for repo in repositories if repo.get("enabled", True))
-        disabled_repos = total_repos - enabled_repos
-        
-        # Get repository details
-        repo_details = []
-        for repo in repositories:
-            repo_details.append({
-                "URL": repo.get("url", "Unknown"),
-                "Branch": repo.get("branch", "Unknown"),
-                "Status": "Enabled" if repo.get("enabled", True) else "Disabled",
-                "Extensions": ", ".join(repo.get("file_extensions", [])) or "None",
-                "Description": repo.get("description", "No description")
-            })
-        
-        return {
-            "total_repositories": total_repos,
-            "enabled_repositories": enabled_repos,
-            "disabled_repositories": disabled_repos,
-            "last_updated": config.get("metadata", {}).get("last_updated", "Unknown"),
-            "validation_status": "Valid configuration",
-            "repositories": repo_details
-        }
-    
+
     def cleanup(self):
         """Clean up resources."""
-        super().cleanup()
+        pass

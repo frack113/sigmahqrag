@@ -1,0 +1,38 @@
+{
+    "network": {
+        "ip": "127.0.0.1",
+        "port": 8000,
+        "timeout": 30
+    },
+    "repositories": [
+        {
+            "url": "https://github.com/SigmaHQ/sigma-specification",
+            "branch": "main",
+            "enabled": true,
+            "file_extensions": [".md"]
+        },
+        {
+            "url": "https://github.com/SigmaHQ/pySigma",
+            "branch": "main",
+            "enabled": true,
+            "file_extensions": [".py"]
+        }
+    ],
+    "llm": {
+        "model": "qwen/qwen3.5-9b",
+        "temperature": 0.7,
+        "max_tokens": 5000,
+        "base_url": "http://127.0.0.1:1234"
+    },
+    "ui_css": {
+        "theme": "soft",
+        "title": "SigmaHQ RAG",
+        "favicon": "favicon.ico",
+        "analytics_enabled": false,
+        "primary_color": "#4f46e5",
+        "secondary_color": "#10b981",
+        "background_color": "#ffffff",
+        "text_color": "#1f2937",
+        "font_family": "Arial, sans-serif"
+    }
+}

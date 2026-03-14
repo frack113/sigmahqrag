@@ -1,47 +1,56 @@
 """
-RAG Chat Service for Gradio
+RAG Chat Service for Gradio - Native Integration
 
-Integrates RAG functionality with the chat interface to provide context-aware responses.
-Uses the optimized RAG service and LLM service for enhanced chat capabilities.
+Uses native Gradio features:
+- Direct LLM service usage
+- Simple synchronous generators (queue=True handles async)
+- No custom threading infrastructure needed
 """
 
 import logging
-from collections.abc import AsyncGenerator
+from collections.abc import Generator
+from pathlib import Path
+from src.shared.constants import DATA_MODELS_PATH
 from typing import Any
 
-from .llm_service_optimized import OptimizedLLMService
-from .rag_service_optimized import OptimizedRAGService
+from src.core.llm_service import create_llm_service
 
 
 class RAGChatService:
     """
-    RAG-enhanced chat service for NiceGUI applications.
+    RAG-enhanced chat service for Gradio applications.
 
-    This service combines the RAG system with the chat interface to provide
-    context-aware responses based on stored documents and conversation history.
+    This service combines the LLM and RAG systems to provide context-aware responses.
+
+    Features:
+    - Synchronous methods (Gradio queue=True handles async)
+    - Simple generator patterns for streaming
+    - Direct client usage, no wrappers needed
     """
 
     def __init__(
         self,
-        llm_service: OptimizedLLMService | None = None,
-        rag_service: OptimizedRAGService | None = None,
-        base_url: str = "http://localhost:1234",
-        rag_enabled: bool = True,
-        rag_n_results: int = 3,
-        rag_min_score: float = 0.1,
-        conversation_history_limit: int = 10,
+        base_url: str,
+        rag_enabled: bool,
+        rag_n_results: int,
+        rag_min_score: float,
+        conversation_history_limit: int,
+        model: str = "llama3.2",
+        temperature: float = 0.7,
+        max_tokens: int = 4096,
     ):
         """
         Initialize the RAG chat service.
 
         Args:
-            llm_service: Pre-configured LLM service
-            rag_service: Pre-configured RAG service
-            base_url: Base URL for LM Studio server
-            rag_enabled: Whether RAG functionality is enabled
-            rag_n_results: Number of RAG results to retrieve
-            rag_min_score: Minimum similarity score for RAG results
-            conversation_history_limit: Maximum number of conversation messages to keep
+            base_url: Base URL for LM Studio server (required - from config)
+            rag_enabled: Whether RAG functionality is enabled (required - from config)
+            rag_n_results: Number of RAG results to retrieve (required - from config)
+            rag_min_score: Minimum similarity score for RAG results (required - from config)
+            conversation_history_limit: Maximum number of conversation messages to keep (required - from config)
+            model: Model name (optional)
+            temperature: Temperature for generation (optional)
+            max_tokens: Max tokens for generation (optional)
         """
         self.logger = logging.getLogger(__name__)
         self.rag_enabled = rag_enabled
@@ -49,20 +58,32 @@ class RAGChatService:
         self.rag_min_score = rag_min_score
         self.conversation_history_limit = conversation_history_limit
 
-        # Initialize LLM service
-        self.llm_service = llm_service or OptimizedLLMService(
-            base_url=base_url, enable_streaming=True
+        # Initialize LLM client directly (native Gradio approach)
+        self.llm_client = create_llm_service(
+            base_url=base_url,
+            model=model,
+            temperature=temperature,
+            max_tokens=max_tokens,
         )
 
-        # Initialize RAG service
+        # Initialize RAG service (native approach)
         if rag_enabled:
-            self.rag_service = rag_service or OptimizedRAGService(
-                llm_service=self.llm_service,
-                base_url=base_url,
-                collection_name="chat_collection",
+            from src.core.local_embedding_service import create_local_embedding_service
+            
+            self.rag_client = create_local_embedding_service()
+            
+            # Create ChromaDB collection directly using constant
+            from chromadb import PersistentClient
+            persist_dir = DATA_MODELS_PATH / "chroma_db"
+            persist_dir.mkdir(parents=True, exist_ok=True)
+            
+            client = PersistentClient(str(persist_dir))
+            self.rag_client.collection = client.get_or_create_collection(
+                name="chat_collection",
+                metadata={"hnsw:space": "cosine"},
             )
         else:
-            self.rag_service = None
+            self.rag_client = None
 
         # Conversation history
         self.conversation_history: list[dict[str, str]] = []
@@ -79,8 +100,9 @@ class RAGChatService:
 
         # Limit conversation history size
         if len(self.conversation_history) > self.conversation_history_limit:
-            # Remove oldest messages, but keep at least the last few
-            self.conversation_history = self.conversation_history[-self.conversation_history_limit:]
+            self.conversation_history = self.conversation_history[
+                -self.conversation_history_limit :
+            ]
 
     def clear_conversation_history(self) -> None:
         """Clear the conversation history."""
@@ -96,219 +118,186 @@ class RAGChatService:
         """
         return self.conversation_history.copy()
 
-    async def generate_response(
+    def stream_response(
         self,
         user_message: str,
-        system_prompt: str | None = None,
-        use_rag: bool | None = None,
-    ) -> str:
-        """
-        Generate a response to a user message with improved timeout handling.
-
-        Args:
-            user_message: The user's message
-            system_prompt: Optional system prompt
-            use_rag: Whether to use RAG (overrides default setting)
-
-        Returns:
-            The generated response
-        """
-        # Determine if RAG should be used
-        should_use_rag = use_rag if use_rag is not None else self.rag_enabled
-
-        try:
-            if should_use_rag and self.rag_service:
-                # Use RAG-enhanced response generation with timeout
-                try:
-                    import asyncio
-                    response_task = asyncio.create_task(
-                        self.rag_service.generate_rag_response(
-                            query=user_message,
-                            system_prompt=system_prompt,
-                            n_results=self.rag_n_results,
-                            min_relevance_score=self.rag_min_score,
-                        )
-                    )
-                    # Set timeout for RAG operations (25 seconds)
-                    response = await asyncio.wait_for(response_task, timeout=25.0)
-                except asyncio.TimeoutError:
-                    self.logger.warning("RAG response timed out, falling back to standard LLM")
-                    # Fallback to standard LLM response
-                    response = self.llm_service.simple_completion(
-                        prompt=user_message, system_prompt=system_prompt
-                    )
-                except Exception as rag_error:
-                    self.logger.error(f"RAG response failed: {rag_error}, falling back to standard LLM")
-                    # Fallback to standard LLM response
-                    response = self.llm_service.simple_completion(
-                        prompt=user_message, system_prompt=system_prompt
-                    )
-            else:
-                # Use standard LLM response generation
-                response = self.llm_service.simple_completion(
-                    prompt=user_message, system_prompt=system_prompt
-                )
-
-            # Add messages to conversation history
-            self.add_message_to_history("user", user_message)
-            self.add_message_to_history("assistant", response)
-
-            return response
-
-        except Exception as e:
-            self.logger.error(f"Error generating response: {e}")
-            error_response = "I apologize, but I encountered an error while processing your request. Please try again."
-            self.add_message_to_history("user", user_message)
-            self.add_message_to_history("assistant", error_response)
-            return error_response
-
-    async def generate_streaming_response(
-        self,
-        user_message: str,
-        system_prompt: str | None = None,
-        use_rag: bool | None = None,
-    ) -> AsyncGenerator[str, None]:
+        session_id: str = "default",
+        rag_enabled: bool | None = None,
+        rag_n_results: int | None = None,
+        rag_min_score: float | None = None,
+    ) -> Generator[str, None, None]:
         """
         Generate a streaming response to a user message.
 
         Args:
             user_message: The user's message
-            system_prompt: Optional system prompt
-            use_rag: Whether to use RAG (overrides default setting)
+            session_id: Session identifier (for history management)
+            rag_enabled: Whether to use RAG (overrides default if not None)
+            rag_n_results: Number of results for RAG (overrides default if not None)
+            rag_min_score: Minimum score for RAG (overrides default if not None)
 
         Yields:
-            Response chunks for streaming
+            Response chunks one character at a time for streaming
         """
-        # Determine if RAG should be used
-        should_use_rag = use_rag if use_rag is not None else self.rag_enabled
+        # Determine effective parameters
+        use_rag = rag_enabled if rag_enabled is not None else self.rag_enabled
+        effective_n_results = (
+            rag_n_results if rag_n_results is not None else self.rag_n_results
+        )
+        effective_min_score = (
+            rag_min_score if rag_min_score is not None else self.rag_min_score
+        )
 
         try:
-            if should_use_rag and self.rag_service:
-                # Use RAG-enhanced streaming response generation
-                async for chunk in self.rag_service.generate_streaming_rag_response(
-                    query=user_message,
-                    system_prompt=system_prompt,
-                    n_results=self.rag_n_results,
-                    min_relevance_score=self.rag_min_score,
-                ):
-                    yield chunk
+            # Build messages for LLM
+            messages: list[dict[str, str]] = []
+
+            if use_rag and self.rag_client:
+                # Get RAG context first (synchronous)
+                try:
+                    context = self.rag_client.query(
+                        query_texts=[user_message],
+                        n_results=effective_n_results,
+                        min_score=effective_min_score,
+                    )
+
+                    if context and len(context) > 0:
+                        context_text = "\n\n".join(
+                            f"[{i+1}] {doc['content']}" for i, doc in enumerate(context)
+                        )
+                        messages.append(
+                            {
+                                "role": "user",
+                                "content": (
+                                    f"Context:\n{context_text}\n\nUser question: {user_message}"
+                                ),
+                            }
+                        )
+                    else:
+                        messages.append({"role": "user", "content": user_message})
+                except Exception as e:
+                    self.logger.error(f"RAG context retrieval failed: {e}")
+                    messages.append({"role": "user", "content": user_message})
             else:
-                # Use standard LLM streaming response generation
-                async for chunk in self.llm_service.streaming_completion(
-                    prompt=user_message, system_prompt=system_prompt
-                ):
-                    yield chunk
+                messages.append({"role": "user", "content": user_message})
+
+            # Stream response using generator (Gradio handles async with queue=True)
+            for chunk in self.llm_client.chat_completion(messages, stream=True):
+                if isinstance(chunk, dict) and "content" in chunk:
+                    yield chunk["content"]
 
         except Exception as e:
-            self.logger.error(f"Error generating streaming response: {e}")
-            error_message = "I apologize, but I encountered an error while processing your request. Please try again."
-            yield error_message
+            self.logger.error(f"Error generating response: {e}")
+            yield "I apologize, but I encountered an error while processing your request. Please try again."
+
+    def complete(self, user_message: str) -> str:
+        """Get a non-streaming response."""
+        try:
+            use_rag = self.rag_enabled
+
+            # Build messages for LLM
+            messages: list[dict[str, str]] = []
+
+            if use_rag and self.rag_client:
+                context = self.rag_client.query(
+                    query_texts=[user_message],
+                    n_results=self.rag_n_results,
+                    min_score=self.rag_min_score,
+                )
+
+                if context and len(context) > 0:
+                    context_text = "\n\n".join(
+                        f"[{i+1}] {doc['content']}" for i, doc in enumerate(context)
+                    )
+                    messages.append(
+                        {
+                            "role": "user",
+                            "content": (
+                                f"Context:\n{context_text}\n\nUser question: {user_message}"
+                            ),
+                        }
+                    )
+                else:
+                    messages.append({"role": "user", "content": user_message})
+            else:
+                messages.append({"role": "user", "content": user_message})
+
+            # Get completion (Gradio queue=True handles async execution)
+            response = self.llm_client.chat_completion(messages, stream=False)
+
+            if isinstance(response, dict):
+                content = (
+                    response.get("choices", [{}])[0]
+                    .get("message", {})
+                    .get("content", "")
+                    .strip()
+                )
+            else:
+                content = str(response).strip()
+
+            return content
+        except Exception as e:
+            self.logger.error(f"Error in completion: {e}")
+            return "I apologize, but I encountered an error."
 
     def get_rag_status(self) -> dict[str, Any]:
-        """
-        Get the status of the RAG system.
-
-        Returns:
-            Dictionary with RAG status information
-        """
-        status = {
+        """Get the status of the RAG system."""
+        status: dict[str, Any] = {
             "rag_enabled": self.rag_enabled,
-            "rag_service_available": False,
-            "conversation_history_count": len(self.conversation_history),
-            "conversation_history_limit": self.conversation_history_limit,
+            "llm_connected": False,
+            "collection_name": "chat_collection",
+            "document_count": 0,
         }
 
-        if self.rag_service:
+        if self.rag_client:
             try:
-                status["rag_service_available"] = self.rag_service.check_availability()
-                if status["rag_service_available"]:
-                    rag_stats = self.rag_service.get_context_stats()
-                    status.update(rag_stats)
+                count_data = self.rag_client.collection.get()
+                status["document_count"] = len(count_data["ids"][0])
+                status["llm_connected"] = True
             except Exception as e:
                 self.logger.error(f"Error getting RAG status: {e}")
-                status["rag_service_available"] = False
+
+        # Test LLM connection
+        try:
+            result = self.llm_client.chat_completion(
+                [{"role": "user", "content": "test"}], stream=False
+            )
+            if isinstance(result, dict):
+                status["llm_connected"] = True
+        except Exception as e:
+            self.logger.warning(f"LLM not connected: {e}")
 
         return status
 
-    def clear_rag_context(self) -> bool:
-        """
-        Clear the RAG context (stored documents).
-
-        Returns:
-            True if successful, False otherwise
-        """
-        if self.rag_service:
-            try:
-                success = self.rag_service.clear_context()
-                if success:
-                    self.logger.info("RAG context cleared")
-                return success
-            except Exception as e:
-                self.logger.error(f"Error clearing RAG context: {e}")
-                return False
-        return False
-
-    def get_rag_stats(self) -> dict[str, Any]:
-        """
-        Get RAG statistics.
-
-        Returns:
-            Dictionary with RAG statistics
-        """
-        stats = {
-            "rag_enabled": self.rag_enabled,
-            "conversation_history_count": len(self.conversation_history),
-        }
-
-        if self.rag_service:
-            try:
-                rag_stats = self.rag_service.get_context_stats()
-                cache_stats = self.rag_service.get_cache_stats()
-                stats.update(rag_stats)
-                stats["cache_stats"] = cache_stats
-            except Exception as e:
-                self.logger.error(f"Error getting RAG stats: {e}")
-                stats["error"] = str(e)
-
-        return stats
-
-    def get_stats(self) -> dict[str, Any]:
-        """
-        Get comprehensive statistics (alias for get_rag_stats for backward compatibility).
-
-        Returns:
-            Dictionary with comprehensive statistics
-        """
-        return self.get_rag_stats()
-
-    def cleanup(self):
+    def cleanup(self) -> None:
         """Clean up resources."""
         try:
-            if self.rag_service:
-                self.rag_service.cleanup()
-            self.llm_service.cleanup()
+            if self.rag_client:
+                self.rag_client.cleanup()
+            # LMStudioClient is a thin wrapper, no cleanup needed
             self.conversation_history.clear()
         except Exception as e:
-            self.logger.error(f"Error during RAG chat service cleanup: {e}")
-
-    def __del__(self):
-        """Destructor to ensure cleanup."""
-        self.cleanup()
+            self.logger.error(f"Error during cleanup: {e}")
 
 
-# Convenience factory function
 def create_rag_chat_service(
-    base_url: str = "http://localhost:1234",
-    rag_enabled: bool = True,
-    rag_n_results: int = 3,
-    rag_min_score: float = 0.1,
-    conversation_history_limit: int = 10,
+    base_url: str,
+    rag_enabled: bool,
+    rag_n_results: int,
+    rag_min_score: float,
+    conversation_history_limit: int,
+    model: str = "llama3.2",
+    temperature: float = 0.7,
+    max_tokens: int = 4096,
 ) -> RAGChatService:
-    """Create a RAG chat service with default configuration."""
+    """Create a RAG chat service with specified configuration (all values required from config)."""
     return RAGChatService(
         base_url=base_url,
         rag_enabled=rag_enabled,
         rag_n_results=rag_n_results,
         rag_min_score=rag_min_score,
         conversation_history_limit=conversation_history_limit,
+        model=model,
+        temperature=temperature,
+        max_tokens=max_tokens,
     )

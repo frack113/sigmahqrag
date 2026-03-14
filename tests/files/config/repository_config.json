@@ -1,0 +1,16 @@
+{
+    "repositories": [
+        {
+            "url": "https://github.com/SigmaHQ/sigma-specification",
+            "branch": "main",
+            "enabled": true,
+            "file_extensions": [".md"]
+        },
+        {
+            "url": "https://github.com/SigmaHQ/pySigma",
+            "branch": "main",
+            "enabled": true,
+            "file_extensions": [".py"]
+        }
+    ]
+}

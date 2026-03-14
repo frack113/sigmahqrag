@@ -1,13 +1,7 @@
-# Initialize the models package
-from .chat_history_service import get_chat_history_service
-from .config_service import ConfigService, RepositoryConfig
-from .data_service import DataService
-from .logging_service import get_logger
+# src.models package - Core abstractions for SigmaHQ RAG
 
-__all__ = [
-    "DataService", 
-    "ConfigService",
-    "RepositoryConfig",
-    "get_logger",
-    "get_chat_history_service",
-]
+# This package defines the core service interfaces that the infrastructure layer
+# implements. These are Gradio-native services optimized for interactive use.
+
+
+__all__ = []  # No exports - this package uses internal modules directly
