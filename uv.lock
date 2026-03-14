@@ -4223,7 +4223,6 @@ wheels = [
 
 [[package]]
 name = "sigmahqrag"
-version = "2026.2.27"
 source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },
@@ -4242,7 +4241,6 @@ dependencies = [
 
 [package.optional-dependencies]
 dev = [
-    { name = "black" },
     { name = "mypy" },
     { name = "pyflakes" },
     { name = "pytest" },
@@ -4251,21 +4249,10 @@ dev = [
     { name = "ruff" },
 ]
 
-[package.dev-dependencies]
-dev = [
-    { name = "black" },
-    { name = "mypy" },
-    { name = "pyflakes" },
-    { name = "pytest" },
-    { name = "pytest-cov" },
-    { name = "ruff" },
-]
-
 [package.metadata]
 requires-dist = [
     { name = "aiohttp", specifier = ">=3.13.3" },
     { name = "black", specifier = ">=26.1.0" },
-    { name = "black", marker = "extra == 'dev'", specifier = ">=26.1.0" },
     { name = "chromadb", specifier = ">=0.5.0" },
     { name = "colorama", specifier = ">=0.4.6" },
     { name = "gitpython", specifier = ">=3.1.0" },
@@ -4284,16 +4271,6 @@ requires-dist = [
     { name = "watchdog", specifier = ">=6.0.0" },
 ]
 provides-extras = ["dev"]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "black", specifier = ">=26.1.0" },
-    { name = "mypy", specifier = ">=1.19.1" },
-    { name = "pyflakes", specifier = ">=3.4.0" },
-    { name = "pytest", specifier = ">=9.0.2" },
-    { name = "pytest-cov", specifier = ">=7.0.0" },
-    { name = "ruff", specifier = ">=0.15.4" },
-]
 
 [[package]]
 name = "six"

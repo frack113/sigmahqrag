@@ -62,7 +62,7 @@ class SQLiteManager(BaseService):
 
     def __init__(
         self,
-        db_path: str = DEFAULT_DB_PATH,
+        db_path: str | None = None,
         max_connections: int = DEFAULT_DB_MAX_CONNECTIONS,
         timeout: int = DEFAULT_DB_TIMEOUT,
     ):
@@ -70,15 +70,18 @@ class SQLiteManager(BaseService):
         Initialize the SQLite manager.
 
         Args:
-            db_path: Path to the SQLite database file
+            db_path: Path to the SQLite database file (default from constants if None)
             max_connections: Maximum number of connections in the pool
             timeout: Connection timeout in seconds
         """
-        BaseService.__init__(self, f"{SERVICE_DATABASE}.sqlite_manager")
-
-        self.db_path = db_path
+        self.db_path = db_path or DEFAULT_DB_PATH
         self.max_connections = max_connections
         self.timeout = timeout
+
+        # Initialize logger
+        import logging
+
+        self.logger = logging.getLogger(f"{__name__}.{SERVICE_DATABASE}.sqlite_manager")
 
         # Connection pool
         self._connections: list[sqlite3.Connection] = []
@@ -497,6 +500,11 @@ class SQLiteManager(BaseService):
                 / self.max_connections,
             }
 
+    async def initialize(self) -> bool:
+        """Initialize the database."""
+        await self._initialize_database()
+        return True
+
     def get_health_status(self) -> dict[str, Any]:
         """Get database health status."""
         status = STATUS_HEALTHY
@@ -591,20 +599,17 @@ class SQLiteManager(BaseService):
         except Exception as e:
             self.logger.error(f"Error during SQLite manager cleanup: {e}")
 
-    def __del__(self):
-        """Destructor to ensure cleanup."""
-        self.cleanup()
-
 
 # Convenience factory function
 def create_sqlite_manager(
-    db_path: str = DEFAULT_DB_PATH,
+    db_path: str | None = None,
     max_connections: int = DEFAULT_DB_MAX_CONNECTIONS,
     timeout: int = DEFAULT_DB_TIMEOUT,
 ) -> SQLiteManager:
     """Create a SQLite manager with default configuration."""
     return SQLiteManager(
-        db_path=db_path,
+        db_path=db_path or DEFAULT_DB_PATH,
         max_connections=max_connections,
         timeout=timeout,
     )
+

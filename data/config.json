@@ -1,4 +1,16 @@
 {
+  "application":{
+    "name": "SigmaHQ RAG",
+    "version": "1.0.0",
+    "description": "A Retrieval-Augmented Generation (RAG) application for SigmaHQ.",
+    "author": "SigmaHQ Team",
+    "license": "MIT"
+  },
+  "network": {
+    "ip": "127.0.0.1",
+    "port": 8000,
+    "timeout": 30,
+  },
   "repositories": [
     {
       "url": "https://github.com/SigmaHQ/sigma-specification",

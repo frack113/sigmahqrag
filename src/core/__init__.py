@@ -1,4 +1,14 @@
-# Core module - deprecated, use src/models/ for services
-# Legacy imports have been moved to native locations
+# Core services - Optimized RAG system
+from .llm_service import LLMService, create_chat_service, create_completion_service, create_creative_service
+from .rag_service import RAGService, create_rag_service
+from .chat_service import ChatService
 
-__all__ = []
+__all__ = [
+    "LLMService",
+    "create_chat_service",
+    "create_completion_service", 
+    "create_creative_service",
+    "RAGService",
+    "create_rag_service",
+    "ChatService",
+]

@@ -12,16 +12,18 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
-from src.shared import (
+from src.shared.base_service import BaseService
+from src.shared.constants import (
     DEFAULT_ALLOWED_FILE_EXTENSIONS,
     DEFAULT_MAX_FILE_SIZE_MB,
     DEFAULT_UPLOAD_DIR,
     SERVICE_FILE_STORAGE,
     STATUS_DEGRADED,
     STATUS_HEALTHY,
-    BaseService,
-    FileError,
-    FileMetadata,
+)
+from src.shared.exceptions import FileError
+from src.shared.types import FileMetadata
+from src.shared.utils import (
     create_directory_if_not_exists,
     sanitize_filename,
     validate_file_upload,

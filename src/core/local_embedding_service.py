@@ -7,6 +7,7 @@ safetensors model file loading. No external API dependencies required.
 Uses Gradio's native queuing system - simple synchronous methods.
 """
 
+import logging
 import time
 from pathlib import Path
 from typing import Any
@@ -32,9 +33,11 @@ class LocalEmbeddingService:
 
     def __init__(self):
         """Initialize the local embedding service."""
+        self.logger = logging.getLogger(__name__)
         self.model = None
         self._model_loaded = False
         self._start_time = time.time()
+        self.collection = None
 
         # Statistics
         self.total_embeddings = 0
@@ -54,7 +57,7 @@ class LocalEmbeddingService:
 
             # Check if safetensors file exists
             if not Path(model_path).exists():
-                print(f"Model file not found: {model_path}")
+                self.logger.error(f"Model file not found: {model_path}")
                 return False
 
             self.model = SentenceTransformer(
@@ -66,19 +69,19 @@ class LocalEmbeddingService:
             test_embedding = self.model.encode(["test"])
             if len(test_embedding) == 384:  # MiniLM produces 384-dim embeddings
                 self._model_loaded = True
-                print(
+                self.logger.info(
                     f"Model loaded successfully. Embedding dimension: {len(test_embedding)}"
                 )
                 return True
             else:
-                print(f"Unexpected embedding dimension: {len(test_embedding)}")
+                self.logger.error(f"Unexpected embedding dimension: {len(test_embedding)}")
                 return False
 
         except ImportError as e:
-            print(f"sentence-transformers not available: {e}")
+            self.logger.error(f"sentence-transformers not available: {e}")
             return False
         except Exception as e:
-            print(f"Error loading model: {e}")
+            self.logger.error(f"Error loading model: {e}")
             self.last_error = str(e)
             return False
 
@@ -89,9 +92,10 @@ class LocalEmbeddingService:
                 del self.model
                 self.model = None
             self._model_loaded = False
-
+            if self.collection is not None:
+                self.collection = None
         except Exception as e:
-            print(f"Error during cleanup: {e}")
+            self.logger.error(f"Error during cleanup: {e}")
 
     def generate_embeddings(self, texts: list[str]) -> list[list[float]]:
         """
@@ -145,12 +149,134 @@ class LocalEmbeddingService:
             "stats": self.get_embedding_stats(),
         }
 
+    def query(
+        self,
+        query_texts: list[str],
+        n_results: int = 3,
+        min_score: float = 0.0,
+    ) -> list[dict[str, Any]]:
+        """
+        Query the ChromaDB collection for relevant documents.
+
+        Args:
+            query_texts: List of text to search for
+            n_results: Number of results to return
+            min_score: Minimum similarity score threshold
+
+        Returns:
+            List of matching documents with metadata
+        """
+        if not self.collection or not self._model_loaded:
+            return []
+
+        try:
+            from sentence_transformers import SentenceTransformer
+
+            if not isinstance(self.model, SentenceTransformer):
+                # Initialize model if not already loaded
+                if not self.initialize():
+                    return []
+
+            # Generate query embeddings
+            query_embeddings = self.model.encode(
+                query_texts, convert_to_numpy=True, normalize_embeddings=True
+            ).tolist()
+
+            # Query ChromaDB
+            results = self.collection.query(
+                query_embeddings=query_embeddings,
+                n_results=n_results,
+                include=["documents", "metadatas", "distances"],
+            )
+
+            # Filter by minimum score and format results
+            filtered_results = []
+            for i, doc_list in enumerate(results["ids"]):
+                for j, doc_id in enumerate(doc_list):
+                    distance = (
+                        results["distances"][i][j] if results["distances"] else 0
+                    )
+                    if distance < min_score:
+                        continue
+
+                    metadata = results["metadatas"][i][j] or {}
+                    filtered_results.append(
+                        {
+                            "id": doc_id,
+                            "content": metadata.get("text", ""),
+                            "score": 1 - distance,
+                            "metadata": metadata,
+                        }
+                    )
+
+            return filtered_results
+
+        except Exception as e:
+            self.logger.error(f"Query error: {e}")
+            return []
+
+    def add(self, texts: list[str], metadatas: list[dict[str, Any]] | None = None) -> bool:
+        """
+        Add documents to the ChromaDB collection.
+
+        Args:
+            texts: List of text documents to add
+            metadatas: Optional metadata for each document
+
+        Returns:
+            True if successful, False otherwise
+        """
+        if not self.collection or not self._model_loaded:
+            return False
+
+        try:
+            from sentence_transformers import SentenceTransformer
+
+            if not isinstance(self.model, SentenceTransformer):
+                if not self.initialize():
+                    return False
+
+            # Generate embeddings
+            embeddings = self.model.encode(
+                texts, convert_to_numpy=True, normalize_embeddings=True
+            ).tolist()
+
+            # Add to collection
+            if metadatas is None:
+                metadatas = [{"index": i} for i in range(len(texts))]
+
+            ids = [f"doc_{i}" for i in range(len(texts))]
+            self.collection.add(
+                embeddings=embeddings,
+                ids=ids,
+                documents=texts,
+                metadatas=metadatas,
+            )
+
+            self.total_embeddings += len(texts)
+            return True
+
+        except Exception as e:
+            self.logger.error(f"Add error: {e}")
+            return False
+
+    def get_collection_count(self) -> int:
+        """Get the number of documents in the collection."""
+        if not self.collection:
+            return 0
+        try:
+            count_data = self.collection.get()
+            return len(count_data["ids"][0]) if count_data["ids"] else 0
+        except Exception:
+            return 0
+
     def get_usage_stats(self) -> dict[str, Any]:
         """Get comprehensive usage statistics."""
         return {
             "model_path": str(self.DEFAULT_MODEL_PATH),
             "stats": self.get_embedding_stats(),
             "health": self.get_health_status(),
+            "collection_count": self.get_collection_count(),
         }
 
 

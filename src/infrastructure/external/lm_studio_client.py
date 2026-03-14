@@ -61,6 +61,9 @@ class LMStudioClient:
         # Default model
         self.model = "qwen2.5-7b-instruct"
 
+        # Tracking for response time calculation
+        self._last_request_start: float | None = None
+
     def _get_headers(self) -> dict[str, str]:
         """Get headers for LM Studio API requests."""
         return {

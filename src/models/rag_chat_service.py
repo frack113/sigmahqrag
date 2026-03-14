@@ -12,8 +12,8 @@ from collections.abc import Generator
 from pathlib import Path
 from typing import Any
 
-from src.infrastructure.lm_studio_client import LMStudioClient
-from src.infrastructure.local_embedding_service import LocalEmbeddingService
+from src.infrastructure.external.lm_studio_client import LMStudioClient
+from src.core.local_embedding_service import LocalEmbeddingService
 
 
 class RAGChatService:
@@ -52,20 +52,32 @@ class RAGChatService:
         self.rag_min_score = rag_min_score
         self.conversation_history_limit = conversation_history_limit
 
+        # Default LLM settings (initialized to None, will use defaults)
+        self._llm_temperature = 0.7
+        self._llm_max_tokens = 512
+
         # Initialize LLM client directly (native Gradio approach)
         self.llm_client = LMStudioClient(
             base_url=base_url,
-            model="qwen/qwen2.5-7b-instruct",
-            temperature=0.7,
-            max_tokens=512,
+            temperature=self._llm_temperature,
+            max_tokens=self._llm_max_tokens,
         )
 
         # Initialize RAG service (native approach)
         if rag_enabled:
+            from src.core.local_embedding_service import create_local_embedding_service
+            
+            self.rag_client = create_local_embedding_service()
+            
+            # Create ChromaDB collection directly
+            from chromadb import PersistentClient
             persist_dir = Path("data/models/chroma_db")
-            self.rag_client = LocalEmbeddingService(
-                collection_name="chat_collection",
-                persist_directory=str(persist_dir),
+            persist_dir.mkdir(parents=True, exist_ok=True)
+            
+            client = PersistentClient(str(persist_dir))
+            self.rag_client.collection = client.get_or_create_collection(
+                name="chat_collection",
+                metadata={"hnsw:space": "cosine"},
             )
         else:
             self.rag_client = None

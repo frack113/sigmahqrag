@@ -1,0 +1,7 @@
+{
+    "name": "SigmaHQ RAG",
+    "version": "1.0.0",
+    "description": "A Retrieval-Augmented Generation (RAG) application for SigmaHQ.",
+    "author": "SigmaHQ Team",
+    "license": "MIT"
+}
