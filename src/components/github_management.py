@@ -29,6 +29,7 @@ class GitHubManagement:
 
     def __init__(self):
         self.config_service = ConfigService()
+        self.current_config: dict[str, Any] | None = None
 
         # Use Gradio state for UI state management
         self.json_state = gr.State(

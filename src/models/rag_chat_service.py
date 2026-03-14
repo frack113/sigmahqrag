@@ -30,21 +30,21 @@ class RAGChatService:
 
     def __init__(
         self,
-        base_url: str = "http://localhost:1234",
-        rag_enabled: bool = True,
-        rag_n_results: int = 3,
-        rag_min_score: float = 0.1,
-        conversation_history_limit: int = 10,
+        base_url: str,
+        rag_enabled: bool,
+        rag_n_results: int,
+        rag_min_score: float,
+        conversation_history_limit: int,
     ):
         """
         Initialize the RAG chat service.
 
         Args:
-            base_url: Base URL for LM Studio server
-            rag_enabled: Whether RAG functionality is enabled
-            rag_n_results: Number of RAG results to retrieve
-            rag_min_score: Minimum similarity score for RAG results
-            conversation_history_limit: Maximum number of conversation messages to keep
+            base_url: Base URL for LM Studio server (required - from config)
+            rag_enabled: Whether RAG functionality is enabled (required - from config)
+            rag_n_results: Number of RAG results to retrieve (required - from config)
+            rag_min_score: Minimum similarity score for RAG results (required - from config)
+            conversation_history_limit: Maximum number of conversation messages to keep (required - from config)
         """
         self.logger = logging.getLogger(__name__)
         self.rag_enabled = rag_enabled
@@ -52,15 +52,10 @@ class RAGChatService:
         self.rag_min_score = rag_min_score
         self.conversation_history_limit = conversation_history_limit
 
-        # Default LLM settings (initialized to None, will use defaults)
-        self._llm_temperature = 0.7
-        self._llm_max_tokens = 512
-
         # Initialize LLM client directly (native Gradio approach)
+        # Temperature and max_tokens will be handled by the caller/service
         self.llm_client = LMStudioClient(
             base_url=base_url,
-            temperature=self._llm_temperature,
-            max_tokens=self._llm_max_tokens,
         )
 
         # Initialize RAG service (native approach)
@@ -278,13 +273,13 @@ class RAGChatService:
 
 
 def create_rag_chat_service(
-    base_url: str = "http://localhost:1234",
-    rag_enabled: bool = True,
-    rag_n_results: int = 3,
-    rag_min_score: float = 0.1,
-    conversation_history_limit: int = 10,
+    base_url: str,
+    rag_enabled: bool,
+    rag_n_results: int,
+    rag_min_score: float,
+    conversation_history_limit: int,
 ) -> RAGChatService:
-    """Create a RAG chat service with default configuration."""
+    """Create a RAG chat service with specified configuration (all values required from config)."""
     return RAGChatService(
         base_url=base_url,
         rag_enabled=rag_enabled,

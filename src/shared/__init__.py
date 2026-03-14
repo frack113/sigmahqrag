@@ -12,54 +12,20 @@ from .config_manager import (
     create_config_manager,
 )
 from .constants import (
-    # Application constants
+    # Application constants - only identity and infrastructure
     APP_NAME,
     APP_VERSION,
-    DEFAULT_ALLOWED_FILE_EXTENSIONS,
-    DEFAULT_BATCH_SIZE,
-    DEFAULT_CACHE_ENABLED,
-    # Cache configuration defaults
-    DEFAULT_CACHE_SIZE,
-    DEFAULT_CACHE_TTL,
-    DEFAULT_CHUNK_OVERLAP,
-    DEFAULT_CHUNK_SIZE,
-    DEFAULT_CONVERSATION_HISTORY_LIMIT,
-    DEFAULT_DB_MAX_CONNECTIONS,
-    # Database configuration defaults
-    DEFAULT_DB_PATH,
-    DEFAULT_DB_TIMEOUT,
-    # RAG configuration defaults
-    DEFAULT_EMBEDDING_MODEL,
-    # GitHub configuration defaults
-    DEFAULT_GITHUB_API_BASE_URL,
-    DEFAULT_GITHUB_RATE_LIMIT_DELAY,
-    DEFAULT_LLM_API_KEY,
-    DEFAULT_LLM_BASE_URL,
-    DEFAULT_LLM_ENABLE_STREAMING,
-    DEFAULT_LLM_MAX_TOKENS,
-    # LLM configuration defaults
-    DEFAULT_LLM_MODEL,
-    DEFAULT_LLM_TEMPERATURE,
-    # LM Studio configuration defaults
-    DEFAULT_LM_STUDIO_BASE_URL,
-    DEFAULT_LOG_FILE,
-    DEFAULT_LOG_FORMAT,
-    # Logging configuration defaults
-    DEFAULT_LOG_LEVEL,
-    # File processing configuration defaults
-    DEFAULT_MAX_FILE_SIZE_MB,
-    # Performance configuration defaults
-    DEFAULT_MAX_WORKERS,
-    DEFAULT_RAG_MIN_SCORE,
-    DEFAULT_RAG_N_RESULTS,
-    DEFAULT_RAG_PERSIST_DIRECTORY,
-    DEFAULT_REQUEST_TIMEOUT,
-    DEFAULT_RETRY_ATTEMPTS,
-    DEFAULT_RETRY_DELAY,
-    DEFAULT_TEMP_DIR,
-    DEFAULT_UPLOAD_DIR,
-    SERVICE_APPLICATION,
-    # Service constants
+    APP_DESCRIPTION,
+    AUTHOR,
+    LICENSE_,
+    # Environment variable keys (values come from config.json)
+    ENV_LLM_MODEL,
+    ENV_LLM_BASE_URL,
+    ENV_LLM_TEMPERATURE,
+    ENV_LLM_MAX_TOKENS,
+    ENV_GITHUB_TOKEN,
+    ENV_GITHUB_API_BASE_URL,
+    # Service identifiers
     SERVICE_CHAT,
     SERVICE_CONFIG,
     SERVICE_DATA,
@@ -70,10 +36,10 @@ from .constants import (
     SERVICE_LLM,
     SERVICE_LM_STUDIO,
     SERVICE_RAG,
-    STATUS_DEGRADED,
-    # Status codes
+    # Status codes (only status values)
     STATUS_HEALTHY,
     STATUS_UNHEALTHY,
+    STATUS_DEGRADED,
 )
 from .exceptions import (
     BaseServiceError,
@@ -143,61 +109,30 @@ from .utils import (
 )
 
 __all__ = [
-    # Application constants
+    # Application constants (identity only)
     "APP_NAME",
     "APP_VERSION",
-    # LLM configuration defaults
-    "DEFAULT_LLM_MODEL",
-    "DEFAULT_LLM_BASE_URL",
-    "DEFAULT_LLM_API_KEY",
-    "DEFAULT_LLM_TEMPERATURE",
-    "DEFAULT_LLM_MAX_TOKENS",
-    "DEFAULT_LLM_ENABLE_STREAMING",
-    # RAG configuration defaults
-    "DEFAULT_EMBEDDING_MODEL",
-    "DEFAULT_CHUNK_SIZE",
-    "DEFAULT_CHUNK_OVERLAP",
-    "DEFAULT_RAG_N_RESULTS",
-    "DEFAULT_RAG_MIN_SCORE",
-    # Database configuration defaults
-    "DEFAULT_DB_PATH",
-    "DEFAULT_DB_MAX_CONNECTIONS",
-    "DEFAULT_DB_TIMEOUT",
-    # Service constants
+    "APP_DESCRIPTION",
+    "AUTHOR",
+    "LICENSE_",
+    # Environment variable keys
+    "ENV_LLM_MODEL",
+    "ENV_LLM_BASE_URL",
+    "ENV_LLM_TEMPERATURE",
+    "ENV_LLM_MAX_TOKENS",
+    "ENV_GITHUB_TOKEN",
+    "ENV_GITHUB_API_BASE_URL",
+    # Service identifiers
     "SERVICE_CHAT",
-    "SERVICE_LLM",
-    "SERVICE_RAG",
     "SERVICE_CONFIG",
-    "SERVICE_FILE_PROCESSOR",
     "SERVICE_DATA",
     "SERVICE_DATABASE",
-    "SERVICE_GITHUB",
-    "SERVICE_LM_STUDIO",
     "SERVICE_EMBEDDING",
-    "SERVICE_APPLICATION",
-    "DEFAULT_CONVERSATION_HISTORY_LIMIT",
-    # Cache configuration defaults
-    "DEFAULT_CACHE_SIZE",
-    "DEFAULT_CACHE_TTL",
-    "DEFAULT_CACHE_ENABLED",
-    # File processing configuration defaults
-    "DEFAULT_MAX_FILE_SIZE_MB",
-    "DEFAULT_ALLOWED_FILE_EXTENSIONS",
-    # Performance configuration defaults
-    "DEFAULT_MAX_WORKERS",
-    "DEFAULT_BATCH_SIZE",
-    "DEFAULT_REQUEST_TIMEOUT",
-    "DEFAULT_RETRY_ATTEMPTS",
-    "DEFAULT_RETRY_DELAY",
-    # Logging configuration defaults
-    "DEFAULT_LOG_LEVEL",
-    "DEFAULT_LOG_FORMAT",
-    "DEFAULT_LOG_FILE",
-    # GitHub configuration defaults
-    "DEFAULT_GITHUB_API_BASE_URL",
-    "DEFAULT_GITHUB_RATE_LIMIT_DELAY",
-    # LM Studio configuration defaults
-    "DEFAULT_LM_STUDIO_BASE_URL",
+    "SERVICE_FILE_PROCESSOR",
+    "SERVICE_GITHUB",
+    "SERVICE_LLM",
+    "SERVICE_LM_STUDIO",
+    "SERVICE_RAG",
     # Status codes
     "STATUS_HEALTHY",
     "STATUS_UNHEALTHY",
@@ -265,7 +200,7 @@ __all__ = [
     # Base classes
     "BaseService",
     "CacheService",
-    # Configuration
+    # Configuration (MUST have config.json)
     "ConfigManager",
     "create_config_manager",
 ]

@@ -1,14 +1,11 @@
 """
-Configuration Service for Gradio Native Integration
+Configuration Service - Simplified for Gradio Native Integration
 
-Uses simple synchronous methods - no async wrappers needed:
-- Direct JSON file operations
-- Simple CRUD operations
-- Gradio queue=True handles async execution
+Uses data/config.json as the single source of truth.
+No fallbacks or DEFAULT_* values - all settings come from config.json.
+Requires data/config.json to exist at startup.
 """
 
-import json
-import os
 from pathlib import Path
 from typing import Any
 
@@ -50,115 +47,52 @@ class RepositoryConfig:
 
 class ConfigService:
     """
-    Configuration service using simple synchronous methods.
+    Configuration service reading directly from data/config.json.
 
     Features:
-    - JSON-based configuration storage
-    - Simple CRUD operations (Gradio queue=True handles async)
-    - Repository management with dataclasses
+    - Single source of truth: data/config.json
+    - No fallback defaults - all values from config
+    - Repository management via the repositories array in config
+
+    Note: All configuration must come from data/config.json.
+    Missing required configuration will cause errors at startup.
     """
 
-    def __init__(self):
-        self.config_dir = Path("data")
-        self.github_config_path = self.config_dir / "github.json"
-        self.rag_config_path = self.config_dir / "rag_config.json"
+    def __init__(self, config_path: str | Path | None = None):
+        """Initialize with config path (defaults to data/config.json)."""
+        from src.shared.config_manager import create_config_manager
 
-        # Load existing configurations
-        self._ensure_default_configs()
-
-    def _ensure_default_configs(self):
-        """Ensure default configuration files exist."""
-        if not self.github_config_path.exists():
-            self.github_config_path.parent.mkdir(parents=True, exist_ok=True)
-
-            default_repos = [
-                RepositoryConfig(
-                    url="https://github.com/user/repo1.git",
-                    branch="main",
-                    enabled=True,
-                    file_extensions=["py", "js", "ts"],
-                )
-            ]
-
-            with open(self.github_config_path, "w", encoding="utf-8") as f:
-                json.dump(
-                    {"repositories": [r.to_dict() for r in default_repos]}, f, indent=2
-                )
+        self.config_manager = create_config_manager(config_path)
 
     def get_repositories(self) -> list[RepositoryConfig]:
-        """Get repository configurations."""
-        if not self.github_config_path.exists():
+        """Get repository configurations from config.json."""
+        repos_data = self.config_manager.get("repositories", [])
+
+        if not isinstance(repos_data, list):
             return []
 
-        try:
-            with open(self.github_config_path, encoding="utf-8") as f:
-                data = json.load(f)
-                return [
-                    RepositoryConfig.from_dict(r) for r in data.get("repositories", [])
-                ]
-        except Exception as e:
-            print(f"Error loading repositories: {e}")
-            return []
+        return [
+            RepositoryConfig.from_dict(repo) for repo in repos_data if isinstance(repo, dict)
+        ]
 
-    def update_repositories(self, repos: list[RepositoryConfig]) -> bool:
-        """Update repository configurations."""
-        try:
-            self.config_dir.mkdir(parents=True, exist_ok=True)
+    def get_llm_config(self) -> dict[str, Any]:
+        """Get LLM configuration from config.json."""
+        llm_config = self.config_manager.get("llm", {})
+        return llm_config or {}
 
-            data = {"repositories": [r.to_dict() for r in repos]}
+    def get_network_config(self) -> dict[str, Any]:
+        """Get network configuration from config.json."""
+        network_config = self.config_manager.get("network", {})
+        return network_config or {}
 
-            with open(self.github_config_path, "w", encoding="utf-8") as f:
-                json.dump(data, f, indent=2)
+    def get_ui_config(self) -> dict[str, Any]:
+        """Get UI/CSS configuration from config.json."""
+        ui_config = self.config_manager.get("ui_css", {})
+        return ui_config or {}
 
-            return True
-        except Exception as e:
-            print(f"Error updating repositories: {e}")
-            return False
-
-    def get_rag_config(self) -> dict[str, Any]:
-        """Get RAG configuration."""
-        if not self.rag_config_path.exists():
-            return {
-                "embedding_model": "all-MiniLM-L6-v2",
-                "collection_name": "chat_collection",
-                "chunk_size": 1000,
-                "chunk_overlap": 200,
-            }
-
-        try:
-            with open(self.rag_config_path, encoding="utf-8") as f:
-                return json.load(f)
-        except Exception as e:
-            print(f"Error loading RAG config: {e}")
-            return {
-                "embedding_model": "all-MiniLM-L6-v2",
-                "collection_name": "chat_collection",
-                "chunk_size": 1000,
-                "chunk_overlap": 200,
-            }
-
-    def update_rag_config(self, config: dict[str, Any]) -> bool:
-        """Update RAG configuration."""
-        try:
-            self.config_dir.mkdir(parents=True, exist_ok=True)
-
-            with open(self.rag_config_path, "w", encoding="utf-8") as f:
-                json.dump(config, f, indent=2)
-
-            return True
-        except Exception as e:
-            print(f"Error updating RAG config: {e}")
-            return False
-
-    def get_server_config(self) -> dict[str, Any]:
-        """Get server configuration."""
-
-        return {
-            "host": os.getenv("HOST", "0.0.0.0"),
-            "port": int(os.getenv("PORT", 8002)),
-            "base_url": os.getenv("LLM_BASE_URL", "http://localhost:1234"),
-            "api_key": os.getenv("LLM_API_KEY", ""),
-        }
+    def get_config_for_repositories(self) -> list[dict[str, Any]]:
+        """Get repositories in format suitable for DataService operations."""
+        return self.config_manager.get("repositories", [])
 
     def cleanup(self):
         """Clean up resources."""

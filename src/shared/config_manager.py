@@ -1,75 +1,83 @@
 """
-Configuration Manager - Optimized for Gradio Native Integration
+Configuration Manager - Optimized for Gradio Native Integration with auto_reload support
 
 Uses simple, native methods without custom async wrappers:
 - Direct JSON file operations
 - Environment variable support
 - Validation helpers
+- Supports auto_reload for Gradio application restart
 """
 
 import json
+import os
 from pathlib import Path
 from typing import Any
 
-# Default configuration values
-DEFAULT_CONFIG = {
-    "server": {
-        "host": "0.0.0.0",
-        "port": 8002,
-    },
-    "rag": {
-        "embedding_model": "all-MiniLM-L6-v2",
-        "chunk_size": 1000,
-        "chunk_overlap": 200,
-        "history_limit": 10,
-    },
-}
+from src.application.application import MissingConfigError
 
-
-def create_config_manager(config_path: str | None = None) -> "ConfigManager":
-    """Create a configured ConfigManager instance."""
-    return ConfigManager(config_path)
+# Configuration file path - must exist at startup
+CONFIG_FILE_PATH = Path("data/config.json")
 
 
 class ConfigManager:
     """
-    Configuration manager using simple JSON operations.
+    Centralized Configuration Manager using simple JSON operations.
 
     Features:
-    - Direct file-based config storage
-    - Environment variable support for server settings
-    - Validation helpers for click handlers
+    - Direct file-based config storage with auto_reload support for Gradio
+    - Environment variable overrides (network.ip and network.port)
+    - Validation helpers for CLI handlers
+    - Thread-safe read/write operations
+    - Auto-reload capability by setting GRADIO_AUTO_RELOAD env var
     """
 
     def __init__(self, config_path: str | None = None):
+        """Initialize ConfigManager - config file must exist."""
         self.config_dir = Path("data")
-        self.config_file = config_path or (self.config_dir / "config.json")
+        if config_path is None:
+            raise ValueError("Config path is required - no defaults allowed")
+        self.config_file = Path(config_path)
         self._config: dict[str, Any] = {}
 
+    @property
+    def auto_reload(self) -> bool:
+        """Get auto_reload setting from network configuration."""
+        return self._get_nested_value("network.auto_reload")
+
+    @auto_reload.setter
+    def auto_reload(self, value: bool):
+        """Set auto_reload and trigger environment variable update."""
+        self.set_nested("network.auto_reload", value)
+        # Update GRADIO_AUTO_RELOAD environment variable if enabled
+        os.environ["GRADIO_AUTO_RELOAD"] = str(value).lower()
+
     def initialize(self) -> None:
-        """Initialize the configuration manager with defaults if needed."""
+        """Validate that config file exists and is readable. Raises MissingConfigError if not found."""
         if not self.config_file.exists():
-            self._config = DEFAULT_CONFIG.copy()
-
-            self.config_dir.mkdir(parents=True, exist_ok=True)
-            self.config_file.parent.mkdir(parents=True, exist_ok=True)
-
-            self.save_config()
-
-    def load_config(self, config_path: str | None = None) -> bool:
-        """Load configuration from file."""
-        if config_path:
-            path = Path(config_path)
-        else:
-            path = self.config_file
-
+            raise MissingConfigError(
+                f"Required configuration file must exist: {self.config_file}"
+            )
+        
+        # Verify it's a valid JSON file
         try:
-            with open(path, encoding="utf-8") as f:
+            with open(self.config_file, 'r') as f:
+                json.load(f)
+        except json.JSONDecodeError as e:
+            raise MissingConfigError(
+                f"Configuration file is not valid JSON: {self.config_file}\n{e}"
+            ) from e
+
+    def load_config(self) -> dict[str, Any]:
+        """Load and parse configuration from JSON file."""
+        try:
+            with open(self.config_file, 'r', encoding='utf-8') as f:
                 self._config = json.load(f)
-            return True
-        except Exception as e:
-            print(f"Error loading config: {e}")
-            return False
+            return self._config
+        except FileNotFoundError:
+            raise MissingConfigError(f"Configuration file not found: {self.config_file}")
+        except json.JSONDecodeError as e:
+            raise MissingConfigError(f"Invalid JSON in configuration file: {e}")
+
 
     def save_config(self, path: str | Path | None = None) -> bool:
         """Save configuration to file."""
@@ -80,6 +88,12 @@ class ConfigManager:
 
         try:
             self.config_dir.mkdir(parents=True, exist_ok=True)
+
+            # Ensure auto_reload is a boolean for proper environment variable handling
+            if "network" in self._config and isinstance(self._config["network"], dict):
+                auto_reload = self._config["network"].get("auto_reload")
+                if auto_reload is not None:
+                    self._config["network"]["auto_reload"] = bool(auto_reload)
 
             with open(filepath, "w", encoding="utf-8") as f:
                 json.dump(self._config, f, indent=2)
@@ -93,144 +107,268 @@ class ConfigManager:
         """Get current configuration."""
         return self._config.copy()
 
-    def merge_with_defaults(self) -> None:
-        """Merge loaded config with defaults for missing keys."""
-        defaults = DEFAULT_CONFIG.copy()
-
-        for key, value in defaults.items():
-            if key not in self._config:
-                self._config[key] = value
-            elif isinstance(value, dict):
-                self._config[key] = {
-                    **value,
-                    **self._config[key],
-                }
-
-    def validate_config(self) -> bool:
-        """Validate configuration values."""
+    def validate_config(self) -> tuple[bool, list[str]]:
+        """Validate configuration values. Returns (is_valid, errors)."""
         errors = []
 
-        # Server validation
-        if "server" not in self._config:
-            errors.append("Missing 'server' section")
+        # Network validation
+        if "network" not in self._config:
+            errors.append("Missing 'network' section")
         else:
-            server = self._config["server"]
+            network = self._config["network"]
 
-            if (
-                not isinstance(server.get("port"), int)
-                or server["port"] < 1024
-                or server["port"] > 65535
-            ):
-                errors.append(f"Invalid port: {server.get('port')}")
+            if isinstance(network, dict):
+                # IP validation - must be present
+                ip = network.get("ip")
+                if ip is None:
+                    errors.append("Missing required config: network.ip")
+                elif not isinstance(ip, str) or not ip.startswith(("http://", "https://", "0.", "1.")):
+                    errors.append(f"Invalid IP: {ip}")
 
-            if "host" in server and not server["host"].startswith(
-                ("http://", "https://", "0.", "1.")
-            ):
-                errors.append(f"Invalid host: {server.get('host')}")
+                # Port validation - must be present
+                port = network.get("port")
+                if port is None:
+                    errors.append("Missing required config: network.port")
+                elif not isinstance(port, int) or port < 1024 or port > 65535:
+                    errors.append(f"Invalid port: {port}")
 
-        # RAG validation
-        if "rag" not in self._config:
-            errors.append("Missing 'rag' section")
+                # Auto_reload must be boolean - must be present
+                auto_reload = network.get("auto_reload")
+                if auto_reload is None:
+                    errors.append("Missing required config: network.auto_reload")
+                elif not isinstance(auto_reload, bool):
+                    errors.append(f"Invalid auto_reload value (must be boolean): {auto_reload}")
+
+        # LLM validation - all fields required
+        if "llm" not in self._config:
+            errors.append("Missing 'llm' section")
         else:
-            rag = self._config["rag"]
+            llm = self._config["llm"]
+            if isinstance(llm, dict):
+                model = llm.get("model")
+                if model is None or model == "":
+                    errors.append("Missing or empty required config: llm.model")
 
-            if not isinstance(rag.get("chunk_size"), int) or rag["chunk_size"] <= 0:
-                errors.append(f"Invalid chunk_size: {rag.get('chunk_size')}")
+                base_url = llm.get("base_url")
+                if base_url is None or base_url == "":
+                    errors.append("Missing or empty required config: llm.base_url")
 
-            if (
-                not isinstance(rag.get("chunk_overlap"), int)
-                or rag["chunk_overlap"] < 0
-            ):
-                errors.append(f"Invalid chunk_overlap: {rag.get('chunk_overlap')}")
+                temperature = llm.get("temperature")
+                if temperature is None:
+                    errors.append("Missing required config: llm.temperature")
 
-        return len(errors) == 0
+                max_tokens = llm.get("max_tokens")
+                if max_tokens is None:
+                    errors.append("Missing required config: llm.max_tokens")
 
-    def get(self, key: str, default: Any = None) -> Any:
-        """Get configuration value by key."""
-        keys = key.split(".")
+        # UI CSS validation - theme must be present
+        if "ui_css" not in self._config:
+            errors.append("Missing 'ui_css' section")
+        else:
+            ui = self._config["ui_css"]
+            if isinstance(ui, dict):
+                theme = ui.get("theme")
+                if theme is None or theme not in ["soft", "default"]:
+                    errors.append(f"Invalid theme: must be 'soft' or 'default', got '{theme}'")
 
+        is_valid = len(errors) == 0
+        return is_valid, errors
+
+    def _get_nested_value(self, keys: str) -> Any:
+        """Get nested configuration value by dot-separated key path. Raises KeyError if not found."""
+        key_list = keys.split(".")
         value = self._config
 
-        for k in keys:
+        for k in key_list:
             if isinstance(value, dict) and k in value:
                 value = value[k]
             else:
-                return default
+                raise KeyError(f"Missing required configuration: {keys}")
 
         return value
 
+    def set_nested(self, keys: str, value: Any) -> None:
+        """Set nested configuration value by dot-separated key path. Raises KeyError if path invalid."""
+        key_list = keys.split(".")
+
+        if len(key_list) == 1:
+            self._config[key_list[0]] = value
+            return
+
+        # Navigate to parent and set/update child
+        parent_key = ".".join(key_list[:-1])
+        last_key = key_list[-1]
+
+        # Get existing dict, raise KeyError if not found (no defaults)
+        parent_dict = self._config.get(parent_key)
+        if parent_dict is None:
+            raise KeyError(f"Cannot set config value at {keys}: parent key '{parent_key}' not found")
+
+        self._config[parent_key][last_key] = value
+
+    def get(self, key: str) -> Any:
+        """Get configuration value by dot-separated key. Raises KeyError if not found."""
+        return self._get_nested_value(key)
+
     def set(self, key: str, value: Any) -> None:
-        """Set configuration value by key."""
-        keys = key.split(".")[:-1]
-        last_key = key.split(".")[-1]
+        """Set configuration value by dot-separated key."""
+        self.set_nested(key, value)
 
-        if not keys:
-            self._config[last_key] = value
-        else:
-            parent = self._config
-            for k in keys:
-                if k not in parent:
-                    parent[k] = {}
-                parent = parent[k]
-
-            parent[last_key] = value
-
-    def update_server_config(
-        self, host: str | None = None, port: int | None = None
+    def update_network_config(
+        self,
+        host: str | None = None,
+        port: int | None = None,
+        auto_reload: bool | None = None,
     ) -> None:
-        """Update server configuration."""
-        if "server" not in self._config:
-            self._config["server"] = {}
+        """Update network configuration in existing config structure."""
+        if "network" not in self._config:
+            raise MissingConfigError("Cannot update network config: 'network' section must be configured first")
+        
+        network_config = self._config["network"]
 
         if host is not None:
-            self._config["server"]["host"] = host
-
+            network_config["ip"] = host
         if port is not None:
-            self._config["server"]["port"] = port
+            network_config["port"] = port
+        if auto_reload is not None:
+            network_config["auto_reload"] = bool(auto_reload)
 
-    def update_rag_config(
+    def update_llm_config(
         self,
-        embedding_model: str | None = None,
-        chunk_size: int | None = None,
-        chunk_overlap: int | None = None,
-        history_limit: int | None = None,
+        model: str | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        base_url: str | None = None,
     ) -> None:
-        """Update RAG configuration."""
-        if "rag" not in self._config:
-            self._config["rag"] = {}
+        """Update LLM configuration in existing config structure."""
+        if "llm" not in self._config:
+            raise MissingConfigError("Cannot update LLM config: 'llm' section must be configured first")
+        
+        llm_config = self._config["llm"]
 
-        if embedding_model is not None:
-            self._config["rag"]["embedding_model"] = embedding_model
+        if model is not None:
+            llm_config["model"] = model
+        if temperature is not None:
+            llm_config["temperature"] = temperature
+        if max_tokens is not None:
+            llm_config["max_tokens"] = max_tokens
+        if base_url is not None:
+            llm_config["base_url"] = base_url
 
-        if chunk_size is not None:
-            self._config["rag"]["chunk_size"] = chunk_size
-
-        if chunk_overlap is not None:
-            self._config["rag"]["chunk_overlap"] = chunk_overlap
-
-        if history_limit is not None:
-            self._config["rag"]["history_limit"] = history_limit
-
-    def get_validated_value(
+    def update_repository_config(
         self,
-        min_val: float | int | None = None,
-        max_val: float | int | None = None,
-        allow_empty: bool = False,
-    ) -> str:
-        """Get validated string value for Gradio UI."""
-        if allow_empty and not self._config.get("server", {}).get("api_key"):
-            return ""  # Allow empty for API key fields
+        url: str | None = None,
+        branch: str | None = None,
+        enabled: bool | None = None,
+        file_extensions: list[str] | None = None,
+        repository_index: int | None = None,
+    ) -> None:
+        """Update a single repository configuration in existing config structure."""
+        if "repositories" not in self._config:
+            raise MissingConfigError("Cannot update repository config: 'repositories' section must be configured first")
+        
+        repositories = self._config["repositories"]
 
-        if min_val is not None and max_val is not None:
-            val = self._config.get("rag", {}).get("chunk_size", 1000)
+        if repository_index is None or 0 <= repository_index < len(repositories):
+            return
 
-            if isinstance(val, str):
-                try:
-                    val = int(val)
-                except ValueError:
-                    val = min_val
+        repo = repositories[repository_index]
+        if isinstance(repo, dict):
+            if url is not None:
+                repo["url"] = url
+            if branch is not None:
+                repo["branch"] = branch
+            if enabled is not None:
+                repo["enabled"] = bool(enabled)
+            if file_extensions is not None:
+                repo["file_extensions"] = file_extensions
 
-            val = float(min(max_val if max_val else val, min_val))
-            return str(int(val))
+    def update_ui_config(
+        self,
+        theme: str | None = None,
+        title: str | None = None,
+        primary_color: str | None = None,
+        secondary_color: str | None = None,
+        background_color: str | None = None,
+        text_color: str | None = None,
+        font_family: str | None = None,
+    ) -> None:
+        """Update UI CSS configuration in existing config structure."""
+        if "ui_css" not in self._config:
+            raise MissingConfigError("Cannot update UI config: 'ui_css' section must be configured first")
 
-        return str(self._config.get("server", {}).get("host", "0.0.0.0"))
+        ui_css = self._config["ui_css"]
+        if theme is not None:
+            ui_css["theme"] = theme
+        if title is not None:
+            ui_css["title"] = title
+        if primary_color is not None:
+            ui_css["primary_color"] = primary_color
+        if secondary_color is not None:
+            ui_css["secondary_color"] = secondary_color
+        if background_color is not None:
+            ui_css["background_color"] = background_color
+        if text_color is not None:
+            ui_css["text_color"] = text_color
+        if font_family is not None:
+            ui_css["font_family"] = font_family
+
+    def get_port(self) -> int:
+        """Get network port - raises KeyError if not in config."""
+        port = self.get("network.port")
+        if isinstance(port, str):
+            try:
+                port = int(port)
+            except ValueError:
+                pass
+        return int(port)
+
+    def get_host(self) -> str:
+        """Get network IP/host - raises KeyError if not in config."""
+        host = self.get("network.ip")
+        if isinstance(host, str) and not host.startswith(("http://", "https//")):
+            return host
+        raise KeyError("Network host/ip must be configured in config.json")
+
+    def should_auto_reload(self) -> bool:
+        """Check if auto-reload is enabled (for Gradio)."""
+        auto_reload = self.get("network.auto_reload")
+        return isinstance(auto_reload, bool) and auto_reload
+
+    def reload_config(self) -> None:
+        """Reload configuration from file without restarting application."""
+        self.load_config()
+
+    def update_from_environment(
+        self,
+        host: str | None = None,
+        port: int | None = None,
+        base_url: str | None = None,
+        api_key: str | None = None,
+    ) -> None:
+        """Update configuration from environment variables."""
+        if host is not None and "network" not in self._config:
+            self._config["network"] = {}
+
+        # Environment override for host/ip
+        if host is not None:
+            self._config.setdefault("network", {})["ip"] = host
+
+        # Environment override for port (with explicit priority check)
+        if port is not None:
+            self._config.setdefault("network", {})["port"] = port
+
+        # Environment override for base_url in LLM section
+        if base_url is not None and "llm" not in self._config:
+            self._config["llm"] = {}
+        if base_url is not None:
+            self._config.setdefault("llm", {})["base_url"] = base_url
+
+    def get_config_for_ui(self) -> dict[str, Any]:
+        """Get configuration formatted for UI display."""
+        config = self.get_config()
+
+        # Create a deep copy and format booleans properly for JSON serialization
+        result = json.loads(json.dumps(config))
+
+        return result

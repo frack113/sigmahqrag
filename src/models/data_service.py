@@ -7,6 +7,7 @@ Uses simple methods without custom async wrappers:
 - No asyncio overhead
 """
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -149,6 +150,39 @@ class DataService:
                 "default_chunk_overlap": "Unknown",
                 "error": str(e),
             }
+
+    def get_repo_config(self) -> dict[str, Any]:
+        """Load repository configuration from data/config.json.
+        
+        Returns repositories in format expected by DataManagement component.
+        Reads from the same config file used by GitHubManagement.
+        """
+        try:
+            config_path = Path("data") / "config.json"
+            
+            if not config_path.exists():
+                return {"repositories": []}
+
+            with open(config_path, encoding="utf-8") as f:
+                data = json.load(f)
+
+            # The config structure can be in different locations:
+            # 1. Directly under "repositories" (expected format)
+            # 2. Under "network.repositories" (current config format)
+            
+            if "repositories" in data and isinstance(data["repositories"], list):
+                return {"repositories": data["repositories"]}
+
+            if "network" in data and isinstance(data["network"], dict):
+                network_data = data["network"]
+                if "repositories" in network_data:
+                    return {"repositories": network_data["repositories"]}
+
+            return {"repositories": []}
+
+        except Exception as e:
+            print(f"Error loading repo config: {e}")
+            return {"repositories": []}
 
     def clear_context(self) -> bool:
         """Clear the RAG context."""

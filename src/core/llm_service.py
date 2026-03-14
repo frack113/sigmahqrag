@@ -21,11 +21,11 @@ class LLMService:
 
     def __init__(
         self,
-        base_url: str = "http://localhost:1234",
-        api_key: str = "lm-studio",
-        model: str = "qwen/qwen2.5-7b-instruct",
-        max_tokens: int = 512,
-        temperature: float = 0.7,
+        base_url: str,
+        api_key: str,
+        model: str,
+        max_tokens: int,
+        temperature: float,
     ):
         """Initialize LLM service."""
         self.base_url = base_url.rstrip("/")
@@ -71,13 +71,13 @@ class LLMService:
         messages = [{"role": "user", "content": prompt}]
         return self.chat_completion(messages)["content"]
 
-    def chat_completion(self, messages: list[dict], model: str | None = None, **kwargs) -> dict[str, Any]:
+    def chat_completion(self, messages: list[dict], model: str | None = None, max_tokens: int | None = None, temperature: float | None = None) -> dict[str, Any]:
         """Chat completion with optional streaming."""
         data = {
             "model": model or self.model,
             "messages": messages,
-            "max_tokens": kwargs.get("max_tokens", self.max_tokens),
-            "temperature": kwargs.get("temperature", self.temperature),
+            "max_tokens": max_tokens if max_tokens is not None else self.max_tokens,
+            "temperature": temperature if temperature is not None else self.temperature,
         }
 
         response = requests.post(f"{self.base_url}/v1/chat/completions", json=data, timeout=30)
@@ -99,11 +99,12 @@ class LLMService:
         return ""
 
 
+# Factory functions that accept all required parameters from config - NO DEFAULTS
 def create_chat_service(
-    base_url: str = "http://localhost:1234",
-    model: str = "qwen/qwen2.5-7b-instruct",
-    temperature: float = 0.7,
-    max_tokens: int = 512,
+    base_url: str,
+    model: str,
+    temperature: float,
+    max_tokens: int,
 ) -> LLMService:
     """Create a chat-focused service optimized for conversation."""
     return LLMService(
@@ -115,21 +116,37 @@ def create_chat_service(
 
 
 def create_completion_service(
-    base_url: str = "http://localhost:1234",
-    model: str = "qwen/qwen2.5-7b-instruct",
+    base_url: str,
+    model: str,
+    temperature: float,
+    max_tokens: int,
 ) -> LLMService:
     """Create a completion-focused service optimized for text generation."""
-    return LLMService(base_url=base_url, model=model, temperature=0.3, max_tokens=1024)
+    return LLMService(base_url=base_url, model=model, temperature=temperature, max_tokens=max_tokens)
 
 
 def create_creative_service(
-    base_url: str = "http://localhost:1234",
-    model: str = "qwen/qwen2.5-7b-instruct",
+    base_url: str,
+    model: str,
+    temperature: float,
+    max_tokens: int,
 ) -> LLMService:
-    """Create a creative-focused service optimized for creative writing."""
-    return LLMService(base_url=base_url, model=model, temperature=1.2, max_tokens=2048)
+    """Create a creative writing-focused service."""
+    return LLMService(base_url=base_url, model=model, temperature=temperature, max_tokens=max_tokens)
 
 
-def create_llm_service() -> LLMService:
-    """Create a default LLM service."""
-    return LLMService()
+# Factory function that accepts all required parameters from config - NO DEFAULTS
+def create_llm_service(
+    base_url: str,
+    model: str,
+    temperature: float,
+    max_tokens: int,
+) -> LLMService:
+    """Create an LLM service with specified configuration."""
+    return LLMService(
+        base_url=base_url,
+        api_key="lm-studio",
+        model=model,
+        max_tokens=max_tokens,
+        temperature=temperature,
+    )

@@ -1,10 +1,11 @@
 """
-Configuration Management Component - Native Gradio Features
+Configuration Management Component - Native Gradio Features with auto_reload support
 
 Uses Gradio's native features:
 - gr.Textbox for configuration display/editing
 - Simple event handlers with queue=True
-- No manual state management needed
+- Real-time validation feedback
+- Toggle for auto_reload option
 """
 
 import json
@@ -24,6 +25,7 @@ class ConfigManagement:
     - gr.Textbox for display/editing configuration
     - Simple click handlers (queue=True)
     - Real-time validation feedback
+    - Toggle for auto_reload option
     """
 
     def __init__(self, config_service: ConfigService):
@@ -34,11 +36,19 @@ class ConfigManagement:
         with gr.Column(elem_classes="config-container"):
             gr.Markdown("### ⚙️ Server Configuration")
 
+            # Toggle for auto_reload
+            with gr.Row():
+                self.auto_reload_enabled = gr.Checkbox(
+                    value=True,
+                    label="Auto-reload on config change",
+                    info="Automatically reload when config file changes"
+                )
+
             # Configuration display - use Textbox component (editable)
             self.config_display = gr.Textbox(
                 value="",
                 label="Current Configuration",
-                lines=10,
+                lines=12,
                 interactive=True,
                 max_lines=15,
             )
@@ -84,11 +94,13 @@ class ConfigManagement:
     def _load_config(self) -> tuple[str, str]:
         """Load current configuration."""
         try:
-            config = self.config_service.get_config()
+            from src.shared.config_manager import ConfigManager, create_config_manager
+            
+            # Create fresh config manager to get latest values
+            config_mgr = create_config_manager()
+            config = config_mgr.get_config_for_ui()
 
             # Format as JSON string for display
-            import json
-
             config_json = json.dumps(config, indent=2)
 
             return config_json, "✅ Configuration loaded"

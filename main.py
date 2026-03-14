@@ -13,8 +13,14 @@ To run: uv run python main.py [--reload]
 import sys
 import signal
 import logging
+import os
 
-from src.application.application import create_application, create_default_application
+# Disable Hugging Face telemetry to prevent external web requests
+os.environ["HF_HUB_DISABLE_TELEMETRY"] = "1"
+
+from pathlib import Path
+from src.shared.config_manager import MissingConfigError
+from src.application.application import create_application, SigmaHQApplication
 
 
 # Configure logging to stderr only (not duplicate with Gradio's logs)
@@ -33,16 +39,49 @@ def signal_handler(signum, frame):
     sys.exit(0)
 
 
+def validate_config_path(config_path: Path | None = None) -> Path:
+    """Validate that config.json exists before starting application.
+
+    Args:
+        config_path: Optional path to config file (defaults to data/config.json)
+
+    Returns:
+        Path to the configuration file
+
+    Raises:
+        MissingConfigError: If config.json does not exist
+    """
+    if config_path is None:
+        config_path = Path("data/config.json")
+
+    if not config_path.exists():
+        raise MissingConfigError(
+            f"Required configuration file not found: {config_path}"
+        )
+
+    return config_path
+
+
 def main():
-    """Main entry point for Gradio application."""
+    """Main entry point for Gradio application.
+
+    Configuration Requirements:
+    - data/config.json MUST exist at startup
+    - All values come from config.json (no DEFAULT_* fallbacks)
+    """
     # Register signal handlers
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
     logger.info("Starting SigmaHQ RAG")
 
-    # Create application (uses native Gradio async support via queue=True)
-    app = create_application()
+    # Validate configuration file exists before starting application
+    # This is a required step - application will not start without config.json
+    config_path = validate_config_path()
+    logger.info(f"Using configuration from: {config_path}")
+
+    # Create application (uses Gradio's native async support via queue=True)
+    app = SigmaHQApplication(config_path=str(config_path))
 
     try:
         app.launch()
