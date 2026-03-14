@@ -7,10 +7,7 @@ This module provides shared functionality used across the application.
 from .base_service import BaseService, CacheService
 
 # Configuration manager
-from .config_manager import (
-    ConfigManager,
-    create_config_manager,
-)
+from .config_manager import ConfigManager
 from .constants import (
     # Application constants - only identity and infrastructure
     APP_NAME,
@@ -18,6 +15,10 @@ from .constants import (
     APP_DESCRIPTION,
     AUTHOR,
     LICENSE_,
+    # Database constants
+    DEFAULT_DB_MAX_CONNECTIONS,
+    DEFAULT_DB_PATH,
+    DEFAULT_DB_TIMEOUT,
     # Environment variable keys (values come from config.json)
     ENV_LLM_MODEL,
     ENV_LLM_BASE_URL,
@@ -111,6 +112,10 @@ __all__ = [
     "APP_DESCRIPTION",
     "AUTHOR",
     "LICENSE_",
+    # Database constants
+    "DEFAULT_DB_MAX_CONNECTIONS",
+    "DEFAULT_DB_PATH",
+    "DEFAULT_DB_TIMEOUT",
     # Environment variable keys
     "ENV_LLM_MODEL",
     "ENV_LLM_BASE_URL",
@@ -195,5 +200,4 @@ __all__ = [
     "CacheService",
     # Configuration (MUST have config.json)
     "ConfigManager",
-    "create_config_manager",
 ]

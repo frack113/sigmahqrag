@@ -1,11 +1,8 @@
 """
-Configuration Manager - Optimized for Gradio Native Integration with auto_reload support
+Configuration Manager - Core Configuration Utilities
 
-Uses simple, native methods without custom async wrappers:
-- Direct JSON file operations
-- Environment variable support
-- Validation helpers
-- Supports auto_reload for Gradio application restart
+Handles configuration loading, validation, and updates.
+All values must be defined in data/config.json - no defaults allowed.
 """
 
 import json
@@ -13,10 +10,25 @@ import os
 from pathlib import Path
 from typing import Any
 
-from src.application.application import MissingConfigError
+from src.shared.exceptions import ConfigurationError
 
-# Configuration file path - must exist at startup
-CONFIG_FILE_PATH = Path("data/config.json")
+
+def create_config_manager(config_path: str | None = None) -> "ConfigManager":
+    """Create and initialize the configuration manager with config loaded.
+    
+    Args:
+        config_path: Path to configuration file (defaults to data/config.json)
+        
+    Returns:
+        Initialized ConfigManager instance
+        
+    Raises:
+        ConfigurationError: If config file doesn't exist or is invalid JSON
+    """
+    config_mgr = ConfigManager(str(config_path) if config_path else "data/config.json")
+    config_mgr.initialize()
+    config_mgr.load_config()
+    return config_mgr
 
 
 class ConfigManager:
@@ -24,11 +36,10 @@ class ConfigManager:
     Centralized Configuration Manager using simple JSON operations.
 
     Features:
-    - Direct file-based config storage with auto_reload support for Gradio
+    - Direct file-based config storage
     - Environment variable overrides (network.ip and network.port)
     - Validation helpers for CLI handlers
     - Thread-safe read/write operations
-    - Auto-reload capability by setting GRADIO_AUTO_RELOAD env var
     """
 
     def __init__(self, config_path: str | None = None):
@@ -38,18 +49,6 @@ class ConfigManager:
             raise ValueError("Config path is required - no defaults allowed")
         self.config_file = Path(config_path)
         self._config: dict[str, Any] = {}
-
-    @property
-    def auto_reload(self) -> bool:
-        """Get auto_reload setting from network configuration."""
-        return self._get_nested_value("network.auto_reload")
-
-    @auto_reload.setter
-    def auto_reload(self, value: bool):
-        """Set auto_reload and trigger environment variable update."""
-        self.set_nested("network.auto_reload", value)
-        # Update GRADIO_AUTO_RELOAD environment variable if enabled
-        os.environ["GRADIO_AUTO_RELOAD"] = str(value).lower()
 
     def initialize(self) -> None:
         """Validate that config file exists and is readable. Raises MissingConfigError if not found."""
@@ -78,22 +77,12 @@ class ConfigManager:
         except json.JSONDecodeError as e:
             raise MissingConfigError(f"Invalid JSON in configuration file: {e}")
 
-
     def save_config(self, path: str | Path | None = None) -> bool:
         """Save configuration to file."""
-        if path:
-            filepath = Path(path)
-        else:
-            filepath = self.config_file
+        filepath = Path(path) if path else self.config_file
 
         try:
             self.config_dir.mkdir(parents=True, exist_ok=True)
-
-            # Ensure auto_reload is a boolean for proper environment variable handling
-            if "network" in self._config and isinstance(self._config["network"], dict):
-                auto_reload = self._config["network"].get("auto_reload")
-                if auto_reload is not None:
-                    self._config["network"]["auto_reload"] = bool(auto_reload)
 
             with open(filepath, "w", encoding="utf-8") as f:
                 json.dump(self._config, f, indent=2)
@@ -132,12 +121,6 @@ class ConfigManager:
                 elif not isinstance(port, int) or port < 1024 or port > 65535:
                     errors.append(f"Invalid port: {port}")
 
-                # Auto_reload must be boolean - must be present
-                auto_reload = network.get("auto_reload")
-                if auto_reload is None:
-                    errors.append("Missing required config: network.auto_reload")
-                elif not isinstance(auto_reload, bool):
-                    errors.append(f"Invalid auto_reload value (must be boolean): {auto_reload}")
 
         # LLM validation - all fields required
         if "llm" not in self._config:
@@ -218,7 +201,6 @@ class ConfigManager:
         self,
         host: str | None = None,
         port: int | None = None,
-        auto_reload: bool | None = None,
     ) -> None:
         """Update network configuration in existing config structure."""
         if "network" not in self._config:
@@ -230,8 +212,6 @@ class ConfigManager:
             network_config["ip"] = host
         if port is not None:
             network_config["port"] = port
-        if auto_reload is not None:
-            network_config["auto_reload"] = bool(auto_reload)
 
     def update_llm_config(
         self,
@@ -330,14 +310,6 @@ class ConfigManager:
             return host
         raise KeyError("Network host/ip must be configured in config.json")
 
-    def should_auto_reload(self) -> bool:
-        """Check if auto-reload is enabled (for Gradio)."""
-        auto_reload = self.get("network.auto_reload")
-        return isinstance(auto_reload, bool) and auto_reload
-
-    def reload_config(self) -> None:
-        """Reload configuration from file without restarting application."""
-        self.load_config()
 
     def update_from_environment(
         self,

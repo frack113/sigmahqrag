@@ -21,12 +21,12 @@ __pycache__/
 logs/
 *.log.*
 
-# RAG Data (old files removed)
-.chromadb/
+# Data Folders
 data/local/
-data/*.db
-data/*.db-db-journal
-data/.current_session
+data/github/
+data/history/
+data/chroma_db/
+
 
 # Build
 build/

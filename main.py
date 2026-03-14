@@ -1,13 +1,11 @@
-# Main Entry Point - Gradio Application (Optimized with Native Gradio Features)
+# Main Entry Point - Gradio Application
 """
-SigmaHQ RAG - Optimized Gradio Application
+SigmaHQ RAG - Gradio Application
 
-This application uses Gradio's native features for async operations:
-- queue=True: Enables built-in request queuing per user
-- concurrency_limit=1: Serializes requests naturally
-- Gradio handles async/await automatically when queue=True
+Uses Gradio's native features for async operations.
+Port conflicts are reported as errors (no automatic retry).
 
-To run: uv run python main.py [--reload]
+Run with: uv run python main.py
 """
 
 import sys
@@ -15,15 +13,14 @@ import signal
 import logging
 import os
 
-# Disable Hugging Face telemetry to prevent external web requests
 os.environ["HF_HUB_DISABLE_TELEMETRY"] = "1"
 
 from pathlib import Path
-from src.shared.config_manager import MissingConfigError
-from src.app import create_application, SigmaHQApplication
+
+from src.shared.exceptions import MissingConfigError
+from src.application.application import SigmaHQApplication
 
 
-# Configure logging to stderr only (not duplicate with Gradio's logs)
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
@@ -40,17 +37,7 @@ def signal_handler(signum, frame):
 
 
 def validate_config_path(config_path: Path | None = None) -> Path:
-    """Validate that config.json exists before starting application.
-
-    Args:
-        config_path: Optional path to config file (defaults to data/config.json)
-
-    Returns:
-        Path to the configuration file
-
-    Raises:
-        MissingConfigError: If config.json does not exist
-    """
+    """Validate that config.json exists before starting application."""
     if config_path is None:
         config_path = Path("data/config.json")
 
@@ -62,29 +49,27 @@ def validate_config_path(config_path: Path | None = None) -> Path:
     return config_path
 
 
-def main():
-    """Main entry point for Gradio application.
-
-    Configuration Requirements:
-    - data/config.json MUST exist at startup
-    - All values come from config.json (no DEFAULT_* fallbacks)
-    """
-    # Register signal handlers
+def main() -> None:
+    """Main entry point for Gradio application."""
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
     logger.info("Starting SigmaHQ RAG")
 
-    # Validate configuration file exists before starting application
-    # This is a required step - application will not start without config.json
     config_path = validate_config_path()
     logger.info(f"Using configuration from: {config_path}")
 
-    # Create application (uses Gradio's native async support via queue=True)
     app = SigmaHQApplication(config_path=str(config_path))
 
     try:
+        # Gradio will raise OSError if port is already in use
+        # Error message will indicate the conflict
         app.launch()
+    except OSError as e:
+        logger.error(f"Failed to start application: {e}")
+        logger.error("Please ensure port %s is not already in use or change the port in config.json", 
+                    app.config["network"]["port"])
+        sys.exit(1)
     except KeyboardInterrupt:
         logger.info("Application shutdown requested")
 

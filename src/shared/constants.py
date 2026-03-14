@@ -245,6 +245,7 @@ SERVICE_LOGGING = "logging_service"
 SERVICE_DATABASE = "database_service"
 SERVICE_FILE_PROCESSOR = "file_processor"
 SERVICE_GITHUB = "github_service"
+SERVICE_EMBEDDING = "embedding_service"
 
 # === Configuration Sections ===
 CONFIG_SECTION_NETWORK = "network"
@@ -263,8 +264,95 @@ EVENT_FILE_PROCESS = "file_process"
 EVENT_CHAT_MESSAGE = "chat_message"
 EVENT_RAG_QUERY = "rag_query"
 
+# === Database Constants (SQLite) ===
+DEFAULT_DB_MAX_CONNECTIONS = 10
+DEFAULT_DB_PATH = "data/history/chat_history.db"
+DEFAULT_DB_TIMEOUT = 5
+
 # === Application Cache Keys ===
 CACHE_KEY_EMBEDDINGS = "embeddings"
 CACHE_KEY_RAG_RESULTS = "rag_results"
 CACHE_KEY_LLM_RESPONSES = "llm_responses"
 CACHE_KEY_FILE_PROCESSED = "file_processed"
+
+# === Custom CSS for Gradio Interface ===
+CUSTOM_CSS = '''
+    /* Dynamic JSON Editor - auto-expanding height */
+    .compact-json-editor {
+        font-size: 13px !important;
+        line-height: 1.45 !important;
+        min-width: 400px !important;
+        max-height: none !important;
+        overflow-y: auto !important;
+        background-color: #f9f9f9 !important;
+        border-radius: 4px !important;
+    }
+
+    /* JSON Editor Label - matching editor size */
+    .json-editor-label {
+        font-size: 14px !important;
+        font-weight: 500 !important;
+        color: #3b3b3b !important;
+        padding-top: 8px !important;
+        padding-bottom: 4px !important;
+    }
+
+    /* Compact Buttons */
+    button[size="sm"] {
+        padding: 6px 12px !important;
+        font-size: 13px !important;
+        height: auto !important;
+    }
+
+    /* Button container scaling */
+    .github-container .row {
+        gap: 4px !important;
+        margin-bottom: 8px !important;
+    }
+
+    /* Validation Status - scrollable area */
+    .validation-status-box {
+        max-height: 200px !important;
+        overflow-y: auto !important;
+        white-space: pre-wrap !important;
+        font-family: monospace !important;
+        font-size: 13px !important;
+    }
+
+    /* Two-column row layout */
+    .two-column-row {
+        display: flex !important;
+        align-items: stretch !important;
+        gap: 16px !important;
+    }
+
+    /* Main column (left) */
+    .main-column {
+        flex: 1 1 100% !important;
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 16px !important;
+    }
+
+    /* Narrow sidebar column (right) */
+    .sidebar-column {
+        width: 240px !important;
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 12px !important;
+    }
+
+    /* GitHub container main column layout */
+    .github-container > :last-child {
+        display: flex !important;
+        align-items: stretch !important;
+        gap: 16px !important;
+        min-height: 400px !important;
+    }
+
+    /* Status row styling */
+    .status-row {
+        display: flex !important;
+        width: calc(100% - 8px) !important;
+    }
+'''

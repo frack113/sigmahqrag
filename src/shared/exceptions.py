@@ -28,6 +28,12 @@ class ConfigurationError(SigmaHQError):
     pass
 
 
+class MissingConfigError(ConfigurationError):
+    """Raised when required configuration is not found."""
+
+    pass
+
+
 class BaseServiceError(SigmaHQError):
     """Base exception for base service operations."""
 

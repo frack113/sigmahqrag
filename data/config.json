@@ -1,32 +1,186 @@
 {
-  "application":{
-    "name": "SigmaHQ RAG",
-    "version": "1.0.0",
-    "description": "A Retrieval-Augmented Generation (RAG) application for SigmaHQ.",
-    "author": "SigmaHQ Team",
-    "license": "MIT"
-  },
   "network": {
     "ip": "127.0.0.1",
-    "port": 8000,
-    "auto_reload": true
+    "port": 8001
   },
   "repositories": [
     {
-      "url": "https://github.com/SigmaHQ/sigma-specification",
+      "url": "https://github.com/SigmaHQ/sigma-specification.git",
       "branch": "main",
       "enabled": true,
       "file_extensions": [
-        ".md"
+        "md"
       ]
     },
     {
-      "url": "https://github.com/SigmaHQ/pySigma",
+      "url": "https://github.com/SigmaHQ/pySigma.git",
       "branch": "main",
       "enabled": true,
       "file_extensions": [
-        ".py"
+        "py"
       ]
+    },
+    {
+      "url": "https://github.com/SigmaHQ/sigma.git",
+      "branch": "master",
+      "enabled": false,
+      "file_extensions": []
+    },
+    {
+      "url": "https://github.com/SigmaHQ/sigmahq.github.io.git",
+      "branch": "main",
+      "enabled": false,
+      "file_extensions": []
+    },
+    {
+      "url": "https://github.com/SigmaHQ/pySigma-pipeline-ocsf.git",
+      "branch": "main",
+      "enabled": false,
+      "file_extensions": []
+    },
+    {
+      "url": "https://github.com/SigmaHQ/pySigma-backend-splunk.git",
+      "branch": "main",
+      "enabled": false,
+      "file_extensions": []
+    },
+    {
+      "url": "https://github.com/SigmaHQ/sigma_engine.git",
+      "branch": "main",
+      "enabled": false,
+      "file_extensions": []
+    },
+    {
+      "url": "https://github.com/SigmaHQ/sigma-cli.git",
+      "branch": "main",
+      "enabled": false,
+      "file_extensions": []
+    },
+    {
+      "url": "https://github.com/SigmaHQ/pySigma-backend-crowdstrike.git",
+      "branch": "main",
+      "enabled": false,
+      "file_extensions": []
+    },
+    {
+      "url": "https://github.com/SigmaHQ/pySigma-backend-elasticsearch.git",
+      "branch": "main",
+      "enabled": false,
+      "file_extensions": []
+    },
+    {
+      "url": "https://github.com/SigmaHQ/pySigma-pipeline-sysmon.git",
+      "branch": "main",
+      "enabled": false,
+      "file_extensions": []
+    },
+    {
+      "url": "https://github.com/SigmaHQ/legacy-sigmatools.git",
+      "branch": "master",
+      "enabled": false,
+      "file_extensions": []
+    },
+    {
+      "url": "https://github.com/SigmaHQ/pySigma-backend-opensearch.git",
+      "branch": "main",
+      "enabled": false,
+      "file_extensions": []
+    },
+    {
+      "url": "https://github.com/SigmaHQ/pySigma-backend-insightidr.git",
+      "branch": "main",
+      "enabled": false,
+      "file_extensions": []
+    },
+    {
+      "url": "https://github.com/SigmaHQ/pySigma-validators-sigmaHQ.git",
+      "branch": "main",
+      "enabled": false,
+      "file_extensions": []
+    },
+    {
+      "url": "https://github.com/SigmaHQ/pySigma-backend-sqlite.git",
+      "branch": "main",
+      "enabled": false,
+      "file_extensions": []
+    },
+    {
+      "url": "https://github.com/SigmaHQ/pySigma-backend-golangexpr.git",
+      "branch": "main",
+      "enabled": false,
+      "file_extensions": []
+    },
+    {
+      "url": "https://github.com/SigmaHQ/pySigma-backend-datadog.git",
+      "branch": "main",
+      "enabled": false,
+      "file_extensions": []
+    },
+    {
+      "url": "https://github.com/SigmaHQ/pySigma-backend-athena.git",
+      "branch": "main",
+      "enabled": false,
+      "file_extensions": []
+    },
+    {
+      "url": "https://github.com/SigmaHQ/pySigma-community-pipelines.git",
+      "branch": "main",
+      "enabled": false,
+      "file_extensions": []
+    },
+    {
+      "url": "https://github.com/SigmaHQ/pySigma-plugin-directory.git",
+      "branch": "main",
+      "enabled": false,
+      "file_extensions": []
+    },
+    {
+      "url": "https://github.com/SigmaHQ/sigma-rules-validator.git",
+      "branch": "main",
+      "enabled": false,
+      "file_extensions": []
+    },
+    {
+      "url": "https://github.com/SigmaHQ/Detection-Rule-License.git",
+      "branch": "main",
+      "enabled": false,
+      "file_extensions": []
+    },
+    {
+      "url": "https://github.com/SigmaHQ/cookiecutter-pySigma-backend.git",
+      "branch": "main",
+      "enabled": false,
+      "file_extensions": []
+    },
+    {
+      "url": "https://github.com/SigmaHQ/pySigma-pipeline-ossem.git",
+      "branch": "main",
+      "enabled": false,
+      "file_extensions": []
+    },
+    {
+      "url": "https://github.com/SigmaHQ/sigma-workshop.git",
+      "branch": "main",
+      "enabled": false,
+      "file_extensions": []
+    },
+    {
+      "url": "https://github.com/SigmaHQ/pySigma-pipeline-windows.git",
+      "branch": "main",
+      "enabled": false,
+      "file_extensions": []
+    },
+    {
+      "url": "https://github.com/SigmaHQ/pySigma-pipeline-crowdstrike-stub.git",
+      "branch": "main",
+      "enabled": false,
+      "file_extensions": []
+    },
+    {
+      "url": "https://github.com/SigmaHQ/pySigma-backend-surrealql.git",
+      "branch": "main",
+      "enabled": false,
+      "file_extensions": []
     }
   ],
   "llm": {

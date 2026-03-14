@@ -2,7 +2,7 @@
 RAG Chat Service for Gradio - Native Integration
 
 Uses native Gradio features:
-- Direct LMStudioClient usage
+- Direct LLM service usage
 - Simple synchronous generators (queue=True handles async)
 - No custom threading infrastructure needed
 """
@@ -12,8 +12,7 @@ from collections.abc import Generator
 from pathlib import Path
 from typing import Any
 
-from src.infrastructure.external.lm_studio_client import LMStudioClient
-from src.core.local_embedding_service import LocalEmbeddingService
+from src.core.llm_service import create_llm_service
 
 
 class RAGChatService:
@@ -35,6 +34,9 @@ class RAGChatService:
         rag_n_results: int,
         rag_min_score: float,
         conversation_history_limit: int,
+        model: str = "llama3.2",
+        temperature: float = 0.7,
+        max_tokens: int = 4096,
     ):
         """
         Initialize the RAG chat service.
@@ -45,6 +47,9 @@ class RAGChatService:
             rag_n_results: Number of RAG results to retrieve (required - from config)
             rag_min_score: Minimum similarity score for RAG results (required - from config)
             conversation_history_limit: Maximum number of conversation messages to keep (required - from config)
+            model: Model name (optional)
+            temperature: Temperature for generation (optional)
+            max_tokens: Max tokens for generation (optional)
         """
         self.logger = logging.getLogger(__name__)
         self.rag_enabled = rag_enabled
@@ -53,9 +58,11 @@ class RAGChatService:
         self.conversation_history_limit = conversation_history_limit
 
         # Initialize LLM client directly (native Gradio approach)
-        # Temperature and max_tokens will be handled by the caller/service
-        self.llm_client = LMStudioClient(
+        self.llm_client = create_llm_service(
             base_url=base_url,
+            model=model,
+            temperature=temperature,
+            max_tokens=max_tokens,
         )
 
         # Initialize RAG service (native approach)
@@ -278,6 +285,9 @@ def create_rag_chat_service(
     rag_n_results: int,
     rag_min_score: float,
     conversation_history_limit: int,
+    model: str = "llama3.2",
+    temperature: float = 0.7,
+    max_tokens: int = 4096,
 ) -> RAGChatService:
     """Create a RAG chat service with specified configuration (all values required from config)."""
     return RAGChatService(
@@ -286,4 +296,7 @@ def create_rag_chat_service(
         rag_n_results=rag_n_results,
         rag_min_score=rag_min_score,
         conversation_history_limit=conversation_history_limit,
+        model=model,
+        temperature=temperature,
+        max_tokens=max_tokens,
     )

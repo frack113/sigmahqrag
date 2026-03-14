@@ -1,11 +1,10 @@
 """
-Configuration Management Component - Native Gradio Features with auto_reload support
+Configuration Management Component - Native Gradio Features
 
 Uses Gradio's native features:
 - gr.Textbox for configuration display/editing
 - Simple event handlers with queue=True
 - Real-time validation feedback
-- Toggle for auto_reload option
 """
 
 import json
@@ -25,7 +24,6 @@ class ConfigManagement:
     - gr.Textbox for display/editing configuration
     - Simple click handlers (queue=True)
     - Real-time validation feedback
-    - Toggle for auto_reload option
     """
 
     def __init__(self, config_service: ConfigService):
@@ -35,14 +33,6 @@ class ConfigManagement:
         """Create the configuration tab with native Gradio components."""
         with gr.Column(elem_classes="config-container"):
             gr.Markdown("### ⚙️ Server Configuration")
-
-            # Toggle for auto_reload
-            with gr.Row():
-                self.auto_reload_enabled = gr.Checkbox(
-                    value=True,
-                    label="Auto-reload on config change",
-                    info="Automatically reload when config file changes"
-                )
 
             # Configuration display - use Textbox component (editable)
             self.config_display = gr.Textbox(
@@ -118,8 +108,8 @@ class ConfigManagement:
             if parsed is None:
                 return "❌ Invalid JSON format"
 
-            # Update configuration via config service
-            result = self.config_service.update_config(parsed)
+            # Update configuration via config manager
+            result = self.config_service.config_manager.update_config(parsed)
 
             if result:
                 return "✅ Configuration saved successfully"
@@ -140,16 +130,31 @@ class ConfigManagement:
         try:
             parsed = json.loads(json_string)
 
-            # Validate required fields
+            # Validate required fields based on config structure
             errors = []
-            if "server" not in parsed:
-                errors.append("Missing 'server' section")
+            
+            if "network" not in parsed:
+                errors.append("Missing 'network' section")
             else:
-                server_config = parsed["server"]
+                network_config = parsed["network"]
+                
+                for field in ["ip", "port"]:
+                    if field not in network_config:
+                        errors.append(f"Missing '{field}' in network config")
 
-                for field in ["host", "port", "base_url", "api_key"]:
-                    if field not in server_config:
-                        errors.append(f"Missing '{field}' in server config")
+            if "llm" not in parsed:
+                errors.append("Missing 'llm' section")
+            else:
+                llm_config = parsed["llm"]
+                for field in ["model", "base_url", "temperature", "max_tokens"]:
+                    if field not in llm_config:
+                        errors.append(f"Missing '{field}' in llm config")
+
+            if "ui_css" not in parsed:
+                errors.append("Missing 'ui_css' section")
+
+            if "repositories" not in parsed:
+                errors.append("Missing 'repositories' section")
 
             if errors:
                 return None
@@ -164,7 +169,25 @@ class ConfigManagement:
         try:
             import json
 
-            default_config = self.config_service.get_default_config()
+            # Build a minimal valid config for reset
+            default_config = {
+                "network": {
+                    "ip": "127.0.0.1",
+                    "port": 8000
+                },
+                "llm": {
+                    "model": "qwen/qwen3.5-9b",
+                    "temperature": 0.7,
+                    "max_tokens": 5000,
+                    "base_url": "http://127.0.0.1:1234"
+                },
+                "repositories": [],
+                "ui_css": {
+                    "theme": "soft",
+                    "title": "SigmaHQ RAG"
+                }
+            }
+            
             config_json = json.dumps(default_config, indent=2)
 
             return config_json, "✅ Configuration reset to defaults"
