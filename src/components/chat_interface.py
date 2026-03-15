@@ -188,9 +188,10 @@ class ChatInterface:
 
         elif cmd == "/stats":
             stats = self._get_stats()
-            return [
-                [{"role": "assistant", "content": f"**System Statistics**:\n{stats}"}]
-            ], "Statistics displayed"
+            result_content = f"**System Statistics**:\n{stats}"
+            return [[{"role": "assistant", "content": result_content}]], (
+                "Statistics displayed"
+            )
 
         elif cmd == "/clear":
             welcome_msg = "Chat history cleared. How can I help you today?"
@@ -202,11 +203,13 @@ class ChatInterface:
             yield from self._export_chat_handler()
 
         else:
-            return [
+            yield [
                 [
                     {
                         "role": "assistant",
-                        "content": "Unknown command. Type /help for available commands.",
+                        "content": (
+                            "Unknown command. " "Type /help for available commands."
+                        ),
                     }
                 ],
                 "Unknown command",
@@ -265,9 +268,13 @@ class ChatInterface:
 
     def _load_initial_messages(self) -> list[dict[str, Any]]:
         """Load initial welcome message only - chat history stored in Gradio state."""
+        welcome = "Welcome to the RAG Chat Interface! 🤖"
+        powered_msg = (
+            "I'm powered by RAG technology. " "Ask me questions about your documents."
+        )
         return [
             {
                 "role": "assistant",
-                "content": "Welcome to the RAG Chat Interface! 🤖\n\nI'm powered by RAG technology. Ask me questions about your documents.",
+                "content": welcome + "\n\n" + powered_msg,
             }
         ]

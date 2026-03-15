@@ -6,22 +6,21 @@ All values must be defined in data/config.json - no defaults allowed.
 """
 
 import json
-import os
 from pathlib import Path
 from typing import Any
 
-from src.shared.exceptions import ConfigurationError
+from src.shared.exceptions import MissingConfigError
 
 
 def create_config_manager(config_path: str | None = None) -> "ConfigManager":
     """Create and initialize the configuration manager with config loaded.
-    
+
     Args:
         config_path: Path to configuration file (defaults to data/config.json)
-        
+
     Returns:
         Initialized ConfigManager instance
-        
+
     Raises:
         ConfigurationError: If config file doesn't exist or is invalid JSON
     """
@@ -56,10 +55,10 @@ class ConfigManager:
             raise MissingConfigError(
                 f"Required configuration file must exist: {self.config_file}"
             )
-        
+
         # Verify it's a valid JSON file
         try:
-            with open(self.config_file, 'r') as f:
+            with open(self.config_file) as f:
                 json.load(f)
         except json.JSONDecodeError as e:
             raise MissingConfigError(
@@ -69,11 +68,13 @@ class ConfigManager:
     def load_config(self) -> dict[str, Any]:
         """Load and parse configuration from JSON file."""
         try:
-            with open(self.config_file, 'r', encoding='utf-8') as f:
+            with open(self.config_file, encoding="utf-8") as f:
                 self._config = json.load(f)
             return self._config
         except FileNotFoundError:
-            raise MissingConfigError(f"Configuration file not found: {self.config_file}")
+            raise MissingConfigError(
+                f"Configuration file not found: {self.config_file}"
+            )
         except json.JSONDecodeError as e:
             raise MissingConfigError(f"Invalid JSON in configuration file: {e}")
 
@@ -111,7 +112,9 @@ class ConfigManager:
                 ip = network.get("ip")
                 if ip is None:
                     errors.append("Missing required config: network.ip")
-                elif not isinstance(ip, str) or not ip.startswith(("http://", "https://", "0.", "1.")):
+                elif not isinstance(ip, str) or not ip.startswith(
+                    ("http://", "https://", "0.", "1.")
+                ):
                     errors.append(f"Invalid IP: {ip}")
 
                 # Port validation - must be present
@@ -120,7 +123,6 @@ class ConfigManager:
                     errors.append("Missing required config: network.port")
                 elif not isinstance(port, int) or port < 1024 or port > 65535:
                     errors.append(f"Invalid port: {port}")
-
 
         # LLM validation - all fields required
         if "llm" not in self._config:
@@ -152,7 +154,9 @@ class ConfigManager:
             if isinstance(ui, dict):
                 theme = ui.get("theme")
                 if theme is None or theme not in ["soft", "default"]:
-                    errors.append(f"Invalid theme: must be 'soft' or 'default', got '{theme}'")
+                    errors.append(
+                        f"Invalid theme: must be 'soft' or 'default', got '{theme}'"
+                    )
 
         is_valid = len(errors) == 0
         return is_valid, errors
@@ -185,7 +189,9 @@ class ConfigManager:
         # Get existing dict, raise KeyError if not found (no defaults)
         parent_dict = self._config.get(parent_key)
         if parent_dict is None:
-            raise KeyError(f"Cannot set config value at {keys}: parent key '{parent_key}' not found")
+            raise KeyError(
+                f"Cannot set config value at {keys}: parent key '{parent_key}' not found"
+            )
 
         self._config[parent_key][last_key] = value
 
@@ -204,8 +210,10 @@ class ConfigManager:
     ) -> None:
         """Update network configuration in existing config structure."""
         if "network" not in self._config:
-            raise MissingConfigError("Cannot update network config: 'network' section must be configured first")
-        
+            raise MissingConfigError(
+                "Cannot update network config: 'network' section must be configured first"
+            )
+
         network_config = self._config["network"]
 
         if host is not None:
@@ -222,8 +230,10 @@ class ConfigManager:
     ) -> None:
         """Update LLM configuration in existing config structure."""
         if "llm" not in self._config:
-            raise MissingConfigError("Cannot update LLM config: 'llm' section must be configured first")
-        
+            raise MissingConfigError(
+                "Cannot update LLM config: 'llm' section must be configured first"
+            )
+
         llm_config = self._config["llm"]
 
         if model is not None:
@@ -245,8 +255,10 @@ class ConfigManager:
     ) -> None:
         """Update a single repository configuration in existing config structure."""
         if "repositories" not in self._config:
-            raise MissingConfigError("Cannot update repository config: 'repositories' section must be configured first")
-        
+            raise MissingConfigError(
+                "Cannot update repository config: 'repositories' section must be configured first"
+            )
+
         repositories = self._config["repositories"]
 
         if repository_index is None or 0 <= repository_index < len(repositories):
@@ -275,7 +287,9 @@ class ConfigManager:
     ) -> None:
         """Update UI CSS configuration in existing config structure."""
         if "ui_css" not in self._config:
-            raise MissingConfigError("Cannot update UI config: 'ui_css' section must be configured first")
+            raise MissingConfigError(
+                "Cannot update UI config: 'ui_css' section must be configured first"
+            )
 
         ui_css = self._config["ui_css"]
         if theme is not None:
@@ -309,7 +323,6 @@ class ConfigManager:
         if isinstance(host, str) and not host.startswith(("http://", "https//")):
             return host
         raise KeyError("Network host/ip must be configured in config.json")
-
 
     def update_from_environment(
         self,

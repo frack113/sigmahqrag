@@ -9,21 +9,21 @@ from .base_service import BaseService, CacheService
 # Configuration manager
 from .config_manager import ConfigManager
 from .constants import (
+    APP_DESCRIPTION,
     # Application constants - only identity and infrastructure
     APP_NAME,
     APP_VERSION,
-    APP_DESCRIPTION,
     AUTHOR,
-    LICENSE_,
     # Database constants
     DEFAULT_DB_MAX_CONNECTIONS,
     DEFAULT_DB_PATH,
     DEFAULT_DB_TIMEOUT,
+    ENV_LLM_BASE_URL,
+    ENV_LLM_MAX_TOKENS,
     # Environment variable keys (values come from config.json)
     ENV_LLM_MODEL,
-    ENV_LLM_BASE_URL,
     ENV_LLM_TEMPERATURE,
-    ENV_LLM_MAX_TOKENS,
+    LICENSE_,
     # Service identifiers
     SERVICE_CHAT,
     SERVICE_CONFIG,
@@ -34,10 +34,10 @@ from .constants import (
     SERVICE_GITHUB,
     SERVICE_LLM,
     SERVICE_RAG,
+    STATUS_DEGRADED,
     # Status codes (only status values)
     STATUS_HEALTHY,
     STATUS_UNHEALTHY,
-    STATUS_DEGRADED,
 )
 from .exceptions import (
     BaseServiceError,

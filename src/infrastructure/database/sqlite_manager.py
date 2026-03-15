@@ -612,4 +612,3 @@ def create_sqlite_manager(
         max_connections=max_connections,
         timeout=timeout,
     )
-

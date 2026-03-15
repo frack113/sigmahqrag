@@ -10,7 +10,6 @@ Provides an optimized LLM interface using LM Studio with:
 - Rate limiting
 """
 
-import time
 from typing import Any
 
 import requests
@@ -71,7 +70,13 @@ class LLMService:
         messages = [{"role": "user", "content": prompt}]
         return self.chat_completion(messages)["content"]
 
-    def chat_completion(self, messages: list[dict], model: str | None = None, max_tokens: int | None = None, temperature: float | None = None) -> dict[str, Any]:
+    def chat_completion(
+        self,
+        messages: list[dict],
+        model: str | None = None,
+        max_tokens: int | None = None,
+        temperature: float | None = None,
+    ) -> dict[str, Any]:
         """Chat completion with optional streaming."""
         data = {
             "model": model or self.model,
@@ -80,7 +85,9 @@ class LLMService:
             "temperature": temperature if temperature is not None else self.temperature,
         }
 
-        response = requests.post(f"{self.base_url}/v1/chat/completions", json=data, timeout=30)
+        response = requests.post(
+            f"{self.base_url}/v1/chat/completions", json=data, timeout=30
+        )
         if response.status_code == 200:
             return response.json()
         return {}
@@ -93,7 +100,9 @@ class LLMService:
             "max_tokens": self.max_tokens,
             "temperature": self.temperature,
         }
-        response = requests.post(f"{self.base_url}/v1/chat/completions", json=data, timeout=30)
+        response = requests.post(
+            f"{self.base_url}/v1/chat/completions", json=data, timeout=30
+        )
         if response.status_code == 200:
             return response.json()["choices"][0]["message"]["content"]
         return ""
@@ -122,7 +131,9 @@ def create_completion_service(
     max_tokens: int,
 ) -> LLMService:
     """Create a completion-focused service optimized for text generation."""
-    return LLMService(base_url=base_url, model=model, temperature=temperature, max_tokens=max_tokens)
+    return LLMService(
+        base_url=base_url, model=model, temperature=temperature, max_tokens=max_tokens
+    )
 
 
 def create_creative_service(
@@ -132,7 +143,9 @@ def create_creative_service(
     max_tokens: int,
 ) -> LLMService:
     """Create a creative writing-focused service."""
-    return LLMService(base_url=base_url, model=model, temperature=temperature, max_tokens=max_tokens)
+    return LLMService(
+        base_url=base_url, model=model, temperature=temperature, max_tokens=max_tokens
+    )
 
 
 # Factory function that accepts all required parameters from config - NO DEFAULTS

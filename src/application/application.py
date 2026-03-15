@@ -11,10 +11,10 @@ from typing import Any
 
 import gradio as gr
 
-from src.shared.config_manager import create_config_manager
-from src.shared.constants import DATA_CHROMA_PATH
 from src.core.rag_service import RAGService
 from src.models.data_service import DataService
+from src.shared.config_manager import create_config_manager
+from src.shared.constants import DATA_CHROMA_PATH
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ class SigmaHQApplication:
 
         # Optional services - initialized when interface is created
         self.interface: gr.Blocks | None = None
-        
+
         logger.info(f"Configuration loaded from {config_file}")
 
     @property
@@ -41,11 +41,11 @@ class SigmaHQApplication:
     def initialize_services(self):
         """Initialize all application services."""
         from src.components.chat_interface import ChatInterface
+        from src.components.config_management import ConfigManagement
         from src.components.data_management import DataManagement
         from src.components.file_management import FileManagement
         from src.components.github_management import GitHubManagement
         from src.components.logs_viewer import LogsViewer
-        from src.components.config_management import ConfigManagement
 
         self.rag_chat_service = RAGService(
             collection_name="documents",
@@ -57,8 +57,8 @@ class SigmaHQApplication:
         self.github_management = GitHubManagement()
         self.file_management = FileManagement()
         self.logs_viewer = LogsViewer()
-        
-        # Assign data_management and config_management instances  
+
+        # Assign data_management and config_management instances
         self.data_management = DataManagement(self.data_service, self.config_manager)
         self.config_management = ConfigManagement(config_service=self.config_manager)
 

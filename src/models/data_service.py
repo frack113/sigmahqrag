@@ -29,8 +29,7 @@ class DataService:
     """
 
     def __init__(self):
-        import os
-        
+
         # Use DATA_* constants directly - they already include "data/" prefix
         self.github_path = Path(DATA_GITHUB_PATH)
         self.chroma_db_path = Path(DATA_CHROMA_PATH)
@@ -43,9 +42,9 @@ class DataService:
 
     def index_repository(self, repo_config: dict[str, Any]) -> bool:
         """Index a repository or local path.
-        
+
         Args:
-            repo_config: Dictionary containing 'url' (path to scan) and 
+            repo_config: Dictionary containing 'url' (path to scan) and
                         'file_extensions' list of extensions to index.
         """
         try:
@@ -55,7 +54,7 @@ class DataService:
             # Determine the path to index
             if not Path(url).is_absolute():
                 # Convert relative path like 'docs/USER_DOCUMENTATION' to absolute
-                import os
+
                 base_dir = Path(DATA_GITHUB_PATH)  # Use constant with "data/" prefix
                 url = str(Path(base_dir) / Path(url))
 
@@ -72,7 +71,16 @@ class DataService:
 
             # If no specific extensions, use defaults
             if not file_extensions:
-                file_extensions = ["py", "md", "yml", "yaml", "json", "toml", "txt", "sh"]
+                file_extensions = [
+                    "py",
+                    "md",
+                    "yml",
+                    "yaml",
+                    "json",
+                    "toml",
+                    "txt",
+                    "sh",
+                ]
 
             for ext in file_extensions:
                 # Find files recursively
@@ -83,9 +91,10 @@ class DataService:
 
             # Copy files to github directory for unified indexing
             import shutil
+
             repo_name = Path(url).name if url else "repo"
             dest_path = self.github_path / repo_name
-            
+
             dest_path.mkdir(exist_ok=True)
 
             for src_file in files_to_index:
@@ -93,10 +102,10 @@ class DataService:
                     # Create destination path preserving relative structure
                     rel_path = src_file.relative_to(path_to_index)
                     dest_file = dest_path / rel_path
-                    
+
                     # Ensure parent directory exists
                     dest_file.parent.mkdir(parents=True, exist_ok=True)
-                    
+
                     # Copy file content
                     shutil.copy2(str(src_file), str(dest_file))
                 except Exception as e:
@@ -144,11 +153,13 @@ class DataService:
                         return True
                     except NotFoundError:
                         # Collection doesn't exist yet (first run) - nothing to clear
-                        print("ChromaDB collection 'documents' not found - this is expected on first run")
+                        print(
+                            "ChromaDB collection 'documents' not found - this is expected on first run"
+                        )
                         return True
             except Exception as e:
                 print(f"Could not clear ChromaDB collection: {e}")
-            
+
             return False
         except Exception as e:
             print(f"Reset failed: {e}")
@@ -160,7 +171,7 @@ class DataService:
             # Use the github_path that was set in __init__ (same path as index_repository uses)
             count = 0
             total_size = 0
-            
+
             extensions = {"py", "md", "yml", "yaml", "json", "toml"}
 
             for repo_dir in self.github_path.iterdir():
@@ -178,7 +189,7 @@ class DataService:
                 "default_chunk_overlap": 200,
             }
 
-        except Exception as e:
+        except Exception:
             return {
                 "count": 0,
                 "size_mb": 0,
@@ -190,11 +201,10 @@ class DataService:
     def get_repo_config(self) -> dict[str, Any]:
         """Load repository configuration from data/config.json."""
         try:
-            import os
-            
+
             # Get absolute path to data/config.json
             config_path = Path("data/config.json")
-            
+
             if not config_path.exists():
                 return {"repositories": []}
 
@@ -204,7 +214,7 @@ class DataService:
             # The config structure can be in different locations:
             # 1. Directly under "repositories" (expected format)
             # 2. Under "network.repositories" (current config format)
-            
+
             if "repositories" in data and isinstance(data["repositories"], list):
                 return {"repositories": data["repositories"]}
 
@@ -221,32 +231,36 @@ class DataService:
 
     def reindex_vector_db(self) -> bool:
         """Re-index existing files in github_path to update ChromaDB vector database only.
-        
-        This reads the already-indexed files from data/github/ and updates the 
+
+        This reads the already-indexed files from data/github/ and updates the
         ChromaDB collection with their embeddings. Does NOT clone repositories.
         """
         try:
             # Get all files in github_path
             extensions = {"py", "md", "yml", "yaml", "json", "toml"}
             file_contents = {}  # Store content: [(relative_path, text), ...]
-            
+
             for repo_dir in self.github_path.iterdir():
                 if repo_dir.is_dir():
                     for ext in extensions:
                         files = list(repo_dir.rglob(f"*.{ext}"))
                         for file_path in files:
                             try:
-                                relative_path = str(file_path.relative_to(self.github_path))
-                                text = file_path.read_text(encoding="utf-8", errors="ignore")
+                                relative_path = str(
+                                    file_path.relative_to(self.github_path)
+                                )
+                                text = file_path.read_text(
+                                    encoding="utf-8", errors="ignore"
+                                )
                                 if text.strip():  # Only store non-empty files
                                     file_contents[(repo_dir.name, relative_path)] = text
                             except Exception as e:
                                 print(f"Error reading {file_path}: {e}")
-            
+
             if not file_contents:
                 print("No content found to index in github_path")
                 return False
-            
+
             # Get all texts to process
             texts_list = []
             for (repo_name, relative_path), text in sorted(file_contents.items()):
@@ -254,69 +268,73 @@ class DataService:
                 for chunk in chunks:
                     if chunk.strip():
                         texts_list.append(chunk)
-            
-            print(f"Processing {len(texts_list)} chunks from {len(file_contents)} files...")
-            
+
+            print(
+                f"Processing {len(texts_list)} chunks from {len(file_contents)} files..."
+            )
+
             # Load embedding model using sentence-transformers from HuggingFace repo
             try:
-                import numpy as np
-                
+
                 from sentence_transformers import SentenceTransformer
-                
+
                 # Use HuggingFace repo ID - sentence-transformers will cache locally
                 model_id = "sentence-transformers/all-MiniLM-L6-v2"
-                
+
                 embedding_model = SentenceTransformer(model_id)
                 print(f"Loaded embedding model: {model_id}")
             except Exception as e:
                 print(f"Error loading model from HuggingFace: {e}")
                 return False
-            
+
             # Generate all embeddings at once (more efficient)
             print("Generating embeddings...")
-            embeddings = embedding_model.encode(texts_list, convert_to_numpy=True, normalize_embeddings=True)
-            
+            embeddings = embedding_model.encode(
+                texts_list, convert_to_numpy=True, normalize_embeddings=True
+            )
+
             # Set up ChromaDB client and collection
             try:
                 from chromadb import PersistentClient
-                
+
                 client = PersistentClient(path=str(self.chroma_db_path))
-                
+
                 # Clear existing collection
                 if client.list_collections():
                     client.delete_collection(name="documents")
                     print("Deleted existing collection 'documents'")
-                
-                # Create new collection  
+
+                # Create new collection
                 embedding_service_collection = client.get_or_create_collection(
-                    name="documents",
-                    metadata={"hnsw:space": "cosine"}
+                    name="documents", metadata={"hnsw:space": "cosine"}
                 )
             except Exception as e:
                 print(f"Error managing ChromaDB collection: {e}")
                 return False
-            
+
             # Prepare data for insertion
             ids = []
             metadatas = []
-            
+
             index = 0
             for (repo_name, relative_path), text in sorted(file_contents.items()):
                 chunks = self._chunk_text(text, 1000, 200)
                 for chunk in chunks:
                     if not chunk.strip():
                         continue
-                    
+
                     chunk_id = f"{repo_name}_{relative_path}_chunk_{index}"
-                    
+
                     ids.append(chunk_id)
-                    metadatas.append({
-                        "repository": repo_name,
-                        "path": relative_path,
-                        "index": index,
-                    })
+                    metadatas.append(
+                        {
+                            "repository": repo_name,
+                            "path": relative_path,
+                            "index": index,
+                        }
+                    )
                     index += 1
-            
+
             # Add to ChromaDB collection
             if ids:
                 print(f"Adding {len(ids)} chunks to vector DB...")
@@ -327,30 +345,33 @@ class DataService:
                     metadatas=metadatas,
                 )
                 print(f"Successfully indexed {len(ids)} chunks")
-            
+
             return True
-            
+
         except Exception as e:
             print(f"Reindex error: {e}")
             import traceback
+
             traceback.print_exc()
             return False
-    
-    def _chunk_text(self, text: str, chunk_size: int = 1000, overlap: int = 200) -> list[str]:
+
+    def _chunk_text(
+        self, text: str, chunk_size: int = 1000, overlap: int = 200
+    ) -> list[str]:
         """Split text into overlapping chunks."""
         if len(text) <= chunk_size:
             return [text]
-        
+
         chunks = []
         start = 0
-        
+
         while start < len(text):
             end = start + chunk_size
             chunks.append(text[start:end])
             start = end - overlap if end < len(text) else len(text)
-        
+
         return chunks
-    
+
     def clear_context(self) -> bool:
         """Clear the RAG context."""
         try:

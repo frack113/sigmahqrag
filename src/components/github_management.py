@@ -9,11 +9,15 @@ Uses Gradio's native features:
 
 import json
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import gradio as gr
 import requests
-from src.models.config_service import ConfigService, RepositoryConfig
+from src.models.config_service import RepositoryConfig
+
+if TYPE_CHECKING:
+    from src.models.config_service import ConfigService
+
 
 logger = logging.getLogger(__name__)
 
@@ -29,9 +33,11 @@ class GitHubManagement:
     - SigmaHQ repository auto-add from GitHub API
     """
 
-    def __init__(self):
-        # Initialize config_service with lazy loading to avoid errors during API init test
-        self.config_service: ConfigService | None = None
+    def __init__(self) -> None:
+        # Lazy-load ConfigService when first needed to avoid initialization errors
+        from src.models.config_service import ConfigService
+
+        self._config_service: ConfigService | None = None
         self.current_config: dict[str, Any] | None = None
 
         # Use Gradio state for UI state management - always start with template
@@ -39,16 +45,17 @@ class GitHubManagement:
             value=json.dumps(self._get_default_template(), indent=2)
         )
         self.status_state = gr.State(value="Ready - Edit the JSON above to get started")
-        
+
         # Load config on first use (lazy initialization)
         try:
             from src.models.config_service import ConfigService
+
             self.config_service = ConfigService()
         except Exception as e:
             logger.error(f"Failed to initialize ConfigService: {e}")
 
     def create_tab(self) -> None:
-        """Create the GitHub management tab using native Gradio features (no CSS needed)."""
+        """Create the GitHub management tab using native Gradio features."""
         with gr.Column(variant="compact"):  # Native compact variant = less padding
             gr.Markdown("### 📁 GitHub Repository Management")
             gr.Markdown(
@@ -57,7 +64,9 @@ class GitHubManagement:
             )
 
             # Use native Gradio Row with scale parameter (no CSS needed)
-            with gr.Row(equal_height=False):  # Native equal_height=False = no vertical scrollbar on empty rows
+            with gr.Row(
+                equal_height=False
+            ):  # Native equal_height=False = no vertical scrollbar on empty rows
                 # Left: JSON editor column with native scrolling
                 with gr.Column(scale=2, min_width=500):
                     self.json_editor = gr.Code(
@@ -70,12 +79,22 @@ class GitHubManagement:
 
                 # Right: Buttons column - wider to fit button text (min_width=160)
                 with gr.Column(scale=0, min_width=160):
-                    self.load_template_btn = gr.Button("📄 Load Template", variant="secondary")
-                    self.load_config_btn = gr.Button("📂 Load Configuration", variant="secondary")
+                    self.load_template_btn = gr.Button(
+                        "📄 Load Template", variant="secondary"
+                    )
+                    self.load_config_btn = gr.Button(
+                        "📂 Load Configuration", variant="secondary"
+                    )
                     self.validate_btn = gr.Button("✅ Validate JSON", variant="primary")
-                    self.save_btn = gr.Button("💾 Save Configuration", variant="primary")
-                    self.update_all_btn = gr.Button("🔄 Update All Repos", variant="secondary")
-                    self.sigmahq_btn = gr.Button("🔍 Add SigmaHQ Repos", variant="secondary")
+                    self.save_btn = gr.Button(
+                        "💾 Save Configuration", variant="primary"
+                    )
+                    self.update_all_btn = gr.Button(
+                        "🔄 Update All Repos", variant="secondary"
+                    )
+                    self.sigmahq_btn = gr.Button(
+                        "🔍 Add SigmaHQ Repos", variant="secondary"
+                    )
 
             # Status textbox using native compact styling
             self.validation_status = gr.Textbox(
@@ -88,7 +107,7 @@ class GitHubManagement:
 
             self._setup_event_handlers()
 
-    def _setup_event_handlers(self):
+    def _setup_event_handlers(self) -> None:
         """Set up event handlers using Gradio's native pattern."""
 
         self.load_template_btn.click(
@@ -136,15 +155,14 @@ class GitHubManagement:
 
     def _load_current_config(self) -> str:
         """Load current configuration from data/config.json.
-        
-        Returns template if config service is unavailable to prevent Gradio API test errors.
-        NEVER returns None - always returns valid JSON string.
-        """
+
+        Returns template if config service unavailable to prevent Gradio API test errors.
+        Always returns valid JSON string, never None."""
         # Always return a valid JSON string - Gradio tests all handlers on init
         try:
-            # Lazy initialize config_service
-            if self.config_service is None:
-                self.config_service = ConfigService()
+            # Lazy initialize config service
+            if self._config_service is None:
+                self._config_service = ConfigService()
 
             # Get repositories data from config service (lazy init ensures file exists)
             repos_data = self.config_service.get_repositories()
@@ -164,7 +182,9 @@ class GitHubManagement:
                 "metadata": {
                     "version": "1.0.0",
                     "total_repos": len(repositories),
-                    "enabled_repos": sum(1 for repo in repositories if repo.get("enabled")),
+                    "enabled_repos": sum(
+                        1 for repo in repositories if repo.get("enabled")
+                    ),
                 },
             }
 
@@ -195,16 +215,18 @@ class GitHubManagement:
             response = requests.get(url, params=params, timeout=30)
             response.raise_for_status()
 
-            repos = []
+            repos: list[dict] = []
             for repo_data in response.json():
                 # Extract key info from API response
-                repos.append({
-                    "name": repo_data["name"],
-                    "full_name": repo_data["full_name"],
-                    "html_url": repo_data["html_url"],
-                    "default_branch": repo_data.get("default_branch", "main"),
-                    "description": repo_data.get("description", ""),
-                })
+                repos.append(
+                    {
+                        "name": repo_data["name"],
+                        "full_name": repo_data["full_name"],
+                        "html_url": repo_data["html_url"],
+                        "default_branch": repo_data.get("default_branch", "main"),
+                        "description": repo_data.get("description", ""),
+                    }
+                )
 
             logger.info(f"Fetched {len(repos)} SigmaHQ repositories from GitHub API")
             return repos if repos else None
@@ -218,50 +240,62 @@ class GitHubManagement:
 
     def _add_sigmahq_repos(self, json_string: str) -> tuple[str, str]:
         """Add missing SigmaHQ repositories to the configuration.
-        
-        Returns tuple of (updated_json_string, status_message)
-        """
+
+        Returns tuple of (updated_json_string, status_message)."""
         if not json_string or not json_string.strip():
             return (json_string, "❌ Error: Empty configuration")
 
         try:
             # Parse current config
             config = json.loads(json_string)
-            
+
             if "repositories" not in config:
-                return (json_string, "❌ Cannot add SigmaHQ repos: missing 'repositories' key")
+                return (
+                    json_string,
+                    "❌ Cannot add SigmaHQ repos: missing 'repositories' key",
+                )
 
             # Get list of already existing repo URLs (to avoid duplicates)
-            existing_urls = {
-                r["url"] for r in config["repositories"]
-                if r.get("url")
-            }
+            existing_urls = {r["url"] for r in config["repositories"] if r.get("url")}
 
             # Fetch new repos from API
             sigmahq_repos = self._fetch_sigmahq_repos()
-            
+
             if not sigmahq_repos:
-                return (json_string, "⚠️ Could not fetch SigmaHQ repos from GitHub API (check network)")
+                return (
+                    json_string,
+                    "⚠️ Could not fetch SigmaHQ repos from GitHub API (check network)",
+                )
 
             # Add only the missing repos that aren't already in config
             added_count = 0
             for api_repo in sigmahq_repos:
                 repo_url = f"{api_repo['html_url']}.git"
                 if repo_url not in existing_urls:
-                    config["repositories"].append({
-                        "url": repo_url,
-                        "branch": api_repo.get("default_branch", "main"),
-                        "enabled": False,  # Disabled by default
-                        "file_extensions": [],  # Empty array = use defaults
-                        "description": api_repo.get("description", ""),
-                    })
+                    config["repositories"].append(
+                        {
+                            "url": repo_url,
+                            "branch": api_repo.get("default_branch", "main"),
+                            "enabled": False,  # Disabled by default
+                            "file_extensions": [],  # Empty array = use defaults
+                            "description": api_repo.get("description", ""),
+                        }
+                    )
                     added_count += 1
 
+            result_message = (
+                f"✅ Added {added_count} SigmaHQ repos. Click Save Config to persist."
+            )
+
             if added_count > 0:
-                status_msg = f"✅ Added {added_count} SigmaHQ repositories (disabled)\n💾 Click 'Save Configuration' to persist changes"
-                return (json.dumps(config, indent=2), status_msg)
+                return (json.dumps(config, indent=2), result_message)
+            elif not existing_urls:
+                return (
+                    json_string,
+                    "ℹ️ No new SigmaHQ repos to add (already in config)",
+                )
             else:
-                return (json_string, "ℹ️ No new SigmaHQ repos to add (already in config)")
+                return (json.dumps(config, indent=2), result_message)
 
         except json.JSONDecodeError as e:
             return (json_string, f"❌ JSON syntax error: {str(e)}")
@@ -290,9 +324,9 @@ class GitHubManagement:
         except Exception as e:
             return f"❌ Validation error: {str(e)}"
 
-    def _validate_config_structure(self, config: dict[str, Any]) -> dict[str, Any]:
+    def _validate_config_structure(self, config: dict[str, Any]) -> dict[str, str]:
         """Validate the configuration structure."""
-        errors = []
+        errors: list[str] = []
 
         if "repositories" not in config:
             errors.append("Missing 'repositories' key")
@@ -321,7 +355,10 @@ class GitHubManagement:
         return {
             "is_valid": len(errors) == 0,
             "errors": "; ".join(errors),
-            "summary": f"{total_repos} total, {enabled_repos} enabled, {total_repos - enabled_repos} disabled",
+            "summary": (
+                f"{total_repos} repos total. "
+                f"{enabled_repos} enabled, {total_repos - enabled_repos} disabled"
+            ),
         }
 
     def _save_configuration(self, json_string: str) -> str:
@@ -337,8 +374,8 @@ class GitHubManagement:
                 return f"❌ Cannot save: {validation_result['errors']}"
 
             # Initialize config_service lazily (needed for handler tests)
-            if self.config_service is None:
-                self.config_service = ConfigService()
+            if self._config_service is None:
+                self._config_service = ConfigService()
 
             # Convert to RepositoryConfig objects
             repositories = [
@@ -384,8 +421,9 @@ class GitHubManagement:
                 {"repositories": enabled_repos}
             )
 
+            success_msg = f"✅ Update completed. {len(enabled_repos)} repos updated."
             if update_result:
-                return f"✅ Update completed successfully: {len(enabled_repos)} repositories updated"
+                return success_msg
             else:
                 return "❌ Update failed"
 
@@ -410,6 +448,6 @@ class GitHubManagement:
             },
         }
 
-    def cleanup(self):
+    def cleanup(self) -> None:
         """Clean up resources."""
         pass

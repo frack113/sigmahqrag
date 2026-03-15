@@ -11,7 +11,6 @@ import logging
 from typing import Any
 
 import gradio as gr
-from pathlib import Path
 from src.models.config_service import ConfigService
 from src.models.data_service import DataService
 
@@ -76,7 +75,7 @@ class DataManagement:
             queue=True,
         )
 
-        # Reset database button - clears ONLY ChromaDB vector DB (indexed files are preserved)
+        # Reset database button - clears only ChromaDB vector DB
         self.reset_btn.click(
             fn=self._reset_database_wrapper,
             inputs=[],
@@ -125,11 +124,11 @@ class DataManagement:
             yield f"Error: {str(e)}", {}
 
     def _reset_database_wrapper(self) -> tuple[str, Any]:
-        """Reset the database - clears ONLY ChromaDB collection (indexed files are preserved)."""
+        """Reset the database - clears only ChromaDB collection."""
         try:
             yield "Clearing vector database...", {}
 
-            # Clear only ChromaDB vector DB (indexed files in DATA_GITHUB_PATH are preserved)
+            # Clear only ChromaDB vector DB; indexed files are preserved
             reset_result = self.data_service.reset_database()
 
             if not reset_result:
@@ -137,7 +136,7 @@ class DataManagement:
                 return
 
             logger.info("ChromaDB collection 'documents' cleared")
-            yield "Database cleared (vector DB only. Run 'Update Database' to re-index)...", {}
+            yield "Database cleared. Run Update Database to re-index...", {}
             # Update statistics after clearing - should be 0 now
             updated_stats = self.data_service.get_context_stats()
             self.stats_cache = updated_stats
@@ -145,13 +144,24 @@ class DataManagement:
             # Statistics should remain unchanged since indexed files are NOT cleared
             stats_count = updated_stats.get("count", 0)
             if stats_count > 0:
-                yield f"Vector DB cleared. {stats_count} indexed files preserved. Run 'Update Database' to re-index.", updated_stats
+                preserved_files = (
+                    f"{stats_count} indexed files preserved" if stats_count > 0 else ""
+                )
+                message = (
+                    "Vector DB cleared. "
+                    f"{preserved_files}. "
+                    "Run 'Update Database' to re-index."
+                )
+                yield message, updated_stats
             else:
-                yield "Database cleared (vector DB only). Statistics refreshed.", updated_stats
+                yield (
+                    "Database cleared (vector DB only). " "Statistics refreshed.",
+                    updated_stats,
+                )
         except Exception as e:
             logger.error(f"Reset error: {e}")
             yield f"Error: {str(e)}", {}
-    
-    def cleanup(self):
+
+    def cleanup(self) -> None:
         """Clean up resources."""
         self.is_updating = False

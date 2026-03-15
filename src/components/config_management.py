@@ -84,8 +84,8 @@ class ConfigManagement:
     def _load_config(self) -> tuple[str, str]:
         """Load current configuration."""
         try:
-            from src.shared.config_manager import ConfigManager, create_config_manager
-            
+            from src.shared.config_manager import create_config_manager
+
             # Create fresh config manager to get latest values
             config_mgr = create_config_manager()
             config = config_mgr.get_config_for_ui()
@@ -132,12 +132,12 @@ class ConfigManagement:
 
             # Validate required fields based on config structure
             errors = []
-            
+
             if "network" not in parsed:
                 errors.append("Missing 'network' section")
             else:
                 network_config = parsed["network"]
-                
+
                 for field in ["ip", "port"]:
                     if field not in network_config:
                         errors.append(f"Missing '{field}' in network config")
@@ -171,23 +171,17 @@ class ConfigManagement:
 
             # Build a minimal valid config for reset
             default_config = {
-                "network": {
-                    "ip": "127.0.0.1",
-                    "port": 8000
-                },
+                "network": {"ip": "127.0.0.1", "port": 8000},
                 "llm": {
                     "model": "qwen/qwen3.5-9b",
                     "temperature": 0.7,
                     "max_tokens": 5000,
-                    "base_url": "http://127.0.0.1:1234"
+                    "base_url": "http://127.0.0.1:1234",
                 },
                 "repositories": [],
-                "ui_css": {
-                    "theme": "soft",
-                    "title": "SigmaHQ RAG"
-                }
+                "ui_css": {"theme": "soft", "title": "SigmaHQ RAG"},
             }
-            
+
             config_json = json.dumps(default_config, indent=2)
 
             return config_json, "✅ Configuration reset to defaults"

@@ -9,10 +9,11 @@ Provides a high-performance RAG system without LangChain overhead:
 - Comprehensive error handling
 """
 
-import logging
-from typing import Any, Self
-from pathlib import Path
 import asyncio
+import logging
+from pathlib import Path
+from typing import Any
+
 import chromadb
 
 from src.shared.constants import DATA_CHROMA_PATH
@@ -21,7 +22,9 @@ from src.shared.constants import DATA_CHROMA_PATH
 class RAGService:
     """High-performance RAG service with direct ChromaDB integration."""
 
-    def __init__(self, collection_name: str = "documents", persist_path: str | None = None):
+    def __init__(
+        self, collection_name: str = "documents", persist_path: str | None = None
+    ):
         """Initialize RAG service."""
         self.collection_name = collection_name
         self.persist_path = Path(persist_path or DATA_CHROMA_PATH)
@@ -37,7 +40,9 @@ class RAGService:
         self.logger = logging.getLogger(__name__)
         self._cache: dict[str, list[dict]] = {}
 
-    async def store_context(self, document_id: str, content: str, metadata: dict[str, Any] | None = None) -> None:
+    async def store_context(
+        self, document_id: str, content: str, metadata: dict[str, Any] | None = None
+    ) -> None:
         """Store document context in vector database."""
         try:
             # Chunk and embed documents
@@ -48,7 +53,9 @@ class RAGService:
                     self.collection.upsert,
                     ids=[f"{document_id}_{i}"],
                     embeddings=await self._get_embeddings([chunk]),
-                    metadatas=[{"index": i, "content": chunk, "document_id": document_id}],
+                    metadatas=[
+                        {"index": i, "content": chunk, "document_id": document_id}
+                    ],
                 )
             self.logger.info(f"Stored {len(chunks)} chunks for document {document_id}")
 
@@ -99,7 +106,9 @@ class RAGService:
             self.logger.error(f"Error deleting document: {e}")
             return False
 
-    def _chunk_text(self, text: str, chunk_size: int = 1000, overlap: int = 200) -> list[str]:
+    def _chunk_text(
+        self, text: str, chunk_size: int = 1000, overlap: int = 200
+    ) -> list[str]:
         """Split text into overlapping chunks."""
         if len(text) <= chunk_size:
             return [text]
@@ -116,14 +125,19 @@ class RAGService:
         """Generate embeddings for text using CPU fallback."""
         try:
             from sentence_transformers import SentenceTransformer
+
             model = SentenceTransformer("all-MiniLM-L6-v2")
             return await asyncio.to_thread(model.encode, texts, show_progress_bar=False)
         except Exception:
             # Fallback: use LM Studio if available
             try:
                 from src.infrastructure.external.lm_studio_client import LMStudioClient
+
                 client = LMStudioClient()
-                return [await asyncio.to_thread(client.generate_embedding, text) for text in texts]
+                return [
+                    await asyncio.to_thread(client.generate_embedding, text)
+                    for text in texts
+                ]
             except Exception as e:
                 self.logger.error(f"Embedding error: {e}")
                 return [[0.0] * 384]  # Fallback empty embedding
@@ -133,6 +147,8 @@ class RAGService:
         self._cache.clear()
 
 
-def create_rag_service(collection_name: str = "documents", persist_path: str | None = None) -> RAGService:
+def create_rag_service(
+    collection_name: str = "documents", persist_path: str | None = None
+) -> RAGService:
     """Create a RAG service with default configuration."""
     return RAGService(collection_name=collection_name, persist_path=persist_path)

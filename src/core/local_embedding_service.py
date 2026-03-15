@@ -74,7 +74,9 @@ class LocalEmbeddingService:
                 )
                 return True
             else:
-                self.logger.error(f"Unexpected embedding dimension: {len(test_embedding)}")
+                self.logger.error(
+                    f"Unexpected embedding dimension: {len(test_embedding)}"
+                )
                 return False
 
         except ImportError as e:
@@ -193,9 +195,7 @@ class LocalEmbeddingService:
             filtered_results = []
             for i, doc_list in enumerate(results["ids"]):
                 for j, doc_id in enumerate(doc_list):
-                    distance = (
-                        results["distances"][i][j] if results["distances"] else 0
-                    )
+                    distance = results["distances"][i][j] if results["distances"] else 0
                     if distance < min_score:
                         continue
 
@@ -215,7 +215,9 @@ class LocalEmbeddingService:
             self.logger.error(f"Query error: {e}")
             return []
 
-    def add(self, texts: list[str], metadatas: list[dict[str, Any]] | None = None) -> bool:
+    def add(
+        self, texts: list[str], metadatas: list[dict[str, Any]] | None = None
+    ) -> bool:
         """
         Add documents to the ChromaDB collection.
 

@@ -8,7 +8,6 @@ This file contains only infrastructure constants (types, patterns, status codes)
 
 from typing import Any
 
-
 # === Application Identity (NOT defaults) ===
 APP_NAME = "SigmaHQ RAG"
 APP_VERSION = "1.0.0"
@@ -285,7 +284,7 @@ CACHE_KEY_LLM_RESPONSES = "llm_responses"
 CACHE_KEY_FILE_PROCESSED = "file_processed"
 
 # === Custom CSS for Gradio Interface ===
-CUSTOM_CSS = '''
+CUSTOM_CSS = """
     /* Dynamic JSON Editor - auto-expanding height */
     .compact-json-editor {
         font-size: 13px !important;
@@ -364,4 +363,4 @@ CUSTOM_CSS = '''
         display: flex !important;
         width: calc(100% - 8px) !important;
     }
-'''
+"""
