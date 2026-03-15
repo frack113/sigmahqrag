@@ -37,7 +37,7 @@ class DataManagement:
 
     def create_tab(self) -> None:
         """Create the data management tab with native Gradio components."""
-        with gr.Column(elem_classes="data-container") as column:
+        with gr.Column() as column:
             gr.Markdown("### Database Statistics 📊")
 
             # Statistics display using JSON component

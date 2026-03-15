@@ -35,7 +35,7 @@ class ChatInterface:
 
     def create_tab(self) -> None:
         """Create the chat interface tab with native Gradio components."""
-        with gr.Column(elem_classes="chat-container"):
+        with gr.Column():
             gr.Markdown("## 🤖 RAG Chat Interface")
 
             # Main chat area
@@ -64,7 +64,6 @@ class ChatInterface:
                         label="Status",
                         interactive=False,
                         value="Ready",
-                        elem_classes="status-box",
                         max_lines=2,
                     )
 

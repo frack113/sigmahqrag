@@ -13,7 +13,6 @@ import gradio as gr
 
 from src.shared.config_manager import create_config_manager
 from src.shared.constants import DATA_CHROMA_PATH
-from src.shared.css import get_css
 from src.core.rag_service import RAGService
 from src.models.data_service import DataService
 
@@ -39,7 +38,6 @@ class SigmaHQApplication:
         """Property to access configuration data."""
         return self._config_data
 
-
     def initialize_services(self):
         """Initialize all application services."""
         from src.components.chat_interface import ChatInterface
@@ -60,22 +58,10 @@ class SigmaHQApplication:
         self.file_management = FileManagement()
         self.logs_viewer = LogsViewer()
         
-        # Assign data_management and config_management instances
+        # Assign data_management and config_management instances  
         self.data_management = DataManagement(self.data_service, self.config_manager)
         self.config_management = ConfigManagement(config_service=self.config_manager)
 
-        return (
-            self.chat_interface,
-            self.data_management,
-            self.github_management,
-            self.file_management,
-            self.config_management,
-            self.logs_viewer,
-        )
-
-    def _get_custom_css(self) -> str:
-        """Return custom CSS for dynamic, responsive UI styling."""
-        return get_css()
     def create_interface(self) -> gr.Blocks:
         """Create the main Gradio interface with tabs using config values."""
         ui_config = self.config["ui_css"]
@@ -115,11 +101,10 @@ class SigmaHQApplication:
 
         logger.info(f"Starting SigmaHQ RAG on {host}:{port}")
 
-        # Create interface and launch with error display enabled and theme parameter
+        # Create interface and launch with error display enabled
         self.interface = self.create_interface()
         self.interface.launch(
             server_port=port,
             server_name=host,
             show_error=True,
-            css=self._get_custom_css(),
         )

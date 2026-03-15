@@ -27,7 +27,7 @@ class LogsViewer:
 
     def create_tab(self) -> None:
         """Create the logs viewer tab with native Gradio components."""
-        with gr.Column(elem_classes="logs-container"):
+        with gr.Column():
             gr.Markdown("### Logs Viewer 📋")
 
             # Log display - use Textbox component (supports Markdown)

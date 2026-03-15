@@ -37,7 +37,7 @@ class FileManagement:
 
     def create_tab(self) -> None:
         """Create the file management tab with native Gradio components."""
-        with gr.Column(elem_classes="file-container"):
+        with gr.Column():
             gr.Markdown("### File Management 📁")
 
             # File upload area - native Gradio component

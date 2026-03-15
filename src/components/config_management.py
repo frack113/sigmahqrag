@@ -31,7 +31,7 @@ class ConfigManagement:
 
     def create_tab(self) -> None:
         """Create the configuration tab with native Gradio components."""
-        with gr.Column(elem_classes="config-container"):
+        with gr.Column():
             gr.Markdown("### ⚙️ Server Configuration")
 
             # Configuration display - use Textbox component (editable)
