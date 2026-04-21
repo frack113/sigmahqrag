@@ -83,20 +83,38 @@ def create_app() -> FastAPI:
 
 def create_gradio_ui() -> gr.Blocks:
     """Create the Gradio UI interface."""
+    from sigmahqrag.ui.chat import ChatInterface
+    from sigmahqrag.ui.mode import create_mode_toggle
 
-    def greet(name: str) -> str:
-        return f"Hello, {name}!"
+    chat = ChatInterface()
+    mode = create_mode_toggle()
 
     with gr.Blocks(title="SigmaHQ RAG") as demo:
         gr.Markdown("# SigmaHQ RAG")
         gr.Markdown("Local RAG system for Sigma rules")
+
         with gr.Row():
-            with gr.Column():
-                input_text = gr.Textbox(label="Input")
-            with gr.Column():
-                output_text = gr.Textbox(label="Output")
-        submit_btn = gr.Button("Submit")
-        submit_btn.click(fn=greet, inputs=input_text, outputs=output_text)
+            mode.render()
+
+        chatbot = gr.Chatbot(label="Chat History", height=500)
+        msg = gr.Textbox(
+            label="Message",
+            placeholder="Ask about Sigma rules...",
+            lines=2,
+        )
+        clear = gr.Button("Clear")
+
+        async def respond(
+            message: str, history: list[list[str]], mode: str
+        ) -> tuple[str, list[list[str]]]:
+            return await chat.chat(message, history, mode)
+
+        msg.submit(
+            fn=respond,
+            inputs=[msg, chatbot, mode],
+            outputs=[msg, chatbot],
+        )
+        clear.click(lambda: (None, []), outputs=[msg, chatbot])
 
     return demo  # type: ignore[no-any-return]
 
