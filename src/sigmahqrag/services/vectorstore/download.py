@@ -9,6 +9,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
+from ...utils import download_file
 
 logger = logging.getLogger(__name__)
 
@@ -107,11 +108,9 @@ def download_qdrant(
 
     try:
         try:
-            urllib.request.urlretrieve(url, archive_path, timeout=300)
-        except urllib.error.URLError as e:
+            download_file(url, archive_path)
+        except OSError as e:
             raise OSError(f"Network error downloading Qdrant: {e}") from e
-        except urllib.error.HTTPError as e:
-            raise OSError(f"HTTP error downloading Qdrant: {e.code} {e.reason}") from e
 
         logger.info(f"Downloaded to: {archive_path}")
 

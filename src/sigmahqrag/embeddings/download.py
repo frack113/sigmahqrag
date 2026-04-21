@@ -3,6 +3,7 @@
 import logging
 from pathlib import Path
 
+from ..utils import download_file
 
 logger = logging.getLogger(__name__)
 
@@ -74,8 +75,8 @@ def download_embedding_model(
     logger.info(f"Downloading embedding model from {model_url}")
 
     try:
-        urllib.request.urlretrieve(model_url, model_path, timeout=300)
-    except urllib.error.URLError as e:
+        download_file(model_url, model_path)
+    except OSError as e:
         raise OSError(f"Failed to download embedding model: {e}") from e
 
     if not model_path.exists():

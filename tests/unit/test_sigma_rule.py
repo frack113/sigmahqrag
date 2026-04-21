@@ -1,6 +1,5 @@
 """Test Sigma rule model."""
 
-import pytest
 from src.models.sigma_rule import SigmaRuleModel
 
 

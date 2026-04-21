@@ -1,10 +1,10 @@
-"""Custom exceptions."""
+"""Custom exceptions for SigmaHQ RAG."""
 
 
 class SigmaError(Exception):
     """Base exception for Sigma errors."""
 
-    def __init__(self, code: str, message: str, details: dict | None = None):
+    def __init__(self, code: str, message: str, details: dict[str, str] | None = None) -> None:
         """Initialize exception."""
         self.code = code
         self.message = message
@@ -23,7 +23,7 @@ class SigmaError(Exception):
 class ServiceUnavailableError(SigmaError):
     """Service unavailable error."""
 
-    def __init__(self, service: str):
+    def __init__(self, service: str) -> None:
         """Initialize exception."""
         super().__init__(
             code="SERVICE_UNAVAILABLE",
@@ -35,7 +35,7 @@ class ServiceUnavailableError(SigmaError):
 class ModelNotFoundError(SigmaError):
     """Model not found error."""
 
-    def __init__(self, model_name: str):
+    def __init__(self, model_name: str) -> None:
         """Initialize exception."""
         super().__init__(
             code="MODEL_NOT_FOUND",
@@ -47,7 +47,7 @@ class ModelNotFoundError(SigmaError):
 class ValidationError(SigmaError):
     """Validation error."""
 
-    def __init__(self, field: str, message: str):
+    def __init__(self, field: str, message: str) -> None:
         """Initialize exception."""
         super().__init__(
             code="VALIDATION_ERROR",

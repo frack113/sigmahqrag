@@ -1,7 +1,6 @@
 """Test custom exceptions."""
 
-import pytest
-from src.errors import SigmaError, ValidationError, ModelNotFoundError
+from src.errors import ModelNotFoundError, SigmaError, ValidationError
 
 
 def test_sigma_error() -> None:

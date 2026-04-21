@@ -8,7 +8,6 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -44,7 +43,7 @@ class LlamaService:
                 "Run download_llama_cpp() first."
             )
 
-    def start(self, model_path: str | Path | None = None) -> subprocess.Popen:
+    def start(self, model_path: str | Path | None = None) -> subprocess.Popen[Any]:
         """Start llama.cpp server.
 
         Args:
@@ -133,7 +132,8 @@ class LlamaService:
                 headers={"Content-Type": "application/json"},
             )
             with urllib.request.urlopen(request, timeout=5) as response:
-                return 200 <= response.status < 300
+                status: int = response.status
+                return 200 <= status < 300
         except urllib.error.URLError as e:
             logger.debug(f"Health check failed: {e}")
             return False

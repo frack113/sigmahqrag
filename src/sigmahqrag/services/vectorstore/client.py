@@ -8,7 +8,6 @@ import urllib.request
 from pathlib import Path
 from typing import Any
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -47,7 +46,7 @@ class QdrantService:
                 "Run download_qdrant() first."
             )
 
-    def start(self) -> subprocess.Popen:
+    def start(self) -> subprocess.Popen[Any]:
         """Start Qdrant server.
 
         Returns:
@@ -124,7 +123,8 @@ class QdrantService:
                 headers={"Content-Type": "application/json"},
             )
             with urllib.request.urlopen(request, timeout=5) as response:
-                return 200 <= response.status < 300
+                status: int = response.status
+                return 200 <= status < 300
         except urllib.error.URLError as e:
             logger.debug(f"Health check failed: {e}")
             return False

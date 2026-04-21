@@ -5,11 +5,13 @@ import os
 import platform
 import shutil
 import subprocess
-import sys
+import tarfile
+import urllib.error
 import urllib.request
 import zipfile
 from pathlib import Path
 
+from ...utils import download_file
 
 logger = logging.getLogger(__name__)
 
@@ -111,8 +113,8 @@ def download_llama_cpp(
 
     try:
         try:
-            urllib.request.urlretrieve(url, archive_path, timeout=300)
-        except urllib.error.URLError as e:
+            download_file(url, archive_path)
+        except OSError as e:
             raise OSError(f"Network error downloading llama.cpp: {e}") from e
 
         logger.info(f"Downloaded to: {archive_path}")
@@ -127,8 +129,6 @@ def download_llama_cpp(
                         extracted_path = temp_dir / member
                         break
         else:
-            import tarfile
-
             with tarfile.open(archive_path, "r:gz") as tf:
                 for member in tf.getmembers():
                     if "llama-server" in member.name:

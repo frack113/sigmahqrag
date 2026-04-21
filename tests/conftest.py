@@ -1,7 +1,8 @@
 """Pytest fixtures."""
 
-import pytest
 from typing import Any
+
+import pytest
 
 
 @pytest.fixture
