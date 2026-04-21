@@ -5,6 +5,9 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+import qdrant_client
+from llama_index.vector_stores.qdrant import QdrantVectorStore
+
 logger = logging.getLogger(__name__)
 
 
@@ -28,17 +31,21 @@ class QdrantService:
 
     async def initialize(self) -> None:
         """Initialize the Qdrant client and vector store."""
-        from llama_index.vector_stores.qdrant import QdrantVectorStore
-
-        self._vector_store = QdrantVectorStore(
-            host=self.host,
-            port=self.port,
-            collection_name=self.collection_name,
-        )
-        self._client = self._vector_store
-        logger.info(
-            f"QdrantService initialized: {self.host}:{self.port}/{self.collection_name}"
-        )
+        try:
+            self._client = qdrant_client.QdrantClient(
+                host=self.host,
+                port=self.port,
+            )
+            self._vector_store = QdrantVectorStore(
+                client=self._client,
+                collection_name=self.collection_name,
+            )
+            logger.info(
+                f"QdrantService initialized: {self.host}:{self.port}/{self.collection_name}"
+            )
+        except Exception as e:
+            logger.error(f"Failed to initialize Qdrant client: {e}")
+            raise
 
     async def add_vectors(
         self,
@@ -93,8 +100,6 @@ class QdrantService:
     async def health_check(self) -> bool:
         """Check if service is healthy."""
         try:
-            import qdrant_client
-
             client = qdrant_client.QdrantClient(host=self.host, port=self.port)
             collections = client.get_collections()
             return collections is not None
