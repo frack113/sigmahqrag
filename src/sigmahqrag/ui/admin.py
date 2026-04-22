@@ -8,7 +8,7 @@ from typing import Any
 import gradio as gr
 
 from sigmahqrag.admin.health import ServiceHealth, create_health_checker
-from sigmahqrag.config import LLAMA_BIN_PATH, QDRANT_BIN_PATH
+from sigmahqrag.config import LLAMA_BIN_PATH, QDRANT_BIN_PATH, get_backend, set_backend
 
 logger = logging.getLogger(__name__)
 
@@ -55,25 +55,60 @@ def create_admin_ui() -> gr.Blocks:
 
     with gr.Blocks(title="SigmaHQ Admin") as admin_demo:
         gr.Markdown("# 📊 SigmaHQ Admin")
-        gr.Markdown("Service Management Dashboard")
 
-        llama_status = gr.Label(
-            label="llama.cpp",
-            value={"status": "loading...", "color": "yellow"},
-        )
-        qdrant_status = gr.Label(
-            label="Qdrant",
-            value={"status": "loading...", "color": "yellow"},
-        )
+        with gr.Tabs():
+            with gr.Tab("Services"):
+                gr.Markdown("### Service Management")
 
-        with gr.Row():
-            refresh_btn = gr.Button("Refresh", variant="secondary")
-            llama_start_btn = gr.Button("Start llama.cpp", variant="primary")
-            llama_stop_btn = gr.Button("Stop llama.cpp", variant="stop")
-            llama_logs_btn = gr.Button("Logs", variant="secondary")
-            qdrant_start_btn = gr.Button("Start Qdrant", variant="primary")
-            qdrant_stop_btn = gr.Button("Stop Qdrant", variant="stop")
-            qdrant_logs_btn = gr.Button("Logs", variant="secondary")
+                llama_status = gr.Label(
+                    label="llama.cpp",
+                    value={"status": "loading...", "color": "yellow"},
+                )
+                qdrant_status = gr.Label(
+                    label="Qdrant",
+                    value={"status": "loading...", "color": "yellow"},
+                )
+
+                with gr.Row():
+                    refresh_btn = gr.Button("Refresh", variant="secondary")
+                    llama_start_btn = gr.Button("Start llama.cpp", variant="primary")
+                    llama_stop_btn = gr.Button("Stop llama.cpp", variant="stop")
+                    llama_logs_btn = gr.Button("Logs", variant="secondary")
+                    qdrant_start_btn = gr.Button("Start Qdrant", variant="primary")
+                    qdrant_stop_btn = gr.Button("Stop Qdrant", variant="stop")
+                    qdrant_logs_btn = gr.Button("Logs", variant="secondary")
+
+                llama_logs_output = gr.Textbox(
+                    label="llama.cpp logs",
+                    lines=10,
+                    interactive=False,
+                    visible=False,
+                )
+                qdrant_logs_output = gr.Textbox(
+                    label="Qdrant logs",
+                    lines=10,
+                    interactive=False,
+                    visible=False,
+                )
+
+            with gr.Tab("Settings"):
+                gr.Markdown("### Configuration")
+
+                backend_dropdown = gr.Dropdown(
+                    label="llama.cpp Backend",
+                    choices=["cpu", "cuda", "hip", "vulkan"],
+                    value=get_backend(),
+                )
+                backend_save_btn = gr.Button("Save Backend", variant="primary")
+                backend_status = gr.Textbox(label="Status", interactive=False)
+
+                gr.Markdown("### Binary Management")
+
+                with gr.Row():
+                    llama_download_btn = gr.Button("Download llama.cpp", variant="secondary")
+                    qdrant_download_btn = gr.Button("Download Qdrant", variant="secondary")
+
+                download_status = gr.Textbox(label="Download Status", interactive=False)
 
         llama_logs_output = gr.Textbox(
             label="llama.cpp logs",
@@ -162,6 +197,29 @@ def create_admin_ui() -> gr.Blocks:
             except Exception as e:
                 return f"Error: {e}", True
 
+        async def save_backend(backend: str) -> str:
+            try:
+                set_backend(backend)
+                return f"Backend saved: {backend}"
+            except Exception as e:
+                return f"Error: {e}"
+
+        async def download_llama_binary() -> str:
+            try:
+                from sigmahqrag.services.llama import download_llama_cpp
+                path = await download_llama_cpp()
+                return f"Downloaded to {path}"
+            except Exception as e:
+                return f"Error: {e}"
+
+        async def download_qdrant_binary() -> str:
+            try:
+                from sigmahqrag.services.vectorstore import download_qdrant
+                path = await download_qdrant()
+                return f"Downloaded to {path}"
+            except Exception as e:
+                return f"Error: {e}"
+
         refresh_btn.click(fn=fetch_status, outputs=[llama_status, qdrant_status])
         llama_start_btn.click(fn=start_llama_service, outputs=[llama_status, qdrant_status])
         llama_stop_btn.click(fn=stop_llama_service, outputs=[llama_status, qdrant_status])
@@ -169,6 +227,10 @@ def create_admin_ui() -> gr.Blocks:
         qdrant_start_btn.click(fn=start_qdrant_service, outputs=[llama_status, qdrant_status])
         qdrant_stop_btn.click(fn=stop_qdrant_service, outputs=[llama_status, qdrant_status])
         qdrant_logs_btn.click(fn=fetch_qdrant_logs, outputs=[qdrant_logs_output, qdrant_logs_output])
+
+        backend_save_btn.click(fn=save_backend, inputs=[backend_dropdown], outputs=[backend_status])
+        llama_download_btn.click(fn=download_llama_binary, outputs=[download_status])
+        qdrant_download_btn.click(fn=download_qdrant_binary, outputs=[download_status])
 
         admin_demo.load(fn=fetch_status, outputs=[llama_status, qdrant_status])
 
