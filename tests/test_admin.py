@@ -57,20 +57,30 @@ def client() -> TestClient:
 class TestGetStatusDisplay:
     """Tests for _get_status_display function."""
 
-    def test_running_status_returns_green(self, mock_llama_health: ServiceHealth) -> None:
+    def test_running_status_returns_green(
+        self, mock_llama_health: ServiceHealth, tmp_path: Path
+    ) -> None:
         """Given running service When _get_status_display Then returns green color."""
         from src.api.routes.admin import _get_status_display
 
-        result = _get_status_display(mock_llama_health, Path("bin/test"))
+        binary_path = tmp_path / "bin" / "llama-server"
+        binary_path.parent.mkdir()
+        binary_path.touch()
+        result = _get_status_display(mock_llama_health, binary_path)
 
         assert result["color"] == "green"
         assert result["status"] == "running"
 
-    def test_stopped_status_returns_red(self, mock_llama_stopped: ServiceHealth) -> None:
+    def test_stopped_status_returns_red(
+        self, mock_llama_stopped: ServiceHealth, tmp_path: Path
+    ) -> None:
         """Given stopped service When _get_status_display Then returns red color."""
         from src.api.routes.admin import _get_status_display
 
-        result = _get_status_display(mock_llama_stopped, Path("bin/test"))
+        binary_path = tmp_path / "bin" / "llama-server"
+        binary_path.parent.mkdir()
+        binary_path.touch()
+        result = _get_status_display(mock_llama_stopped, binary_path)
 
         assert result["color"] == "red"
         assert result["status"] == "stopped"
@@ -89,12 +99,15 @@ class TestGetStatusDisplay:
         assert "Binary not found" in result["message"]
 
     def test_message_included_when_present(
-        self, mock_llama_stopped: ServiceHealth
+        self, mock_llama_stopped: ServiceHealth, tmp_path: Path
     ) -> None:
         """Given health with message When _get_status_display Then message included."""
         from src.api.routes.admin import _get_status_display
 
-        result = _get_status_display(mock_llama_stopped, Path("bin/test"))
+        binary_path = tmp_path / "bin" / "llama-server"
+        binary_path.parent.mkdir()
+        binary_path.touch()
+        result = _get_status_display(mock_llama_stopped, binary_path)
 
         assert result["message"] == "Connection refused"
 
