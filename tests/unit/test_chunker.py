@@ -2,13 +2,13 @@
 
 from pathlib import Path
 
-from sigmahqrag.models.sigma_rule import SigmaRule
-from sigmahqrag.rag.chunker import (
+from src.rag.chunker import (
     SigmaChunker,
     _format_detection,
     chunk_sigma_rule,
     count_tokens,
 )
+from src.schemas.sigma_rule import SigmaRule
 
 
 class TestCountTokens:
@@ -61,10 +61,10 @@ class TestSigmaRuleModel:
         assert rule.level == "high"
 
     def test_from_dict_with_path(self):
-        """Test creating from dict with file path."""
+        """Test creating from dict with dict with file path."""
         data = {"id": "test-001", "title": "Test", "detection": {}}
         rule = SigmaRule.from_dict(data, Path("/path/to/file.yaml"), 10)
-        assert rule.file_path == Path("/path/to/file.yaml")
+        assert rule.file_path == "\\path\\to\\file.yaml"
         assert rule.line_number == 10
 
     def test_to_dict(self):
@@ -102,14 +102,14 @@ class TestChunkSigmaRule:
             id="test-001",
             title="Test Rule",
             detection={"condition": "test"},
-            file_path=Path("/path/to/rules/test.yaml"),
+            file_path="\\path\\to\\rules\\test.yaml",
             line_number=10,
         )
         chunks = chunk_sigma_rule(rule)
         assert len(chunks) >= 1
         assert chunks[0].metadata["rule_id"] == "test-001"
         assert chunks[0].metadata["title"] == "Test Rule"
-        assert "test.yaml" in chunks[0].metadata["file_path"]
+        assert chunks[0].metadata["file_path"] == "\\path\\to\\rules\\test.yaml"
         assert chunks[0].metadata["line_start"] == 10
 
 

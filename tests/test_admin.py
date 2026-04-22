@@ -7,7 +7,8 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
-from sigmahqrag.admin.health import ServiceHealth, ServiceStatus
+
+from src.admin.health import ServiceHealth, ServiceStatus
 
 
 @pytest.fixture
@@ -47,7 +48,7 @@ def mock_llama_stopped() -> ServiceHealth:
 @pytest.fixture
 def client() -> TestClient:
     """Create test client for the app."""
-    from sigmahqrag.main import create_app
+    from src.main import create_app
 
     app = create_app()
     return TestClient(app)
@@ -58,7 +59,7 @@ class TestGetStatusDisplay:
 
     def test_running_status_returns_green(self, mock_llama_health: ServiceHealth) -> None:
         """Given running service When _get_status_display Then returns green color."""
-        from sigmahqrag.api.routes.admin import _get_status_display
+        from src.api.routes.admin import _get_status_display
 
         result = _get_status_display(mock_llama_health, Path("bin/test"))
 
@@ -67,7 +68,7 @@ class TestGetStatusDisplay:
 
     def test_stopped_status_returns_red(self, mock_llama_stopped: ServiceHealth) -> None:
         """Given stopped service When _get_status_display Then returns red color."""
-        from sigmahqrag.api.routes.admin import _get_status_display
+        from src.api.routes.admin import _get_status_display
 
         result = _get_status_display(mock_llama_stopped, Path("bin/test"))
 
@@ -78,7 +79,7 @@ class TestGetStatusDisplay:
         self, mock_llama_health: ServiceHealth, tmp_path: Path
     ) -> None:
         """Given binary not found When _get_status_display Then returns not installed."""
-        from sigmahqrag.api.routes.admin import _get_status_display
+        from src.api.routes.admin import _get_status_display
 
         non_existent_path = tmp_path / "nonexistent"
         result = _get_status_display(mock_llama_health, non_existent_path)
@@ -91,7 +92,7 @@ class TestGetStatusDisplay:
         self, mock_llama_stopped: ServiceHealth
     ) -> None:
         """Given health with message When _get_status_display Then message included."""
-        from sigmahqrag.api.routes.admin import _get_status_display
+        from src.api.routes.admin import _get_status_display
 
         result = _get_status_display(mock_llama_stopped, Path("bin/test"))
 
@@ -109,7 +110,7 @@ class TestAdminHealthEndpoint:
     ) -> None:
         """Given services are running When GET /admin/health Then returns service statuses."""
         with patch(
-            "sigmahqrag.api.routes.admin.create_health_checker"
+            "src.api.routes.admin.create_health_checker"
         ) as mock_checker:
             mock_instance = AsyncMock()
             mock_instance.check_all.return_value = {
@@ -130,7 +131,7 @@ class TestAdminHealthEndpoint:
     ) -> None:
         """Given health check fails When GET /admin/health Then returns error."""
         with patch(
-            "sigmahqrag.api.routes.admin.create_health_checker"
+            "src.api.routes.admin.create_health_checker"
         ) as mock_checker:
             mock_instance = AsyncMock()
             mock_instance.check_all.side_effect = Exception("Connection failed")

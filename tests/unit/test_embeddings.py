@@ -9,7 +9,7 @@ class TestEmbeddingGenerator:
 
     def test_init_defaults(self):
         """Test default initialization."""
-        from sigmahqrag.rag.embeddings import EmbeddingGenerator
+        from src.rag.embeddings import EmbeddingGenerator
 
         generator = EmbeddingGenerator()
         assert generator.batch_size == 32
@@ -17,7 +17,7 @@ class TestEmbeddingGenerator:
 
     def test_init_custom(self):
         """Test custom initialization."""
-        from sigmahqrag.rag.embeddings import EmbeddingGenerator
+        from src.rag.embeddings import EmbeddingGenerator
 
         generator = EmbeddingGenerator(batch_size=64, embedding_dim=512)
         assert generator.batch_size == 64
@@ -30,7 +30,7 @@ class TestEmbedDocuments:
     @pytest.mark.asyncio
     async def test_empty_documents(self):
         """Test with empty documents."""
-        from sigmahqrag.rag.embeddings import embed_documents
+        from src.rag.embeddings import embed_documents
 
         result = await embed_documents([])
         assert result == []
@@ -38,7 +38,7 @@ class TestEmbedDocuments:
     @pytest.mark.asyncio
     async def test_single_document(self):
         """Test with single document."""
-        from sigmahqrag.rag.embeddings import embed_documents
+        from src.rag.embeddings import embed_documents
 
         docs = [Document(text="Test document", metadata={})]
         result = await embed_documents(docs)
@@ -50,7 +50,7 @@ class TestGetEmbeddingModel:
 
     def test_model_returns_object(self):
         """Test that model returns an object."""
-        from sigmahqrag.rag.embeddings import get_embedding_model
+        from src.rag.embeddings import get_embedding_model
 
         model = get_embedding_model()
         assert model is not None
@@ -58,7 +58,7 @@ class TestGetEmbeddingModel:
     @pytest.mark.skip(reason="Requires HF token for model download")
     def test_model_has_embed_method(self):
         """Test that model has embed method."""
-        from sigmahqrag.rag.embeddings import get_embedding_model
+        from src.rag.embeddings import get_embedding_model
 
         model = get_embedding_model()
         assert hasattr(model, "embed_documents")
@@ -72,7 +72,7 @@ class TestAirGappedConfig:
         """Test SIGMA_RAG_EMBED_MODEL=local raises when no GGUF."""
         monkeypatch.setenv("SIGMA_RAG_EMBED_MODEL", "local")
 
-        import sigmahqrag.rag.embeddings as emb_module
+        import src.rag.embeddings as emb_module
         emb_module._embed_model = None
 
         with pytest.raises(EnvironmentError, match="no GGUF model"):
@@ -80,7 +80,7 @@ class TestAirGappedConfig:
 
     def test_singleton_pattern(self):
         """Test that model is reused (singleton)."""
-        from sigmahqrag.rag.embeddings import get_embedding_model
+        from src.rag.embeddings import get_embedding_model
 
         model1 = get_embedding_model()
         model2 = get_embedding_model()

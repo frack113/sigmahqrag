@@ -26,7 +26,7 @@ class TestLlamaServiceIntegration:
     @pytest.mark.asyncio
     async def test_health_check_returns_status(self):
         """Test health_check() returns correct status."""
-        from sigmahqrag.services.llama_service import LlamaService
+        from src.services.llama_service import LlamaService
 
         service = LlamaService(base_url="http://127.0.0.1:8080")
         result = await service.health_check()
@@ -39,7 +39,7 @@ class TestLlamaServiceIntegration:
 
         AC1 continuation: Verify connection is possible.
         """
-        from sigmahqrag.services.llama_service import LlamaService
+        from src.services.llama_service import LlamaService
 
         service = LlamaService(base_url="http://127.0.0.1:8080")
         is_healthy = await service.health_check()
@@ -61,7 +61,7 @@ class TestQdrantServiceIntegration:
     @pytest.mark.asyncio
     async def test_health_check_returns_status(self):
         """Test health_check() returns correct status."""
-        from sigmahqrag.services.qdrant_service import QdrantService
+        from src.services.qdrant_service import QdrantService
 
         service = QdrantService(host="127.0.0.1", port=6333)
         result = await service.health_check()
@@ -77,7 +77,7 @@ class TestQdrantServiceIntegration:
         When I attempt to create a test collection in Qdrant
         Then the collection is created successfully
         """
-        from sigmahqrag.services.qdrant_service import QdrantService
+        from src.services.qdrant_service import QdrantService
 
         test_collection = "test_integration_collection"
         service = QdrantService(
@@ -98,7 +98,7 @@ class TestQdrantServiceIntegration:
 
         AC3 continuation: Verify vectors can be stored and retrieved.
         """
-        from sigmahqrag.services.qdrant_service import QdrantService
+        from src.services.qdrant_service import QdrantService
 
         test_collection = "test_vector_collection"
         service = QdrantService(
@@ -150,7 +150,7 @@ class TestServiceManager:
         Note: This test verifies the health check mechanism.
         Actual start/stop requires binary paths from prerequisites.
         """
-        from sigmahqrag.services.llama_service import LlamaService
+        from src.services.llama_service import LlamaService
 
         service = LlamaService(base_url="http://127.0.0.1:8080")
 
@@ -168,7 +168,7 @@ class TestServiceManager:
         Note: This test verifies the health check mechanism.
         Actual start/stop requires binary paths from prerequisites.
         """
-        from sigmahqrag.services.qdrant_service import QdrantService
+        from src.services.qdrant_service import QdrantService
 
         service = QdrantService(host="127.0.0.1", port=6333)
 
