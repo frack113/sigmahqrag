@@ -24,6 +24,7 @@ class ServiceProcess:
     process: subprocess.Popen[str] | None = None
     pid: int | None = None
     log_file: Path | None = None
+    log_handle: Any = None
     is_running: bool = False
 
 
@@ -95,6 +96,7 @@ class ServiceManager:
         """
         try:
             import os
+
             os.kill(pid, 0)
             return True
         except (OSError, ProcessLookupError):
@@ -120,40 +122,70 @@ class ServiceManager:
             return {"success": False, "error": "llama.cpp already running"}
 
         if not self.llama_bin.exists():
-            return {"success": False, "error": f"llama.cpp binary not found: {self.llama_bin}"}
+            return {
+                "success": False,
+                "error": f"llama.cpp binary not found: {self.llama_bin}",
+            }
 
         log_file = self.logs_dir / "llama.cpp.log"
         pid_file = self.pid_dir / "llama.cpp.pid"
 
+        log_handle = None
+        try:
+            log_handle = open(log_file, "a")
+        except OSError as e:
+            return {"success": False, "error": f"Cannot open log file {log_file}: {e}"}
+
         try:
             cmd = [
                 str(self.llama_bin),
-                "-m", model_path,
-                "--port", str(port),
-                "-c", str(context_size),
+                "-m",
+                model_path,
+                "--port",
+                str(port),
+                "-c",
+                str(context_size),
             ]
 
-            log_handle = open(log_file, "a")
             process = subprocess.Popen(
                 cmd,
                 stdout=log_handle,
                 stderr=subprocess.STDOUT,
             )
 
-            pid_file.write_text(str(process.pid))
+            if process.pid is None:
+                process.kill()
+                log_handle.close()
+                return {"success": False, "error": "Failed to get process PID"}
+
+            try:
+                pid_file.write_text(str(process.pid))
+            except OSError as e:
+                logger.warning(f"Failed to write PID file: {e}")
 
             self._llama_process = ServiceProcess(
                 name="llama.cpp",
                 process=process,
                 pid=process.pid,
                 log_file=log_file,
+                log_handle=log_handle,
                 is_running=True,
             )
 
             logger.info(f"Started llama.cpp (PID: {process.pid})")
-            return {"success": True, "pid": process.pid, "log": str(log_file), "port": port}
+            return {
+                "success": True,
+                "pid": process.pid,
+                "log": str(log_file),
+                "port": port,
+            }
 
         except Exception as e:
+            if log_handle:
+                try:
+                    log_handle.close()
+                except OSError:
+                    pass
             logger.error(f"Failed to start llama.cpp: {e}")
             return {"success": False, "error": str(e)}
 
@@ -181,31 +213,49 @@ class ServiceManager:
             return {"success": False, "error": "Qdrant already running"}
 
         if not self.qdrant_bin.exists():
-            return {"success": False, "error": f"Qdrant binary not found: {self.qdrant_bin}"}
+            return {
+                "success": False,
+                "error": f"Qdrant binary not found: {self.qdrant_bin}",
+            }
 
         log_file = self.logs_dir / "qdrant.log"
         pid_file = self.pid_dir / "qdrant.pid"
 
+        log_handle = None
+        try:
+            log_handle = open(log_file, "a")
+        except OSError as e:
+            return {"success": False, "error": f"Cannot open log file {log_file}: {e}"}
+
         try:
             cmd = [
                 str(self.qdrant_bin),
-                "--storage", storage_path,
+                "--storage",
+                storage_path,
             ]
 
-            log_handle = open(log_file, "a")
             process = subprocess.Popen(
                 cmd,
                 stdout=log_handle,
                 stderr=subprocess.STDOUT,
             )
 
-            pid_file.write_text(str(process.pid))
+            if process.pid is None:
+                process.kill()
+                log_handle.close()
+                return {"success": False, "error": "Failed to get process PID"}
+
+            try:
+                pid_file.write_text(str(process.pid))
+            except OSError as e:
+                logger.warning(f"Failed to write PID file: {e}")
 
             self._qdrant_process = ServiceProcess(
                 name="qdrant",
                 process=process,
                 pid=process.pid,
                 log_file=log_file,
+                log_handle=log_handle,
                 is_running=True,
             )
 
@@ -213,6 +263,11 @@ class ServiceManager:
             return {"success": True, "pid": process.pid, "log": str(log_file)}
 
         except Exception as e:
+            if log_handle:
+                try:
+                    log_handle.close()
+                except OSError:
+                    pass
             logger.error(f"Failed to start Qdrant: {e}")
             return {"success": False, "error": str(e)}
 
@@ -249,6 +304,10 @@ class ServiceManager:
             except subprocess.TimeoutExpired:
                 service_proc.process.kill()
                 service_proc.process.wait()
+
+            if service_proc.log_handle is not None:
+                service_proc.log_handle.close()
+                service_proc.log_handle = None
 
             logger.info(f"Stopped {name}")
             service_proc.is_running = False

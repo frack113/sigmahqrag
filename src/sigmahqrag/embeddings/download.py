@@ -10,7 +10,9 @@ logger = logging.getLogger(__name__)
 DEFAULT_EMBEDDINGS_DIR = Path("models/embeddings")
 
 
-def get_embedding_model_path(model_name: str, embeddings_dir: Path | None = None) -> Path:
+def get_embedding_model_path(
+    model_name: str, embeddings_dir: Path | None = None
+) -> Path:
     """Get path to an embedding model file.
 
     Args:
@@ -26,7 +28,9 @@ def get_embedding_model_path(model_name: str, embeddings_dir: Path | None = None
     return embeddings_dir / model_name
 
 
-def is_embedding_model_downloaded(model_name: str, embeddings_dir: Path | None = None) -> bool:
+def is_embedding_model_downloaded(
+    model_name: str, embeddings_dir: Path | None = None
+) -> bool:
     """Check if embedding model is already downloaded.
 
     Args:
@@ -57,8 +61,6 @@ def download_embedding_model(
     Returns:
         Path to downloaded model
     """
-    import urllib.error
-    import urllib.request
 
     if embeddings_dir is None:
         embeddings_dir = DEFAULT_EMBEDDINGS_DIR

@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from sigmahqrag.rag.embeddings import EMBEDDING_DIM, embed_documents, get_embedding_model
+from sigmahqrag.rag.embeddings import EMBEDDING_DIM, get_embedding_model
 from sigmahqrag.services.qdrant_service import QdrantService
 
 logger = logging.getLogger(__name__)
@@ -55,8 +55,7 @@ async def search(
         )
 
         filtered_results = [
-            r for r in results
-            if r.get("score", 0) >= similarity_threshold
+            r for r in results if r.get("score", 0) >= similarity_threshold
         ]
 
         return filtered_results

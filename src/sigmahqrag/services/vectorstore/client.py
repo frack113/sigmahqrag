@@ -42,8 +42,7 @@ class QdrantService:
 
         if not self.binary_path.exists():
             logger.warning(
-                f"Qdrant binary not found at {self.binary_path}. "
-                "Run download_qdrant() first."
+                f"Qdrant binary not found at {self.binary_path}. Run download_qdrant() first."
             )
 
     def start(self) -> subprocess.Popen[Any]:
@@ -58,8 +57,7 @@ class QdrantService:
         """
         if not self.binary_path.exists():
             raise FileNotFoundError(
-                f"Qdrant binary not found at {self.binary_path}. "
-                "Run download_qdrant() first."
+                f"Qdrant binary not found at {self.binary_path}. Run download_qdrant() first."
             )
 
         if self.port < 1 or self.port > 65535:
@@ -77,9 +75,12 @@ class QdrantService:
 
         cmd = [
             str(self.binary_path),
-            "--host", self.host,
-            "--port", str(self.port),
-            "--storage", str(self.storage_path),
+            "--host",
+            self.host,
+            "--port",
+            str(self.port),
+            "--storage",
+            str(self.storage_path),
         ]
 
         self._process = subprocess.Popen(

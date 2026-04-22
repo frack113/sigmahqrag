@@ -114,10 +114,12 @@ class RepositoryManager:
         repos = []
         for item in self.repos_dir.iterdir():
             if item.is_dir() and self._is_valid_repo(item):
-                repos.append({
-                    "name": item.name,
-                    "path": str(item),
-                })
+                repos.append(
+                    {
+                        "name": item.name,
+                        "path": str(item),
+                    }
+                )
         return sorted(repos, key=lambda r: r["name"])
 
     def delete(self, name: str) -> dict[str, Any]:

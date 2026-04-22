@@ -115,7 +115,4 @@ class QdrantService:
         logger.info(f"Collection {self.collection_name} ready")
 
     def __repr__(self) -> str:
-        return (
-            f"QdrantService(collection={self.collection_name}, "
-            f"host={self.host}:{self.port})"
-        )
+        return f"QdrantService(collection={self.collection_name}, host={self.host}:{self.port})"

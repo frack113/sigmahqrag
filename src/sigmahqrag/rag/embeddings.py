@@ -21,6 +21,7 @@ def _check_hf_available() -> bool:
     """Check if HuggingFace Hub is accessible."""
     try:
         import httpx
+
         response = httpx.get("https://huggingface.co", timeout=5)
         return response.status_code == 200
     except Exception:
@@ -52,7 +53,9 @@ def get_embedding_model() -> Any:
     env_mode = os.environ.get("SIGMA_RAG_EMBED_MODEL", "").lower()
 
     if env_mode == "huggingface":
-        logger.info("Using HuggingFace Hub for embeddings (SIGMA_RAG_EMBED_MODEL=huggingface)")
+        logger.info(
+            "Using HuggingFace Hub for embeddings (SIGMA_RAG_EMBED_MODEL=huggingface)"
+        )
         _embed_model = HuggingFaceEmbedding(
             model_name="BAAI/bge-small-en-v1.5",
             embed_batch_size=BATCH_SIZE,
@@ -68,7 +71,7 @@ def get_embedding_model() -> Any:
         return _embed_model
 
     if env_mode == "local":
-        raise EnvironmentError(
+        raise OSError(
             "SIGMA_RAG_EMBED_MODEL=local but no GGUF model found in models/embeddings/"
         )
 
@@ -80,7 +83,7 @@ def get_embedding_model() -> Any:
         )
         return _embed_model
 
-    raise EnvironmentError(
+    raise OSError(
         "Air-gapped environment: no GGUF model in models/embeddings/ and HF Hub unreachable. "
         "Set SIGMA_RAG_EMBED_MODEL=local or provide a GGUF model."
     )
@@ -100,9 +103,7 @@ async def embed_documents(documents: list[Document]) -> list[list[float]]:
 
     try:
         embed_model = get_embedding_model()
-        embeddings = await embed_model.aembed_documents(
-            [doc.text for doc in documents]
-        )
+        embeddings = await embed_model.aembed_documents([doc.text for doc in documents])
         return embeddings  # type: ignore[return-value]
     except Exception as e:
         logger.error(f"Failed to generate embeddings: {e}")
@@ -130,6 +131,7 @@ def store_embeddings(
 
     try:
         import asyncio
+
         from sigmahqrag.services.qdrant_service import QdrantService
 
         async def _store() -> bool:

@@ -6,8 +6,6 @@ import platform
 import shutil
 import subprocess
 import tarfile
-import urllib.error
-import urllib.request
 import zipfile
 from pathlib import Path
 
@@ -182,8 +180,7 @@ def get_binary_path(bin_dir: Path | None = None) -> Path:
 
     if not binary_path.exists():
         raise FileNotFoundError(
-            f"llama.cpp binary not found at {binary_path}. "
-            "Run download_llama_cpp() first."
+            f"llama.cpp binary not found at {binary_path}. Run download_llama_cpp() first."
         )
 
     return binary_path

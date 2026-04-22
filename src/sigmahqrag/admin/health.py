@@ -23,6 +23,7 @@ def _is_cache_valid(cached: tuple[ServiceHealth, float], ttl: float) -> bool:
         True if cache is valid
     """
     import time
+
     return (time.time() - cached[1]) < ttl
 
 

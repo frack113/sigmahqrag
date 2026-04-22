@@ -8,8 +8,7 @@ from typing import Any
 
 import yaml
 from llama_index.core.schema import Document
-
-from sigmahqrag.models.sigma_rule import SigmaRule
+from sigmahqrag.schemas.sigma_rule import SigmaRule
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +24,7 @@ def load_sigma_rule(file_path: Path) -> list[SigmaRule]:
     """Load Sigma rules from a YAML file."""
     rules: list[SigmaRule] = []
     try:
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(file_path, encoding="utf-8") as f:
             content = f.read()
             line_number = 1
             for line in content.split("\n"):
@@ -40,7 +39,9 @@ def load_sigma_rule(file_path: Path) -> list[SigmaRule]:
     return rules
 
 
-def load_sigma_rules_from_directory(directory: Path, pattern: str = "*.yaml") -> list[SigmaRule]:
+def load_sigma_rules_from_directory(
+    directory: Path, pattern: str = "*.yaml"
+) -> list[SigmaRule]:
     """Load all Sigma rules from a directory."""
     rules: list[SigmaRule] = []
     for file_path in directory.glob(pattern):
@@ -118,7 +119,9 @@ def chunk_sigma_rule(rule: SigmaRule) -> list[Document]:
     emit_chunk("\n".join(chunk_content), metadata.copy())
 
     if not chunks:
-        chunks.append(Document(text=f"{rule.title}: {detection_str}", metadata=metadata))
+        chunks.append(
+            Document(text=f"{rule.title}: {detection_str}", metadata=metadata)
+        )
 
     return chunks
 
@@ -159,7 +162,9 @@ class SigmaChunker:
             chunks.extend(rule_chunks)
         return chunks
 
-    def chunk_directory(self, directory: Path, pattern: str = "*.yaml") -> list[Document]:
+    def chunk_directory(
+        self, directory: Path, pattern: str = "*.yaml"
+    ) -> list[Document]:
         """Chunk all Sigma rules in a directory."""
         rules = load_sigma_rules_from_directory(directory, pattern)
         chunks: list[Document] = []

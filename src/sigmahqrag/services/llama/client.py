@@ -39,8 +39,7 @@ class LlamaService:
 
         if not self.binary_path.exists():
             logger.warning(
-                f"llama.cpp binary not found at {self.binary_path}. "
-                "Run download_llama_cpp() first."
+                f"llama.cpp binary not found at {self.binary_path}. Run download_llama_cpp() first."
             )
 
     def start(self, model_path: str | Path | None = None) -> subprocess.Popen[Any]:
@@ -58,8 +57,7 @@ class LlamaService:
         """
         if not self.binary_path.exists():
             raise FileNotFoundError(
-                f"llama.cpp binary not found at {self.binary_path}. "
-                "Run download_llama_cpp() first."
+                f"llama.cpp binary not found at {self.binary_path}. Run download_llama_cpp() first."
             )
 
         if self.port < 1 or self.port > 65535:
@@ -84,8 +82,10 @@ class LlamaService:
 
         cmd = [
             str(self.binary_path),
-            "--port", str(self.port),
-            "--host", self.host,
+            "--port",
+            str(self.port),
+            "--host",
+            self.host,
         ]
 
         if model_path is not None:

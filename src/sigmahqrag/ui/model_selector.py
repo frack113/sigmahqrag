@@ -34,7 +34,9 @@ def scan_models(models_dir: str = DEFAULT_MODELS_DIR) -> list[str]:
     return sorted(models)
 
 
-def get_model_info(model_name: str, models_dir: str = DEFAULT_MODELS_DIR) -> dict[str, Any]:
+def get_model_info(
+    model_name: str, models_dir: str = DEFAULT_MODELS_DIR
+) -> dict[str, Any]:
     """Get model information.
 
     Args:
@@ -146,7 +148,7 @@ def format_model_info(info: dict[str, Any]) -> str:
     size_mb = info.get("size_mb", 0)
     quantization = info.get("quantization", "Unknown")
 
-    return f"""**Model:** {info['name']}
+    return f"""**Model:** {info["name"]}
 
 - **Size:** {size_mb:.1f} MB
 - **Quantization:** {quantization}"""

@@ -16,22 +16,24 @@ from sigmahqrag.admin.health import (
     create_health_checker,
 )
 from sigmahqrag.admin.service_manager import (
-    ServiceManager,
     create_service_manager,
 )
-from sigmahqrag.config import LLAMA_BIN_PATH, QDRANT_BIN_PATH, LOGS_DIR
+from sigmahqrag.config import LLAMA_BIN_PATH, LOGS_DIR, QDRANT_BIN_PATH
 
 logger = logging.getLogger(__name__)
 
 
 class StartRequest(BaseModel):
     """Request model for starting a service."""
+
     model_path: str | None = None
 
 
 class StopRequest(BaseModel):
     """Request model for stopping a service."""
+
     pass
+
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -123,11 +125,13 @@ async def start_llama(request: StartRequest | None = None) -> JSONResponse:
         result = await manager.start_llama(model_path=model_path)
 
         if result.get("success"):
-            return JSONResponse(content={
-                "success": True,
-                "message": f"llama.cpp started (PID: {result.get('pid')})",
-                "pid": result.get("pid"),
-            })
+            return JSONResponse(
+                content={
+                    "success": True,
+                    "message": f"llama.cpp started (PID: {result.get('pid')})",
+                    "pid": result.get("pid"),
+                }
+            )
         else:
             return JSONResponse(
                 status_code=400,
@@ -157,10 +161,12 @@ async def stop_llama() -> JSONResponse:
         result = await manager.stop_llama()
 
         if result.get("success"):
-            return JSONResponse(content={
-                "success": True,
-                "message": "llama.cpp stopped",
-            })
+            return JSONResponse(
+                content={
+                    "success": True,
+                    "message": "llama.cpp stopped",
+                }
+            )
         else:
             return JSONResponse(
                 status_code=400,
@@ -190,11 +196,13 @@ async def start_qdrant() -> JSONResponse:
         result = await manager.start_qdrant()
 
         if result.get("success"):
-            return JSONResponse(content={
-                "success": True,
-                "message": f"Qdrant started (PID: {result.get('pid')})",
-                "pid": result.get("pid"),
-            })
+            return JSONResponse(
+                content={
+                    "success": True,
+                    "message": f"Qdrant started (PID: {result.get('pid')})",
+                    "pid": result.get("pid"),
+                }
+            )
         else:
             return JSONResponse(
                 status_code=400,
@@ -224,10 +232,12 @@ async def stop_qdrant() -> JSONResponse:
         result = await manager.stop_qdrant()
 
         if result.get("success"):
-            return JSONResponse(content={
-                "success": True,
-                "message": "Qdrant stopped",
-            })
+            return JSONResponse(
+                content={
+                    "success": True,
+                    "message": "Qdrant stopped",
+                }
+            )
         else:
             return JSONResponse(
                 status_code=400,
@@ -237,7 +247,7 @@ async def stop_qdrant() -> JSONResponse:
                 },
             )
 
-except Exception as e:
+    except Exception as e:
         logger.error(f"Failed to stop qdrant: {e}")
         return JSONResponse(
             status_code=500,
@@ -256,11 +266,13 @@ async def get_llama_logs() -> JSONResponse:
         manager = create_service_manager()
         logs = manager.get_logs("llama.cpp")
 
-        return JSONResponse(content={
-            "service": "llama.cpp",
-            "log_file": str(LOGS_DIR / "llama.cpp.log"),
-            "logs": logs,
-        })
+        return JSONResponse(
+            content={
+                "service": "llama.cpp",
+                "log_file": str(LOGS_DIR / "llama.cpp.log"),
+                "logs": logs,
+            }
+        )
 
     except Exception as e:
         logger.error(f"Failed to get llama.cpp logs: {e}")
@@ -281,11 +293,13 @@ async def get_qdrant_logs() -> JSONResponse:
         manager = create_service_manager()
         logs = manager.get_logs("qdrant")
 
-        return JSONResponse(content={
-            "service": "qdrant",
-            "log_file": str(LOGS_DIR / "qdrant.log"),
-            "logs": logs,
-        })
+        return JSONResponse(
+            content={
+                "service": "qdrant",
+                "log_file": str(LOGS_DIR / "qdrant.log"),
+                "logs": logs,
+            }
+        )
 
     except Exception as e:
         logger.error(f"Failed to get qdrant logs: {e}")

@@ -12,6 +12,7 @@ def create_app() -> FastAPI:
 
 def create_gradio_ui() -> gr.Interface:
     """Create the Gradio UI interface."""
+
     def greet(name: str) -> str:
         return f"Hello, {name}!"
 
@@ -26,4 +27,5 @@ app.mount("/gradio", gradio_app)
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=7860)

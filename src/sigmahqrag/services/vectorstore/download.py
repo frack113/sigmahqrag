@@ -5,8 +5,6 @@ import os
 import platform
 import shutil
 import subprocess
-import urllib.error
-import urllib.request
 from pathlib import Path
 
 from ...utils import download_file
@@ -174,8 +172,7 @@ def get_binary_path(bin_dir: Path | None = None) -> Path:
 
     if not binary_path.exists():
         raise FileNotFoundError(
-            f"Qdrant binary not found at {binary_path}. "
-            "Run download_qdrant() first."
+            f"Qdrant binary not found at {binary_path}. Run download_qdrant() first."
         )
 
     return binary_path

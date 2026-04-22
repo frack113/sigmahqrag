@@ -4,7 +4,9 @@
 class SigmaError(Exception):
     """Base exception for Sigma errors."""
 
-    def __init__(self, code: str, message: str, details: dict[str, str] | None = None) -> None:
+    def __init__(
+        self, code: str, message: str, details: dict[str, str] | None = None
+    ) -> None:
         """Initialize exception."""
         self.code = code
         self.message = message
