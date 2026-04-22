@@ -18,11 +18,15 @@ logger = logging.getLogger(__name__)
 
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
+    from sigmahqrag.api.routes.admin import router as admin_router
+
     app = FastAPI(
         title="SigmaHQ RAG",
         version="0.1.0",
         description="Local RAG system for Sigma rules",
     )
+
+    app.include_router(admin_router)
 
     @app.exception_handler(SigmaError)
     async def sigma_error_handler(request: Request, exc: SigmaError) -> JSONResponse:
@@ -119,9 +123,18 @@ def create_gradio_ui() -> gr.Blocks:
     return demo  # type: ignore[no-any-return]
 
 
+def create_admin_ui() -> gr.Blocks:
+    """Create the admin Gradio UI interface."""
+    from sigmahqrag.ui.admin import create_admin_ui as make_admin_ui
+
+    return make_admin_ui()
+
+
 app = create_app()
 gradio_ui = create_gradio_ui()
+admin_ui = create_admin_ui()
 app = gr.mount_gradio_app(app, gradio_ui, "/gradio")
+app = gr.mount_gradio_app(app, admin_ui, "/admin")
 
 
 if __name__ == "__main__":

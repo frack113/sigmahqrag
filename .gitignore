@@ -46,6 +46,7 @@ venv.bak/
 
 qdrant/storage/
 data/rules/
+bin/
 models/
 logs/
 *.log
