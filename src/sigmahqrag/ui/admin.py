@@ -8,7 +8,7 @@ from typing import Any
 import gradio as gr
 
 from sigmahqrag.admin.health import ServiceHealth, create_health_checker
-from sigmahqrag.config import LLAMA_BIN_PATH, QDRANT_BIN_PATH, get_backend, set_backend
+from sigmahqrag.config import LLAMA_BIN_PATH, QDRANT_BIN_PATH, get_backend, set_backend, LLM_DIR, EMBEDDINGS_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -109,6 +109,71 @@ def create_admin_ui() -> gr.Blocks:
                     qdrant_download_btn = gr.Button("Download Qdrant", variant="secondary")
 
                 download_status = gr.Textbox(label="Download Status", interactive=False)
+
+                gr.Markdown("### Model Selection")
+
+                def scan_llm_models() -> list[str]:
+                    """Scan available LLM models."""
+                    from sigmahqrag.ui.model_selector import scan_models
+                    models = scan_models(str(LLM_DIR))
+                    return models if models else ["No models found"]
+
+                def scan_embedding_models() -> list[str]:
+                    """Scan available embedding models."""
+                    from pathlib import Path
+                    models = []
+                    if EMBEDDINGS_DIR.exists():
+                        for f in EMBEDDINGS_DIR.iterdir():
+                            if f.suffix.lower() == ".gguf":
+                                models.append(f.stem)
+                    return models if models else ["No models found"]
+
+                llm_model_dropdown = gr.Dropdown(
+                    label="LLM Model",
+                    choices=scan_llm_models(),
+                )
+                embedding_model_dropdown = gr.Dropdown(
+                    label="Embedding Model",
+                    choices=scan_embedding_models(),
+                )
+                model_save_btn = gr.Button("Save Model Selection", variant="primary")
+                model_status = gr.Textbox(label="Model Status", interactive=False)
+
+                model_info_output = gr.Markdown(value="Select a model to view VRAM requirements")
+
+                def get_model_vram(model_name: str) -> str:
+                    """Calculate and display VRAM for a model."""
+                    if not model_name or model_name == "No models found":
+                        return "No model selected"
+                    
+                    model_path = LLM_DIR / f"{model_name}.gguf"
+                    if not model_path.exists():
+                        return f"Model file not found: {model_name}.gguf"
+                    
+                    size_bytes = model_path.stat().st_size
+                    size_gb = size_bytes / (1024 ** 3)
+                    
+                    size_mb = size_bytes / (1024 ** 2)
+                    if size_mb < 4096:
+                        vram_note = "~1x model size (Q4)"
+                    else:
+                        vram_note = "~1.2x model size + context"
+                    
+                    return f"""**{model_name}**
+
+- **File Size:** {size_mb:.0f} MB ({size_gb:.2f} GB)
+- **Est. VRAM:** {vram_note}
+- **Note:** Actual VRAM depends on quantization and context length"""
+
+                with gr.Accordion("Download Models Info"):
+                    gr.Markdown("""
+                    **Recommended LLM Models:**
+                    - llama-3.1-8b-q4_0.gguf (~5GB)
+                    - phi-3.5-q4_0.gguf (~4GB)
+                    
+                    **Recommended Embedding Models:**
+                    - bge-small-en-v1.5-q4_0.gguf (~130MB)
+                    """)
 
         llama_logs_output = gr.Textbox(
             label="llama.cpp logs",
@@ -228,9 +293,30 @@ def create_admin_ui() -> gr.Blocks:
         qdrant_stop_btn.click(fn=stop_qdrant_service, outputs=[llama_status, qdrant_status])
         qdrant_logs_btn.click(fn=fetch_qdrant_logs, outputs=[qdrant_logs_output, qdrant_logs_output])
 
+        async def save_model_selection(llm_model: str, embedding_model: str) -> str:
+            try:
+                from sigmahqrag.config import load_config, save_config
+                config = load_config()
+                config["llm_model"] = llm_model
+                config["embedding_model"] = embedding_model
+                save_config(config)
+                return f"Saved: LLM={llm_model}, Embedding={embedding_model}"
+            except Exception as e:
+                return f"Error: {e}"
+
         backend_save_btn.click(fn=save_backend, inputs=[backend_dropdown], outputs=[backend_status])
         llama_download_btn.click(fn=download_llama_binary, outputs=[download_status])
         qdrant_download_btn.click(fn=download_qdrant_binary, outputs=[download_status])
+        model_save_btn.click(
+            fn=save_model_selection,
+            inputs=[llm_model_dropdown, embedding_model_dropdown],
+            outputs=[model_status],
+        )
+
+        def on_model_select(model_name: str) -> str:
+            return get_model_vram(model_name)
+
+        llm_model_dropdown.change(fn=on_model_select, inputs=[llm_model_dropdown], outputs=[model_info_output])
 
         admin_demo.load(fn=fetch_status, outputs=[llama_status, qdrant_status])
 
