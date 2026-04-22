@@ -70,7 +70,6 @@ class TestAirGappedConfig:
 
     def test_env_var_local_no_model_raises(self, monkeypatch):
         """Test SIGMA_RAG_EMBED_MODEL=local raises when no GGUF."""
-        import os
         monkeypatch.setenv("SIGMA_RAG_EMBED_MODEL", "local")
 
         import sigmahqrag.rag.embeddings as emb_module

@@ -132,7 +132,7 @@ def store_embeddings(
     try:
         import asyncio
 
-        from sigmahqrag.services.qdrant_service import QdrantService
+        from src.services.qdrant_service import QdrantService
 
         async def _store() -> bool:
             service = QdrantService(

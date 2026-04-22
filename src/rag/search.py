@@ -5,8 +5,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from sigmahqrag.rag.embeddings import EMBEDDING_DIM, get_embedding_model
-from sigmahqrag.services.qdrant_service import QdrantService
+from src.rag.embeddings import EMBEDDING_DIM, get_embedding_model
+from src.services.qdrant_service import QdrantService
 
 logger = logging.getLogger(__name__)
 

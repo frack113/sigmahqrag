@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
-from sigmahqrag.services.qdrant_service import QdrantService
+from src.services.qdrant_service import QdrantService
 
 logger = logging.getLogger(__name__)
 

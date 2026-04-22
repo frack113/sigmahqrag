@@ -2,15 +2,12 @@
 
 from pathlib import Path
 
-import pytest
-
 from sigmahqrag.models.sigma_rule import SigmaRule
 from sigmahqrag.rag.chunker import (
     SigmaChunker,
     _format_detection,
     chunk_sigma_rule,
     count_tokens,
-    load_sigma_rule,
 )
 
 

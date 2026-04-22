@@ -27,7 +27,7 @@ build-backend = "hatchling.build"
 
 [tool.hatch]
 [tool.hatch.build.targets.wheel]
-packages = ["src/sigmahqrag"]
+packages = ["src"]
 
 [tool.ruff]
 target-version = "py312"

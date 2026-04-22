@@ -7,8 +7,8 @@ from typing import Any
 
 import gradio as gr
 
-from sigmahqrag.admin.health import ServiceHealth, create_health_checker
-from sigmahqrag.config import (
+from src.admin.health import ServiceHealth, create_health_checker
+from src.config import (
     EMBEDDINGS_DIR,
     LLAMA_BIN_PATH,
     LLM_DIR,
@@ -22,33 +22,18 @@ logger = logging.getLogger(__name__)
 
 def _get_status_display(health: ServiceHealth, binary_path: object) -> dict[str, Any]:
     """Get display data for a service health status."""
-    from sigmahqrag.admin.health import ServiceStatus
+    from src.admin.health import ServiceStatus
 
     if health.status == ServiceStatus.RUNNING:
-        color = "green"
-        display_status = "running"
+        # Return dict with status as key and confidence as value
+        result = {"running": 1.0}
     elif health.status == ServiceStatus.STOPPED:
-        color = "red"
-        display_status = "stopped"
+        result = {"stopped": 1.0}
     else:
-        color = "yellow"
-        display_status = "unknown"
-
-    result: dict[str, Any] = {
-        "name": health.name,
-        "status": display_status,
-        "color": color,
-        "port": health.port,
-        "url": health.url,
-    }
-
-    if health.message:
-        result["message"] = health.message
+        result = {"unknown": 0.5}
 
     if not binary_path.exists():
-        result["status"] = "not installed"
-        result["color"] = "yellow"
-        result["message"] = "Binary not found"
+        result = {"not installed": 0.5}
 
     return result
 
@@ -69,11 +54,11 @@ def create_admin_ui() -> gr.Blocks:
 
                 llama_status = gr.Label(
                     label="llama.cpp",
-                    value={"status": "loading...", "color": "yellow"},
+                    value={"loading...": 0.5},
                 )
                 qdrant_status = gr.Label(
                     label="Qdrant",
-                    value={"status": "loading...", "color": "yellow"},
+                    value={"loading...": 0.5},
                 )
 
                 with gr.Row():
@@ -125,7 +110,7 @@ def create_admin_ui() -> gr.Blocks:
 
                 def scan_llm_models() -> list[str]:
                     """Scan available LLM models."""
-                    from sigmahqrag.ui.model_selector import scan_models
+                    from src.ui.model_selector import scan_models
 
                     models = scan_models(str(LLM_DIR))
                     return models if models else ["No models found"]
@@ -219,7 +204,7 @@ def create_admin_ui() -> gr.Blocks:
 
         async def start_llama_service() -> tuple[dict[str, Any], dict[str, Any]]:
             try:
-                from sigmahqrag.admin.service_manager import create_service_manager
+                from src.admin.service_manager import create_service_manager
 
                 manager = create_service_manager()
                 await manager.start_llama(str(LLAMA_BIN_PATH))
@@ -230,7 +215,7 @@ def create_admin_ui() -> gr.Blocks:
 
         async def stop_llama_service() -> tuple[dict[str, Any], dict[str, Any]]:
             try:
-                from sigmahqrag.admin.service_manager import create_service_manager
+                from src.admin.service_manager import create_service_manager
 
                 manager = create_service_manager()
                 await manager.stop_llama()
@@ -241,7 +226,7 @@ def create_admin_ui() -> gr.Blocks:
 
         async def start_qdrant_service() -> tuple[dict[str, Any], dict[str, Any]]:
             try:
-                from sigmahqrag.admin.service_manager import create_service_manager
+                from src.admin.service_manager import create_service_manager
 
                 manager = create_service_manager()
                 await manager.start_qdrant()
@@ -252,7 +237,7 @@ def create_admin_ui() -> gr.Blocks:
 
         async def stop_qdrant_service() -> tuple[dict[str, Any], dict[str, Any]]:
             try:
-                from sigmahqrag.admin.service_manager import create_service_manager
+                from src.admin.service_manager import create_service_manager
 
                 manager = create_service_manager()
                 await manager.stop_qdrant()
@@ -263,7 +248,7 @@ def create_admin_ui() -> gr.Blocks:
 
         async def fetch_llama_logs() -> tuple[str, bool]:
             try:
-                from sigmahqrag.admin.service_manager import create_service_manager
+                from src.admin.service_manager import create_service_manager
 
                 manager = create_service_manager()
                 logs = manager.get_logs("llama.cpp")
@@ -273,7 +258,7 @@ def create_admin_ui() -> gr.Blocks:
 
         async def fetch_qdrant_logs() -> tuple[str, bool]:
             try:
-                from sigmahqrag.admin.service_manager import create_service_manager
+                from src.admin.service_manager import create_service_manager
 
                 manager = create_service_manager()
                 logs = manager.get_logs("qdrant")
@@ -290,7 +275,7 @@ def create_admin_ui() -> gr.Blocks:
 
         async def download_llama_binary() -> str:
             try:
-                from sigmahqrag.services.llama import download_llama_cpp
+                from src.services.llama import download_llama_cpp
 
                 path = await download_llama_cpp()
                 return f"Downloaded to {path}"
@@ -299,7 +284,7 @@ def create_admin_ui() -> gr.Blocks:
 
         async def download_qdrant_binary() -> str:
             try:
-                from sigmahqrag.services.vectorstore import download_qdrant
+                from src.services.vectorstore import download_qdrant
 
                 path = await download_qdrant()
                 return f"Downloaded to {path}"
@@ -328,7 +313,7 @@ def create_admin_ui() -> gr.Blocks:
 
         async def save_model_selection(llm_model: str, embedding_model: str) -> str:
             try:
-                from sigmahqrag.config import load_config, save_config
+                from src.config import load_config, save_config
 
                 config = load_config()
                 config["llm_model"] = llm_model

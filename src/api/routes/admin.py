@@ -10,15 +10,15 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from sigmahqrag.admin.health import (
+from src.admin.health import (
     ServiceHealth,
     ServiceStatus,
     create_health_checker,
 )
-from sigmahqrag.admin.service_manager import (
+from src.admin.service_manager import (
     create_service_manager,
 )
-from sigmahqrag.config import LLAMA_BIN_PATH, LOGS_DIR, QDRANT_BIN_PATH
+from src.config import LLAMA_BIN_PATH, LOGS_DIR, QDRANT_BIN_PATH
 
 logger = logging.getLogger(__name__)
 

@@ -50,3 +50,5 @@ bin/
 models/
 logs/
 *.log
+
+config.json

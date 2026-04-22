@@ -7,8 +7,8 @@ from typing import Any
 
 import gradio as gr
 
-from sigmahqrag.rag.search import SearchEngine
-from sigmahqrag.ui.mode import ChatMode
+from src.rag.search import SearchEngine
+from src.ui.mode import ChatMode
 
 logger = logging.getLogger(__name__)
 

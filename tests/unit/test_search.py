@@ -1,6 +1,5 @@
 """Tests for search module."""
 
-from llama_index.core.schema import Document
 
 import pytest
 
