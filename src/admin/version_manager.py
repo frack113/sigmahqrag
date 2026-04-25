@@ -205,3 +205,51 @@ class VersionManager:
 def create_version_manager(github_token: str | None = None) -> VersionManager:
     """Create a version manager instance."""
     return VersionManager(github_token=github_token)
+
+
+async def get_current_version(service: str) -> str | None:
+    """Get currently installed version for a service.
+
+    Args:
+        service: Service name (llama.cpp, qdrant)
+
+    Returns:
+        Version string or None
+    """
+    from src.admin.backup_manager import create_backup_manager
+
+    backup_mgr = create_backup_manager()
+    return backup_mgr.get_current_version(service)
+
+
+async def check_for_updates(service: str) -> dict | None:
+    """Check if a new version is available for a service.
+
+    Args:
+        service: Service name (llama.cpp, qdrant)
+
+    Returns:
+        Dict with current_version, latest_version, update_available keys or None if check fails
+    """
+    vm = VersionManager()
+
+    current = await get_current_version(service)
+    if not current:
+        return None
+
+    try:
+        release = await vm.get_release(service, "latest")
+        latest = release.tag_name.lstrip("v") if release.tag_name else None
+
+        if not latest:
+            return None
+
+        update_available = current != latest
+
+        return {
+            "current_version": current,
+            "latest_version": latest,
+            "update_available": update_available,
+        }
+    except Exception:
+        return None

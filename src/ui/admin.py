@@ -8,6 +8,7 @@ from typing import Any
 import gradio as gr
 
 from src.admin.health import ServiceHealth, create_health_checker
+from src.admin.version_manager import check_for_updates, get_current_version
 from src.config import (
     EMBEDDINGS_DIR,
     LLAMA_BIN_PATH,
@@ -25,7 +26,6 @@ def _get_status_display(health: ServiceHealth, binary_path: object) -> dict[str,
     from src.admin.health import ServiceStatus
 
     if health.status == ServiceStatus.RUNNING:
-        # Return dict with status as key and confidence as value
         result = {"running": 1.0}
     elif health.status == ServiceStatus.STOPPED:
         result = {"stopped": 1.0}
@@ -38,6 +38,14 @@ def _get_status_display(health: ServiceHealth, binary_path: object) -> dict[str,
     return result
 
 
+async def _get_version_info(service: str) -> str:
+    """Get version info for a service."""
+    version = await get_current_version(service)
+    if version:
+        return f"v{version}"
+    return "unknown"
+
+
 def create_admin_ui() -> gr.Blocks:
     """Create the admin page Gradio UI.
 
@@ -48,18 +56,37 @@ def create_admin_ui() -> gr.Blocks:
     with gr.Blocks(title="SigmaHQ Admin") as admin_demo:
         gr.Markdown("# 📊 SigmaHQ Admin")
 
+        update_banner = gr.HTML(
+            visible=False,
+        )
+
         with gr.Tabs():
             with gr.Tab("Services"):
                 gr.Markdown("### Service Management")
 
-                llama_status = gr.Label(
-                    label="llama.cpp",
-                    value={"loading...": 0.5},
-                )
-                qdrant_status = gr.Label(
-                    label="Qdrant",
-                    value={"loading...": 0.5},
-                )
+                with gr.Row():
+                    with gr.Column(scale=2):
+                        llama_status = gr.Label(
+                            label="llama.cpp - click to refresh",
+                            value={"loading...": 0.5},
+                        )
+                    with gr.Column(scale=1):
+                        llama_version = gr.Label(
+                            label="Version",
+                            value={"checking...": 0.5},
+                        )
+
+                with gr.Row():
+                    with gr.Column(scale=2):
+                        qdrant_status = gr.Label(
+                            label="Qdrant - click to refresh",
+                            value={"loading...": 0.5},
+                        )
+                    with gr.Column(scale=1):
+                        qdrant_version = gr.Label(
+                            label="Version",
+                            value={"checking...": 0.5},
+                        )
 
                 with gr.Row():
                     refresh_btn = gr.Button("Refresh", variant="secondary")
@@ -186,23 +213,53 @@ def create_admin_ui() -> gr.Blocks:
             visible=False,
         )
 
-        async def fetch_status() -> tuple[dict[str, Any], dict[str, Any]]:
+        async def fetch_status() -> tuple[dict[str, Any], dict[str, Any], str, str, str]:
             try:
                 checker = create_health_checker()
                 all_health = await checker.check_all()
 
+                llama_version = await _get_version_info("llama.cpp")
+                qdrant_version = await _get_version_info("qdrant")
+
+                banner_html = ""
+
+                llama_update = await check_for_updates("llama.cpp")
+                if llama_update and llama_update.get("update_available"):
+                    banner_html += f'''
+                    <div style="background: #f59e0b; padding: 12px; border-radius: 6px; margin-bottom: 10px;">
+                        <strong>Update available for llama.cpp:</strong> v{llama_update["latest_version"]} available
+                    </div>
+                    '''
+
+                qdrant_update = await check_for_updates("qdrant")
+                if qdrant_update and qdrant_update.get("update_available"):
+                    banner_html += f'''
+                    <div style="background: #f59e0b; padding: 12px; border-radius: 6px; margin-bottom: 10px;">
+                        <strong>Update available for Qdrant:</strong> v{qdrant_update["latest_version"]} available
+                    </div>
+                    '''
+
+                llama_version_display = {f"v{llama_version}": 1.0} if llama_version else {"unknown": 0.5}
+                qdrant_version_display = {f"v{qdrant_version}": 1.0} if qdrant_version else {"unknown": 0.5}
+
                 return (
                     _get_status_display(all_health["llama"], LLAMA_BIN_PATH),
                     _get_status_display(all_health["qdrant"], QDRANT_BIN_PATH),
+                    banner_html if banner_html else "",
+                    llama_version_display,
+                    qdrant_version_display,
                 )
             except Exception as e:
                 logger.error(f"Status fetch failed: {e}")
                 return (
                     {"status": "error", "color": "red", "message": str(e)},
                     {"status": "error", "color": "red", "message": str(e)},
+                    "",
+                    {"error": 0.5},
+                    {"error": 0.5},
                 )
 
-        async def start_llama_service() -> tuple[dict[str, Any], dict[str, Any]]:
+        async def start_llama_service() -> tuple[dict[str, Any], dict[str, Any], str, str, str]:
             try:
                 from src.admin.service_manager import create_service_manager
 
@@ -213,7 +270,7 @@ def create_admin_ui() -> gr.Blocks:
                 logger.error(f"Start llama failed: {e}")
                 return await fetch_status()
 
-        async def stop_llama_service() -> tuple[dict[str, Any], dict[str, Any]]:
+        async def stop_llama_service() -> tuple[dict[str, Any], dict[str, Any], str, str, str]:
             try:
                 from src.admin.service_manager import create_service_manager
 
@@ -224,7 +281,7 @@ def create_admin_ui() -> gr.Blocks:
                 logger.error(f"Stop llama failed: {e}")
                 return await fetch_status()
 
-        async def start_qdrant_service() -> tuple[dict[str, Any], dict[str, Any]]:
+        async def start_qdrant_service() -> tuple[dict[str, Any], dict[str, Any], str, str, str]:
             try:
                 from src.admin.service_manager import create_service_manager
 
@@ -235,7 +292,7 @@ def create_admin_ui() -> gr.Blocks:
                 logger.error(f"Start qdrant failed: {e}")
                 return await fetch_status()
 
-        async def stop_qdrant_service() -> tuple[dict[str, Any], dict[str, Any]]:
+        async def stop_qdrant_service() -> tuple[dict[str, Any], dict[str, Any], str, str, str]:
             try:
                 from src.admin.service_manager import create_service_manager
 
@@ -291,21 +348,21 @@ def create_admin_ui() -> gr.Blocks:
             except Exception as e:
                 return f"Error: {e}"
 
-        refresh_btn.click(fn=fetch_status, outputs=[llama_status, qdrant_status])
+        refresh_btn.click(fn=fetch_status, outputs=[llama_status, qdrant_status, update_banner, llama_version, qdrant_version])
         llama_start_btn.click(
-            fn=start_llama_service, outputs=[llama_status, qdrant_status]
+            fn=start_llama_service, outputs=[llama_status, qdrant_status, update_banner, llama_version, qdrant_version]
         )
         llama_stop_btn.click(
-            fn=stop_llama_service, outputs=[llama_status, qdrant_status]
+            fn=stop_llama_service, outputs=[llama_status, qdrant_status, update_banner, llama_version, qdrant_version]
         )
         llama_logs_btn.click(
             fn=fetch_llama_logs, outputs=[llama_logs_output, llama_logs_output]
         )
         qdrant_start_btn.click(
-            fn=start_qdrant_service, outputs=[llama_status, qdrant_status]
+            fn=start_qdrant_service, outputs=[llama_status, qdrant_status, update_banner, llama_version, qdrant_version]
         )
         qdrant_stop_btn.click(
-            fn=stop_qdrant_service, outputs=[llama_status, qdrant_status]
+            fn=stop_qdrant_service, outputs=[llama_status, qdrant_status, update_banner, llama_version, qdrant_version]
         )
         qdrant_logs_btn.click(
             fn=fetch_qdrant_logs, outputs=[qdrant_logs_output, qdrant_logs_output]
@@ -341,6 +398,6 @@ def create_admin_ui() -> gr.Blocks:
             fn=on_model_select, inputs=[llm_model_dropdown], outputs=[model_info_output]
         )
 
-        admin_demo.load(fn=fetch_status, outputs=[llama_status, qdrant_status])
+        admin_demo.load(fn=fetch_status, outputs=[llama_status, qdrant_status, update_banner, llama_version, qdrant_version])
 
     return admin_demo

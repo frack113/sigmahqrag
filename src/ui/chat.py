@@ -2,15 +2,100 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
 import gradio as gr
 
 from src.rag.search import SearchEngine
+from src.ui.components.details_panel import DetailsPanel
+from src.ui.components.result_card import ResultCard
+from src.ui.components.search_bar import SearchBar
 from src.ui.mode import ChatMode
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_TOP_K = 10
+SEARCH_TIMEOUT = 3.0
+
+
+class SearchInterface:
+    """Search interface with split pane layout."""
+
+    def __init__(
+        self,
+        search_engine: SearchEngine | None = None,
+    ) -> None:
+        """Initialize search interface."""
+        self.search_engine = search_engine or SearchEngine()
+        self.search_bar = SearchBar()
+        self.result_card = ResultCard()
+        self.details_panel = DetailsPanel()
+
+    async def handle_search(
+        self,
+        query: str,
+    ) -> tuple[list[str], str]:
+        """Handle search with live suggestions.
+
+        Args:
+            query: User search query
+
+        Returns:
+            Tuple of (result cards html list, details markdown)
+        """
+        if not query or not query.strip():
+            return [], DetailsPanel.format_empty_state()
+
+        try:
+            results = await asyncio.wait_for(
+                self.search_engine.search(query, top_k=DEFAULT_TOP_K),
+                timeout=SEARCH_TIMEOUT,
+            )
+
+            if not results:
+                return [], DetailsPanel.format_empty_state(query)
+
+            card_htmls = []
+            for result in results:
+                html = ResultCard.format_card(result)
+                card_htmls.append(html)
+
+            details = DetailsPanel.format_details(results[0])
+            return card_htmls, details
+
+        except asyncio.TimeoutError:
+            logger.error(f"Search timeout for: {query}")
+            return [], f"**Timeout:** Search exceeded {SEARCH_TIMEOUT}s"
+        except Exception as e:
+            logger.error(f"Search error: {e}")
+            return [], f"**Error:** {str(e)}"
+
+    async def get_suggestions(self, query: str) -> list[str]:
+        """Get live search suggestions.
+
+        Args:
+            query: User input
+
+        Returns:
+            List of suggestions
+        """
+        return await self.search_bar.get_suggestions(query)
+
+    def handle_result_click(self, index: int, results_data: list[dict[str, Any]]) -> str:
+        """Handle result selection to show details.
+
+        Args:
+            index: Selected result index
+            results_data: Current results
+
+        Returns:
+            Details panel markdown
+        """
+        if not results_data or index < 0 or index >= len(results_data):
+            return DetailsPanel.format_empty_state()
+        return DetailsPanel.format_details(results_data[index])
 
 
 class ChatInterface:
@@ -22,6 +107,7 @@ class ChatInterface:
     ) -> None:
         """Initialize chat interface."""
         self.search_engine = search_engine or SearchEngine()
+        self.search_interface = SearchInterface(search_engine)
 
     async def chat(
         self,
