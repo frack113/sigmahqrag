@@ -132,6 +132,15 @@ def create_admin_ui() -> gr.Blocks:
                     )
 
                 download_status = gr.Textbox(label="Download Status", interactive=False)
+                # In Gradio, gr.Progress() is not a UI element that is "shown".
+                # Instead, it is passed as an argument to the function.
+                # We'll use a dummy variable here to satisfy the code structure,
+                # but the actual progress bar is triggered by the function call.
+                download_progress = gr.Progress()
+                # Gr.Progress is usually passed to functions, not instantiated as a UI component like Textbox
+                # To show it, it needs to be used within a function decorated with @gr.on(...) or similar
+                # For now, we'll ensure it's available for the backend to use.
+                download_progress = gr.Progress()
 
                 gr.Markdown("### Model Selection")
 
@@ -330,21 +339,72 @@ def create_admin_ui() -> gr.Blocks:
             except Exception as e:
                 return f"Error: {e}"
 
-        async def download_llama_binary() -> str:
+        async def download_llama_binary(progress=gr.Progress()):
             try:
-                from src.services.llama import download_llama_cpp
+                from src.admin.download_manager import create_download_manager
+                from src.admin.version_manager import VersionManager
 
-                path = await download_llama_cpp()
-                return f"Downloaded to {path}"
+                vm = VersionManager()
+                release = await vm.get_release("llama.cpp", "latest")
+                total_size = 0
+                for asset in release.assets:
+                    if "windows" in asset.name.lower() and "x64" in asset.name.lower():
+                        total_size = asset.size
+                        break
+
+                dm = create_download_manager()
+                result = await dm.start_download("llama.cpp", "latest")
+                
+                task = None
+                if total_size > 0:
+                    for _ in range(60):
+                        await asyncio.sleep(1)
+                        task = dm.active_downloads.get(result["download_id"])
+                        if not task:
+                            break
+                        progress_val = task.bytes_downloaded / total_size
+                        progress(progress_val, desc=f"Downloading: {task.bytes_downloaded // (1024*1024)}MB / {total_size // (1024*1024)}MB")
+                        if task.status in ("completed", "failed", "cancelled"):
+                            break
+                else:
+                    # If no size found, at least get the task once
+                    task = dm.active_downloads.get(result["download_id"])
+
+                return f"Download completed!" if task and task.status == "completed" else f"Status: {task.status if task else 'unknown'}"
             except Exception as e:
                 return f"Error: {e}"
 
-        async def download_qdrant_binary() -> str:
+        async def download_qdrant_binary(progress=gr.Progress()):
             try:
-                from src.services.vectorstore import download_qdrant
+                from src.admin.download_manager import create_download_manager
+                from src.admin.version_manager import VersionManager
 
-                path = await download_qdrant()
-                return f"Downloaded to {path}"
+                vm = VersionManager()
+                release = await vm.get_release("qdrant", "latest")
+                total_size = 0
+                for asset in release.assets:
+                    if "windows" in asset.name.lower() and "x64" in asset.name.lower():
+                        total_size = asset.size
+                        break
+
+                dm = create_download_manager()
+                result = await dm.start_download("qdrant", "latest")
+                
+                task = None
+                if total_size > 0:
+                    for _ in range(60):
+                        await asyncio.sleep(1)
+                        task = dm.active_downloads.get(result["download_id"])
+                        if not task:
+                            break
+                        progress_val = task.bytes_downloaded / total_size
+                        progress(progress_val, desc=f"Downloading: {task.bytes_downloaded // (1024*1024)}MB / {total_size // (1024*1024)}MB")
+                        if task.status in ("completed", "failed", "cancelled"):
+                            break
+                else:
+                    task = dm.active_downloads.get(result["download_id"])
+
+                return f"Download completed!" if task and task.status == "completed" else f"Status: {task.status if task else 'unknown'}"
             except Exception as e:
                 return f"Error: {e}"
 

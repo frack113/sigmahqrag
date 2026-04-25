@@ -180,7 +180,7 @@ class BackupManager:
 
         except Exception as e:
             logger.error(f"Backup failed: {e}")
-            raise BackupError(f"Failed to create backup: {e}")
+            raise BackupError(f"Failed to create backup: {e}") from e
 
     async def restore_backup(
         self, service: str, backup_id: str | None = None
@@ -225,7 +225,7 @@ class BackupManager:
 
         except Exception as e:
             logger.error(f"Restore failed: {e}")
-            raise BackupError(f"Failed to restore backup: {e}")
+            raise BackupError(f"Failed to restore backup: {e}") from e
 
     async def _load_backup_metadata(
         self, service: str, backup_id: str
@@ -260,7 +260,7 @@ class BackupManager:
                 checksum=data.get("checksum", ""),
             )
         except (json.JSONDecodeError, OSError, KeyError) as e:
-            raise BackupError(f"Failed to load backup metadata: {e}")
+            raise BackupError(f"Failed to load backup metadata: {e}") from e
 
     async def list_backups(self, service: str) -> list[BackupMetadata]:
         """List available backups for a service.

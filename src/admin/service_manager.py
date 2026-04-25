@@ -11,7 +11,7 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 LOGS_DIR = "logs"
-LLAMA_BIN = "bin/llama-server"
+LLAMA_BIN = "bin/llama-cpp/llama-server.exe"
 QDRANT_BIN = "bin/qdrant"
 PID_DIR = "data/pids"
 

@@ -2,10 +2,9 @@
 
 import logging
 
-from fastapi import APIRouter, Depends, Response, Header
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import APIRouter, Depends, Header, Response
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from src.auth.service import AuthService
 from src.feedback.models import FeedbackIn, FeedbackResponse, FeedbackStats
 from src.feedback.service import FeedbackService
 
@@ -22,10 +21,11 @@ async def get_current_admin_user(
     if credentials is None:
         from fastapi import HTTPException
         raise HTTPException(status_code=401, detail="Not authenticated")
-    
-    from jose import jwt, JWTError
+
     import os
-    
+
+    from jose import JWTError, jwt
+
     try:
         secret = os.getenv("JWT_SECRET", "default-secret")
         payload = jwt.decode(credentials.credentials, secret, algorithms=["HS256"])
@@ -34,9 +34,9 @@ async def get_current_admin_user(
             from fastapi import HTTPException
             raise HTTPException(status_code=403, detail="Admin required")
         return payload.get("sub", "admin")
-    except JWTError:
+    except JWTError as e:
         from fastapi import HTTPException
-        raise HTTPException(status_code=401, detail="Invalid token")
+        raise HTTPException(status_code=401, detail="Invalid token") from e
 
 
 def get_session_id(x_session_id: str | None = Header(None)) -> str | None:

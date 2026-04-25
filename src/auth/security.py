@@ -74,7 +74,7 @@ def decode_access_token(token: str) -> dict[str, Any]:
         )
         return payload
     except JWTError as e:
-        raise ValueError(f"Invalid token: {e}")
+        raise ValueError(f"Invalid token: {e}") from e
 
 
 def get_password_hash(password: str) -> str:

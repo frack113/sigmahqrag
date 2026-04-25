@@ -438,7 +438,6 @@ async def apply_update(request: UpdateApplyRequest) -> JSONResponse:
     try:
         update_service = create_update_service()
 
-        from src.admin.download_manager import create_download_manager
         from src.admin.version_manager import create_version_manager
         from src.config import BIN_DIR
 
@@ -449,8 +448,6 @@ async def apply_update(request: UpdateApplyRequest) -> JSONResponse:
             )
 
         version_manager = create_version_manager()
-        download_manager = create_download_manager()
-
         release = await version_manager.get_release(request.service, request.version)
         asset = version_manager.find_matching_asset(release, request.service)
 

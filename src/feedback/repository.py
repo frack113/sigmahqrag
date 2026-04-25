@@ -3,9 +3,10 @@
 import logging
 import os
 import uuid
-import aiosqlite
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
+
+import aiosqlite
 
 from src.feedback.models import Feedback, FeedbackStats, hash_query
 
@@ -67,7 +68,7 @@ class FeedbackRepository:
             id=str(uuid.uuid4()),
             query_hash=hash_query(query),
             helpful=helpful,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(),
             session_id=session_id,
         )
 

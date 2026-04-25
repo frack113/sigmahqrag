@@ -5,7 +5,9 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import shutil
 import uuid
+import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -89,8 +91,9 @@ class DownloadManager:
             )
 
         download_id = str(uuid.uuid4())
-        temp_path = self.temp_manager.create_temp_file(download_id)
-        target_path = BIN_DIR / f"{service.replace('.', '-')}"
+        temp_path = self.temp_manager.create_temp_file(download_id, extension=".zip")
+        file_ext = ".zip" if asset.name.endswith(".zip") else ".tar.gz"
+        target_path = BIN_DIR / f"{service.replace('.', '-')}{file_ext}"
 
         cancel_event = asyncio.Event()
         progress_queue = asyncio.Queue()
@@ -139,7 +142,8 @@ class DownloadManager:
 
         try:
             async with httpx.AsyncClient(
-                timeout=httpx.Timeout(300.0, connect=30.0)
+                timeout=httpx.Timeout(300.0, connect=30.0),
+                follow_redirects=True,
             ) as client:
                 async with client.stream(
                     "GET",
@@ -193,8 +197,11 @@ class DownloadManager:
 
                     task.status = "completed"
                     task.bytes_downloaded = downloaded
-                    task.temp_path.rename(task.target_path)
-                    os.chmod(task.target_path, 0o755)
+                    BIN_DIR.mkdir(parents=True, exist_ok=True)
+
+                    await self._extract_and_install(
+                        task.temp_path, task.target_path, task.service
+                    )
 
                     if task.progress_queue:
                         await task.progress_queue.put({
@@ -215,6 +222,95 @@ class DownloadManager:
                     "status": "failed",
                     "error": str(e),
                 })
+
+    async def _extract_and_install(
+        self, temp_path: Path, target_dir: Path, service: str
+    ) -> None:
+        """Extract archive and install to bin directory.
+
+        Args:
+            temp_path: Path to downloaded archive
+            target_dir: Target directory for extraction
+            service: Service name (llama.cpp, qdrant)
+        """
+        import subprocess
+
+        service_dir = BIN_DIR / service.replace(".", "-")
+
+        # Clean up existing service directory
+        if service_dir.exists():
+            try:
+                shutil.rmtree(service_dir)
+                logger.info(f"Cleaned existing directory: {service_dir}")
+            except Exception as e:
+                logger.warning(f"Could not clean {service_dir}: {e}")
+
+        BIN_DIR.mkdir(parents=True, exist_ok=True)
+
+        if temp_path.suffix == ".zip":
+            with zipfile.ZipFile(temp_path, "r") as zf:
+                members = zf.namelist()
+                top_level = set()
+                root_files = []
+                for name in members:
+                    parts = Path(name).parts
+                    if len(parts) == 1 or (len(parts) == 2 and not parts[1]):
+                        root_files.append(name)
+                    elif parts and parts[0]:
+                        top_level.add(parts[0])
+
+                logger.info(f"ZIP top-level dirs: {top_level}, root files: {len(root_files)}")
+
+                if top_level:
+                    # Files in a subdirectory - extract all
+                    zf.extractall(BIN_DIR)
+                    logger.info(f"Extracted ZIP: {temp_path.name}")
+
+                    # Move files from extracted subdir to service_dir
+                    for extracted_name in top_level:
+                        extracted_dir = BIN_DIR / extracted_name
+                        if extracted_dir.exists() and extracted_dir.is_dir():
+                            service_dir.mkdir(parents=True, exist_ok=True)
+                            for f in os.listdir(extracted_dir):
+                                src = extracted_dir / f
+                                dst = service_dir / f
+                                src.rename(dst)
+                            shutil.rmtree(extracted_dir)
+                            logger.info(f"Moved files to {service_dir}")
+                            break
+                else:
+                    # Root files only - extract directly to service_dir
+                    service_dir.mkdir(parents=True, exist_ok=True)
+                    zf.extractall(service_dir)
+                    logger.info(f"Extracted ZIP to {service_dir}")
+        else:
+            result = subprocess.run(
+                ["tar", "-tf", str(temp_path)],
+                capture_output=True,
+                text=True,
+            )
+            top_level = set()
+            for name in result.stdout.splitlines()[:10]:
+                parts = name.split("/")
+                if parts and parts[0]:
+                    top_level.add(parts[0])
+
+            result = subprocess.run(
+                ["tar", "-xf", str(temp_path), "-C", str(BIN_DIR)],
+                capture_output=True,
+                text=True,
+            )
+            if result.returncode != 0:
+                raise RuntimeError(f"Failed to extract tar.gz: {result.stderr}")
+
+            extracted_names = list(top_level - {"", ".", "__MACOSX"})
+            if extracted_names:
+                extracted_dir = BIN_DIR / extracted_names[0]
+                if extracted_dir.exists() and extracted_dir != service_dir:
+                    extracted_dir.rename(service_dir)
+
+        self.temp_manager.cleanup(temp_path)
+        logger.info(f"Cleaned temp file: {temp_path}")
 
     async def cancel_download(self, download_id: str) -> dict[str, Any]:
         """Cancel an active download.

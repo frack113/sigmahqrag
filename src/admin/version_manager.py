@@ -43,12 +43,13 @@ class VersionManager:
 
     BINARY_PATTERNS = {
         "llama.cpp": [
-            r"llama-.*-windows-x64",
+            r"llama-.*-win-cpu-x64",
+            r"llama-.*-win-cuda-\d+\.\d+-x64",
+            r"llama-.*-win-hip.*x64",
             r"llama-.*-linux-x64",
             r"llama-.*-linux-arm64",
             r"llama-.*-macos-x64",
             r"llama-.*-macos-arm64",
-            r"cudart-llama-bin-win",  # CUDA variant for Windows
         ],
         "qdrant": [
             r"x86_64-unknown-linux-musl",
@@ -162,23 +163,37 @@ class VersionManager:
         for asset in release.assets:
             asset_name = asset.name.lower()
 
+            # Skip CUDA/cuBLAS/cuDNN/cuDART runtime libraries - these are not the main binary
+            if "cuda" in asset_name or "cudnn" in asset_name or "cublas" in asset_name:
+                continue
+
             if service == "llama.cpp":
-                # Check patterns with regex
+                # Try pattern match
                 for pattern in patterns:
-                    if os_name in pattern and arch in pattern:
+                    target_os = pattern.replace("llama-", "").split("-")[0]  # e.g., "win-cpu", "linux"
+                    target_arch = pattern.split("-")[-1]  # e.g., "x64"
+
+                    if os_name in target_os and arch in target_arch:
                         if re.search(pattern, asset_name):
+                            logger.info(f"Matched pattern {pattern} for {asset.name}")
                             return asset
-                # Fallback: check for OS in asset name (widened for new naming)
-                if "windows" in asset_name or "win" in asset_name:
-                    if "x64" in asset_name:
+
+                # Fallback: check for OS+arch in asset name
+                if os_name == "windows":
+                    if "win-cpu" in asset_name and "x64" in asset_name:
                         return asset
-                if "linux" in asset_name:
-                    if "x64" in asset_name or "arm" in asset_name:
+                    if "win-cuda" in asset_name and "x64" in asset_name:
                         return asset
-                if "macos" in asset_name or "darwin" in asset_name:
-                    if "x64" in asset_name or "arm64" in asset_name:
+                elif os_name == "linux":
+                    if "ubuntu" in asset_name and "x64" in asset_name:
                         return asset
-            elif service == "qdrant":
+                elif os_name == "macos":
+                    if "macos" in asset_name and ("x64" in asset_name or "arm64" in asset_name):
+                        return asset
+
+        for asset in release.assets:
+            asset_name = asset.name.lower()
+            if service == "qdrant":
                 for pattern in patterns:
                     if os_name in pattern or arch in pattern:
                         if re.search(pattern, asset_name):

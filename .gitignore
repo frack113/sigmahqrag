@@ -50,5 +50,6 @@ bin/
 models/
 logs/
 *.log
+*.tmp
 
 config.json

@@ -108,11 +108,9 @@ async def ingest_sigma_rules(
                 )
             )
 
-    indexed = 0
     if successful_rules:
         try:
-            index_result = await index_sigma_rules(successful_rules)
-            indexed = index_result.get("indexed", 0)
+            await index_sigma_rules(successful_rules)
         except Exception as e:
             logger.error(f"Failed to index rules: {e}")
 

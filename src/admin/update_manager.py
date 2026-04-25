@@ -78,7 +78,7 @@ class UpdateService:
             if backup_id:
                 await self._perform_rollback(service, backup_id)
 
-            raise UpdateError(error_msg)
+            raise UpdateError(error_msg) from None
 
         health_result = await self._check_service_health(service)
 
