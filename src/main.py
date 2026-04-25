@@ -1,10 +1,13 @@
 """SigmaHQ RAG - FastAPI + Gradio application."""
 
 import logging
+import uuid
+from contextvars import ContextVar
 
 import gradio as gr
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from src.errors import (
     ModelNotFoundError,
@@ -15,10 +18,32 @@ from src.errors import (
 
 logger = logging.getLogger(__name__)
 
+correlation_id_var: ContextVar[str | None] = ContextVar("correlation_id", default=None)
+
+
+class CorrelationIDMiddleware(BaseHTTPMiddleware):
+    """Middleware to add correlation ID to requests."""
+
+    async def dispatch(self, request: Request, call_next):
+        """Process request and add correlation ID."""
+        correlation_id = request.headers.get("X-Correlation-ID")
+        if not correlation_id:
+            correlation_id = str(uuid.uuid4())
+
+        correlation_id_var.set(correlation_id)
+        request.state.correlation_id = correlation_id
+
+        response = await call_next(request)
+        response.headers["X-Correlation-ID"] = correlation_id
+
+        return response
+
 
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
     from src.api.routes.admin import router as admin_router
+    from src.api.routes.auth import router as auth_router
+    from src.api.routes.documents import router as documents_router
 
     app = FastAPI(
         title="SigmaHQ RAG",
@@ -26,14 +51,18 @@ def create_app() -> FastAPI:
         description="Local RAG system for Sigma rules",
     )
 
+    app.add_middleware(CorrelationIDMiddleware)
+
+    app.include_router(auth_router)
     app.include_router(admin_router)
+    app.include_router(documents_router)
 
     @app.exception_handler(SigmaError)
     async def sigma_error_handler(request: Request, exc: SigmaError) -> JSONResponse:
         """Handle SigmaError exceptions."""
-        logger.error(f"Sigma error: {exc.message}")
+        _log_error_with_context(request, exc)
         return JSONResponse(
-            status_code=500,
+            status_code=exc.http_status,
             content=exc.to_dict(),
         )
 
@@ -42,9 +71,9 @@ def create_app() -> FastAPI:
         request: Request, exc: ServiceUnavailableError
     ) -> JSONResponse:
         """Handle ServiceUnavailableError exceptions."""
-        logger.error(f"Service unavailable: {exc.message}")
+        _log_error_with_context(request, exc)
         return JSONResponse(
-            status_code=503,
+            status_code=exc.http_status,
             content=exc.to_dict(),
         )
 
@@ -53,9 +82,9 @@ def create_app() -> FastAPI:
         request: Request, exc: ModelNotFoundError
     ) -> JSONResponse:
         """Handle ModelNotFoundError exceptions."""
-        logger.error(f"Model not found: {exc.message}")
+        _log_error_with_context(request, exc)
         return JSONResponse(
-            status_code=404,
+            status_code=exc.http_status,
             content=exc.to_dict(),
         )
 
@@ -64,10 +93,31 @@ def create_app() -> FastAPI:
         request: Request, exc: ValidationError
     ) -> JSONResponse:
         """Handle ValidationError exceptions."""
-        logger.error(f"Validation error: {exc.message}")
+        _log_error_with_context(request, exc)
         return JSONResponse(
-            status_code=422,
+            status_code=exc.http_status,
             content=exc.to_dict(),
+        )
+
+    @app.exception_handler(Exception)
+    async def generic_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+        """Handle uncaught exceptions - returns 500 with clean message."""
+        logger.exception(
+            f"Unhandled exception: {exc}",
+            extra={
+                "request_method": request.method,
+                "request_path": request.url.path,
+                "request_query_params": str(request.query_params),
+                "correlation_id": getattr(request.state, "correlation_id", None),
+            },
+        )
+        return JSONResponse(
+            status_code=500,
+            content={
+                "code": "INTERNAL_ERROR",
+                "message": "An internal error occurred",
+                "details": {},
+            },
         )
 
     @app.get("/health")
@@ -83,6 +133,20 @@ def create_app() -> FastAPI:
         )
 
     return app
+
+
+def _log_error_with_context(request: Request, exc: SigmaError) -> None:
+    """Log error with request context."""
+    logger.error(
+        f"{exc.code}: {exc.message}",
+        extra={
+            "request_method": request.method,
+            "request_path": request.url.path,
+            "request_query_params": str(request.query_params),
+            "correlation_id": getattr(request.state, "correlation_id", None),
+            "error_details": exc.details,
+        },
+    )
 
 
 def create_gradio_ui() -> gr.Blocks:

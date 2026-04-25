@@ -2,14 +2,19 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter
-from fastapi.responses import JSONResponse
+import httpx
+from fastapi import APIRouter, Depends
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
+from src.admin.download_manager import (
+    create_download_manager,
+)
 from src.admin.health import (
     ServiceHealth,
     ServiceStatus,
@@ -18,7 +23,20 @@ from src.admin.health import (
 from src.admin.service_manager import (
     create_service_manager,
 )
+from src.admin.update_manager import (
+    create_update_service,
+)
+from src.api.dependencies import require_role
+from src.auth.models import UserRole
 from src.config import LLAMA_BIN_PATH, LOGS_DIR, QDRANT_BIN_PATH
+from src.schemas.download import (
+    DownloadCancelRequest,
+    DownloadRequest,
+)
+from src.schemas.update import (
+    UpdateApplyRequest,
+    UpdateRollbackRequest,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +95,7 @@ def _get_status_display(health: ServiceHealth, binary_path: Path) -> dict[str, A
     return result
 
 
-@router.get("/health")
+@router.get("/health", dependencies=[Depends(require_role(UserRole.ANALYST, UserRole.ADMIN))])
 async def get_admin_health() -> JSONResponse:
     """Get health status of all services for admin page.
 
@@ -105,7 +123,7 @@ async def get_admin_health() -> JSONResponse:
         )
 
 
-@router.post("/llama/start")
+@router.post("/llama/start", dependencies=[Depends(require_role(UserRole.ADMIN))])
 async def start_llama(request: StartRequest | None = None) -> JSONResponse:
     """Start llama.cpp server.
 
@@ -149,7 +167,7 @@ async def start_llama(request: StartRequest | None = None) -> JSONResponse:
         )
 
 
-@router.post("/llama/stop")
+@router.post("/llama/stop", dependencies=[Depends(require_role(UserRole.ADMIN))])
 async def stop_llama() -> JSONResponse:
     """Stop llama.cpp server.
 
@@ -184,7 +202,7 @@ async def stop_llama() -> JSONResponse:
         )
 
 
-@router.post("/qdrant/start")
+@router.post("/qdrant/start", dependencies=[Depends(require_role(UserRole.ADMIN))])
 async def start_qdrant() -> JSONResponse:
     """Start Qdrant server.
 
@@ -220,7 +238,7 @@ async def start_qdrant() -> JSONResponse:
         )
 
 
-@router.post("/qdrant/stop")
+@router.post("/qdrant/stop", dependencies=[Depends(require_role(UserRole.ADMIN))])
 async def stop_qdrant() -> JSONResponse:
     """Stop Qdrant server.
 
@@ -255,7 +273,7 @@ async def stop_qdrant() -> JSONResponse:
         )
 
 
-@router.get("/llama/logs")
+@router.get("/llama/logs", dependencies=[Depends(require_role(UserRole.ANALYST, UserRole.ADMIN))])
 async def get_llama_logs() -> JSONResponse:
     """Get llama.cpp logs.
 
@@ -282,7 +300,7 @@ async def get_llama_logs() -> JSONResponse:
         )
 
 
-@router.get("/qdrant/logs")
+@router.get("/qdrant/logs", dependencies=[Depends(require_role(UserRole.ANALYST, UserRole.ADMIN))])
 async def get_qdrant_logs() -> JSONResponse:
     """Get Qdrant logs.
 
@@ -303,6 +321,220 @@ async def get_qdrant_logs() -> JSONResponse:
 
     except Exception as e:
         logger.error(f"Failed to get qdrant logs: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"error": str(e)},
+        )
+
+
+@router.post("/download", dependencies=[Depends(require_role(UserRole.ADMIN))])
+async def download_binary(request: DownloadRequest) -> JSONResponse:
+    """Download a binary from GitHub releases.
+
+    Args:
+        request: DownloadRequest with service and version
+
+    Returns:
+        JSON with download_id, status, service, version, target_path
+    """
+    try:
+        manager = create_download_manager()
+        result = await manager.start_download(
+            service=request.service,
+            version=request.version,
+        )
+
+        return JSONResponse(content=result)
+
+    except Exception as e:
+        logger.error(f"Download failed: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"error": str(e)},
+        )
+
+
+@router.post("/download/cancel", dependencies=[Depends(require_role(UserRole.ADMIN))])
+async def cancel_download(request: DownloadCancelRequest) -> JSONResponse:
+    """Cancel an active download.
+
+    Args:
+        request: DownloadCancelRequest with download_id
+
+    Returns:
+        JSON with download_id, status, message
+    """
+    try:
+        manager = create_download_manager()
+        result = await manager.cancel_download(request.download_id)
+
+        return JSONResponse(content=result)
+
+    except Exception as e:
+        logger.error(f"Cancellation failed: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"error": str(e)},
+        )
+
+
+async def _progress_generator(download_id: str) -> str:
+    """Generate SSE progress updates.
+
+    Args:
+        download_id: Download ID
+
+    Yields:
+        SSE formatted progress data
+    """
+    manager = create_download_manager()
+    queue = manager.get_progress_stream(download_id)
+
+    if not queue:
+        yield "data: {\"status\": \"not_found\"}\n\n"
+        return
+
+    while True:
+        try:
+            data = await asyncio.wait_for(queue.get(), timeout=30.0)
+            yield f"data: {data}\n\n"
+
+            if data.get("status") in ("completed", "cancelled", "failed"):
+                break
+        except TimeoutError:
+            yield "data: {\"status\": \"timeout\"}\n\n"
+            break
+
+
+@router.get(
+    "/download/{download_id}/progress",
+    dependencies=[Depends(require_role(UserRole.ADMIN))],
+)
+async def get_download_progress(download_id: str) -> StreamingResponse:
+    """Get download progress via SSE.
+
+    Args:
+        download_id: Download ID
+
+    Returns:
+        StreamingResponse with SSE data
+    """
+    return StreamingResponse(
+        _progress_generator(download_id),
+        media_type="text/event-stream",
+    )
+
+
+@router.post("/update/apply", dependencies=[Depends(require_role(UserRole.ADMIN))])
+async def apply_update(request: UpdateApplyRequest) -> JSONResponse:
+    """Apply an update to a service.
+
+    Args:
+        request: UpdateApplyRequest with service and version
+
+    Returns:
+        JSON with update result
+    """
+    try:
+        update_service = create_update_service()
+
+        from src.admin.download_manager import create_download_manager
+        from src.admin.version_manager import create_version_manager
+        from src.config import BIN_DIR
+
+        if request.service not in ("llama.cpp", "qdrant"):
+            return JSONResponse(
+                status_code=400,
+                content={"error": f"Unsupported service: {request.service}"},
+            )
+
+        version_manager = create_version_manager()
+        download_manager = create_download_manager()
+
+        release = await version_manager.get_release(request.service, request.version)
+        asset = version_manager.find_matching_asset(release, request.service)
+
+        if not asset:
+            return JSONResponse(
+                status_code=400,
+                content={"error": "No matching binary found for this platform"},
+            )
+
+        temp_dir = BIN_DIR / "pending"
+        temp_dir.mkdir(parents=True, exist_ok=True)
+
+        binary_path = temp_dir / f"{request.service.replace('.', '-')}"
+
+        async with httpx.AsyncClient(timeout=300.0) as client:
+            response = await client.get(
+                asset.browser_download_url,
+                follow_redirects=True,
+            )
+            response.raise_for_status()
+            binary_path.write_bytes(response.content)
+
+        result = await update_service.apply_update(
+            service=request.service,
+            version=request.version,
+            binary_path=binary_path,
+        )
+
+        try:
+            binary_path.unlink()
+        except OSError:
+            pass
+
+        return JSONResponse(content=result)
+
+    except Exception as e:
+        logger.error(f"Update failed: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"error": str(e)},
+        )
+
+
+@router.post("/update/rollback", dependencies=[Depends(require_role(UserRole.ADMIN))])
+async def rollback_update(request: UpdateRollbackRequest) -> JSONResponse:
+    """Rollback a service to previous version.
+
+    Args:
+        request: UpdateRollbackRequest with service
+
+    Returns:
+        JSON with rollback result
+    """
+    try:
+        update_service = create_update_service()
+
+        result = await update_service.rollback(service=request.service)
+
+        return JSONResponse(content=result)
+
+    except Exception as e:
+        logger.error(f"Rollback failed: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"error": str(e)},
+        )
+
+
+@router.get("/update/status", dependencies=[Depends(require_role(UserRole.ADMIN))])
+async def get_update_status() -> JSONResponse:
+    """Get update system status.
+
+    Returns:
+        JSON with current versions and available backups
+    """
+    try:
+        update_service = create_update_service()
+
+        result = await update_service.get_status()
+
+        return JSONResponse(content=result)
+
+    except Exception as e:
+        logger.error(f"Status check failed: {e}")
         return JSONResponse(
             status_code=500,
             content={"error": str(e)},

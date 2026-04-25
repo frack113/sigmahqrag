@@ -1,0 +1,9 @@
+title: Test Rule 1
+id: test-rule-001
+detection:
+  selection:
+    EventID: 4688
+condition: selection
+level: high
+author: Test Author
+date: "2025-01-01"

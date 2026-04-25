@@ -23,6 +23,9 @@ LOGS_DIR = Path("logs")
 DATA_DIR = Path("data")
 QDRANT_STORAGE_DIR = Path("qdrant/storage")
 
+BACKUP_DIR = Path("backups")
+MAX_BACKUPS = 5
+
 CONFIG_FILE = Path("config.json")
 
 
