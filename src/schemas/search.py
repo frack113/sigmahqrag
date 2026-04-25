@@ -1,6 +1,5 @@
 """Search request/response schema."""
 
-
 from pydantic import BaseModel, Field
 
 

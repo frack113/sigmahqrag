@@ -14,6 +14,8 @@ class VectorStoreClient:
         """Search vectors."""
         return []
 
-    async def add(self, vectors: list[list[float]], documents: list[dict[str, Any]]) -> None:
+    async def add(
+        self, vectors: list[list[float]], documents: list[dict[str, Any]]
+    ) -> None:
         """Add vectors."""
         pass

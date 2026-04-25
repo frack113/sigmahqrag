@@ -1,7 +1,6 @@
 """Embedder."""
 
 
-
 class Embedder:
     """Document embedder."""
 

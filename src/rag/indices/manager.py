@@ -1,7 +1,6 @@
 """Index manager."""
 
 
-
 class IndexManager:
     """Manages indices."""
 

@@ -1,8 +1,12 @@
 """Custom exceptions."""
 
+from typing import Any
+
 
 class SigmaError(Exception):
     """Base exception for Sigma errors."""
+
+    http_status: int = 500
 
     def __init__(self, code: str, message: str, details: dict | None = None):
         """Initialize exception."""
@@ -11,7 +15,7 @@ class SigmaError(Exception):
         self.details = details or {}
         super().__init__(self.message)
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """Convert exception to dictionary."""
         return {
             "code": self.code,
@@ -22,6 +26,8 @@ class SigmaError(Exception):
 
 class ServiceUnavailableError(SigmaError):
     """Service unavailable error."""
+
+    http_status = 503
 
     def __init__(self, service: str):
         """Initialize exception."""
@@ -35,6 +41,8 @@ class ServiceUnavailableError(SigmaError):
 class ModelNotFoundError(SigmaError):
     """Model not found error."""
 
+    http_status = 404
+
     def __init__(self, model_name: str):
         """Initialize exception."""
         super().__init__(
@@ -47,10 +55,40 @@ class ModelNotFoundError(SigmaError):
 class ValidationError(SigmaError):
     """Validation error."""
 
+    http_status = 422
+
     def __init__(self, field: str, message: str):
         """Initialize exception."""
         super().__init__(
             code="VALIDATION_ERROR",
             message=message,
             details={"field": field},
+        )
+
+
+class AuthenticationError(SigmaError):
+    """Authentication error."""
+
+    http_status = 401
+
+    def __init__(self, message: str):
+        """Initialize exception."""
+        super().__init__(
+            code="AUTHENTICATION_ERROR",
+            message=message,
+            details={},
+        )
+
+
+class AuthorizationError(SigmaError):
+    """Authorization error."""
+
+    http_status = 403
+
+    def __init__(self, message: str):
+        """Initialize exception."""
+        super().__init__(
+            code="AUTHORIZATION_ERROR",
+            message=message,
+            details={},
         )

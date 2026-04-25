@@ -1,4 +1,9 @@
-"""Services package."""
+"""Services layer for external integrations."""
 
-from .llama.client import LlamaClient  # noqa: F401
-from .vectorstore.client import VectorStoreClient  # noqa: F401
+from .llama_service import LlamaService
+from .qdrant_service import QdrantService
+
+__all__ = [
+    "LlamaService",
+    "QdrantService",
+]

@@ -11,6 +11,7 @@ dependencies = [
     "llama-index-llms-llamafile",
     "llama-index-embeddings-huggingface",
     "gitpython",
+    "python-jose>=3.5.0",
 ]
 
 [project.optional-dependencies]
@@ -27,7 +28,7 @@ build-backend = "hatchling.build"
 
 [tool.hatch]
 [tool.hatch.build.targets.wheel]
-packages = ["src/sigmahqrag"]
+packages = ["src"]
 
 [tool.ruff]
 target-version = "py312"

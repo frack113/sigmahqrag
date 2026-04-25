@@ -10,41 +10,41 @@ import pytest
 class TestPlatformDetection:
     """Test platform detection functions."""
 
-    @patch("sigmahqrag.services.llama.download.platform.system")
-    @patch("sigmahqrag.services.llama.download.platform.machine")
+    @patch("src.services.llama.download.platform.system")
+    @patch("src.services.llama.download.platform.machine")
     def test_windows_platform(self, mock_machine, mock_system):
         """Test Windows platform detection."""
         mock_system.return_value = "Windows"
         mock_machine.return_value = "amd64"
 
-        from sigmahqrag.services.llama.download import get_platform_info
+        from src.services.llama.download import get_platform_info
 
         info = get_platform_info()
         assert info["system"] == "windows"
         assert info["extension"] == ".exe"
         assert info["archive"] == ".zip"
 
-    @patch("sigmahqrag.services.llama.download.platform.system")
-    @patch("sigmahqrag.services.llama.download.platform.machine")
+    @patch("src.services.llama.download.platform.system")
+    @patch("src.services.llama.download.platform.machine")
     def test_macos_arm64_platform(self, mock_machine, mock_system):
         """Test macOS ARM64 platform detection."""
         mock_system.return_value = "Darwin"
         mock_machine.return_value = "arm64"
 
-        from sigmahqrag.services.llama.download import get_platform_info
+        from src.services.llama.download import get_platform_info
 
         info = get_platform_info()
         assert info["system"] == "macos"
         assert info["arch"] == "arm64"
 
-    @patch("sigmahqrag.services.llama.download.platform.system")
-    @patch("sigmahqrag.services.llama.download.platform.machine")
+    @patch("src.services.llama.download.platform.system")
+    @patch("src.services.llama.download.platform.machine")
     def test_linux_platform(self, mock_machine, mock_system):
         """Test Linux platform detection."""
         mock_system.return_value = "Linux"
         mock_machine.return_value = "x86_64"
 
-        from sigmahqrag.services.llama.download import get_platform_info
+        from src.services.llama.download import get_platform_info
 
         info = get_platform_info()
         assert info["system"] == "linux"
@@ -64,7 +64,7 @@ class TestDownloadUrl:
                 "archive": ".zip",
             }
 
-            from sigmahqrag.services.llama.download import get_download_url
+            from src.services.llama.download import get_download_url
 
             url = get_download_url("latest")
             assert "llama-server-windows-x86_64.exe.zip" in url
@@ -79,7 +79,7 @@ class TestDownloadUrl:
                 "archive": ".gz",
             }
 
-            from sigmahqrag.services.llama.download import get_download_url
+            from src.services.llama.download import get_download_url
 
             url = get_download_url("v1.0.0")
             assert "download/v1.0.0" in url
@@ -204,7 +204,7 @@ class TestBinaryPath:
         """Test get_binary_path raises error when binary not found."""
         mock_exists.return_value = False
 
-        from sigmahqrag.services.llama.download import get_binary_path
+        from src.services.llama.download import get_binary_path
 
         with pytest.raises(FileNotFoundError):
             get_binary_path(Path("/fake/bin"))
@@ -215,7 +215,7 @@ class TestBinaryPath:
         binary = tmp_path / binary_name
         binary.touch()
 
-        from sigmahqrag.services.llama.download import get_binary_path
+        from src.services.llama.download import get_binary_path
 
         result = get_binary_path(tmp_path)
         assert result == binary
