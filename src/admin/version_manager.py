@@ -43,11 +43,12 @@ class VersionManager:
 
     BINARY_PATTERNS = {
         "llama.cpp": [
-            r"llama-linux-x64",
-            r"llama-linux-arm64",
-            r"llama-macos-x64",
-            r"llama-macos-arm64",
-            r"llama-windows-x64",
+            r"llama-.*-windows-x64",
+            r"llama-.*-linux-x64",
+            r"llama-.*-linux-arm64",
+            r"llama-.*-macos-x64",
+            r"llama-.*-macos-arm64",
+            r"cudart-llama-bin-win",  # CUDA variant for Windows
         ],
         "qdrant": [
             r"x86_64-unknown-linux-musl",
@@ -162,22 +163,33 @@ class VersionManager:
             asset_name = asset.name.lower()
 
             if service == "llama.cpp":
+                # Check patterns with regex
                 for pattern in patterns:
                     if os_name in pattern and arch in pattern:
                         if re.search(pattern, asset_name):
                             return asset
+                # Fallback: check for OS in asset name (widened for new naming)
+                if "windows" in asset_name or "win" in asset_name:
+                    if "x64" in asset_name:
+                        return asset
+                if "linux" in asset_name:
+                    if "x64" in asset_name or "arm" in asset_name:
+                        return asset
+                if "macos" in asset_name or "darwin" in asset_name:
+                    if "x64" in asset_name or "arm64" in asset_name:
+                        return asset
             elif service == "qdrant":
                 for pattern in patterns:
                     if os_name in pattern or arch in pattern:
                         if re.search(pattern, asset_name):
                             return asset
 
-            if os_name == "windows" and "windows" in asset_name:
-                return asset
-            if os_name == "macos" and "macos" in asset_name:
-                return asset
-            if os_name == "linux" and "linux" in asset_name:
-                return asset
+                if os_name == "windows" and "windows" in asset_name:
+                    return asset
+                if os_name == "macos" and "macos" in asset_name:
+                    return asset
+                if os_name == "linux" and "linux" in asset_name:
+                    return asset
 
         logger.warning(
             f"No matching asset found for {service} on {os_name}-{arch}"
