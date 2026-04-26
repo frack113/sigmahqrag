@@ -157,13 +157,13 @@ async def test_checksum_verification(temp_dir):
     test_file = temp_dir / "test.gguf"
     test_file.write_bytes(b"test content")
 
-    hash_val = await service.compute_checksum(test_file)
+    hash_val = service.compute_checksum(test_file)
     assert len(hash_val) == 64
 
-    is_valid = await service.verify_checksum(test_file, hash_val)
+    is_valid = service.verify_checksum(test_file, hash_val)
     assert is_valid is True
 
-    is_invalid = await service.verify_checksum(test_file, "invalid_hash")
+    is_invalid = service.verify_checksum(test_file, "invalid_hash")
     assert is_invalid is False
 
 
@@ -178,7 +178,7 @@ async def test_atomic_download_service(temp_dir):
 async def test_disk_space_check(temp_dir):
     """Test disk space check."""
     service = AtomicDownloadService(final_dir=temp_dir)
-    has_space = await service.check_disk_space(1024, temp_dir)
+    has_space = service.check_disk_space(1024, temp_dir)
     assert isinstance(has_space, bool)
 
 
