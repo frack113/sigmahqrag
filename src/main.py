@@ -44,7 +44,9 @@ def create_app() -> FastAPI:
     from src.api.routes.admin import router as admin_router
     from src.api.routes.auth import router as auth_router
     from src.api.routes.documents import router as documents_router
+    from src.api.routes.embeddings import router as embeddings_router
     from src.api.routes.feedback import router as feedback_router
+    from src.api.routes.llm import router as llm_router
 
     app = FastAPI(
         title="SigmaHQ RAG",
@@ -58,6 +60,8 @@ def create_app() -> FastAPI:
     app.include_router(admin_router)
     app.include_router(documents_router)
     app.include_router(feedback_router)
+    app.include_router(embeddings_router)
+    app.include_router(llm_router)
 
     @app.exception_handler(SigmaError)
     async def sigma_error_handler(request: Request, exc: SigmaError) -> JSONResponse:
@@ -155,6 +159,7 @@ def create_gradio_ui() -> gr.Blocks:
     """Create the Gradio UI interface."""
     from src.ui.chat import ChatInterface
     from src.ui.mode import create_mode_toggle
+    from src.ui.model_selector import scan_models
 
     chat = ChatInterface()
     mode = create_mode_toggle()
@@ -162,6 +167,7 @@ def create_gradio_ui() -> gr.Blocks:
     with gr.Blocks(title="SigmaHQ RAG") as demo:
         gr.Markdown("# SigmaHQ RAG")
         gr.Markdown("Local RAG system for Sigma rules")
+        gr.Markdown("[Chat](/gradio) | [Models](/models) | [Admin](/admin)")
 
         with gr.Row():
             mode.render()
@@ -185,6 +191,110 @@ def create_gradio_ui() -> gr.Blocks:
             outputs=[msg, chatbot],
         )
         clear.click(lambda: (None, []), outputs=[msg, chatbot])
+
+    return demo  # type: ignore[no-any-return]
+
+
+def create_models_ui() -> gr.Blocks:
+    """Create the Models management UI."""
+    from src.core.services import ModelManager, EmbeddingManager
+
+    async def search_models(query: str) -> list:
+        """Search for models."""
+        mm = ModelManager()
+        results = await mm.search_models(query)
+        return [(r.repo_id, f"{r.filename} ({r.size/1024/1024:.0f}MB)") for r in results]
+
+    async def search_embeddings(query: str) -> list:
+        """Search for embedding models."""
+        em = EmbeddingManager()
+        results = await em.search_models(query)
+        return [(r.repo_id, f"{r.filename} ({r.size/1024/1024:.0f}MB)") for r in results]
+
+    async def estimate_vram(repo_id: str) -> str:
+        """Estimate VRAM for a model."""
+        mm = ModelManager()
+        try:
+            result = await mm.estimate_vram(repo_id)
+            if result.get("is_compatible"):
+                return f"✅ Compatible - {result['estimated_vram_gb']}GB needed, {result['available_vram_gb']}GB available"
+            else:
+                return f"⚠️ Not compatible - {result['estimated_vram_gb']}GB needed, {result['available_vram_gb']}GB available"
+        except Exception as e:
+            return f"Error: {e}"
+
+    async def download_model(repo_id: str) -> str:
+        """Download a model."""
+        mm = ModelManager()
+        try:
+            record = await mm.download_model(repo_id)
+            return f"Downloaded to {record.local_path}"
+        except Exception as e:
+            return f"Error: {e}"
+
+    async def list_installed() -> list:
+        """List installed models."""
+        mm = ModelManager()
+        models = await mm.list_installed_models()
+        return [(m.repo_id, f"{m.file_size/1024/1024:.0f}MB") for m in models]
+
+    with gr.Blocks(title="Models") as demo:
+        gr.Markdown("# Model Management")
+        gr.Markdown("Download and manage LLM and embedding models")
+
+        with gr.Tab("LLM Models"):
+            gr.Markdown("### Download LLM Models")
+            with gr.Row():
+                llm_query = gr.Textbox(label="Search", placeholder="e.g., llama")
+                dl_btn = gr.Button("Download")
+
+            llm_results = gr.Dataframe(
+                headers=["Repo ID", "Info"],
+                label="Search Results",
+            )
+
+            with gr.Row():
+                est_btn = gr.Button("Check VRAM")
+                vram_output = gr.Textbox(label="VRAM Estimate")
+
+            gr.Markdown("### Installed Models")
+            installed_list = gr.Dataframe(
+                headers=["Repo ID", "Size"],
+                label="Installed Models",
+            )
+            installed_refresh = gr.Button("Refresh")
+            
+            def on_installed():
+                import asyncio
+                return asyncio.get_event_loop().run_until_complete(list_installed())
+            
+            installed_refresh.click(
+                on_installed,
+                outputs=[installed_list],
+            )
+
+        with gr.Tab("Embedding Models"):
+            gr.Markdown("### Embedding Models")
+            with gr.Row():
+                emb_query = gr.Textbox(label="Search", placeholder="sentence-transformers")
+                emb_dl_btn = gr.Button("Download")
+
+            emb_results = gr.Dataframe(
+                headers=["Repo ID", "Info"],
+                label="Search Results",
+            )
+
+        dl_btn.click(
+            search_models,
+            inputs=[llm_query],
+            outputs=[llm_results],
+        )
+
+        est_btn.click(
+            estimate_vram,
+            inputs=[llm_query],
+            outputs=[vram_output],
+        )
 
     return demo  # type: ignore[no-any-return]
 
