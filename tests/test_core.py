@@ -7,7 +7,6 @@ from pathlib import Path
 
 from src.core.services import (
     HFDownloadService,
-    AtomicDownloadService,
     LocalRegistry,
     ModelInfo,
     ModelManager,
@@ -35,12 +34,6 @@ def registry(temp_dir):
 def download_service(temp_dir):
     """Create download service."""
     return HFDownloadService(temp_dir=temp_dir)
-
-
-@pytest.fixture
-def atomic_service(download_service, temp_dir):
-    """Create atomic service."""
-    return AtomicDownloadService(hf_service=download_service, final_dir=temp_dir)
 
 
 @pytest.fixture
@@ -166,20 +159,6 @@ async def test_checksum_verification(temp_dir):
     is_invalid = service.verify_checksum(test_file, "invalid_hash")
     assert is_invalid is False
 
-
-@pytest.mark.asyncio
-async def test_atomic_download_service(temp_dir):
-    """Test atomic download service."""
-    service = AtomicDownloadService(final_dir=temp_dir)
-    assert service.final_dir == temp_dir
-
-
-@pytest.mark.asyncio
-async def test_disk_space_check(temp_dir):
-    """Test disk space check."""
-    service = AtomicDownloadService(final_dir=temp_dir)
-    has_space = service.check_disk_space(1024, temp_dir)
-    assert isinstance(has_space, bool)
 
 
 @pytest.mark.asyncio

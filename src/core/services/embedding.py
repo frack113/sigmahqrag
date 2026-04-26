@@ -40,7 +40,7 @@ class EmbeddingManager:
         self, query: str = "sentence-transformers", limit: int = 10
     ):
         """Search for embedding models."""
-        return await self.download_service.list_models(query, limit=limit)
+        return await self.download_service.list_models(query)
 
     async def _create_index(self, model_path: Path, dimension: int = 384) -> Path:
         """Create FAISS index for embeddings."""
@@ -61,12 +61,30 @@ class EmbeddingManager:
         create_index: bool = True,
     ) -> ModelRecord:
         """Download an embedding model."""
-        temp_path = Path(self.download_service.download(repo_id, filename))
+        from src.core.types import HFRepo
+        repo = HFRepo.from_string(repo_id)
+        temp_dir = self.embeddings_dir / "temp" / repo.full_id.replace("/", "_")
+        temp_dir.mkdir(parents=True, exist_ok=True)
+        downloaded_path = self.download_service.download(repo, temp_dir, filename=filename, is_embedding=True)
+        temp_path = Path(downloaded_path)
 
-        final_dir = self.embeddings_dir / repo_id.replace("/", "_")
+        final_dir = self.embeddings_dir / repo.full_id.replace("/", "_")
         final_dir.mkdir(parents=True, exist_ok=True)
-        dest = final_dir / temp_path.name
-        temp_path.rename(dest)
+        
+        if temp_path.exists() and not temp_path.is_dir():
+             # If it's a single file (though for embeddings we expect a dir)
+             dest = final_dir / temp_path.name
+             shutil.move(str(temp_path), str(dest))
+        else:
+             # It's a directory, move its contents or the directory itself
+             # Actually snapshot_download returns the path to the directory it downloaded into.
+             # If target_dir was temp_dir, then temp_path is temp_dir.
+             # Let's just move the whole thing.
+             if final_dir.exists():
+                 import shutil
+                 shutil.rmtree(final_dir)
+             shutil.move(str(temp_path), str(final_dir))
+             dest = final_dir
 
         dimension = 384
         index_path = None
@@ -92,6 +110,7 @@ class EmbeddingManager:
         await self._save_registry(registry)
 
         return record
+
 
     async def list_installed(self) -> dict:
         """List installed embedding models."""

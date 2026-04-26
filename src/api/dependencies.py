@@ -5,17 +5,23 @@ from functools import lru_cache
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+security = HTTPBearer(auto_error=False)
+
 from src.auth.models import CurrentUser, UserRole
 from src.auth.security import decode_access_token
 from src.core.services.embedding import EmbeddingManager
-
-security = HTTPBearer(auto_error=False)
-
+from src.core.services.manager import ModelManager
 
 @lru_cache
 def get_embedding_manager() -> EmbeddingManager:
     """Get a singleton instance of the embedding manager."""
     return EmbeddingManager()
+
+
+@lru_cache
+def get_model_manager() -> ModelManager:
+    """Get a singleton instance of the model manager."""
+    return ModelManager()
 
 
 async def get_current_user(

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from src.config import LLM_DIR
 
-from .download import AtomicDownloadService, DownloadError, HFDownloadService
+from .download import DownloadError, HFDownloadService
 from .registry import LocalRegistry, ModelRecord
 from .vram import VRAMEstimator
 
@@ -25,7 +25,6 @@ class ModelManager:
     ) -> None:
         self.registry = registry or LocalRegistry()
         self.download_service = download_service or HFDownloadService()
-        self.atomic_service = AtomicDownloadService(hf_service=self.download_service)
         self.vram_estimator = VRAMEstimator()
         self.llm_dir = LLM_DIR
         self.llm_dir.mkdir(parents=True, exist_ok=True)
@@ -36,7 +35,8 @@ class ModelManager:
 
     async def get_model_info(self, repo_id: str):
         """Get model information."""
-        return await self.download_service.get_model_info(repo_id)
+        from src.core.types import HFRepo
+        return await self.download_service.get_model_info(HFRepo.from_string(repo_id))
 
     async def download_model(
         self,
@@ -45,11 +45,13 @@ class ModelManager:
         expected_hash: str | None = None,
     ) -> ModelRecord:
         """Download a model with atomic workflow."""
+        from src.core.types import HFRepo
+        repo = HFRepo.from_string(repo_id)
         await self.registry.update_status(repo_id, "downloading")
 
         try:
-            final_path = await self.atomic_service.download_atomic(
-                repo_id, filename, expected_hash
+            final_path = await self.download_service.download_gguf(
+                repo, self.llm_dir, filename
             )
 
             await self.registry.update_status(repo_id, "ready")
