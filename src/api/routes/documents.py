@@ -6,7 +6,6 @@ import logging
 import os
 
 from fastapi import APIRouter, Depends
-from fastapi.security import HTTPBearer
 
 from src.api.dependencies import require_role
 from src.auth.models import CurrentUser, UserRole
@@ -22,8 +21,6 @@ from src.documents.validator import validate_sigma_rule
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/documents", tags=["documents"])
-
-security = HTTPBearer(auto_error=False)
 
 
 def get_sigma_rules_dir() -> str:

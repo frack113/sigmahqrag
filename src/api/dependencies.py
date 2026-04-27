@@ -5,19 +5,23 @@ from functools import lru_cache
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+security = HTTPBearer(auto_error=False)
+
 from src.auth.models import CurrentUser, UserRole
 from src.auth.security import decode_access_token
+from src.core.services.embedding import EmbeddingManager
+from src.core.services.manager import ModelManager
 
-security = HTTPBearer(auto_error=False)
+@lru_cache
+def get_embedding_manager() -> EmbeddingManager:
+    """Get a singleton instance of the embedding manager."""
+    return EmbeddingManager()
 
 
 @lru_cache
-def get_settings() -> dict:
-    """Get application settings."""
-    return {
-        "app_name": "SigmaHQ RAG",
-        "version": "0.1.0",
-    }
+def get_model_manager() -> ModelManager:
+    """Get a singleton instance of the model manager."""
+    return ModelManager()
 
 
 async def get_current_user(

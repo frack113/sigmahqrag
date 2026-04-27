@@ -42,8 +42,11 @@ class CorrelationIDMiddleware(BaseHTTPMiddleware):
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
     from src.api.routes.admin import router as admin_router
+    from src.api.routes.admin_embedding import router as admin_embedding_router
+    from src.api.routes.admin_llm import router as admin_llm_router
     from src.api.routes.auth import router as auth_router
     from src.api.routes.documents import router as documents_router
+    from src.api.routes.embeddings import router as embeddings_router
     from src.api.routes.feedback import router as feedback_router
 
     app = FastAPI(
@@ -57,7 +60,10 @@ def create_app() -> FastAPI:
     app.include_router(auth_router)
     app.include_router(admin_router)
     app.include_router(documents_router)
+    app.include_router(embeddings_router)
+    app.include_router(admin_embedding_router)
     app.include_router(feedback_router)
+    app.include_router(admin_llm_router)
 
     @app.exception_handler(SigmaError)
     async def sigma_error_handler(request: Request, exc: SigmaError) -> JSONResponse:
@@ -162,6 +168,7 @@ def create_gradio_ui() -> gr.Blocks:
     with gr.Blocks(title="SigmaHQ RAG") as demo:
         gr.Markdown("# SigmaHQ RAG")
         gr.Markdown("Local RAG system for Sigma rules")
+        gr.Markdown("[Chat](/gradio) | [Models](/models) | [Admin](/admin)")
 
         with gr.Row():
             mode.render()
@@ -185,6 +192,136 @@ def create_gradio_ui() -> gr.Blocks:
             outputs=[msg, chatbot],
         )
         clear.click(lambda: (None, []), outputs=[msg, chatbot])
+
+    return demo  # type: ignore[no-any-return]
+
+
+def create_models_ui() -> gr.Blocks:
+    """Create the Models management UI."""
+    from src.core.services import ModelManager
+
+    async def list_files(repo_id: str) -> list:
+        """List GGUF files for a repo."""
+        if not repo_id:
+            return []
+        from src.core.types import HFRepo
+
+        mm = ModelManager()
+        try:
+            files = mm.download_service.list_gguf_files(HFRepo.from_string(repo_id))
+            return [f["filename"] for f in files]
+        except Exception:
+            return []
+
+    async def list_installed() -> list:
+        """List installed models."""
+        mm = ModelManager()
+        models = await mm.list_installed_models()
+        result = []
+        for m in models:
+            for fn, f in m.files.items():
+                size_mb = f.file_size / 1024 / 1024
+                result.append((f"{m.repo_id}/{fn}", f"{size_mb:.0f}MB"))
+        return result
+
+    async def delete_model(repo_id: str, filename: str | None = None) -> str:
+        """Delete a model."""
+        mm = ModelManager()
+        try:
+            await mm.delete_model(repo_id, filename)
+            return "Deleted successfully"
+        except Exception as e:
+            return f"Error: {e}"
+
+    with gr.Blocks(title="Models") as demo:
+        gr.Markdown("# Model Management")
+        gr.Markdown("Download and manage LLM and embedding models")
+
+        with gr.Tab("LLM Models"):
+            gr.Markdown("### Download LLM Model")
+            with gr.Row():
+                llm_repo = gr.Textbox(
+                    label="Repo ID",
+                    placeholder="e.g., leliuga/gemma-2b-it-GGUF",
+                    scale=2,
+                )
+                search_btn = gr.Button("Search Files", scale=1)
+
+            file_list = gr.Dropdown(
+                label="Select Quantization",
+                choices=[],
+                interactive=True,
+            )
+
+            with gr.Row():
+                dl_btn = gr.Button("Download", variant="primary")
+
+            dl_output = gr.Textbox(label="Status")
+
+            search_btn.click(
+                list_files,
+                inputs=[llm_repo],
+                outputs=[file_list],
+            )
+
+            def on_download_click(repo_id: str, selected_file: str):
+                if not repo_id or not selected_file:
+                    return "Please enter repo ID and select a file"
+
+                async def do_download():
+                    mm = ModelManager()
+                    return await mm.download_model(repo_id, selected_file)
+
+                try:
+                    import asyncio
+
+                    record = asyncio.get_event_loop().run_until_complete(do_download())
+                    return f"Downloaded: {record.local_path}"
+                except Exception as e:
+                    return f"Error: {e}"
+
+            dl_btn.click(
+                on_download_click,
+                inputs=[llm_repo, file_list],
+                outputs=[dl_output],
+            )
+
+            gr.Markdown("### Installed Models")
+            installed_list = gr.Dataframe(
+                headers=["Model", "Size"],
+                label="Installed Models",
+            )
+            with gr.Row():
+                installed_refresh = gr.Button("Refresh")
+                delete_btn = gr.Button("Delete Selected", variant="stop")
+            delete_output = gr.Textbox(label="Delete Status")
+
+            def on_installed():
+                import asyncio
+                return asyncio.get_event_loop().run_until_complete(list_installed())
+
+            installed_refresh.click(
+                on_installed,
+                outputs=[installed_list],
+            )
+
+            def on_delete(selected):
+                if not selected:
+                    return "No model selected"
+                import asyncio
+                return asyncio.get_event_loop().run_until_complete(
+                    delete_model(selected[0], selected[0].split("/")[-1])
+                )
+
+            delete_btn.click(
+                on_delete,
+                inputs=[installed_list],
+                outputs=[delete_output],
+            )
+
+        with gr.Tab("Embedding Models"):
+            gr.Markdown("### Embedding Models")
+            gr.Markdown("*Coming soon*")
 
     return demo  # type: ignore[no-any-return]
 

@@ -132,22 +132,15 @@ def create_admin_ui() -> gr.Blocks:
                     )
 
                 download_status = gr.Textbox(label="Download Status", interactive=False)
-                # In Gradio, gr.Progress() is not a UI element that is "shown".
-                # Instead, it is passed as an argument to the function.
-                # We'll use a dummy variable here to satisfy the code structure,
-                # but the actual progress bar is triggered by the function call.
-                download_progress = gr.Progress()
-                # Gr.Progress is usually passed to functions, not instantiated as a UI component like Textbox
-                # To show it, it needs to be used within a function decorated with @gr.on(...) or similar
-                # For now, we'll ensure it's available for the backend to use.
                 download_progress = gr.Progress()
 
-                gr.Markdown("### Model Selection")
-
+            with gr.Tab("Models"):
+                gr.Markdown("### Model Management")
+                
+                from src.ui.model_selector import scan_models
+                
                 def scan_llm_models() -> list[str]:
                     """Scan available LLM models."""
-                    from src.ui.model_selector import scan_models
-
                     models = scan_models(str(LLM_DIR))
                     return models if models else ["No models found"]
 
@@ -160,56 +153,143 @@ def create_admin_ui() -> gr.Blocks:
                                 models.append(f.stem)
                     return models if models else ["No models found"]
 
-                llm_model_dropdown = gr.Dropdown(
+                gr.Markdown("#### Download New Models")
+
+                model_search_input = gr.Textbox(
+                    label="Search",
+                    placeholder="Search models (e.g., gemma, llama, qwen)",
+                )
+                search_btn = gr.Button("Search", variant="primary")
+                
+                search_results = gr.Dropdown(
+                    label="Results - select a model",
+                    choices=[],
+                    allow_custom_value=True,
+                )
+                
+                quant_dropdown = gr.Dropdown(
+                    label="Select Quantization",
+                    choices=[],
+                )
+                
+                model_download_btn = gr.Button("Download", variant="primary")
+                download_status = gr.Textbox(label="Status", interactive=False)
+
+                async def on_search(query: str) -> list:
+                    """Search for models via API."""
+                    if not query or not query.strip():
+                        return []
+                    import httpx
+                    try:
+                        async with httpx.AsyncClient(timeout=30.0) as client:
+                            resp = await client.get(
+                                f"http://localhost:8000/api/models/search?query={query.strip()}"
+                            )
+                            if resp.status_code == 200:
+                                data = resp.json()
+                                return [m["id"] for m in data.get("models", [])]
+                            return []
+                    except Exception as e:
+                        print(f"Search error: {e}")
+                        return []
+
+                async def on_select_model(repo_id: str | None) -> list:
+                    """Get files for a model via API."""
+                    if not repo_id:
+                        return []
+                    import httpx
+                    try:
+                        async with httpx.AsyncClient(timeout=30.0) as client:
+                            resp = await client.get(
+                                f"http://localhost:8000/api/models/{repo_id}/files"
+                            )
+                            if resp.status_code == 200:
+                                data = resp.json()
+                                return data.get("files", [])
+                            return []
+                    except Exception as e:
+                        print(f"Files error: {e}")
+                        return []
+
+                def on_download(repo_id: str | None, filename: str | None) -> str:
+                    """Download model via API."""
+                    if not repo_id or not filename:
+                        return "Select model and quantization"
+                    import httpx
+                    try:
+                        resp = httpx.post(
+                            "http://localhost:8000/api/models/download",
+                            json={"repo_id": repo_id, "filename": filename},
+                            timeout=300.0,
+                        )
+                        if resp.status_code == 200:
+                            data = resp.json()
+                            return f"✅ Downloaded: {data.get('path')}"
+                        else:
+                            return f"❌ Error: {resp.json().get('error')}"
+                    except Exception as e:
+                        return f"❌ Error: {e}"
+
+                search_btn.click(fn=on_search, inputs=[model_search_input], outputs=[search_results])
+                search_results.change(fn=on_select_model, inputs=[search_results], outputs=[quant_dropdown])
+                model_download_btn.click(fn=on_download, inputs=[search_results, quant_dropdown], outputs=[download_status])
+
+                gr.Markdown("#### Installed LLM Models")
+                
+                llm_dropdown = gr.Dropdown(
                     label="LLM Model",
                     choices=scan_llm_models(),
                 )
-                embedding_model_dropdown = gr.Dropdown(
-                    label="Embedding Model",
-                    choices=scan_embedding_models(),
-                )
-                model_save_btn = gr.Button("Save Model Selection", variant="primary")
-                model_status = gr.Textbox(label="Model Status", interactive=False)
-
-                model_info_output = gr.Markdown(
-                    value="Select a model to view VRAM requirements"
-                )
-
-                def get_model_vram(model_name: str) -> str:
+                llm_vram_info = gr.Markdown("Select a model to view VRAM requirements")
+                llm_delete_btn = gr.Button("Delete", variant="stop")
+                
+                def get_llm_vram(model_name: str) -> str:
                     """Calculate and display VRAM for a model."""
                     if not model_name or model_name == "No models found":
                         return "No model selected"
-
+                    
                     model_path = LLM_DIR / f"{model_name}.gguf"
                     if not model_path.exists():
                         return f"Model file not found: {model_name}.gguf"
-
+                    
                     size_bytes = model_path.stat().st_size
                     size_gb = size_bytes / (1024**3)
-
                     size_mb = size_bytes / (1024**2)
-                    if size_mb < 4096:
-                        vram_note = "~1x model size (Q4)"
-                    else:
-                        vram_note = "~1.2x model size + context"
+                    vram_note = "~1x model size (Q4)" if size_mb < 4096 else "~1.2x model size + context"
+                    
+                    return f"**{model_name}**\n\n- **Size:** {size_mb:.0f} MB ({size_gb:.2f} GB)\n- **Est. VRAM:** {vram_note}"
 
-                    return f"""**{model_name}**
+                def delete_llm_model(model_name: str) -> str:
+                    """Delete LLM model."""
+                    if not model_name or model_name == "No models found":
+                        return "No model selected"
+                    
+                    model_path = LLM_DIR / f"{model_name}.gguf"
+                    if model_path.exists():
+                        model_path.unlink()
+                        return f"Deleted: {model_name}"
+                    return "Model not found"
 
-- **File Size:** {size_mb:.0f} MB ({size_gb:.2f} GB)
-- **Est. VRAM:** {vram_note}
-- **Note:** Actual VRAM depends on quantization and context length"""
+                gr.Markdown("#### Installed Embedding Models")
+                
+                embedding_dropdown = gr.Dropdown(
+                    label="Embedding Model",
+                    choices=scan_embedding_models(),
+                )
+                embedding_delete_btn = gr.Button("Delete", variant="stop")
+                
+                def delete_embedding_model(model_name: str) -> str:
+                    """Delete embedding model."""
+                    if not model_name or model_name == "No models found":
+                        return "No model selected"
+                    
+                    model_path = EMBEDDINGS_DIR / f"{model_name}.gguf"
+                    if model_path.exists():
+                        model_path.unlink()
+                        return f"Deleted: {model_name}"
+                    return "Model not found"
 
-                with gr.Accordion("Download Models Info"):
-                    gr.Markdown("""
-                    **Recommended LLM Models:**
-                    - llama-3.1-8b-q4_0.gguf (~5GB)
-                    - phi-3.5-q4_0.gguf (~4GB)
-
-                    **Recommended Embedding Models:**
-                    - bge-small-en-v1.5-q4_0.gguf (~130MB)
-                    """)
-
-        llama_logs_output = gr.Textbox(
+            llama_logs_output = gr.Textbox(
             label="llama.cpp logs",
             lines=10,
             interactive=False,
@@ -428,35 +508,16 @@ def create_admin_ui() -> gr.Blocks:
             fn=fetch_qdrant_logs, outputs=[qdrant_logs_output, qdrant_logs_output]
         )
 
-        async def save_model_selection(llm_model: str, embedding_model: str) -> str:
-            try:
-                from src.config import load_config, save_config
-
-                config = load_config()
-                config["llm_model"] = llm_model
-                config["embedding_model"] = embedding_model
-                save_config(config)
-                return f"Saved: LLM={llm_model}, Embedding={embedding_model}"
-            except Exception as e:
-                return f"Error: {e}"
-
         backend_save_btn.click(
             fn=save_backend, inputs=[backend_dropdown], outputs=[backend_status]
         )
         llama_download_btn.click(fn=download_llama_binary, outputs=[download_status])
         qdrant_download_btn.click(fn=download_qdrant_binary, outputs=[download_status])
-        model_save_btn.click(
-            fn=save_model_selection,
-            inputs=[llm_model_dropdown, embedding_model_dropdown],
-            outputs=[model_status],
-        )
 
-        def on_model_select(model_name: str) -> str:
-            return get_model_vram(model_name)
-
-        llm_model_dropdown.change(
-            fn=on_model_select, inputs=[llm_model_dropdown], outputs=[model_info_output]
-        )
+        llm_dropdown.change(fn=get_llm_vram, inputs=[llm_dropdown], outputs=[llm_vram_info])
+        llm_delete_btn.click(fn=delete_llm_model, inputs=[llm_dropdown], outputs=[llm_vram_info])
+        
+        embedding_delete_btn.click(fn=delete_embedding_model, inputs=[embedding_dropdown], outputs=[llm_vram_info])
 
         admin_demo.load(fn=fetch_status, outputs=[llama_status, qdrant_status, update_banner, llama_version, qdrant_version])
 

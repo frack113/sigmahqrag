@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from typing import Any
 
@@ -11,68 +10,86 @@ import gradio as gr
 DEFAULT_MODELS_DIR = "models/llm"
 
 
-def scan_models(models_dir: str = DEFAULT_MODELS_DIR) -> list[str]:
+def scan_models(models_dir: str = DEFAULT_MODELS_DIR) -> list[tuple[str, str]]:
     """Scan directory for available GGUF models.
 
     Args:
         models_dir: Path to models directory
 
     Returns:
-        List of model names (filenames without extension)
+        List of tuples (repo_id, filename)
     """
-    if not os.path.exists(models_dir):
+    registry_path = Path("models/registry.json")
+    if not registry_path.exists():
         return []
 
+    import json
+
+    with open(registry_path) as f:
+        data = json.load(f)
+
     models = []
-    for f in os.listdir(models_dir):
-        f_lower = f.lower()
-        if f_lower.endswith(".gguf"):
-            ext_len = len(".gguf")
-            model_name = f[:-ext_len]
-            models.append(model_name)
+    for repo_id, record in data.get("models", {}).items():
+        files = record.get("files", {})
+        if not files:
+            continue
+        for filename in files.keys():
+            if filename.endswith(".gguf"):
+                models.append((f"{repo_id}/{filename}", f"{repo_id} - {filename}"))
 
-    return sorted(models)
+    return sorted(models, key=lambda x: x[1])
 
 
-def get_model_info(
-    model_name: str, models_dir: str = DEFAULT_MODELS_DIR
-) -> dict[str, Any]:
+def get_model_info(repo_id: str, filename: str) -> dict[str, Any]:
     """Get model information.
 
     Args:
-        model_name: Name of the model
-        models_dir: Path to models directory
+        repo_id: HuggingFace repo ID
+        filename: Model filename
 
     Returns:
         Dict with model info (size, quantization)
     """
-    model_path = Path(models_dir) / f"{model_name}.gguf"
+    registry_path = Path("models/registry.json")
+    if not registry_path.exists():
+        return {"error": "Registry not found"}
 
-    if not model_path.exists():
-        return {"error": "Model not found"}
+    import json
 
-    file_size = model_path.stat().st_size
+    with open(registry_path) as f:
+        data = json.load(f)
 
-    quantization = detect_quantization(model_name)
+    record = data.get("models", {}).get(repo_id)
+    if not record:
+        return {"error": "Model not found in registry"}
+
+    files = record.get("files", {})
+    file_data = files.get(filename)
+    if not file_data:
+        return {"error": "File not found"}
+
+    file_size = file_data.get("file_size", 0)
+    quantization = detect_quantization(filename)
 
     return {
-        "name": model_name,
+        "repo_id": repo_id,
+        "filename": filename,
         "size_bytes": file_size,
         "size_mb": file_size / (1024 * 1024),
         "quantization": quantization,
     }
 
 
-def detect_quantization(model_name: str) -> str:
+def detect_quantization(filename: str) -> str:
     """Detect quantization type from model filename.
 
     Args:
-        model_name: Model filename
+        filename: Model filename
 
     Returns:
         Quantization type (e.g., Q4_K_M, Q8_0, F16)
     """
-    model_lower = model_name.lower()
+    model_lower = filename.lower()
 
     patterns = [
         ("q2_k", "Q2_K"),
@@ -113,11 +130,12 @@ def create_model_dropdown(
         Gradio Dropdown component
     """
     models = scan_models(models_dir)
+    choices = [m[1] for m in models]
 
     return gr.Dropdown(
-        choices=models,
+        choices=choices,
         label="Select Model",
-        value=models[0] if models else "",
+        value=choices[0] if choices else "",
     )
 
 
@@ -147,8 +165,12 @@ def format_model_info(info: dict[str, Any]) -> str:
 
     size_mb = info.get("size_mb", 0)
     quantization = info.get("quantization", "Unknown")
+    repo_id = info.get("repo_id", "")
+    filename = info.get("filename", "")
 
-    return f"""**Model:** {info["name"]}
+    return f"""**Model:** {repo_id}
 
+- **File:** {filename}
 - **Size:** {size_mb:.1f} MB
-- **Quantization:** {quantization}"""
+- **Quantization:** {quantization}
+"""
