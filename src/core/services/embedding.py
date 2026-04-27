@@ -8,7 +8,7 @@ from pathlib import Path
 from src.config import EMBEDDINGS_DIR
 
 from .download import HFDownloadService
-from .registry import ModelRecord
+from .registry import ModelFile, ModelRecord
 
 
 class EmbeddingManager:
@@ -64,28 +64,22 @@ class EmbeddingManager:
         """Download an embedding model."""
         from src.core.types import HFRepo
         repo = HFRepo.from_string(repo_id)
-        temp_dir = self.embeddings_dir / "temp" / repo.full_id.replace("/", "_")
+        temp_dir = self.embeddings_dir / "temp" / repo.owner / repo.name
         temp_dir.mkdir(parents=True, exist_ok=True)
         downloaded_path = self.download_service.download_repo(repo, temp_dir)
         temp_path = Path(downloaded_path)
 
-        final_dir = self.embeddings_dir / repo.full_id.replace("/", "_")
+        final_dir = self.embeddings_dir / repo.owner / repo.name
         final_dir.mkdir(parents=True, exist_ok=True)
-        
+
         if temp_path.exists() and not temp_path.is_dir():
-             # If it's a single file (though for embeddings we expect a dir)
-             dest = final_dir / temp_path.name
-             shutil.move(str(temp_path), str(dest))
+            dest = final_dir / temp_path.name
+            shutil.move(str(temp_path), str(dest))
         else:
-             # It's a directory, move its contents or the directory itself
-             # Actually snapshot_download returns the path to the directory it downloaded into.
-             # If target_dir was temp_dir, then temp_path is temp_dir.
-             # Let's just move the whole thing.
-             if final_dir.exists():
-                 import shutil
-                 shutil.rmtree(final_dir)
-             shutil.move(str(temp_path), str(final_dir))
-             dest = final_dir
+            if final_dir.exists():
+                shutil.rmtree(final_dir)
+            shutil.move(str(temp_path), str(final_dir))
+            dest = final_dir
 
         dimension = 384
         index_path = None
@@ -95,15 +89,23 @@ class EmbeddingManager:
 
         record = ModelRecord(
             repo_id=repo_id,
-            local_path=dest,
-            file_size=dest.stat().st_size,
+            files={
+                dest.name: ModelFile(
+                    filename=dest.name,
+                    local_path=dest,
+                    file_size=dest.stat().st_size,
+                )
+            },
             status="ready",
         )
 
         registry = await self._load_registry()
+        total_size = sum(
+            f.stat().st_size for f in dest.rglob("*") if f.is_file()
+        )
         registry[repo_id] = {
             "local_path": str(dest),
-            "file_size": dest.stat().st_size,
+            "file_size": total_size,
             "status": "ready",
             "dimension": dimension,
             "index_path": str(index_path) if index_path else None,
@@ -133,7 +135,10 @@ class EmbeddingManager:
         if repo_id in registry:
             path = Path(registry[repo_id]["local_path"])
             if path.exists():
-                path.unlink()
+                if path.is_dir():
+                    shutil.rmtree(path)
+                else:
+                    path.unlink()
             index_path = registry[repo_id].get("index_path")
             if index_path and Path(index_path).exists():
                 Path(index_path).unlink()

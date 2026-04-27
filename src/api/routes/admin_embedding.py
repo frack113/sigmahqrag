@@ -18,22 +18,13 @@ router = APIRouter(prefix="/admin/embeddings", tags=["admin-embeddings"])
 
 @router.get("/")
 async def embedding_admin_get(
-    action: str = Query(..., description="Action: list, installed, info"),
+    action: str = Query(..., description="Action: installed, info"),
     repo_id: str | None = Query(None, description="HuggingFace repo ID"),
     manager: EmbeddingManager = Depends(get_embedding_manager),
 ) -> JSONResponse:
     """Unified embeddings admin GET endpoint."""
     try:
         match action:
-            case "list":
-                if not repo_id:
-                    return JSONResponse(
-                        status_code=400,
-                        content={"error": "repo_id required for action=list"},
-                    )
-                files = await manager.get_repo_files(repo_id)
-                return JSONResponse(content={"files": files})
-
             case "installed":
                 models = await manager.list_installed()
                 return JSONResponse(content={"models": models})

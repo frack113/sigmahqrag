@@ -12,26 +12,60 @@ uv run scripts/test_health.py
 
 Some scripts require admin authentication (password defaults to "admin").
 
-## Scripts
+## Unified Admin APIs
 
-| Script | Endpoint | Auth Required |
-|--------|----------|---------------|
-| `test_health.py` | GET /health | No |
-| `test_auth_login.py` | POST /auth/login | No |
-| `test_search_rules.py` | POST /api/search-rules | No |
-| `test_documents_ingest.py` | POST /documents/ingest | Yes |
-| `test_feedback.py` | POST /feedback, GET /feedback/stats | No / Yes |
-| `test_llm_list_files.py` | GET /llm/list-files/{repo_id} | No |
-| `test_llm_download.py` | POST /llm/download | No |
-| `test_llm_installed.py` | GET /llm/installed | No |
-| `test_llm_delete.py` | DELETE /llm/{repo_id} | Yes |
-| `test_embeddings_search.py` | GET /embeddings/search | No |
-| `test_embeddings_files.py` | GET /embeddings/{repo_id}/files | No |
-| `test_embeddings_installed.py` | GET /embeddings/installed | No |
-| `test_embeddings_embed.py` | POST /embeddings/embed | No |
-| `test_embeddings_admin_download.py` | POST /embeddings/admin/download | Yes |
-| `test_admin_health.py` | GET /admin/health | Yes |
-| `test_admin_llama.py` [start/stop] | POST /admin/llama/start, /admin/llama/stop | Yes |
-| `test_admin_qdrant.py` [start/stop] | POST /admin/qdrant/start, /admin/qdrant/stop | Yes |
-| `test_admin_stats.py` | GET /admin/ | Yes |
-| `test_coverage.py` | GET /check-coverage | No |
+### LLM Admin (`/admin/llm`)
+
+```bash
+# List GGUF files for a model
+uv run scripts/test_api_admin_llm.py list <repo_id>
+
+# Get model info
+uv run scripts/test_api_admin_llm.py info <repo_id>
+
+# List installed models
+uv run scripts/test_api_admin_llm.py installed
+
+# Download a model
+uv run scripts/test_api_admin_llm.py download [-f] <repo_id> [filename]
+
+# Delete a model or specific file
+uv run scripts/test_api_admin_llm.py delete [-f] <repo_id> [filename]
+```
+
+### Embeddings Admin (`/admin/embeddings`)
+
+```bash
+# List installed embedding models
+uv run scripts/test_api_admin_embeddings.py installed
+
+# Get model info
+uv run scripts/test_api_admin_embeddings.py info <repo_id>
+
+# Download an embedding model (full repo via snapshot_download)
+uv run scripts/test_api_admin_embeddings.py download [-f] <repo_id>
+
+# Delete an embedding model
+uv run scripts/test_api_admin_embeddings.py delete [-f] <repo_id>
+```
+
+## Legacy Scripts
+
+| Script | Endpoint | Notes |
+|--------|----------|-------|
+| `test_health.py` | GET /health | |
+| `test_auth_login.py` | POST /auth/login | |
+| `test_search_rules.py` | POST /api/search-rules | |
+| `test_documents_ingest.py` | POST /documents/ingest | Auth required |
+| `test_feedback.py` | POST /feedback, GET /feedback/stats | |
+| `test_admin_health.py` | GET /admin/health | Auth required |
+| `test_admin_llama.py` [start/stop] | POST /admin/llama/start, /admin/llama/stop | Auth required |
+| `test_admin_qdrant.py` [start/stop] | POST /admin/qdrant/start, /admin/qdrant/stop | Auth required |
+| `test_admin_stats.py` | GET /admin/ | Auth required |
+| `test_coverage.py` | GET /check-coverage | |
+
+## Options
+
+- `-f, --force`: Skip confirmation prompt
+- `-n, --filename`: Specify filename (for LLM downloads)
+- `--url`: Override default base URL (default: http://localhost:7860)
