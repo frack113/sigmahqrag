@@ -17,17 +17,39 @@ class RegistryError(Exception):
 
 
 @dataclass
+class ModelFile:
+    """A single model file."""
+
+    filename: str
+    local_path: Path
+    file_size: int
+    status: Literal["pending", "downloading", "ready", "error"] = "ready"
+    created_at: datetime = field(default_factory=datetime.now)
+
+
+@dataclass
 class ModelRecord:
     """Registered model record."""
 
     repo_id: str
-    local_path: Path
-    file_size: int
-    status: Literal["pending", "downloading", "ready", "error"] = "pending"
+    files: dict[str, ModelFile] = field(default_factory=dict)
+    status: Literal["pending", "downloading", "ready", "error"] = "ready"
     created_at: datetime = field(default_factory=datetime.now)
     updated_at: datetime = field(default_factory=datetime.now)
     metadata: dict[str, Any] = field(default_factory=dict)
     error_message: str | None = None
+
+    @property
+    def local_path(self) -> Path:
+        """Get first file path for backwards compatibility."""
+        if self.files:
+            return next(iter(self.files.values())).local_path
+        return Path()
+
+    @property
+    def file_size(self) -> int:
+        """Get total file size for backwards compatibility."""
+        return sum(f.file_size for f in self.files.values())
 
 
 class LocalRegistry:
@@ -52,11 +74,18 @@ class LocalRegistry:
                 with open(self.registry_path) as f:
                     data = json.load(f)
                 for repo_id, record in data.get("models", {}).items():
+                    files = {}
+                    for fn, file_data in record.get("files", {}).items():
+                        files[fn] = ModelFile(
+                            filename=fn,
+                            local_path=Path(file_data["local_path"]),
+                            file_size=file_data["file_size"],
+                            status=file_data.get("status", "ready"),
+                        )
                     self._models[repo_id] = ModelRecord(
                         repo_id=repo_id,
-                        local_path=Path(record["local_path"]),
-                        file_size=record["file_size"],
-                        status=record["status"],
+                        files=files,
+                        status=record.get("status", "ready"),
                         created_at=datetime.fromisoformat(record["created_at"]),
                         updated_at=datetime.fromisoformat(record["updated_at"]),
                         metadata=record.get("metadata", {}),
@@ -70,8 +99,14 @@ class LocalRegistry:
         data = {
             "models": {
                 repo_id: {
-                    "local_path": str(record.local_path),
-                    "file_size": record.file_size,
+                    "files": {
+                        fn: {
+                            "local_path": str(f.local_path),
+                            "file_size": f.file_size,
+                            "status": f.status,
+                        }
+                        for fn, f in record.files.items()
+                    },
                     "status": record.status,
                     "created_at": record.created_at.isoformat(),
                     "updated_at": record.updated_at.isoformat(),
@@ -89,6 +124,33 @@ class LocalRegistry:
             await self._ensure_loaded()
             self._models[model.repo_id] = model
             await self._save()
+
+    async def add_file(self, repo_id: str, filename: str, local_path: Path, file_size: int) -> None:
+        """Add a file to an existing model."""
+        async with self._lock:
+            await self._ensure_loaded()
+            if repo_id not in self._models:
+                self._models[repo_id] = ModelRecord(repo_id=repo_id)
+            self._models[repo_id].files[filename] = ModelFile(
+                filename=filename,
+                local_path=local_path,
+                file_size=file_size,
+            )
+            self._models[repo_id].updated_at = datetime.now()
+            await self._save()
+
+    async def delete_file(self, repo_id: str, filename: str) -> bool:
+        """Delete a specific file from a model. Returns True if file was deleted."""
+        async with self._lock:
+            await self._ensure_loaded()
+            if repo_id not in self._models:
+                return False
+            if filename in self._models[repo_id].files:
+                del self._models[repo_id].files[filename]
+                self._models[repo_id].updated_at = datetime.now()
+                await self._save()
+                return True
+            return False
 
     async def get_model(self, repo_id: str) -> ModelRecord | None:
         """Get a model by ID."""
@@ -118,10 +180,21 @@ class LocalRegistry:
             await self._ensure_loaded()
             return list(self._models.values())
 
-    async def delete_model(self, repo_id: str) -> None:
-        """Delete a model from registry."""
+    async def delete_model(self, repo_id: str, filename: str | None = None) -> bool:
+        """Delete a model or specific file from registry."""
         async with self._lock:
             await self._ensure_loaded()
-            if repo_id in self._models:
+            if repo_id not in self._models:
+                return False
+
+            if filename:
+                if filename in self._models[repo_id].files:
+                    del self._models[repo_id].files[filename]
+                    self._models[repo_id].updated_at = datetime.now()
+                    await self._save()
+                    return True
+                return False
+            else:
                 del self._models[repo_id]
                 await self._save()
+                return True

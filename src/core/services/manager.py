@@ -5,7 +5,7 @@ from __future__ import annotations
 from src.config import LLM_DIR
 
 from .download import DownloadError, HFDownloadService
-from .registry import LocalRegistry, ModelRecord
+from .registry import LocalRegistry, ModelFile, ModelRecord
 from .vram import VRAMEstimator
 
 
@@ -31,12 +31,13 @@ class ModelManager:
 
     async def search_models(self, query: str) -> list:
         """Search for models on HuggingFace."""
-        return await self.download_service.list_models(query)
+        return self.download_service.list_models(query)
 
     async def get_model_info(self, repo_id: str):
         """Get model information."""
         from src.core.types import HFRepo
-        return await self.download_service.get_model_info(HFRepo.from_string(repo_id))
+
+        return self.download_service.get_model_info(HFRepo.from_string(repo_id))
 
     async def download_model(
         self,
@@ -50,16 +51,24 @@ class ModelManager:
         await self.registry.update_status(repo_id, "downloading")
 
         try:
-            final_path = await self.download_service.download_gguf(
+            final_path = self.download_service.download_gguf(
                 repo, self.llm_dir, filename
             )
 
             await self.registry.update_status(repo_id, "ready")
 
+            if not filename:
+                filename = final_path.name
+
             record = ModelRecord(
                 repo_id=repo_id,
-                local_path=final_path,
-                file_size=final_path.stat().st_size,
+                files={
+                    filename: ModelFile(
+                        filename=filename,
+                        local_path=final_path,
+                        file_size=final_path.stat().st_size,
+                    )
+                },
                 status="ready",
             )
             await self.registry.register_model(record)
@@ -72,20 +81,33 @@ class ModelManager:
         """List all installed models."""
         return await self.registry.list_models()
 
-    async def delete_model(self, repo_id: str) -> None:
-        """Delete a model."""
+    async def delete_model(self, repo_id: str, filename: str | None = None) -> None:
+        """Delete a model or specific file."""
         record = await self.registry.get_model(repo_id)
         if not record:
             raise ModelNotFoundError(f"Model {repo_id} not found")
 
-        if record.local_path.exists():
-            record.local_path.unlink()
-
-        await self.registry.delete_model(repo_id)
+        if filename:
+            file_record = record.files.get(filename)
+            parent_dir = file_record.local_path.parent if file_record else None
+            if file_record and file_record.local_path.exists():
+                file_record.local_path.unlink()
+            await self.registry.delete_model(repo_id, filename)
+            if parent_dir and parent_dir.exists() and not any(parent_dir.iterdir()):
+                parent_dir.rmdir()
+        else:
+            first_file = next(iter(record.files.values()), None)
+            parent_dir = first_file.local_path.parent if first_file else None
+            for f in record.files.values():
+                if f.local_path.exists():
+                    f.local_path.unlink()
+            await self.registry.delete_model(repo_id)
+            if parent_dir and parent_dir.exists() and not any(parent_dir.iterdir()):
+                parent_dir.rmdir()
 
     async def estimate_vram(self, repo_id: str, context_length: int = 2048) -> dict:
         """Estimate VRAM for a model."""
-        info = await self.get_model_info(repo_id)
+        info = self.get_model_info(repo_id)
         if not info:
             raise ModelNotFoundError(f"Model {repo_id} not found")
 

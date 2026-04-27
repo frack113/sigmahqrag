@@ -8,7 +8,6 @@ import os
 from pathlib import Path
 from typing import Any
 
-from src.config import LLM_DIR
 from src.core.types import HFRepo
 
 
@@ -73,18 +72,16 @@ class HFDownloadService:
 
         api = HfApi(token=self.token)
         try:
-            files = api.list_repo_files(repo_id=repo.full_id)
-            gguf_files = [f for f in files if f.endswith(".gguf")]
+            info = api.model_info(repo_id=repo.full_id)
+            siblings = info.siblings or []
 
             results = []
-            for filename in gguf_files:
-                # Get file size from metadata if possible, or use a placeholder
-                # Note: list_repo_files doesn't give sizes directly,
-                # but we can use model_info to get file details in a more complex way if needed.
-                # For now, we return the filename.
-                results.append({
-                    "filename": filename,
-                })
+            for f in siblings:
+                if f.rfilename.endswith(".gguf"):
+                    results.append({
+                        "filename": f.rfilename,
+                        "size": f.size or 0,
+                    })
             return results
         except Exception as e:
             raise DownloadError(f"Failed to list GGUF files for {repo.full_id}: {e}") from e
@@ -111,10 +108,13 @@ class HFDownloadService:
         if filename is None:
             raise DownloadError(f"No GGUF file found for {repo.full_id}")
 
+        model_dir = target_dir / repo.owner / repo.name
+        model_dir.mkdir(parents=True, exist_ok=True)
+
         path = hf_hub_download(
             repo_id=repo.full_id,
             filename=filename,
-            local_dir=target_dir,
+            local_dir=model_dir,
             local_dir_use_symlinks=False,
             token=self.token,
         )
