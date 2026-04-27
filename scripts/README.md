@@ -2,18 +2,12 @@
 
 Scripts to test each API endpoint. Requires the API server to be running on `http://localhost:7860`.
 
-## Setup
-
-```bash
-pip install requests
-```
-
 ## Usage
 
 Run a script directly:
 
 ```bash
-python dev_test/test_health.py
+uv run scripts/test_health.py
 ```
 
 Some scripts require admin authentication (password defaults to "admin").
