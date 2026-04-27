@@ -2,6 +2,7 @@
 
 from huggingface_hub import ModelInfo
 from .download import (
+    AtomicDownloadService,
     ChecksumMismatchError,
     DiskSpaceError,
     DownloadError,
@@ -19,6 +20,7 @@ from .vram import VRAMEstimator
 
 __all__ = [
     "HFDownloadService",
+    "AtomicDownloadService",
     "DownloadError",
     "ChecksumMismatchError",
     "DiskSpaceError",
