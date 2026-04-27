@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 
 from src.config import EMBEDDINGS_DIR
@@ -65,7 +66,7 @@ class EmbeddingManager:
         repo = HFRepo.from_string(repo_id)
         temp_dir = self.embeddings_dir / "temp" / repo.full_id.replace("/", "_")
         temp_dir.mkdir(parents=True, exist_ok=True)
-        downloaded_path = self.download_service.download(repo, temp_dir, filename=filename, is_embedding=True)
+        downloaded_path = self.download_service.download_repo(repo, temp_dir)
         temp_path = Path(downloaded_path)
 
         final_dir = self.embeddings_dir / repo.full_id.replace("/", "_")
@@ -115,6 +116,16 @@ class EmbeddingManager:
     async def list_installed(self) -> dict:
         """List installed embedding models."""
         return await self._load_registry()
+
+    async def get_repo_files(self, repo_id: str) -> list[str]:
+        """Get list of files in an embedding model repo."""
+        from src.core.types import HFRepo
+
+        repo = HFRepo.from_string(repo_id)
+        api = self.download_service.get_model_info(repo)
+        if api.siblings:
+            return [f.rfilename for f in api.siblings]
+        return []
 
     async def delete_model(self, repo_id: str) -> None:
         """Delete an embedding model."""

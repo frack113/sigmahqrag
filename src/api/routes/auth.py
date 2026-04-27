@@ -3,17 +3,14 @@
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import HTTPBearer
 
 from src.auth.models import LoginRequest, TokenResponse
 from src.auth.service import AuthService, create_auth_service
+from src.api.dependencies import security
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-
-security = HTTPBearer(auto_error=False)
-
 
 async def get_auth_service() -> AuthService:
     """Get auth service dependency."""

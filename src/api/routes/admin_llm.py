@@ -11,6 +11,7 @@ from pydantic import BaseModel
 
 from src.api.dependencies import require_role, get_model_manager
 from src.auth.models import UserRole
+from src.core.services.manager import ModelManager, ModelNotFoundError
 from src.core.types import HFRepo
 from src.core.services.download import DownloadError
 
