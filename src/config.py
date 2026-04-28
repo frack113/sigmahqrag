@@ -11,11 +11,11 @@ QDRANT_PORT = 6333
 LLAMA_HEALTH_ENDPOINT = "/v1/models"
 QDRANT_HEALTH_ENDPOINT = "/health"
 
-BIN_DIR = Path("bin")
+BIN_DIR = Path("data/bin")
 LLAMA_BIN_PATH = BIN_DIR / "llama-server"
 QDRANT_BIN_PATH = BIN_DIR / "qdrant"
 
-MODELS_DIR = Path("models")
+MODELS_DIR = Path("data/models")
 LLM_DIR = MODELS_DIR / "llm"
 EMBEDDINGS_DIR = MODELS_DIR / "embeddings"
 
