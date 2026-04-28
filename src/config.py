@@ -21,7 +21,7 @@ EMBEDDINGS_DIR = MODELS_DIR / "embeddings"
 
 LOGS_DIR = Path("logs")
 DATA_DIR = Path("data")
-QDRANT_STORAGE_DIR = Path("qdrant/storage")
+QDRANT_STORAGE_DIR = Path("data/database")
 
 BACKUP_DIR = Path("backups")
 MAX_BACKUPS = 5
