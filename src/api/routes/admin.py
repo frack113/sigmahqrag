@@ -10,7 +10,6 @@ from typing import Any
 import httpx
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse, StreamingResponse
-from pydantic import BaseModel
 
 from src.admin.download_manager import (
     create_download_manager,
@@ -20,15 +19,12 @@ from src.admin.health import (
     ServiceStatus,
     create_health_checker,
 )
-from src.admin.service_manager import (
-    create_service_manager,
-)
 from src.admin.update_manager import (
     create_update_service,
 )
 from src.api.dependencies import require_role
 from src.auth.models import UserRole
-from src.config import LLAMA_BIN_PATH, LOGS_DIR, QDRANT_BIN_PATH
+from src.config import LLAMA_BIN_PATH, QDRANT_BIN_PATH
 from src.schemas.download import (
     DownloadCancelRequest,
     DownloadRequest,
@@ -39,18 +35,6 @@ from src.schemas.update import (
 )
 
 logger = logging.getLogger(__name__)
-
-
-class StartRequest(BaseModel):
-    """Request model for starting a service."""
-
-    model_path: str | None = None
-
-
-class StopRequest(BaseModel):
-    """Request model for stopping a service."""
-
-    pass
 
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -123,208 +107,6 @@ async def get_admin_health() -> JSONResponse:
         )
 
 
-@router.post("/llama/start", dependencies=[Depends(require_role(UserRole.ADMIN))])
-async def start_llama(request: StartRequest | None = None) -> JSONResponse:
-    """Start llama.cpp server.
-
-    Args:
-        request: Optional StartRequest with model_path
-
-    Returns:
-        JSON with start result
-    """
-    try:
-        manager = create_service_manager()
-
-        model_path = str(LLAMA_BIN_PATH)
-        if request and request.model_path:
-            model_path = request.model_path
-
-        result = await manager.start_llama(model_path=model_path)
-
-        if result.get("success"):
-            return JSONResponse(
-                content={
-                    "success": True,
-                    "message": f"llama.cpp started (PID: {result.get('pid')})",
-                    "pid": result.get("pid"),
-                }
-            )
-        else:
-            return JSONResponse(
-                status_code=400,
-                content={
-                    "success": False,
-                    "error": result.get("error", "Failed to start"),
-                },
-            )
-
-    except Exception as e:
-        logger.error(f"Failed to start llama.cpp: {e}")
-        return JSONResponse(
-            status_code=500,
-            content={"error": str(e)},
-        )
-
-
-@router.post("/llama/stop", dependencies=[Depends(require_role(UserRole.ADMIN))])
-async def stop_llama() -> JSONResponse:
-    """Stop llama.cpp server.
-
-    Returns:
-        JSON with stop result
-    """
-    try:
-        manager = create_service_manager()
-        result = await manager.stop_llama()
-
-        if result.get("success"):
-            return JSONResponse(
-                content={
-                    "success": True,
-                    "message": "llama.cpp stopped",
-                }
-            )
-        else:
-            return JSONResponse(
-                status_code=400,
-                content={
-                    "success": False,
-                    "error": result.get("error", "Failed to stop"),
-                },
-            )
-
-    except Exception as e:
-        logger.error(f"Failed to stop llama.cpp: {e}")
-        return JSONResponse(
-            status_code=500,
-            content={"error": str(e)},
-        )
-
-
-@router.post("/qdrant/start", dependencies=[Depends(require_role(UserRole.ADMIN))])
-async def start_qdrant() -> JSONResponse:
-    """Start Qdrant server.
-
-    Returns:
-        JSON with start result
-    """
-    try:
-        manager = create_service_manager()
-        result = await manager.start_qdrant()
-
-        if result.get("success"):
-            return JSONResponse(
-                content={
-                    "success": True,
-                    "message": f"Qdrant started (PID: {result.get('pid')})",
-                    "pid": result.get("pid"),
-                }
-            )
-        else:
-            return JSONResponse(
-                status_code=400,
-                content={
-                    "success": False,
-                    "error": result.get("error", "Failed to start"),
-                },
-            )
-
-    except Exception as e:
-        logger.error(f"Failed to start Qdrant: {e}")
-        return JSONResponse(
-            status_code=500,
-            content={"error": str(e)},
-        )
-
-
-@router.post("/qdrant/stop", dependencies=[Depends(require_role(UserRole.ADMIN))])
-async def stop_qdrant() -> JSONResponse:
-    """Stop Qdrant server.
-
-    Returns:
-        JSON with stop result
-    """
-    try:
-        manager = create_service_manager()
-        result = await manager.stop_qdrant()
-
-        if result.get("success"):
-            return JSONResponse(
-                content={
-                    "success": True,
-                    "message": "Qdrant stopped",
-                }
-            )
-        else:
-            return JSONResponse(
-                status_code=400,
-                content={
-                    "success": False,
-                    "error": result.get("error", "Failed to stop"),
-                },
-            )
-
-    except Exception as e:
-        logger.error(f"Failed to stop qdrant: {e}")
-        return JSONResponse(
-            status_code=500,
-            content={"error": str(e)},
-        )
-
-
-@router.get("/llama/logs", dependencies=[Depends(require_role(UserRole.ANALYST, UserRole.ADMIN))])
-async def get_llama_logs() -> JSONResponse:
-    """Get llama.cpp logs.
-
-    Returns:
-        JSON with log content
-    """
-    try:
-        manager = create_service_manager()
-        logs = manager.get_logs("llama.cpp")
-
-        return JSONResponse(
-            content={
-                "service": "llama.cpp",
-                "log_file": str(LOGS_DIR / "llama.cpp.log"),
-                "logs": logs,
-            }
-        )
-
-    except Exception as e:
-        logger.error(f"Failed to get llama.cpp logs: {e}")
-        return JSONResponse(
-            status_code=500,
-            content={"error": str(e)},
-        )
-
-
-@router.get("/qdrant/logs", dependencies=[Depends(require_role(UserRole.ANALYST, UserRole.ADMIN))])
-async def get_qdrant_logs() -> JSONResponse:
-    """Get Qdrant logs.
-
-    Returns:
-        JSON with log content
-    """
-    try:
-        manager = create_service_manager()
-        logs = manager.get_logs("qdrant")
-
-        return JSONResponse(
-            content={
-                "service": "qdrant",
-                "log_file": str(LOGS_DIR / "qdrant.log"),
-                "logs": logs,
-            }
-        )
-
-    except Exception as e:
-        logger.error(f"Failed to get qdrant logs: {e}")
-        return JSONResponse(
-            status_code=500,
-            content={"error": str(e)},
-        )
 
 
 @router.post("/download", dependencies=[Depends(require_role(UserRole.ADMIN))])
