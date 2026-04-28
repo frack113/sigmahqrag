@@ -219,7 +219,7 @@ class UpdateService:
                 current_version=version or "unknown",
                 last_updated=datetime.now() if version else None,
             )
-            services_status[service.replace(".", "_")] = version_info
+            services_status[service.replace(".", "_")] = version_info.dict()
 
         all_backups = []
         for service in ("llama.cpp", "qdrant"):
@@ -232,7 +232,7 @@ class UpdateService:
                         version=backup.version,
                         created=backup.created,
                         size_bytes=backup.size_bytes,
-                    )
+                    ).dict()
                 )
 
         return {
