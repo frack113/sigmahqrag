@@ -43,9 +43,9 @@ class VersionManager:
 
     BINARY_PATTERNS = {
         "llama.cpp": [
-            r"llama-.*-win-cpu-x64",
-            r"llama-.*-win-cuda-\d+\.\d+-x64",
             r"llama-.*-win-hip.*x64",
+            r"llama-.*-win-cuda-\d+\.\d+-x64",
+            r"llama-.*-win-cpu-x64",
             r"llama-.*-linux-x64",
             r"llama-.*-linux-arm64",
             r"llama-.*-macos-x64",
@@ -73,11 +73,12 @@ class VersionManager:
             headers["Authorization"] = f"Bearer {self.github_token}"
         return headers
 
-    def _detect_platform(self) -> tuple[str, str]:
+    def _detect_platform(self) -> tuple[str, str, str | None]:
         """Detect current platform and architecture.
 
         Returns:
-            Tuple of (os, arch)
+            Tuple of (os, arch, preferred_gpu_type)
+            preferred_gpu_type: None, "hip", "cuda", or "cpu"
         """
         system = platform.system().lower()
         machine = platform.machine().lower()
@@ -98,7 +99,31 @@ class VersionManager:
         else:
             arch = machine
 
-        return os_name, arch
+        # Read preferred GPU type from config file
+        preferred_gpu_type = self._read_gpu_preference()
+
+        return os_name, arch, preferred_gpu_type
+
+    def _read_gpu_preference(self) -> str | None:
+        """Read GPU preference from config file.
+
+        Returns:
+            "hip", "cuda", "cpu", or None if not specified
+        """
+        try:
+            import tomllib
+            from pathlib import Path
+
+            config_path = Path("data/sigmahqrag.toml")
+            if config_path.exists():
+                with open(config_path, "rb") as f:
+                    config = tomllib.load(f)
+                    gpu_type = config.get("backend", {}).get("gpu_type")
+                    if gpu_type in ("hip", "cuda", "cpu"):
+                        return gpu_type
+        except Exception as e:
+            logger.debug(f"Could not read GPU preference from config: {e}")
+        return None
 
     async def get_release(
         self, service: str, version: str | None = None
@@ -157,7 +182,7 @@ class VersionManager:
         Returns:
             Matching ReleaseAsset or None
         """
-        os_name, arch = self._detect_platform()
+        os_name, arch, preferred_gpu = self._detect_platform()
         patterns = self.BINARY_PATTERNS.get(service, [])
 
         # Filter assets by service-specific patterns
@@ -172,12 +197,28 @@ class VersionManager:
                 # Try pattern match
                 for pattern in patterns:
                     if re.search(pattern, asset_name):
-                        logger.info(f"Matched pattern {pattern} for {asset.name}")
-                        return asset
+                        # If GPU preference is set, prioritize matching type
+                        if preferred_gpu and os_name == "windows":
+                            if (preferred_gpu == "hip" and "hip" in asset_name) or \
+                               (preferred_gpu == "cuda" and "cuda" in asset_name) or \
+                               (preferred_gpu == "cpu" and "cpu" in asset_name and "hip" not in asset_name and "cuda" not in asset_name):
+                                logger.info(f"Matched {preferred_gpu.upper()} pattern {pattern} for {asset.name} (from config)")
+                                return asset
+                        else:
+                            logger.info(f"Matched pattern {pattern} for {asset.name}")
+                            return asset
 
                 # Fallback: check for OS+arch in asset name
                 if os_name == "windows" and "win" in asset_name and arch in asset_name:
-                    return asset
+                    if preferred_gpu == "hip" and "hip" in asset_name:
+                        return asset
+                    elif preferred_gpu == "cuda" and "cuda" in asset_name:
+                        return asset
+                    elif preferred_gpu == "cpu" and "cpu" in asset_name:
+                        return asset
+                    elif preferred_gpu is None:
+                        # No preference: default to CPU or first match
+                        return asset
                 elif os_name == "linux" and ("linux" in asset_name or "ubuntu" in asset_name) and arch in asset_name:
                     return asset
                 elif os_name == "macos" and "macos" in asset_name and arch in asset_name:
@@ -199,7 +240,7 @@ class VersionManager:
                     return asset
 
         logger.warning(
-            f"No matching asset found for {service} on {os_name}-{arch}"
+            f"No matching asset found for {service} on {os_name}-{arch} (GPU preference: {preferred_gpu})"
         )
         return None
 
