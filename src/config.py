@@ -5,8 +5,22 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 from typing import Any
+from functools import lru_cache
 
 logger = logging.getLogger(__name__)
+
+BASE_DIR = Path("data")
+BIN_DIR = BASE_DIR / "bin"
+MODELS_DIR = BASE_DIR / "models"
+LLM_DIR = MODELS_DIR / "llm"
+EMBEDDINGS_DIR = MODELS_DIR / "embeddings"
+LOGS_DIR = Path("logs")
+BACKUP_DIR = Path("backups")
+MAX_BACKUPS = 5
+LLAMA_BIN_PATH = BIN_DIR / "llama.cpp"
+QDRANT_BIN_PATH = BIN_DIR / "qdrant"
+QDRANT_STORAGE_DIR = BASE_DIR / "qdrant_storage"
+DATA_DIR = BASE_DIR
 
 # Default configuration
 DEFAULT_CONFIG = {
@@ -42,7 +56,13 @@ DEFAULT_CONFIG = {
 
 CONFIG_FILE = Path("data/sigmahqrag.toml")
 
+try:
+    import tomllib
+except ModuleNotFoundError:
+    import tomli as tomllib
 
+
+@lru_cache(maxsize=1)
 def load_config() -> dict[str, Any]:
     """Load configuration from TOML file with defaults.
 
@@ -53,8 +73,6 @@ def load_config() -> dict[str, Any]:
 
     if CONFIG_FILE.exists():
         try:
-            import tomllib
-
             with open(CONFIG_FILE, "rb") as f:
                 file_config = tomllib.load(f)
                 # Deep merge with defaults
@@ -84,6 +102,14 @@ def _deep_merge(base: dict, override: dict) -> None:
 def get_backend_gpu_type() -> str:
     """Get GPU type from config (hip, cuda, cpu)."""
     return load_config().get("backend", {}).get("gpu_type", "cpu")
+
+
+def set_backend_gpu_type(gpu_type: str) -> None:
+    """Set GPU type in config (only in memory for this session)."""
+    config = load_config()
+    if "backend" not in config:
+        config["backend"] = {}
+    config["backend"]["gpu_type"] = gpu_type
 
 
 def get_llama_config() -> dict[str, Any]:

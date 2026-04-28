@@ -10,8 +10,6 @@ Run a script directly:
 uv run scripts/test_health.py
 ```
 
-Some scripts require admin authentication (password defaults to "admin").
-
 ## Unified Admin APIs
 
 ### LLM Admin (`/admin/llm`)
@@ -49,23 +47,45 @@ uv run scripts/test_api_admin_embeddings.py download [-f] <repo_id>
 uv run scripts/test_api_admin_embeddings.py delete [-f] <repo_id>
 ```
 
-## Legacy Scripts
+### Backend Admin (`/admin/backend`)
 
-| Script | Endpoint | Notes |
-|--------|----------|-------|
-| `test_health.py` | GET /health | |
-| `test_auth_login.py` | POST /auth/login | |
-| `test_search_rules.py` | POST /api/search-rules | |
-| `test_documents_ingest.py` | POST /documents/ingest | Auth required |
-| `test_feedback.py` | POST /feedback, GET /feedback/stats | |
-| `test_admin_health.py` | GET /admin/health | Auth required |
-| `test_admin_llama.py` [start/stop] | POST /admin/llama/start, /admin/llama/stop | Auth required |
-| `test_admin_qdrant.py` [start/stop] | POST /admin/qdrant/start, /admin/qdrant/stop | Auth required |
-| `test_admin_stats.py` | GET /admin/ | Auth required |
-| `test_coverage.py` | GET /check-coverage | |
+Manages binary downloads for llama.cpp and qdrant.
+
+```bash
+# Start a binary download (GET /admin/backend/?action=download)
+uv run scripts/test_api_admin_backend.py download --service <llama|qdrant> [--version <ver>]
+
+# Cancel a download (POST /admin/backend/?action=cancel)
+uv run scripts/test_api_admin_backend.py cancel --download-id <id>
+
+# Get download progress via SSE stream (GET /admin/backend/?action=progress)
+uv run scripts/test_api_admin_backend.py progress --download-id <id>
+
+# Get update status (GET /admin/backend/?action=status)
+uv run scripts/test_api_admin_backend.py status
+```
+
+### Services Admin (`/admin/services`)
+
+Start, stop and monitor llama.cpp and qdrant services.
+
+```bash
+# Start a service (POST /admin/services/?action=start)
+uv run scripts/test_api_admin_service.py start --service <llama|qdrant> [--model-path <path>]
+
+# Stop a service (POST /admin/services/?action=stop)
+uv run scripts/test_api_admin_service.py stop --service <llama|qdrant>
+
+# Get service logs (GET /admin/services/?action=logs)
+uv run scripts/test_api_admin_service.py logs --service <llama|qdrant>
+```
 
 ## Options
 
 - `-f, --force`: Skip confirmation prompt
 - `-n, --filename`: Specify filename (for LLM downloads)
 - `--url`: Override default base URL (default: http://localhost:7860)
+- `--service`: Service name (llama, qdrant) for backend and services scripts
+- `--download-id`: Download ID for cancel/progress actions
+- `--version`: Version to download (default: latest)
+- `--model-path`: Model path for llama service start

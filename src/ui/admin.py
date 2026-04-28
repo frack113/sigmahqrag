@@ -14,8 +14,8 @@ from src.config import (
     LLAMA_BIN_PATH,
     LLM_DIR,
     QDRANT_BIN_PATH,
-    get_backend,
-    set_backend,
+    get_backend_gpu_type,
+    set_backend_gpu_type,
 )
 
 logger = logging.getLogger(__name__)
@@ -116,7 +116,7 @@ def create_admin_ui() -> gr.Blocks:
                 backend_dropdown = gr.Dropdown(
                     label="llama.cpp Backend",
                     choices=["cpu", "cuda", "hip", "vulkan"],
-                    value=get_backend(),
+                    value=get_backend_gpu_type(),
                 )
                 backend_save_btn = gr.Button("Save Backend", variant="primary")
                 backend_status = gr.Textbox(label="Status", interactive=False)
@@ -414,7 +414,7 @@ def create_admin_ui() -> gr.Blocks:
 
         async def save_backend(backend: str) -> str:
             try:
-                set_backend(backend)
+                set_backend_gpu_type(backend)
                 return f"Backend saved: {backend}"
             except Exception as e:
                 return f"Error: {e}"

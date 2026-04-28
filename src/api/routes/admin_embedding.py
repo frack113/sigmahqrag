@@ -60,7 +60,6 @@ async def embedding_admin_post(
     repo_id: str = Query(..., description="HuggingFace repo ID"),
     filename: str | None = Query(None, description="Specific file to download"),
     manager: EmbeddingManager = Depends(get_embedding_manager),
-    # for dev: _: None = Depends(require_role(UserRole.ADMIN)),
 ) -> JSONResponse:
     """Unified embeddings admin POST endpoint."""
     try:

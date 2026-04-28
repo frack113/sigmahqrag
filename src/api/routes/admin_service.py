@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
@@ -17,8 +17,6 @@ from src.admin.health import (
 from src.admin.service_manager import (
     create_service_manager,
 )
-from src.api.dependencies import require_role
-from src.auth.models import UserRole
 from src.config import LLAMA_BIN_PATH, QDRANT_BIN_PATH, LOGS_DIR, MODELS_DIR
 
 logger = logging.getLogger(__name__)
@@ -70,7 +68,6 @@ VALID_POST_ACTIONS = {"start", "stop"}
 
 @router.get(
     "/health",
-    # dependencies=[Depends(require_role(UserRole.ANALYST, UserRole.ADMIN))],
 )
 async def get_admin_health() -> JSONResponse:
     """Get health status of all services for admin page."""
@@ -102,7 +99,6 @@ def _normalize_params(action: str, service: str) -> tuple[str, str]:
 
 @router.get(
     "/services/",
-    # dependencies=[Depends(require_role(UserRole.ANALYST, UserRole.ADMIN))],
 )
 async def services_get(
     action: str = Query(..., description="Action: logs"),
@@ -166,7 +162,6 @@ async def services_get(
 
 @router.post(
     "/services/",
-    # dependencies=[Depends(require_role(UserRole.ADMIN))],
 )
 async def services_post(
     action: str = Query(..., description="Action: start, stop"),

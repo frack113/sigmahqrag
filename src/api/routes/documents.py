@@ -5,10 +5,9 @@ from __future__ import annotations
 import logging
 import os
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter
+from fastapi.responses import JSONResponse
 
-from src.api.dependencies import require_role
-from src.auth.models import CurrentUser, UserRole
 from src.documents.indexing import index_sigma_rules
 from src.documents.models import (
     IngestRequest,
@@ -31,19 +30,17 @@ def get_sigma_rules_dir() -> str:
     return directory
 
 
-@router.post("/ingest", response_model=IngestResponse)
+@router.post("/ingest")
 async def ingest_sigma_rules(
     request: IngestRequest | None = None,
-    current_user: CurrentUser = Depends(require_role(UserRole.ADMIN)),
-) -> IngestResponse:
+) -> JSONResponse:
     """Ingest Sigma rules from configured directory.
 
     Args:
         request: Optional IngestRequest with directory/recursive options
-        current_user: Authenticated admin user
 
     Returns:
-        IngestResponse with ingestion results
+        JSONResponse with ingestion results (open in v0.1.0)
     """
     directory = request.directory if request else None
     recursive = request.recursive if request else True
@@ -111,9 +108,11 @@ async def ingest_sigma_rules(
         except Exception as e:
             logger.error(f"Failed to index rules: {e}")
 
-    return IngestResponse(
-        total_files=len(files),
-        successful=len(successful_rules),
-        failed=len(files) - len(successful_rules),
-        results=results,
+    return JSONResponse(
+        content=IngestResponse(
+            total_files=len(files),
+            successful=len(successful_rules),
+            failed=len(files) - len(successful_rules),
+            results=results,
+        ).model_dump()
     )

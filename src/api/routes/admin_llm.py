@@ -119,7 +119,6 @@ async def llm_post_endpoint(
     filename: str | None = Query(None, description="Specific file to download"),
     expected_hash: str | None = Query(None, description="Expected file hash"),
     mm: ModelManager = Depends(get_model_manager),
-    # for dev: _: None = Depends(require_role(UserRole.ADMIN)),
 ) -> JSONResponse:
     """Unified LLM POST endpoint for write operations."""
     try:
