@@ -12,7 +12,7 @@ LLAMA_HEALTH_ENDPOINT = "/v1/models"
 QDRANT_HEALTH_ENDPOINT = "/health"
 
 BIN_DIR = Path("data/bin")
-LLAMA_BIN_PATH = BIN_DIR / "llama-server"
+LLAMA_BIN_PATH = BIN_DIR / "llama-cpp" / "llama-server.exe"
 QDRANT_BIN_PATH = BIN_DIR / "qdrant"
 
 MODELS_DIR = Path("data/models")
