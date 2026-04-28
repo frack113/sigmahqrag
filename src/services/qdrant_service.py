@@ -16,16 +16,19 @@ class QdrantService:
 
     def __init__(
         self,
-        collection_name: str = "sigma_rules",
-        vector_size: int = 384,
-        host: str = "127.0.0.1",
-        port: int = 6333,
+        collection_name: str | None = None,
+        vector_size: int | None = None,
+        host: str | None = None,
+        port: int | None = None,
     ) -> None:
         """Initialize QdrantService."""
-        self.collection_name = collection_name
-        self.vector_size = vector_size
-        self.host = host
-        self.port = port
+        from src.config import get_qdrant_config
+
+        config = get_qdrant_config()
+        self.collection_name = collection_name or config.get("collection_name", "sigma_rules")
+        self.vector_size = vector_size if vector_size is not None else config.get("vector_size", 384)
+        self.host = host or config.get("host", "127.0.0.1")
+        self.port = port if port is not None else config.get("port", 6333)
         self._client: object | None = None
         self._vector_store: object | None = None
 

@@ -111,16 +111,8 @@ class VersionManager:
             "hip", "cuda", "cpu", or None if not specified
         """
         try:
-            import tomllib
-            from pathlib import Path
-
-            config_path = Path("data/sigmahqrag.toml")
-            if config_path.exists():
-                with open(config_path, "rb") as f:
-                    config = tomllib.load(f)
-                    gpu_type = config.get("backend", {}).get("gpu_type")
-                    if gpu_type in ("hip", "cuda", "cpu"):
-                        return gpu_type
+            from src.config import get_backend_gpu_type
+            return get_backend_gpu_type()
         except Exception as e:
             logger.debug(f"Could not read GPU preference from config: {e}")
         return None

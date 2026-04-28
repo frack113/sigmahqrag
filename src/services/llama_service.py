@@ -12,10 +12,15 @@ class LlamaService:
 
     def __init__(
         self,
-        base_url: str = "http://127.0.0.1:8080",
+        base_url: str | None = None,
         model_name: str | None = None,
     ) -> None:
         """Initialize LlamaService."""
+        if base_url is None:
+            from src.config import get_llama_config
+            config = get_llama_config()
+            base_url = config.get("base_url", "http://127.0.0.1:8080")
+            model_name = config.get("model_name")
         self.base_url = base_url
         self.model_name = model_name
         self._llm: object | None = None
