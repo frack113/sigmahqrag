@@ -1,3 +1,3 @@
 """API routes package."""
 
-from . import coverage, explain, search, admin_service # noqa: F401
+from . import coverage, explain, search, admin_service, admin_backend # noqa: F401

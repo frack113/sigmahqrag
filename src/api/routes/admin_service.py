@@ -9,15 +9,50 @@ from fastapi import APIRouter, Depends, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from src.admin.health import create_health_checker
+from src.admin.health import (
+    ServiceHealth,
+    ServiceStatus,
+    create_health_checker,
+)
 from src.admin.service_manager import (
     create_service_manager,
 )
 from src.api.dependencies import require_role
 from src.auth.models import UserRole
-from src.config import LLAMA_BIN_PATH, LOGS_DIR, MODELS_DIR
+from src.config import LLAMA_BIN_PATH, QDRANT_BIN_PATH, LOGS_DIR, MODELS_DIR
 
 logger = logging.getLogger(__name__)
+
+
+def _get_status_display(health: ServiceHealth, binary_path: Path) -> dict[str, Any]:
+    """Get display data for a service health status."""
+    if health.status == ServiceStatus.RUNNING:
+        color = "green"
+        display_status = "running"
+    elif health.status == ServiceStatus.STOPPED:
+        color = "red"
+        display_status = "stopped"
+    else:
+        color = "yellow"
+        display_status = "unknown"
+
+    result: dict[str, Any] = {
+        "name": health.name,
+        "status": display_status,
+        "color": color,
+        "port": health.port,
+        "url": health.url,
+    }
+
+    if health.message:
+        result["message"] = health.message
+
+    if not binary_path.exists():
+        result["status"] = "not installed"
+        result["color"] = "yellow"
+        result["message"] = "Binary not found"
+
+    return result
 
 
 class StartRequest(BaseModel):
@@ -31,6 +66,33 @@ router = APIRouter(prefix="/admin", tags=["admin-services"])
 ALLOWED_SERVICES = {"llama", "qdrant"}
 VALID_GET_ACTIONS = {"logs"}
 VALID_POST_ACTIONS = {"start", "stop"}
+
+
+@router.get(
+    "/health",
+    dependencies=[Depends(require_role(UserRole.ANALYST, UserRole.ADMIN))],
+)
+async def get_admin_health() -> JSONResponse:
+    """Get health status of all services for admin page."""
+    try:
+        checker = create_health_checker()
+        all_health = await checker.check_all()
+
+        result: dict[str, Any] = {
+            "services": [
+                _get_status_display(all_health["llama"], LLAMA_BIN_PATH),
+                _get_status_display(all_health["qdrant"], QDRANT_BIN_PATH),
+            ],
+        }
+
+        return JSONResponse(content=result)
+
+    except Exception as e:
+        logger.error(f"Health check failed: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Internal server error"},
+        )
 
 
 def _normalize_params(action: str, service: str) -> tuple[str, str]:

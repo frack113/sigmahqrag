@@ -41,7 +41,8 @@ class CorrelationIDMiddleware(BaseHTTPMiddleware):
 
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
-    from src.api.routes.admin import router as admin_router
+    from src.api.routes.admin_service import router as admin_router
+    from src.api.routes.admin_backend import router as admin_backend_router
     from src.api.routes.admin_embedding import router as admin_embedding_router
     from src.api.routes.admin_llm import router as admin_llm_router
     from src.api.routes.auth import router as auth_router
@@ -64,6 +65,7 @@ def create_app() -> FastAPI:
     app.include_router(admin_embedding_router)
     app.include_router(feedback_router)
     app.include_router(admin_llm_router)
+    app.include_router(admin_backend_router)
 
     @app.exception_handler(SigmaError)
     async def sigma_error_handler(request: Request, exc: SigmaError) -> JSONResponse:
