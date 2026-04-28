@@ -160,6 +160,7 @@ class VersionManager:
         os_name, arch = self._detect_platform()
         patterns = self.BINARY_PATTERNS.get(service, [])
 
+        # Filter assets by service-specific patterns
         for asset in release.assets:
             asset_name = asset.name.lower()
 
@@ -170,40 +171,31 @@ class VersionManager:
             if service == "llama.cpp":
                 # Try pattern match
                 for pattern in patterns:
-                    target_os = pattern.replace("llama-", "").split("-")[0]  # e.g., "win-cpu", "linux"
-                    target_arch = pattern.split("-")[-1]  # e.g., "x64"
-
-                    if os_name in target_os and arch in target_arch:
-                        if re.search(pattern, asset_name):
-                            logger.info(f"Matched pattern {pattern} for {asset.name}")
-                            return asset
+                    if re.search(pattern, asset_name):
+                        logger.info(f"Matched pattern {pattern} for {asset.name}")
+                        return asset
 
                 # Fallback: check for OS+arch in asset name
-                if os_name == "windows":
-                    if "win-cpu" in asset_name and "x64" in asset_name:
-                        return asset
-                    if "win-cuda" in asset_name and "x64" in asset_name:
-                        return asset
-                elif os_name == "linux":
-                    if "ubuntu" in asset_name and "x64" in asset_name:
-                        return asset
-                elif os_name == "macos":
-                    if "macos" in asset_name and ("x64" in asset_name or "arm64" in asset_name):
-                        return asset
+                if os_name == "windows" and "win" in asset_name and arch in asset_name:
+                    return asset
+                elif os_name == "linux" and ("linux" in asset_name or "ubuntu" in asset_name) and arch in asset_name:
+                    return asset
+                elif os_name == "macos" and "macos" in asset_name and arch in asset_name:
+                    return asset
 
-        for asset in release.assets:
-            asset_name = asset.name.lower()
-            if service == "qdrant":
+            elif service == "qdrant":
+                # Try pattern match
                 for pattern in patterns:
-                    if os_name in pattern or arch in pattern:
-                        if re.search(pattern, asset_name):
-                            return asset
+                    if re.search(pattern, asset_name):
+                        logger.info(f"Matched pattern {pattern} for {asset.name}")
+                        return asset
 
+                # Fallback: check for OS in asset name
                 if os_name == "windows" and "windows" in asset_name:
                     return asset
-                if os_name == "macos" and "macos" in asset_name:
+                elif os_name == "linux" and "linux" in asset_name:
                     return asset
-                if os_name == "linux" and "linux" in asset_name:
+                elif os_name == "macos" and "macos" in asset_name:
                     return asset
 
         logger.warning(

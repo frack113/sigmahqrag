@@ -7,8 +7,7 @@ import json
 import logging
 from collections.abc import AsyncGenerator
 
-import httpx
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from src.admin.download_manager import (
@@ -17,8 +16,6 @@ from src.admin.download_manager import (
 from src.admin.update_manager import (
     create_update_service,
 )
-from src.api.dependencies import require_role
-from src.auth.models import UserRole
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +23,7 @@ router = APIRouter(prefix="/admin", tags=["admin-backend"])
 
 ALLOWED_SERVICES = {"llama", "qdrant"}
 VALID_GET_ACTIONS = {"progress", "status"}
-VALID_POST_ACTIONS = {"download", "cancel", "apply", "rollback"}
+VALID_POST_ACTIONS = {"download", "cancel"}
 
 
 def _normalize_params(action: str, service: str | None = None) -> tuple[str, str | None]:
@@ -112,12 +109,12 @@ async def backend_get(
     # dependencies=[Depends(require_role(UserRole.ADMIN))],
 )
 async def backend_post(
-    action: str = Query(..., description="Action: download, cancel, apply, rollback"),
+    action: str = Query(..., description="Action: download, cancel"),
     service: str | None = Query(None, description="Service: llama, qdrant"),
-    version: str | None = Query(None, description="Version for download/apply"),
+    version: str | None = Query(None, description="Version for download (default: latest)"),
     download_id: str | None = Query(None, description="Download ID for cancel"),
 ) -> JSONResponse:
-    """Unified POST endpoint for backend operations (download, cancel, apply, rollback)."""
+    """Unified POST endpoint for backend operations (download, cancel)."""
     try:
         action, service = _normalize_params(action, service)
 
@@ -134,17 +131,12 @@ async def backend_post(
                         status_code=400,
                         content={"error": "Valid service required (llama, qdrant)"},
                     )
-                if not version:
-                    return JSONResponse(
-                        status_code=400,
-                        content={"error": "version required for action=download"},
-                    )
 
                 service_name = "llama.cpp" if service == "llama" else "qdrant"
                 manager = create_download_manager()
                 result = await manager.start_download(
                     service=service_name,
-                    version=version,
+                    version=version or "latest",
                 )
                 return JSONResponse(content=result)
 
@@ -157,74 +149,6 @@ async def backend_post(
 
                 manager = create_download_manager()
                 result = await manager.cancel_download(download_id)
-                return JSONResponse(content=result)
-
-            case "apply":
-                if not service or service not in ALLOWED_SERVICES:
-                    return JSONResponse(
-                        status_code=400,
-                        content={"error": "Valid service required (llama, qdrant)"},
-                    )
-                if not version:
-                    return JSONResponse(
-                        status_code=400,
-                        content={"error": "version required for action=apply"},
-                    )
-
-                service_name = "llama.cpp" if service == "llama" else "qdrant"
-
-                update_service = create_update_service()
-
-                from src.admin.version_manager import create_version_manager
-                from src.config import BIN_DIR
-
-                version_manager = create_version_manager()
-                release = await version_manager.get_release(service_name, version)
-                asset = version_manager.find_matching_asset(release, service_name)
-
-                if not asset:
-                    return JSONResponse(
-                        status_code=400,
-                        content={"error": "No matching binary found for this platform"},
-                    )
-
-                temp_dir = BIN_DIR / "pending"
-                temp_dir.mkdir(parents=True, exist_ok=True)
-
-                binary_path = temp_dir / f"{service_name.replace('.', '-')}"
-
-                async with httpx.AsyncClient(timeout=300.0) as client:
-                    response = await client.get(
-                        asset.browser_download_url,
-                        follow_redirects=True,
-                    )
-                    response.raise_for_status()
-                    binary_path.write_bytes(response.content)
-
-                result = await update_service.apply_update(
-                    service=service_name,
-                    version=version,
-                    binary_path=binary_path,
-                )
-
-                try:
-                    binary_path.unlink()
-                except OSError:
-                    pass
-
-                return JSONResponse(content=result)
-
-            case "rollback":
-                if not service or service not in ALLOWED_SERVICES:
-                    return JSONResponse(
-                        status_code=400,
-                        content={"error": "Valid service required (llama, qdrant)"},
-                    )
-
-                service_name = "llama.cpp" if service == "llama" else "qdrant"
-                update_service = create_update_service()
-
-                result = await update_service.rollback(service=service_name)
                 return JSONResponse(content=result)
 
             case _:

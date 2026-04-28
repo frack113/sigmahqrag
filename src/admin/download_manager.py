@@ -82,6 +82,28 @@ class DownloadManager:
         if service not in ("llama.cpp", "qdrant"):
             raise DownloadError(f"Unsupported service: {service}")
 
+        # Check if requested version is already installed
+        from src.admin.backup_manager import create_backup_manager
+        backup_mgr = create_backup_manager()
+        current_version = backup_mgr.get_current_version(service)
+
+        # If version is "latest", get the actual latest version from release
+        if version == "latest":
+            release = await self.version_manager.get_release(service, version)
+            version_to_check = release.tag_name.lstrip("v")
+        else:
+            version_to_check = version.lstrip("v")
+
+        if current_version and current_version == version_to_check:
+            logger.info(f"Version {version_to_check} already installed for {service}")
+            return {
+                "download_id": None,
+                "status": "skipped",
+                "service": service,
+                "version": version_to_check,
+                "message": "Version already installed",
+            }
+
         release = await self.version_manager.get_release(service, version)
 
         asset = self.version_manager.find_matching_asset(release, service)
@@ -224,13 +246,13 @@ class DownloadManager:
                 })
 
     async def _extract_and_install(
-        self, temp_path: Path, target_dir: Path, service: str
+        self, temp_path: Path, target_path: Path, service: str
     ) -> None:
         """Extract archive and install to bin directory.
 
         Args:
             temp_path: Path to downloaded archive
-            target_dir: Target directory for extraction
+            target_path: Target path for the service binary/directory
             service: Service name (llama.cpp, qdrant)
         """
         import subprocess
@@ -245,72 +267,100 @@ class DownloadManager:
             except Exception as e:
                 logger.warning(f"Could not clean {service_dir}: {e}")
 
-        BIN_DIR.mkdir(parents=True, exist_ok=True)
+        try:
+            BIN_DIR.mkdir(parents=True, exist_ok=True)
 
-        if temp_path.suffix == ".zip":
-            with zipfile.ZipFile(temp_path, "r") as zf:
-                members = zf.namelist()
-                top_level = set()
-                root_files = []
-                for name in members:
-                    parts = Path(name).parts
-                    if len(parts) == 1 or (len(parts) == 2 and not parts[1]):
-                        root_files.append(name)
-                    elif parts and parts[0]:
-                        top_level.add(parts[0])
+            if temp_path.suffix == ".zip":
+                with zipfile.ZipFile(temp_path, "r") as zf:
+                    members = zf.namelist()
+                    top_level = set()
+                    for name in members:
+                        parts = Path(name).parts
+                        if len(parts) > 0 and parts[0]:
+                            top_level.add(parts[0])
 
-                logger.info(f"ZIP top-level dirs: {top_level}, root files: {len(root_files)}")
+                    logger.info(f"ZIP top-level dirs: {top_level}")
 
-                if top_level:
-                    # Files in a subdirectory - extract all
+                    # Extract all to BIN_DIR first
                     zf.extractall(BIN_DIR)
                     logger.info(f"Extracted ZIP: {temp_path.name}")
 
-                    # Move files from extracted subdir to service_dir
+                    # Find and move the extracted directory to service_dir
                     for extracted_name in top_level:
                         extracted_dir = BIN_DIR / extracted_name
                         if extracted_dir.exists() and extracted_dir.is_dir():
-                            service_dir.mkdir(parents=True, exist_ok=True)
-                            for f in os.listdir(extracted_dir):
-                                src = extracted_dir / f
+                            if extracted_dir != service_dir:
+                                service_dir.mkdir(parents=True, exist_ok=True)
+                                for f in os.listdir(extracted_dir):
+                                    src = extracted_dir / f
+                                    dst = service_dir / f
+                                    src.rename(dst)
+                                shutil.rmtree(extracted_dir)
+                                logger.info(f"Moved files from {extracted_name} to {service_dir}")
+                            break
+
+                    # If no top-level dir found, files are in root - move them to service_dir
+                    if not top_level:
+                        service_dir.mkdir(parents=True, exist_ok=True)
+                        for f in os.listdir(BIN_DIR):
+                            src = BIN_DIR / f
+                            if src.is_file() and src != temp_path:
                                 dst = service_dir / f
                                 src.rename(dst)
-                            shutil.rmtree(extracted_dir)
-                            logger.info(f"Moved files to {service_dir}")
-                            break
-                else:
-                    # Root files only - extract directly to service_dir
-                    service_dir.mkdir(parents=True, exist_ok=True)
-                    zf.extractall(service_dir)
-                    logger.info(f"Extracted ZIP to {service_dir}")
-        else:
-            result = subprocess.run(
-                ["tar", "-tf", str(temp_path)],
-                capture_output=True,
-                text=True,
-            )
-            top_level = set()
-            for name in result.stdout.splitlines()[:10]:
-                parts = name.split("/")
-                if parts and parts[0]:
-                    top_level.add(parts[0])
+                        logger.info(f"Moved root files to {service_dir}")
 
-            result = subprocess.run(
-                ["tar", "-xf", str(temp_path), "-C", str(BIN_DIR)],
-                capture_output=True,
-                text=True,
-            )
-            if result.returncode != 0:
-                raise RuntimeError(f"Failed to extract tar.gz: {result.stderr}")
+            else:
+                # tar.gz handling
+                result = subprocess.run(
+                    ["tar", "-tf", str(temp_path)],
+                    capture_output=True,
+                    text=True,
+                )
+                top_level = set()
+                for name in result.stdout.splitlines()[:10]:
+                    parts = name.split("/")
+                    if parts and parts[0]:
+                        top_level.add(parts[0])
 
-            extracted_names = list(top_level - {"", ".", "__MACOSX"})
-            if extracted_names:
-                extracted_dir = BIN_DIR / extracted_names[0]
-                if extracted_dir.exists() and extracted_dir != service_dir:
-                    extracted_dir.rename(service_dir)
+                result = subprocess.run(
+                    ["tar", "-xf", str(temp_path), "-C", str(BIN_DIR)],
+                    capture_output=True,
+                    text=True,
+                )
+                if result.returncode != 0:
+                    raise RuntimeError(f"Failed to extract tar.gz: {result.stderr}")
 
-        self.temp_manager.cleanup(temp_path)
-        logger.info(f"Cleaned temp file: {temp_path}")
+                extracted_names = list(top_level - {"", ".", "__MACOSX"})
+                if extracted_names:
+                    extracted_dir = BIN_DIR / extracted_names[0]
+                    if extracted_dir.exists() and extracted_dir.is_dir() and extracted_dir != service_dir:
+                        service_dir.mkdir(parents=True, exist_ok=True)
+                        for f in os.listdir(extracted_dir):
+                            src = extracted_dir / f
+                            dst = service_dir / f
+                            src.rename(dst)
+                        shutil.rmtree(extracted_dir)
+                        logger.info(f"Moved files from {extracted_names[0]} to {service_dir}")
+
+            # Verify extraction success
+            if not service_dir.exists():
+                raise RuntimeError(f"Extraction failed: {service_dir} does not exist")
+
+            logger.info(f"Successfully installed {service} to {service_dir}")
+
+        except Exception as e:
+            logger.error(f"Extraction failed for {service}: {e}")
+            # Clean up partial extraction
+            if service_dir.exists():
+                try:
+                    shutil.rmtree(service_dir)
+                except Exception:
+                    pass
+            raise
+
+        finally:
+            self.temp_manager.cleanup(temp_path)
+            logger.info(f"Cleaned temp file: {temp_path}")
 
     async def cancel_download(self, download_id: str) -> dict[str, Any]:
         """Cancel an active download.
