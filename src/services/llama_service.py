@@ -45,6 +45,14 @@ class LlamaService:
         if self._llm is None:
             await self.initialize()
 
+        from src.admin.admin_prompts import get_active_prompt_content
+
+        active_content = get_active_prompt_content()
+        if active_content and (
+            not messages or messages[0].get("role") != "system"
+        ):
+            messages = [{"role": "system", "content": active_content}] + messages
+
         response = await self._llm.achat(messages)  # type: ignore[union-attr]
         return str(response)
 

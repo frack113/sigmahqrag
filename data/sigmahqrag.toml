@@ -1,5 +1,4 @@
 [backend]
-# GPU type preference for llama.cpp downloads on Windows
-# Options: "hip" (AMD), "cuda" (NVIDIA), "cpu" (default)
-# If not specified, defaults to CPU on Windows
-gpu_type = "hip"  # Change to "cuda" for NVIDIA or "cpu" for CPU-only
+gpu_type = "hip"
+
+[system_prompts]

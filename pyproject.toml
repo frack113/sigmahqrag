@@ -13,6 +13,7 @@ dependencies = [
     "gitpython",
     "python-jose>=3.5.0",
     "huggingface-hub>=1.11.0",
+    "tomli-w>=1.2.0",
 ]
 
 [project.optional-dependencies]
