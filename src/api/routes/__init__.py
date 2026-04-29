@@ -1,3 +1,11 @@
 """API routes package."""
 
-from . import admin_backend, admin_prompts, admin_service, coverage, explain, search  # noqa: F401
+from . import (  # noqa: F401
+    admin_backend,
+    admin_github,
+    admin_prompts,
+    admin_service,
+    coverage,
+    explain,
+    search,
+)

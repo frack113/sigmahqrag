@@ -1,91 +1,122 @@
-# API Test Scripts
+# API Test Scripts#
 
-Scripts to test each API endpoint. Requires the API server to be running on `http://localhost:7860`.
+This directory contains test scripts for the SigmaHQ RAG admin API endpoints.
 
-## Usage
+## Prerequisites
 
-Run a script directly:
+- The application must be running (`python main.py` or `uv run python main.py`)
+- Server listens on `http://localhost:7860`
 
+## Available Scripts
+
+### test_api_admin_github.py
+
+Test script for the `/admin/github` endpoint.
+
+**Actions supported:**
+
+#### List all repositories
 ```bash
-uv run scripts/test_health.py
+uv run python scripts/test_api_admin_github.py list
 ```
 
-## Unified Admin APIs
-
-### LLM Admin (`/admin/llm`)
-
+#### Get repository info
 ```bash
-# List GGUF files for a model
-uv run scripts/test_api_admin_llm.py list <repo_id>
-
-# Get model info
-uv run scripts/test_api_admin_llm.py info <repo_id>
-
-# List installed models
-uv run scripts/test_api_admin_llm.py installed
-
-# Download a model
-uv run scripts/test_api_admin_llm.py download [-f] <repo_id> [filename]
-
-# Delete a model or specific file
-uv run scripts/test_api_admin_llm.py delete [-f] <repo_id> [filename]
+# Usage: info <org> <name>
+uv run python scripts/test_api_admin_github.py info sigmahq sigma-specification
 ```
 
-### Embeddings Admin (`/admin/embeddings`)
-
+#### Clone repository
 ```bash
-# List installed embedding models
-uv run scripts/test_api_admin_embeddings.py installed
-
-# Get model info
-uv run scripts/test_api_admin_embeddings.py info <repo_id>
-
-# Download an embedding model (full repo via snapshot_download)
-uv run scripts/test_api_admin_embeddings.py download [-f] <repo_id>
-
-# Delete an embedding model
-uv run scripts/test_api_admin_embeddings.py delete [-f] <repo_id>
+uv run python scripts/test_api_admin_github.py clone --org sigmahq --name sigma-specification --branch main
 ```
 
-### Backend Admin (`/admin/backend`)
-
-Manages binary downloads for llama.cpp and qdrant.
-
+#### Update repository (git pull)
 ```bash
-# Start a binary download (GET /admin/backend/?action=download)
-uv run scripts/test_api_admin_backend.py download --service <llama|qdrant> [--version <ver>]
-
-# Cancel a download (POST /admin/backend/?action=cancel)
-uv run scripts/test_api_admin_backend.py cancel --download-id <id>
-
-# Get download progress via SSE stream (GET /admin/backend/?action=progress)
-uv run scripts/test_api_admin_backend.py progress --download-id <id>
-
-# Get update status (GET /admin/backend/?action=status)
-uv run scripts/test_api_admin_backend.py status
+uv run python scripts/test_api_admin_github.py update sigmahq sigma-specification
 ```
 
-### Services Admin (`/admin/services`)
-
-Start, stop and monitor llama.cpp and qdrant services.
-
+#### Update metadata (extensions, branch)
 ```bash
-# Start a service (POST /admin/services/?action=start)
-uv run scripts/test_api_admin_service.py start --service <llama|qdrant> [--model-path <path>]
-
-# Stop a service (POST /admin/services/?action=stop)
-uv run scripts/test_api_admin_service.py stop --service <llama|qdrant>
-
-# Get service logs (GET /admin/services/?action=logs)
-uv run scripts/test_api_admin_service.py logs --service <llama|qdrant>
+uv run python scripts/test_api_admin_github.py update-metadata sigmahq sigma-specification --branch main --extensions "*.yml,*.yaml,*.md"
 ```
 
-## Options
+#### Delete repository
+```bash
+uv run python scripts/test_api_admin_github.py delete sigmahq sigma-specification
+# Or force delete without confirmation
+uv run python scripts/test_api_admin_github.py delete sigmahq sigma-specification -f
+```
 
-- `-f, --force`: Skip confirmation prompt
-- `-n, --filename`: Specify filename (for LLM downloads)
-- `--url`: Override default base URL (default: http://localhost:7860)
-- `--service`: Service name (llama, qdrant) for backend and services scripts
-- `--download-id`: Download ID for cancel/progress actions
-- `--version`: Version to download (default: latest)
-- `--model-path`: Model path for llama service start
+---
+
+### test_api_admin_backend.py
+
+Test script for the `/admin/backend` endpoint.
+
+```bash
+uv run python scripts/test_api_admin_backend.py --help
+```
+
+---
+
+### test_api_admin_service.py
+
+Test script for the `/admin/services` endpoint.
+
+```bash
+uv run python scripts/test_api_admin_service.py --help
+```
+
+---
+
+### test_api_admin_llm.py
+
+Test script for the `/admin/llm` endpoint.
+
+```bash
+uv run python scripts/test_api_admin_llm.py --help
+```
+
+---
+
+### test_api_admin_embeddings.py
+
+Test script for the `/admin/embeddings` endpoint.
+
+```bash
+uv run python scripts/test_api_admin_embeddings.py --help
+```
+
+---
+
+## Repository Structure
+
+Repositories are stored in `./data/github/{organization}/{name}/` with a `metadata.json` file containing:
+- `org`: organization name
+- `name`: repository name
+- `branch`: default branch
+- `extensions_to_index`: list of file extensions to index in Qdrant
+
+## Complete Example
+
+```bash
+# Start the server (terminal 1)
+cd D:\rootme\sigmahqrag
+uv run python main.py
+
+# Use the script (terminal 2)
+cd D:\rootme\sigmahqrag
+
+# Clone a repository
+uv run python scripts/test_api_admin_github.py clone --org sigmahq --name sigma-specification --branch main
+
+# View repository info
+uv run python scripts/test_api_admin_github.py info sigmahq sigma-specification
+
+# Set extensions to index
+uv run python scripts/test_api_admin_github.py update-metadata sigmahq sigma-specification --extensions "*.yml,*.yaml"
+
+# List all repositories
+uv run python scripts/test_api_admin_github.py list
+```
