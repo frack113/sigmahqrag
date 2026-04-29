@@ -2756,7 +2756,7 @@ wheels = [
 [[package]]
 name = "sigmahqrag"
 version = "0.1.0"
-source = { editable = "." }
+source = { virtual = "." }
 dependencies = [
     { name = "fastapi" },
     { name = "gitpython" },
@@ -2772,44 +2772,32 @@ dependencies = [
 
 [package.optional-dependencies]
 dev = [
+    { name = "black" },
     { name = "mypy" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "ruff" },
 ]
 
-[package.dev-dependencies]
-dev = [
-    { name = "black" },
-    { name = "mypy" },
-    { name = "ruff" },
-]
-
 [package.metadata]
 requires-dist = [
-    { name = "fastapi", specifier = ">=0.136" },
+    { name = "black", marker = "extra == 'dev'" },
+    { name = "fastapi" },
     { name = "gitpython" },
     { name = "gradio", specifier = ">=6.11" },
-    { name = "huggingface-hub", specifier = ">=1.11.0" },
-    { name = "llama-index", specifier = ">=0.14" },
+    { name = "huggingface-hub" },
+    { name = "llama-index" },
     { name = "llama-index-embeddings-huggingface" },
     { name = "llama-index-llms-llamafile" },
     { name = "llama-index-vector-stores-qdrant" },
     { name = "mypy", marker = "extra == 'dev'" },
     { name = "pytest", marker = "extra == 'dev'" },
     { name = "pytest-asyncio", marker = "extra == 'dev'" },
-    { name = "python-jose", specifier = ">=3.5.0" },
+    { name = "python-jose" },
     { name = "ruff", marker = "extra == 'dev'" },
     { name = "tomli-w", specifier = ">=1.2.0" },
 ]
 provides-extras = ["dev"]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "black", specifier = ">=26.3.1" },
-    { name = "mypy", specifier = ">=1.20.1" },
-    { name = "ruff", specifier = ">=0.15.11" },
-]
 
 [[package]]
 name = "six"
