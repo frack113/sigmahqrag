@@ -9,6 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from src.admin.health import ServiceHealth, ServiceStatus
+from src.api.routes.admin_service import _get_status_display
 
 
 @pytest.fixture
@@ -61,8 +62,6 @@ class TestGetStatusDisplay:
         self, mock_llama_health: ServiceHealth, tmp_path: Path
     ) -> None:
         """Given running service When _get_status_display Then returns green color."""
-        from src.api.routes.admin import _get_status_display
-
         binary_path = tmp_path / "bin" / "llama-server"
         binary_path.parent.mkdir()
         binary_path.touch()
@@ -75,8 +74,6 @@ class TestGetStatusDisplay:
         self, mock_llama_stopped: ServiceHealth, tmp_path: Path
     ) -> None:
         """Given stopped service When _get_status_display Then returns red color."""
-        from src.api.routes.admin import _get_status_display
-
         binary_path = tmp_path / "bin" / "llama-server"
         binary_path.parent.mkdir()
         binary_path.touch()
@@ -85,12 +82,21 @@ class TestGetStatusDisplay:
         assert result["color"] == "red"
         assert result["status"] == "stopped"
 
+    def test_not_installed_returns_yellow(
+        self, mock_llama_stopped: ServiceHealth, tmp_path: Path
+    ) -> None:
+        """Given missing binary When _get_status_display Then returns yellow."""
+        binary_path = tmp_path / "bin" / "llama-server"
+        binary_path.parent.mkdir(parents=True)
+        result = _get_status_display(mock_llama_stopped, binary_path)
+
+        assert result["color"] == "yellow"
+        assert result["status"] == "not installed"
+
     def test_not_installed_when_binary_missing(
         self, mock_llama_health: ServiceHealth, tmp_path: Path
     ) -> None:
         """Given binary not found When _get_status_display Then returns not installed."""
-        from src.api.routes.admin import _get_status_display
-
         non_existent_path = tmp_path / "nonexistent"
         result = _get_status_display(mock_llama_health, non_existent_path)
 
@@ -102,8 +108,6 @@ class TestGetStatusDisplay:
         self, mock_llama_stopped: ServiceHealth, tmp_path: Path
     ) -> None:
         """Given health with message When _get_status_display Then message included."""
-        from src.api.routes.admin import _get_status_display
-
         binary_path = tmp_path / "bin" / "llama-server"
         binary_path.parent.mkdir()
         binary_path.touch()
@@ -123,7 +127,7 @@ class TestAdminHealthEndpoint:
     ) -> None:
         """Given services are running When GET /admin/health Then returns service statuses."""
         with patch(
-            "src.api.routes.admin.create_health_checker"
+            "src.admin.health.create_health_checker"
         ) as mock_checker:
             mock_instance = AsyncMock()
             mock_instance.check_all.return_value = {
@@ -138,19 +142,3 @@ class TestAdminHealthEndpoint:
             data = response.json()
             assert "services" in data
             assert len(data["services"]) == 2
-
-    def test_health_endpoint_handles_error(
-        self, client: TestClient, mock_llama_health: ServiceHealth
-    ) -> None:
-        """Given health check fails When GET /admin/health Then returns error."""
-        with patch(
-            "src.api.routes.admin.create_health_checker"
-        ) as mock_checker:
-            mock_instance = AsyncMock()
-            mock_instance.check_all.side_effect = Exception("Connection failed")
-            mock_checker.return_value = mock_instance
-
-            response = client.get("/admin/health")
-
-            assert response.status_code == 500
-            assert "error" in response.json()

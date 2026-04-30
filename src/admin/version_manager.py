@@ -43,9 +43,9 @@ class VersionManager:
 
     BINARY_PATTERNS = {
         "llama.cpp": [
-            r"llama-.*-win-cpu-x64",
-            r"llama-.*-win-cuda-\d+\.\d+-x64",
             r"llama-.*-win-hip.*x64",
+            r"llama-.*-win-cuda-\d+\.\d+-x64",
+            r"llama-.*-win-cpu-x64",
             r"llama-.*-linux-x64",
             r"llama-.*-linux-arm64",
             r"llama-.*-macos-x64",
@@ -73,11 +73,12 @@ class VersionManager:
             headers["Authorization"] = f"Bearer {self.github_token}"
         return headers
 
-    def _detect_platform(self) -> tuple[str, str]:
+    def _detect_platform(self) -> tuple[str, str, str | None]:
         """Detect current platform and architecture.
 
         Returns:
-            Tuple of (os, arch)
+            Tuple of (os, arch, preferred_gpu_type)
+            preferred_gpu_type: None, "hip", "cuda", or "cpu"
         """
         system = platform.system().lower()
         machine = platform.machine().lower()
@@ -98,7 +99,23 @@ class VersionManager:
         else:
             arch = machine
 
-        return os_name, arch
+        # Read preferred GPU type from config file
+        preferred_gpu_type = self._read_gpu_preference()
+
+        return os_name, arch, preferred_gpu_type
+
+    def _read_gpu_preference(self) -> str | None:
+        """Read GPU preference from config file.
+
+        Returns:
+            "hip", "cuda", "cpu", or None if not specified
+        """
+        try:
+            from src.config import get_backend_gpu_type
+            return get_backend_gpu_type()
+        except Exception as e:
+            logger.debug(f"Could not read GPU preference from config: {e}")
+        return None
 
     async def get_release(
         self, service: str, version: str | None = None
@@ -157,9 +174,10 @@ class VersionManager:
         Returns:
             Matching ReleaseAsset or None
         """
-        os_name, arch = self._detect_platform()
+        os_name, arch, preferred_gpu = self._detect_platform()
         patterns = self.BINARY_PATTERNS.get(service, [])
 
+        # Filter assets by service-specific patterns
         for asset in release.assets:
             asset_name = asset.name.lower()
 
@@ -170,44 +188,51 @@ class VersionManager:
             if service == "llama.cpp":
                 # Try pattern match
                 for pattern in patterns:
-                    target_os = pattern.replace("llama-", "").split("-")[0]  # e.g., "win-cpu", "linux"
-                    target_arch = pattern.split("-")[-1]  # e.g., "x64"
-
-                    if os_name in target_os and arch in target_arch:
-                        if re.search(pattern, asset_name):
+                    if re.search(pattern, asset_name):
+                        # If GPU preference is set, prioritize matching type
+                        if preferred_gpu and os_name == "windows":
+                            if (preferred_gpu == "hip" and "hip" in asset_name) or \
+                               (preferred_gpu == "cuda" and "cuda" in asset_name) or \
+                               (preferred_gpu == "cpu" and "cpu" in asset_name and "hip" not in asset_name and "cuda" not in asset_name):
+                                logger.info(f"Matched {preferred_gpu.upper()} pattern {pattern} for {asset.name} (from config)")
+                                return asset
+                        else:
                             logger.info(f"Matched pattern {pattern} for {asset.name}")
                             return asset
 
                 # Fallback: check for OS+arch in asset name
-                if os_name == "windows":
-                    if "win-cpu" in asset_name and "x64" in asset_name:
+                if os_name == "windows" and "win" in asset_name and arch in asset_name:
+                    if preferred_gpu == "hip" and "hip" in asset_name:
                         return asset
-                    if "win-cuda" in asset_name and "x64" in asset_name:
+                    elif preferred_gpu == "cuda" and "cuda" in asset_name:
                         return asset
-                elif os_name == "linux":
-                    if "ubuntu" in asset_name and "x64" in asset_name:
+                    elif preferred_gpu == "cpu" and "cpu" in asset_name:
                         return asset
-                elif os_name == "macos":
-                    if "macos" in asset_name and ("x64" in asset_name or "arm64" in asset_name):
+                    elif preferred_gpu is None:
+                        # No preference: default to CPU or first match
                         return asset
+                elif os_name == "linux" and ("linux" in asset_name or "ubuntu" in asset_name) and arch in asset_name:
+                    return asset
+                elif os_name == "macos" and "macos" in asset_name and arch in asset_name:
+                    return asset
 
-        for asset in release.assets:
-            asset_name = asset.name.lower()
-            if service == "qdrant":
+            elif service == "qdrant":
+                # Try pattern match
                 for pattern in patterns:
-                    if os_name in pattern or arch in pattern:
-                        if re.search(pattern, asset_name):
-                            return asset
+                    if re.search(pattern, asset_name):
+                        logger.info(f"Matched pattern {pattern} for {asset.name}")
+                        return asset
 
+                # Fallback: check for OS in asset name
                 if os_name == "windows" and "windows" in asset_name:
                     return asset
-                if os_name == "macos" and "macos" in asset_name:
+                elif os_name == "linux" and "linux" in asset_name:
                     return asset
-                if os_name == "linux" and "linux" in asset_name:
+                elif os_name == "macos" and "macos" in asset_name:
                     return asset
 
         logger.warning(
-            f"No matching asset found for {service} on {os_name}-{arch}"
+            f"No matching asset found for {service} on {os_name}-{arch} (GPU preference: {preferred_gpu})"
         )
         return None
 

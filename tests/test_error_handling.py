@@ -7,8 +7,6 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from src.errors import (
-    AuthenticationError,
-    AuthorizationError,
     ModelNotFoundError,
     ServiceUnavailableError,
     SigmaError,
@@ -51,18 +49,6 @@ class TestHttpStatusProperty:
         exc = ValidationError(field="field", message="Invalid")
 
         assert exc.http_status == 422
-
-    def test_authentication_error_http_status(self) -> None:
-        """Given AuthenticationError Then http_status is 401."""
-        exc = AuthenticationError("Invalid credentials")
-
-        assert exc.http_status == 401
-
-    def test_authorization_error_http_status(self) -> None:
-        """Given AuthorizationError Then http_status is 403."""
-        exc = AuthorizationError("Access denied")
-
-        assert exc.http_status == 403
 
 
 class TestCorrelationID:

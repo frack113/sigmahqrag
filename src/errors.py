@@ -65,30 +65,3 @@ class ValidationError(SigmaError):
             details={"field": field},
         )
 
-
-class AuthenticationError(SigmaError):
-    """Authentication error."""
-
-    http_status = 401
-
-    def __init__(self, message: str):
-        """Initialize exception."""
-        super().__init__(
-            code="AUTHENTICATION_ERROR",
-            message=message,
-            details={},
-        )
-
-
-class AuthorizationError(SigmaError):
-    """Authorization error."""
-
-    http_status = 403
-
-    def __init__(self, message: str):
-        """Initialize exception."""
-        super().__init__(
-            code="AUTHORIZATION_ERROR",
-            message=message,
-            details={},
-        )

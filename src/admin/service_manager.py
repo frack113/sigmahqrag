@@ -8,12 +8,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from src.config import LLAMA_BIN_PATH, QDRANT_BIN_PATH, LOGS_DIR, DATA_DIR, QDRANT_STORAGE_DIR
+
 logger = logging.getLogger(__name__)
 
-LOGS_DIR = "logs"
-LLAMA_BIN = "bin/llama-cpp/llama-server.exe"
-QDRANT_BIN = "bin/qdrant"
-PID_DIR = "data/pids"
+LOGS_DIR = Path(LOGS_DIR)
+LLAMA_BIN = str(LLAMA_BIN_PATH)
+QDRANT_BIN = str(QDRANT_BIN_PATH)
+PID_DIR = DATA_DIR / "pids"
 
 
 @dataclass
@@ -199,7 +201,7 @@ class ServiceManager:
 
     async def start_qdrant(
         self,
-        storage_path: str = "qdrant/storage",
+        storage_path: str = str(QDRANT_STORAGE_DIR),
     ) -> dict[str, Any]:
         """Start Qdrant server.
 

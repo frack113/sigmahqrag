@@ -8,8 +8,7 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from src.api.dependencies import require_role, get_embedding_manager
-from src.auth.models import UserRole
+from src.api.dependencies import get_embedding_manager
 from src.core.services.embedding import EmbeddingManager
 
 

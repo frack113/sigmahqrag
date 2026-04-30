@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
@@ -14,8 +15,8 @@ from src.config import (
     LLAMA_BIN_PATH,
     LLM_DIR,
     QDRANT_BIN_PATH,
-    get_backend,
-    set_backend,
+    get_backend_gpu_type,
+    set_backend_gpu_type,
 )
 
 logger = logging.getLogger(__name__)
@@ -116,7 +117,7 @@ def create_admin_ui() -> gr.Blocks:
                 backend_dropdown = gr.Dropdown(
                     label="llama.cpp Backend",
                     choices=["cpu", "cuda", "hip", "vulkan"],
-                    value=get_backend(),
+                    value=get_backend_gpu_type(),
                 )
                 backend_save_btn = gr.Button("Save Backend", variant="primary")
                 backend_status = gr.Textbox(label="Status", interactive=False)
@@ -132,13 +133,12 @@ def create_admin_ui() -> gr.Blocks:
                     )
 
                 download_status = gr.Textbox(label="Download Status", interactive=False)
-                download_progress = gr.Progress()
 
             with gr.Tab("Models"):
                 gr.Markdown("### Model Management")
-                
+
                 from src.ui.model_selector import scan_models
-                
+
                 def scan_llm_models() -> list[str]:
                     """Scan available LLM models."""
                     models = scan_models(str(LLM_DIR))
@@ -160,18 +160,18 @@ def create_admin_ui() -> gr.Blocks:
                     placeholder="Search models (e.g., gemma, llama, qwen)",
                 )
                 search_btn = gr.Button("Search", variant="primary")
-                
+
                 search_results = gr.Dropdown(
                     label="Results - select a model",
                     choices=[],
                     allow_custom_value=True,
                 )
-                
+
                 quant_dropdown = gr.Dropdown(
                     label="Select Quantization",
                     choices=[],
                 )
-                
+
                 model_download_btn = gr.Button("Download", variant="primary")
                 download_status = gr.Textbox(label="Status", interactive=False)
 
@@ -235,35 +235,35 @@ def create_admin_ui() -> gr.Blocks:
                 model_download_btn.click(fn=on_download, inputs=[search_results, quant_dropdown], outputs=[download_status])
 
                 gr.Markdown("#### Installed LLM Models")
-                
+
                 llm_dropdown = gr.Dropdown(
                     label="LLM Model",
                     choices=scan_llm_models(),
                 )
                 llm_vram_info = gr.Markdown("Select a model to view VRAM requirements")
                 llm_delete_btn = gr.Button("Delete", variant="stop")
-                
+
                 def get_llm_vram(model_name: str) -> str:
                     """Calculate and display VRAM for a model."""
                     if not model_name or model_name == "No models found":
                         return "No model selected"
-                    
+
                     model_path = LLM_DIR / f"{model_name}.gguf"
                     if not model_path.exists():
                         return f"Model file not found: {model_name}.gguf"
-                    
+
                     size_bytes = model_path.stat().st_size
                     size_gb = size_bytes / (1024**3)
                     size_mb = size_bytes / (1024**2)
                     vram_note = "~1x model size (Q4)" if size_mb < 4096 else "~1.2x model size + context"
-                    
+
                     return f"**{model_name}**\n\n- **Size:** {size_mb:.0f} MB ({size_gb:.2f} GB)\n- **Est. VRAM:** {vram_note}"
 
                 def delete_llm_model(model_name: str) -> str:
                     """Delete LLM model."""
                     if not model_name or model_name == "No models found":
                         return "No model selected"
-                    
+
                     model_path = LLM_DIR / f"{model_name}.gguf"
                     if model_path.exists():
                         model_path.unlink()
@@ -271,25 +271,148 @@ def create_admin_ui() -> gr.Blocks:
                     return "Model not found"
 
                 gr.Markdown("#### Installed Embedding Models")
-                
+
                 embedding_dropdown = gr.Dropdown(
                     label="Embedding Model",
                     choices=scan_embedding_models(),
                 )
                 embedding_delete_btn = gr.Button("Delete", variant="stop")
-                
+
                 def delete_embedding_model(model_name: str) -> str:
                     """Delete embedding model."""
                     if not model_name or model_name == "No models found":
                         return "No model selected"
-                    
+
                     model_path = EMBEDDINGS_DIR / f"{model_name}.gguf"
                     if model_path.exists():
                         model_path.unlink()
                         return f"Deleted: {model_name}"
                     return "Model not found"
 
-            llama_logs_output = gr.Textbox(
+        with gr.Tab("Prompts"):
+            gr.Markdown("### System Prompts")
+
+            from src.admin.admin_prompts import (
+                add_prompt,
+                delete_prompt,
+                get_active_prompt,
+                get_prompt_content,
+                list_prompts,
+                set_active_prompt,
+            )
+
+            gr.Markdown("#### Active Prompt")
+            active_display = gr.Markdown("Chargement...")
+            refresh_active_btn = gr.Button("Rafraîchir", variant="secondary")
+
+            gr.Markdown("#### Profils disponibles")
+            prompt_list = gr.Dropdown(
+                label="Sélectionner un profil",
+                choices=[],
+                allow_custom_value=False,
+            )
+            prompt_content = gr.Textbox(
+                label="Contenu du prompt (markdown)",
+                lines=10,
+                interactive=False,
+            )
+            prompt_row = gr.Row()
+            with prompt_row:
+                activate_btn = gr.Button("Activer ce profil", variant="primary")
+                delete_prompt_btn = gr.Button("Supprimer", variant="stop")
+
+            gr.Markdown("#### Ajouter / Modifier un profil")
+            new_prompt_name = gr.Textbox(
+                label="Nom du profil (kebab-case)",
+                placeholder="ex: analyste-sigma",
+            )
+            new_prompt_content = gr.Textbox(
+                label="Contenu du prompt",
+                lines=8,
+                placeholder="Tu es un expert en règles Sigma...",
+            )
+            save_prompt_btn = gr.Button("Sauvegarder", variant="primary")
+            prompt_status = gr.Markdown("")
+
+            async def load_prompts_and_active() -> tuple[list[str], str, str, str]:
+                """Load prompts list and active prompt info."""
+                prompts = list_prompts()
+                names = [p["name"] for p in prompts]
+                active = get_active_prompt()
+
+                active_md = f"**Actif :** {active}" if active else "**Aucun profil actif**"
+
+                content = ""
+                if active:
+                    c = get_prompt_content(active)
+                    content = c or ""
+
+                return names, active_md, content, gr.update(choices=names, value=active)
+
+            async def on_select_prompt(name: str | None) -> str:
+                """Load selected prompt content."""
+                if not name:
+                    return ""
+                content = get_prompt_content(name)
+                return content or ""
+
+            async def on_activate(name: str | None) -> tuple[str, list[str], str, str]:
+                """Activate selected prompt."""
+                if not name:
+                    return "Sélectionnez un profil", [], "", ""
+                result = set_active_prompt(name)
+                if result["success"]:
+                    return f"✅ {result['message']}", [], "", ""
+                return f"❌ {result.get('message', 'Erreur')}", [], "", ""
+
+            async def on_delete(name: str | None) -> tuple[str, list[str], str, str]:
+                """Delete selected prompt."""
+                if not name:
+                    return "Sélectionnez un profil", [], "", ""
+                result = delete_prompt(name)
+                if result["success"]:
+                    names, active_md, content, _ = await load_prompts_and_active()
+                    return f"✅ {result['message']}", names, "", active_md
+                return f"❌ {result.get('message', 'Erreur')}", [], "", ""
+
+            async def on_save(name: str, content: str) -> tuple[str, list[str], str, str]:
+                """Save (add or update) a prompt."""
+                if not name or not name.strip():
+                    return "❌ Le nom ne peut pas être vide", [], "", ""
+                if not content or not content.strip():
+                    return "❌ Le contenu ne peut pas être vide", [], "", ""
+                result = add_prompt(name.strip(), content)
+                if result["success"]:
+                    names, active_md, _, _ = await load_prompts_and_active()
+                    return f"✅ {result['message']}", names, content, active_md
+                return f"❌ {result.get('message', 'Erreur')}", [], "", ""
+
+            refresh_active_btn.click(
+                fn=load_prompts_and_active,
+                outputs=[prompt_list, active_display, prompt_content, prompt_list],
+            )
+            prompt_list.change(
+                fn=on_select_prompt,
+                inputs=[prompt_list],
+                outputs=[prompt_content],
+            )
+            activate_btn.click(
+                fn=on_activate,
+                inputs=[prompt_list],
+                outputs=[prompt_status, prompt_list, prompt_content, active_display],
+            )
+            delete_prompt_btn.click(
+                fn=on_delete,
+                inputs=[prompt_list],
+                outputs=[prompt_status, prompt_list, prompt_content, active_display],
+            )
+            save_prompt_btn.click(
+                fn=on_save,
+                inputs=[new_prompt_name, new_prompt_content],
+                outputs=[prompt_status, prompt_list, prompt_content, active_display],
+            )
+
+        llama_logs_output = gr.Textbox(
             label="llama.cpp logs",
             lines=10,
             interactive=False,
@@ -300,6 +423,11 @@ def create_admin_ui() -> gr.Blocks:
             lines=10,
             interactive=False,
             visible=False,
+        )
+
+        admin_demo.load(
+            fn=load_prompts_and_active,
+            outputs=[prompt_list, active_display, prompt_content, prompt_list],
         )
 
         async def fetch_status() -> tuple[dict[str, Any], dict[str, Any], str, str, str]:
@@ -414,7 +542,7 @@ def create_admin_ui() -> gr.Blocks:
 
         async def save_backend(backend: str) -> str:
             try:
-                set_backend(backend)
+                set_backend_gpu_type(backend)
                 return f"Backend saved: {backend}"
             except Exception as e:
                 return f"Error: {e}"
@@ -434,7 +562,7 @@ def create_admin_ui() -> gr.Blocks:
 
                 dm = create_download_manager()
                 result = await dm.start_download("llama.cpp", "latest")
-                
+
                 task = None
                 if total_size > 0:
                     for _ in range(60):
@@ -450,7 +578,7 @@ def create_admin_ui() -> gr.Blocks:
                     # If no size found, at least get the task once
                     task = dm.active_downloads.get(result["download_id"])
 
-                return f"Download completed!" if task and task.status == "completed" else f"Status: {task.status if task else 'unknown'}"
+                return "Download completed!" if task and task.status == "completed" else f"Status: {task.status if task else 'unknown'}"
             except Exception as e:
                 return f"Error: {e}"
 
@@ -469,7 +597,7 @@ def create_admin_ui() -> gr.Blocks:
 
                 dm = create_download_manager()
                 result = await dm.start_download("qdrant", "latest")
-                
+
                 task = None
                 if total_size > 0:
                     for _ in range(60):
@@ -484,7 +612,7 @@ def create_admin_ui() -> gr.Blocks:
                 else:
                     task = dm.active_downloads.get(result["download_id"])
 
-                return f"Download completed!" if task and task.status == "completed" else f"Status: {task.status if task else 'unknown'}"
+                return "Download completed!" if task and task.status == "completed" else f"Status: {task.status if task else 'unknown'}"
             except Exception as e:
                 return f"Error: {e}"
 
@@ -516,9 +644,10 @@ def create_admin_ui() -> gr.Blocks:
 
         llm_dropdown.change(fn=get_llm_vram, inputs=[llm_dropdown], outputs=[llm_vram_info])
         llm_delete_btn.click(fn=delete_llm_model, inputs=[llm_dropdown], outputs=[llm_vram_info])
-        
+
         embedding_delete_btn.click(fn=delete_embedding_model, inputs=[embedding_dropdown], outputs=[llm_vram_info])
 
         admin_demo.load(fn=fetch_status, outputs=[llama_status, qdrant_status, update_banner, llama_version, qdrant_version])
+        admin_demo.load(fn=load_prompts_and_active, outputs=[prompt_list, active_display, prompt_content, prompt_list])
 
     return admin_demo

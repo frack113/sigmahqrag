@@ -1,3 +1,3 @@
 """API package."""
 
-from .routes import coverage, explain, search  # noqa: F401
+from .routes import admin_prompts, coverage, explain, search  # noqa: F401

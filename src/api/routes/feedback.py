@@ -2,11 +2,9 @@
 
 import logging
 
-from fastapi import APIRouter, Depends, Header, Response, HTTPException, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi import APIRouter, Depends, Header, Response, status
+from fastapi.responses import JSONResponse
 
-from src.api.dependencies import security, get_current_user, require_role
-from src.auth.models import UserRole
 from src.feedback.models import FeedbackIn, FeedbackResponse, FeedbackStats
 from src.feedback.service import FeedbackService
 
@@ -33,26 +31,27 @@ async def submit_feedback(
     return result
 
 
-@router.get("", response_model=list[FeedbackIn])
-async def get_feedback(
-    _: str = Depends(require_role(UserRole.ADMIN)),
-) -> list[FeedbackIn]:
-    """Get all feedback (admin only)."""
+@router.get("")
+async def get_feedback() -> JSONResponse:
+    """Get all feedback (admin only in v1.0, now open)."""
     service = FeedbackService()
     feedbacks = await service.get_all_feedback()
-    return [
-        FeedbackIn(
-            query=f"query:{f.query_hash}",
-            helpful=f.helpful,
-        )
-        for f in feedbacks
-    ]
+    return JSONResponse(
+        content={
+            "feedbacks": [
+                {
+                    "query": f"query:{f.query_hash}",
+                    "helpful": f.helpful,
+                }
+                for f in feedbacks
+            ]
+        }
+    )
 
 
-@router.get("/stats", response_model=FeedbackStats)
-async def get_feedback_stats(
-    _: str = Depends(require_role(UserRole.ADMIN)),
-) -> FeedbackStats:
-    """Get feedback statistics (admin only)."""
+@router.get("/stats")
+async def get_feedback_stats() -> JSONResponse:
+    """Get feedback statistics (admin only in v1.0, now open)."""
     service = FeedbackService()
-    return await service.get_feedback_stats()
+    stats = await service.get_feedback_stats()
+    return JSONResponse(content=stats.model_dump())

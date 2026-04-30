@@ -1,0 +1,4 @@
+[backend]
+gpu_type = "hip"
+
+[system_prompts]
