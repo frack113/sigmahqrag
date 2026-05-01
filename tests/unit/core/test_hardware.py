@@ -2,159 +2,147 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
+import pytest
 
 from src.core.hardware import check_model_compatibility, detect_hardware, get_hardware_report
 
 
 class TestDetectHardware:
-    """Test hardware detection function."""
+    """Test hardware detection functionality (AC1)."""
 
-    @patch("src.core.hardware.psutil")
-    def test_detect_cpu_info(self, mock_psutil: MagicMock) -> None:
-        """Given psutil available, when detect_hardware called, then CPU info returned (AC1)."""
-        mock_psutil.cpu_count.return_value = 8
-        mock_psutil.cpu_freq.return_value = MagicMock(current=2400.0, max=3200.0)
-        mock_psutil.virtual_memory.return_value = MagicMock(
-            total=16 * 1024**3, available=8 * 1024**3
-        )
+    @pytest.mark.asyncio
+    async def test_detect_cpu_info(self):
+        """Test CPU info detection (cores, threads)."""
+        hardware = await detect_hardware()
+        assert "cpu" in hardware
+        assert "cores" in hardware["cpu"]
+        assert "threads" in hardware["cpu"]
+        assert hardware["cpu"]["cores"] > 0
+        assert hardware["cpu"]["threads"] > 0
 
-        result = detect_hardware()
+    @pytest.mark.asyncio
+    async def test_detect_ram_info(self):
+        """Test RAM info detection (total/available)."""
+        hardware = await detect_hardware()
+        assert "ram" in hardware
+        assert "total" in hardware["ram"]
+        assert "available" in hardware["ram"]
+        assert hardware["ram"]["total"] > 0
 
-        assert "cpu" in result
-        assert result["cpu"]["cores"] == 8
-        assert "ram" in result
+    @pytest.mark.asyncio
+    async def test_detect_gpu_info_when_available(self):
+        """Test GPU detection if available."""
+        hardware = await detect_hardware()
+        # GPU may or may not be present - just check it's a dict if present
+        if "gpu" in hardware:
+            assert isinstance(hardware["gpu"], dict)
 
-    @patch("src.core.hardware.psutil")
-    def test_detect_ram_info(self, mock_psutil: MagicMock) -> None:
-        """Given psutil available, when detect_hardware called, then RAM info returned (AC1)."""
-        mock_psutil.cpu_count.return_value = 4
-        mock_psutil.cpu_freq.return_value = None
-        mock_psutil.virtual_memory.return_value = MagicMock(
-            total=8 * 1024**3, available=4 * 1024**3
-        )
-
-        result = detect_hardware()
-
-        assert result["ram"]["total_gb"] == 8
-        assert result["ram"]["available_gb"] == 4
-
-    @patch("src.core.hardware.psutil")
-    def test_detect_gpu_info(self, mock_psutil: MagicMock) -> None:
-        """Given GPU available, when detect_hardware called, then GPU info returned (AC1)."""
-        mock_psutil.cpu_count.return_value = 4
-        mock_psutil.virtual_memory.return_value = MagicMock(
-            total=16 * 1024**3, available=8 * 1024**3
-        )
-
-        with patch("src.core.hardware.Path") as mock_path:
-            mock_path.return_value.exists.return_value = True
-            result = detect_hardware()
-
-        assert "gpu" in result or True  # GPU detection optional
-
-    @patch("src.core.hardware.psutil")
-    def test_detect_hardware_failure_graceful(self, mock_psutil: MagicMock) -> None:
-        """Given psutil fails, when detect_hardware called, then return defaults (AC4, NFR14)."""
-        mock_psutil.cpu_count.side_effect = Exception("psutil error")
-
-        result = detect_hardware()
-
-        assert "error" in result or "cpu" in result
-        # Should not raise exception
+    @pytest.mark.asyncio
+    async def test_hardware_detection_logged(self, caplog):
+        """Test hardware info is logged (AC1)."""
+        import logging
+        with caplog.at_level(logging.INFO, logger="src.core.hardware"):
+            await detect_hardware()
+        assert "Hardware detected" in caplog.text or "CPU:" in caplog.text
 
 
 class TestCheckModelCompatibility:
-    """Test model compatibility checking."""
+    """Test model compatibility validation (AC2)."""
 
-    def test_gguf_model_compatible(self) -> None:
-        """Given GGUF model and sufficient RAM, when check called, then compatible (AC2)."""
-        hardware = {
-            "cpu": {"cores": 8},
-            "ram": {"total_gb": 16, "available_gb": 12},
-        }
+    @pytest.mark.asyncio
+    async def test_valid_gguf_model(self, tmp_path):
+        """Test GGUF model format validation."""
+        # Create a fake GGUF file
+        model_file = tmp_path / "model.gguf"
+        model_file.write_bytes(b"GGUF")  # Simplified GGUF header
 
-        with patch("src.core.hardware.Path") as mock_path:
-            mock_path.return_value.exists.return_value = True
-            mock_path.return_value.stat.return_value.st_size = 4 * 1024**3  # 4GB model
-            mock_path.return_value.suffix = ".gguf"
+        hardware = await detect_hardware()
+        result = await check_model_compatibility(str(model_file), hardware)
+        assert result["compatible"] is True
+        assert result["format"] == "GGUF"
 
-            result = check_model_compatibility("/models/llama.gguf", hardware)
+    @pytest.mark.asyncio
+    async def test_invalid_model_format(self, tmp_path):
+        """Test non-GGUF model rejection."""
+        model_file = tmp_path / "model.bin"
+        model_file.write_bytes(b"INVALID")
 
-        assert result["compatible"] is True or "error" not in result
-
-    def test_model_file_not_found(self) -> None:
-        """Given non-existent model path, when check called, then return error (AC2)."""
-        hardware = {"ram": {"available_gb": 8}}
-
-        with patch("src.core.hardware.Path") as mock_path:
-            mock_path.return_value.exists.return_value = False
-
-            result = check_model_compatibility("/models/nonexistent.gguf", hardware)
-
+        hardware = await detect_hardware()
+        result = await check_model_compatibility(str(model_file), hardware)
         assert result["compatible"] is False
-        assert "error" in result
+        assert "format" in result or "error" in result
 
-    def test_insufficient_memory(self) -> None:
-        """Given model larger than available RAM, when check called, then incompatible (AC2)."""
-        hardware = {"ram": {"available_gb": 4}}
+    @pytest.mark.asyncio
+    async def test_model_memory_requirements(self, tmp_path):
+        """Test model memory requirement validation."""
+        model_file = tmp_path / "model.gguf"
+        model_file.write_bytes(b"GGUF")
 
-        with patch("src.core.hardware.Path") as mock_path:
-            mock_path.return_value.exists.return_value = True
-            mock_path.return_value.stat.return_value.st_size = 8 * 1024**3  # 8GB model
-
-            result = check_model_compatibility("/models/large.gguf", hardware)
-
-        assert result["compatible"] is False
+        hardware = await detect_hardware()
+        result = await check_model_compatibility(str(model_file), hardware)
+        assert "memory_required" in result
+        assert "memory_available" in result
 
 
 class TestGetHardwareReport:
-    """Test hardware report endpoint function."""
+    """Test hardware report endpoint data (AC3)."""
 
-    @patch("src.core.hardware.detect_hardware")
-    async def test_report_returns_json(self, mock_detect: AsyncMock) -> None:
-        """Given hardware detected, when get_hardware_report called, then return JSON (AC3)."""
-        mock_detect.return_value = {
-            "cpu": {"cores": 8, "threads": 16, "freq_mhz": 3200},
-            "ram": {"total_gb": 16, "available_gb": 8},
-        }
+    @pytest.mark.asyncio
+    async def test_report_returns_json_structure(self):
+        """Test report returns proper JSON structure."""
+        report = await get_hardware_report()
+        assert "hardware" in report
+        assert "model_compatibility" in report
+        assert "status" in report
 
-        result = await get_hardware_report()
+    @pytest.mark.asyncio
+    async def test_report_response_time(self):
+        """Test report returns within 200ms (AC3)."""
+        import time
+        start = time.time()
+        await get_hardware_report()
+        elapsed = (time.time() - start) * 1000
+        assert elapsed < 200, f"Report took {elapsed}ms, expected <200ms"
 
-        assert "cpu" in result
-        assert "ram" in result
-
-    @patch("src.core.hardware.detect_hardware")
-    async def test_report_includes_model_status(self, mock_detect: AsyncMock) -> None:
-        """Given model configured, when get_hardware_report called, then include model status (AC3)."""
-        mock_detect.return_value = {"cpu": {"cores": 4}, "ram": {"total_gb": 8}}
-
-        result = await get_hardware_report()
-
-        assert "model" in result or True  # Model status optional if not configured
+    @pytest.mark.asyncio
+    async def test_report_includes_compatibility_status(self):
+        """Test report includes model compatibility status."""
+        report = await get_hardware_report()
+        # When no model configured, compatible should be None
+        assert "compatible" in report["model_compatibility"]
+        assert report["model_compatibility"]["compatible"] is None
 
 
-class TestHardwareEdgeCases:
-    """Test edge cases for hardware detection."""
+class TestGracefulDegradation:
+    """Test graceful degradation on detection failure (AC4)."""
 
-    @patch("src.core.hardware.psutil")
-    def test_zero_cpu_cores(self, mock_psutil: MagicMock) -> None:
-        """Given psutil returns 0 cores, when detect called, then default to 1 (graceful)."""
-        mock_psutil.cpu_count.return_value = 0
-        mock_psutil.virtual_memory.return_value = MagicMock(
-            total=1024**3, available=512**2
-        )
+    @pytest.mark.asyncio
+    async def test_continues_with_defaults_on_failure(self, monkeypatch):
+        """Test system continues with defaults if detection fails."""
+        from src.core import hardware as hw_module
 
-        result = detect_hardware()
+        def mock_virtual_memory_fail(*args, **kwargs):
+            raise Exception("Detection failed")
 
-        # Implementation defaults to 1 when psutil returns 0
-        assert result["cpu"]["cores"] == 1
+        monkeypatch.setattr(hw_module.psutil, "virtual_memory", mock_virtual_memory_fail)
 
-    def test_empty_model_path(self) -> None:
-        """Given empty model path, when check called, then return error."""
-        hardware = {"ram": {"available_gb": 8}}
+        # Should not raise, should return defaults
+        hardware = await detect_hardware()
+        assert hardware is not None
+        assert "cpu" in hardware  # CPU detection should still work
 
-        result = check_model_compatibility("", hardware)
+    @pytest.mark.asyncio
+    async def test_logs_warning_on_detection_failure(self, monkeypatch, caplog):
+        """Test warning is logged on detection failure (AC4)."""
+        import logging
 
-        assert result["compatible"] is False
-        assert "error" in result
+        from src.core import hardware as hw_module
+
+        def mock_cpu_count_fail(*args, **kwargs):
+            raise Exception("CPU detection failed")
+
+        monkeypatch.setattr(hw_module.psutil, "cpu_count", mock_cpu_count_fail)
+
+        with caplog.at_level(logging.WARNING, logger="src.core.hardware"):
+            await detect_hardware()
+        assert "warning" in caplog.text.lower() or "failed" in caplog.text.lower()

@@ -65,6 +65,6 @@ development_status:
   3-1-action-based-api-endpoints: done
   3-2-idempotent-stateless-api: done
   3-3-local-services-setup-llama-cpp-qdrant: done
-  3-4-hardware-detection-model-support: ready-for-dev
+   3-4-hardware-detection-model-support: in-progress
     3-5-tdd-strict-version-pinning: done
   epic-3-retrospective: optional

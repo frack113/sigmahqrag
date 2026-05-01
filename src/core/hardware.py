@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from pathlib import Path
 from typing import Any
 
 import psutil
 
+logger = logging.getLogger(__name__)
 
-def detect_hardware() -> dict[str, Any]:
+
+async def detect_hardware() -> dict[str, Any]:
     """Detect hardware capabilities (AC1, AC4, NFR14).
 
     Returns hardware profile with CPU, RAM, and optional GPU info.
@@ -28,40 +31,73 @@ def detect_hardware() -> dict[str, Any]:
             "threads": threads,
             "freq_mhz": int(freq.current) if freq else 0,
         }
-    except Exception:
+        logger.info(f"CPU: {cores} cores, {threads} threads")
+    except Exception as e:
+        logger.warning(f"CPU detection failed: {e}")
         hardware["cpu"] = {"cores": 1, "threads": 1, "freq_mhz": 0}
         hardware["cpu_error"] = "Detection failed"
 
     try:
-        # RAM detection
+        # RAM detection - keys match test expectations
         memory = psutil.virtual_memory()
         hardware["ram"] = {
-            "total_gb": memory.total // (1024**3),
-            "available_gb": memory.available // (1024**3),
+            "total": memory.total,
+            "available": memory.available,
         }
-    except Exception:
-        hardware["ram"] = {"total_gb": 0, "available_gb": 0}
+        logger.info(f"RAM: {hardware['ram']['total'] // (1024**3)}GB total")
+    except Exception as e:
+        logger.warning(f"RAM detection failed: {e}")
+        hardware["ram"] = {"total": 0, "available": 0}
         hardware["ram_error"] = "Detection failed"
 
-    # GPU detection (optional, platform-specific)
+    # GPU detection (optional, returns None if not available)
     try:
         gpu_info = _detect_gpu()
         if gpu_info:
             hardware["gpu"] = gpu_info
-    except Exception:
-        pass  # GPU detection is optional
+    except Exception as e:
+        logger.debug(f"GPU detection failed: {e}")
+        # GPU detection is optional
 
+    logger.info("Hardware detected")
     return hardware
 
 
 def _detect_gpu() -> dict[str, Any] | None:
-    """Detect GPU capabilities (optional)."""
-    # Placeholder for GPU detection logic
-    # Could use torch.cuda.is_available() or similar in Growth phase
+    """Detect GPU capabilities (optional).
+
+    Returns GPU info dict or None if not available.
+    """
+    try:
+        # Try to detect NVIDIA GPU via nvidia-smi (Windows/Linux)
+        import subprocess
+
+        result = subprocess.run(
+            [
+                "nvidia-smi",
+                "--query-gpu=name,memory.total,memory.free",
+                "--format=csv,noheader,nounits",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=2,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            lines = result.stdout.strip().split("\n")
+            if lines:
+                parts = lines[0].split(",")
+                if len(parts) >= 3:
+                    return {
+                        "name": parts[0].strip(),
+                        "memory_total_mb": int(parts[1].strip()),
+                        "memory_free_mb": int(parts[2].strip()),
+                    }
+    except Exception:
+        pass
     return None
 
 
-def check_model_compatibility(
+async def check_model_compatibility(
     model_path: str, hardware: dict[str, Any]
 ) -> dict[str, Any]:
     """Check if model is compatible with hardware (AC2).
@@ -71,7 +107,7 @@ def check_model_compatibility(
         hardware: Hardware profile from detect_hardware()
 
     Returns:
-        Dict with 'compatible' bool and optional 'error' or 'reason'
+        Dict with 'compatible' bool, 'format', and memory info
     """
     if not model_path:
         return {"compatible": False, "error": "Empty model path"}
@@ -82,22 +118,37 @@ def check_model_compatibility(
         return {"compatible": False, "error": "Model file not found"}
 
     if path.suffix.lower() != ".gguf":
-        return {"compatible": False, "error": "Not a GGUF model"}
+        return {
+            "compatible": False,
+            "format": path.suffix.lower(),
+            "error": "Not a GGUF model",
+        }
 
     try:
         model_size = path.stat().st_size
-        available_ram = hardware.get("ram", {}).get("available_gb", 0)
+        available_ram = hardware.get("ram", {}).get("available", 0)
 
         # Rough estimate: model needs at least 1.5x its size in RAM
-        required_gb = (model_size * 1.5) / (1024**3)
+        required_bytes = model_size * 1.5
+        required_gb = required_bytes / (1024**3)
+        available_gb = available_ram / (1024**3)
 
-        if required_gb > available_ram:
+        if required_bytes > available_ram:
             return {
                 "compatible": False,
-                "reason": f"Model requires ~{required_gb:.1f}GB, only {available_ram}GB available",
+                "format": "GGUF",
+                "memory_required": required_gb,
+                "memory_available": available_gb,
+                "reason": f"Model requires ~{required_gb:.1f}GB, only {available_gb:.1f}GB available",
             }
 
-        return {"compatible": True, "model_size_gb": model_size / (1024**3)}
+        return {
+            "compatible": True,
+            "format": "GGUF",
+            "memory_required": required_gb,
+            "memory_available": available_gb,
+            "model_size_gb": model_size / (1024**3),
+        }
 
     except Exception as e:
         return {"compatible": False, "error": str(e)}
@@ -115,18 +166,20 @@ async def get_hardware_report() -> dict[str, Any]:
     hardware = await loop.run_in_executor(None, detect_hardware)
 
     report: dict[str, Any] = {
-        "cpu": hardware.get("cpu", {}),
-        "ram": hardware.get("ram", {}),
+        "hardware": hardware,
+        "status": "ok",
     }
-
-    if "gpu" in hardware:
-        report["gpu"] = hardware["gpu"]
 
     # Model compatibility check (if model configured)
     model_path = _get_configured_model()
     if model_path:
-        compatibility = check_model_compatibility(model_path, hardware)
-        report["model"] = compatibility
+        compatibility = await check_model_compatibility(model_path, hardware)
+        report["model_compatibility"] = compatibility
+    else:
+        report["model_compatibility"] = {
+            "compatible": None,
+            "message": "No model configured",
+        }
 
     return report
 
