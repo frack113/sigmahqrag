@@ -50,6 +50,7 @@ def create_app() -> FastAPI:
     from src.api.routes.documents import router as documents_router
     from src.api.routes.embeddings import router as embeddings_router
     from src.api.routes.feedback import router as feedback_router
+    from src.api.v1.admin import router as admin_v1_router
 
     app = FastAPI(
         title="SigmaHQ RAG",
@@ -68,6 +69,7 @@ def create_app() -> FastAPI:
     app.include_router(admin_backend_router)
     app.include_router(admin_prompts_router)
     app.include_router(admin_github_router)
+    app.include_router(admin_v1_router)
 
     @app.exception_handler(SigmaError)
     async def sigma_error_handler(request: Request, exc: SigmaError) -> JSONResponse:
