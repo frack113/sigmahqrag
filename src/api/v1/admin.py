@@ -3,51 +3,112 @@
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any
 
-from fastapi import APIRouter, Header, Request
+from fastapi import APIRouter, Header
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/admin", tags=["admin-v1"])
 
 # In-memory store for idempotency keys (ephemeral for MVP)
-_idempotency_store: dict[str, Any] = {}
+# Format: {key: (response_content, timestamp, endpoint)}
+# TODO Growth: Replace with Redis for multi-worker support
+_idempotency_store: dict[str, tuple[dict[str, Any], float, str]] = {}
+_IDEMPOTENCY_TTL = 3600  # 1 hour TTL for MVP
+_IDEMPOTENCY_MAX_SIZE = 1000  # Prevent memory leaks
+
+
+def _is_valid_idempotency_key(key: str | None) -> bool:
+    """Validate idempotency key (Patch 11: reject empty strings)."""
+    return key is not None and len(key.strip()) > 0
+
+
+def _cleanup_expired_entries() -> None:
+    """Remove expired entries (Patch 2: TTL support)."""
+    now = time.time()
+    expired_keys = [
+        k for k, (_, ts, _) in _idempotency_store.items()
+        if now - ts > _IDEMPOTENCY_TTL
+    ]
+    for k in expired_keys:
+        del _idempotency_store[k]
+    # Patch 2: Size limit
+    if len(_idempotency_store) > _IDEMPOTENCY_MAX_SIZE:
+        # Remove oldest entries
+        sorted_keys = sorted(
+            _idempotency_store.keys(),
+            key=lambda k: _idempotency_store[k][1]
+        )
+        for k in sorted_keys[:len(sorted_keys) // 2]:
+            del _idempotency_store[k]
 
 
 async def check_service_health() -> dict[str, Any]:
-    """Check health of llama.cpp and Qdrant services."""
-    import httpx
+    """Check health of llama.cpp and Qdrant services (AC3 - <500ms by parallel checks)."""
+    import asyncio
+
+    from httpx import AsyncClient
 
     result: dict[str, Any] = {
-        "llama_cpp": {"status": "unknown", "component": "llama.cpp"},
-        "qdrant": {"status": "unknown", "component": "qdrant"},
+        "llama_cpp": {"status": "unknown", "component": "llama.cpp", "port": 8080},
+        "qdrant": {"status": "unknown", "component": "qdrant", "port": 6333},
     }
 
-    try:
-        response = await httpx.AsyncClient().get("http://localhost:8080/health", timeout=2.0)
-        if response.status_code == 200:
-            result["llama_cpp"]["status"] = "active"
-        else:
-            result["llama_cpp"]["status"] = "inactive"
-    except Exception:
-        result["llama_cpp"]["status"] = "inactive"
+    async with AsyncClient() as client:
+        # Parallel health checks to meet <500ms requirement (AC3)
+        import asyncio
 
-    try:
-        response = await httpx.AsyncClient().get("http://localhost:6333/health", timeout=2.0)
-        if response.status_code == 200:
-            result["qdrant"]["status"] = "active"
-        else:
-            result["qdrant"]["status"] = "inactive"
-    except Exception:
-        result["qdrant"]["status"] = "inactive"
+        llama_url = "http://localhost:8080/health"  # TODO Growth: from config
+        qdrant_url = "http://localhost:6333/health"  # TODO Growth: from config
+
+        async def check_llama():
+            try:
+                response = await client.get(llama_url, timeout=2.0)
+                if response.status_code == 200 and response.json().get("status") == "healthy":
+                    result["llama_cpp"]["status"] = "active"
+                else:
+                    result["llama_cpp"]["status"] = "inactive"
+            except Exception:
+                result["llama_cpp"]["status"] = "inactive"
+
+        async def check_qdrant():
+            try:
+                response = await client.get(qdrant_url, timeout=2.0)
+                if response.status_code == 200 and response.json().get("status") == "healthy":
+                    result["qdrant"]["status"] = "active"
+                else:
+                    result["qdrant"]["status"] = "inactive"
+            except Exception:
+                result["qdrant"]["status"] = "inactive"
+
+        await asyncio.gather(check_llama(), check_qdrant())
 
     return result
 
 
-async def start_download() -> dict[str, Any]:
-    """Start download action and return job info."""
+class DownloadRequest(BaseModel):
+    """Request model for download action (Patch 13: Pydantic model)."""
+    repo_url: str | None = None
+    target_dir: str | None = None
+
+
+class CancelRequest(BaseModel):
+    """Request model for cancel action (Patch 13: Pydantic model)."""
+    job_id: str
+
+
+class JobResponse(BaseModel):
+    """Response model for job actions (Patch 13: Pydantic model)."""
+    job_id: str
+    status: str
+
+
+def start_download() -> dict[str, Any]:
+    """Start download action and return job info (Patch 20: remove unnecessary async)."""
     import uuid
 
     return {"job_id": f"job-{uuid.uuid4().hex[:8]}", "status": "started"}
@@ -72,7 +133,7 @@ def _build_error_response(
 
 @router.post("/download")
 async def download_action(
-    request: Request,
+    request: DownloadRequest | None = None,
     x_idempotency_key: str | None = Header(default=None, alias="X-Idempotency-Key"),
 ) -> JSONResponse:
     """POST /api/v1/admin/download - Action-based endpoint (FR16, FR20, NFR20).
@@ -80,37 +141,50 @@ async def download_action(
     Supports idempotency via X-Idempotency-Key header.
     Returns 503 if llama.cpp or Qdrant is down (FR17, NFR9, NFR10).
     """
-    # Check idempotency
-    if x_idempotency_key and x_idempotency_key in _idempotency_store:
-        return JSONResponse(content=_idempotency_store[x_idempotency_key])
+    # Patch 11: Validate idempotency key
+    if _is_valid_idempotency_key(x_idempotency_key):
+        _cleanup_expired_entries()
+        # Patch 10: Namespace per endpoint
+        cache_key = f"download:{x_idempotency_key}"
+        if cache_key in _idempotency_store:
+            cached_content, _, _ = _idempotency_store[cache_key]
+            return JSONResponse(content=cached_content)
 
     # Health check (fail-fast pattern)
     health = await check_service_health()
 
     if health["llama_cpp"]["status"] != "active":
-        return _build_error_response(
+        response = _build_error_response(
             status_code=503,
             error_type="service_unavailable",
             message="llama.cpp is not responding on port 8080",
             component="llama.cpp",
         )
+        # Patch 4: Cache error responses too
+        if _is_valid_idempotency_key(x_idempotency_key):
+            _idempotency_store[f"download:{x_idempotency_key}"] = (response.content, time.time(), "download")
+        return response
 
     if health["qdrant"]["status"] != "active":
-        return _build_error_response(
+        response = _build_error_response(
             status_code=503,
             error_type="service_unavailable",
             message="Qdrant is not responding on port 6333",
             component="qdrant",
         )
+        # Patch 4: Cache error responses too
+        if _is_valid_idempotency_key(x_idempotency_key):
+            _idempotency_store[f"download:{x_idempotency_key}"] = (response.content, time.time(), "download")
+        return response
 
     # Process download action
     result = await start_download()
 
     response_content = {"data": result, "status": "success"}
 
-    # Store idempotency result
-    if x_idempotency_key:
-        _idempotency_store[x_idempotency_key] = response_content
+    # Patch 2,5: Store idempotency result with timestamp
+    if _is_valid_idempotency_key(x_idempotency_key):
+        _idempotency_store[f"download:{x_idempotency_key}"] = (response_content, time.time(), "download")
 
     return JSONResponse(content=response_content)
 
@@ -119,59 +193,58 @@ async def download_action(
 async def get_status(
     x_idempotency_key: str | None = Header(default=None, alias="X-Idempotency-Key"),
 ) -> JSONResponse:
-    """GET /api/v1/admin/status - Return component statuses (FR18)."""
-    # Check idempotency
-    if x_idempotency_key and x_idempotency_key in _idempotency_store:
-        return JSONResponse(content=_idempotency_store[x_idempotency_key])
+    """GET /api/v1/admin/status - Return component statuses (FR18).
 
+    Note: Idempotency removed from GET (Patch 8: GET doesn't need idempotency).
+    """
     health = await check_service_health()
 
     response_content = {"data": health, "status": "success"}
-
-    # Store idempotency result
-    if x_idempotency_key:
-        _idempotency_store[x_idempotency_key] = response_content
 
     return JSONResponse(content=response_content)
 
 
 @router.post("/cancel")
 async def cancel_action(
-    request: dict[str, Any],
+    request: CancelRequest,
     x_idempotency_key: str | None = Header(default=None, alias="X-Idempotency-Key"),
 ) -> JSONResponse:
-    """POST /api/v1/admin/cancel - Cancel a running job (FR16)."""
-    # Check idempotency
-    if x_idempotency_key and x_idempotency_key in _idempotency_store:
-        return JSONResponse(content=_idempotency_store[x_idempotency_key])
+    """POST /api/v1/admin/cancel - Cancel a running job (FR16).
 
-    # Health check (fail-fast pattern)
+    Note: Only checks Qdrant health (Patch 9: no need for llama.cpp in cancel).
+    """
+    # Patch 11: Validate idempotency key
+    if _is_valid_idempotency_key(x_idempotency_key):
+        _cleanup_expired_entries()
+        cache_key = f"cancel:{x_idempotency_key}"
+        if cache_key in _idempotency_store:
+            cached_content, _, _ = _idempotency_store[cache_key]
+            return JSONResponse(content=cached_content)
+
+    # Health check - only Qdrant needed for job tracking (Patch 9)
     health = await check_service_health()
 
-    if health["llama_cpp"]["status"] != "active":
-        return _build_error_response(
-            status_code=503,
-            error_type="service_unavailable",
-            message="llama.cpp is not responding on port 8080",
-            component="llama.cpp",
-        )
-
     if health["qdrant"]["status"] != "active":
-        return _build_error_response(
+        response = _build_error_response(
             status_code=503,
             error_type="service_unavailable",
             message="Qdrant is not responding on port 6333",
             component="qdrant",
         )
+        # Patch 4: Cache error responses too
+        if _is_valid_idempotency_key(x_idempotency_key):
+            _idempotency_store[f"cancel:{x_idempotency_key}"] = (response.content, time.time(), "cancel")
+        return response
 
     # Process cancel action
-    job_id = request.get("job_id", "unknown")
+    # TODO: Add job tracking for Growth phase (Patch 14)
+    job_id = request.job_id if request else "unknown"
     result = {"job_id": job_id, "status": "cancelled"}
 
     response_content = {"data": result, "status": "success"}
 
-    # Store idempotency result
-    if x_idempotency_key:
-        _idempotency_store[x_idempotency_key] = response_content
+    # Patch 2,5: Store with timestamp and namespace
+    if _is_valid_idempotency_key(x_idempotency_key):
+        _idempotency_store[f"cancel:{x_idempotency_key}"] = (response_content, time.time(), "cancel")
 
     return JSONResponse(content=response_content)
