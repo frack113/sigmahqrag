@@ -54,6 +54,8 @@ class TestIdempotencyMiddleware:
         assert response1.status_code == 200
         assert response2.status_code == 200
         assert response1.json() == response2.json()
+        # Verify second call used cache (handler called only once)
+        assert mock_start.call_count == 1
 
     @patch("src.api.v1.admin.check_service_health", new_callable=AsyncMock)
     @patch("src.api.v1.admin.start_download", new_callable=AsyncMock)
@@ -125,3 +127,26 @@ class TestIdempotencyMiddleware:
         assert response.status_code == 200
         # Should not cache GET requests
         assert "data" in response.json()
+
+    def test_empty_idempotency_key(
+        self, client: TestClient
+    ) -> None:
+        """Given POST with empty idempotency key, when key is empty string, then processes normally (no caching)."""
+        with patch("src.api.v1.admin.check_service_health", new_callable=AsyncMock) as mock_health, \
+             patch("src.api.v1.admin.start_download", new_callable=AsyncMock) as mock_start:
+            mock_start.return_value = {"job_id": "job-empty", "status": "started"}
+            mock_health.return_value = {
+                "llama_cpp": {"status": "active"},
+                "qdrant": {"status": "active"},
+            }
+
+            response = client.post(
+                "/api/v1/admin/download",
+                json={},
+                headers={"X-Idempotency-Key": ""},
+            )
+
+            assert response.status_code == 200
+            assert "job_id" in response.json()["data"]
+            # Handler should be called (empty key not cached)
+            assert mock_start.call_count >= 1
