@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from typing import Any
 
 from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
@@ -17,7 +18,7 @@ from src.admin.health import (
 from src.admin.service_manager import (
     create_service_manager,
 )
-from src.config import LLAMA_BIN_PATH, QDRANT_BIN_PATH, LOGS_DIR, MODELS_DIR
+from src.config import LLAMA_BIN_PATH, LOGS_DIR, MODELS_DIR, QDRANT_BIN_PATH
 
 logger = logging.getLogger(__name__)
 

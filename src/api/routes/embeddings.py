@@ -11,7 +11,6 @@ from pydantic import BaseModel
 from src.api.dependencies import get_embedding_manager
 from src.core.services.embedding import EmbeddingManager
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -26,8 +25,8 @@ router = APIRouter(prefix="/embeddings", tags=["embeddings"])
 
 @router.get("/search")
 async def search_embedding_models(
-    query: str, 
-    limit: int = 20, 
+    query: str,
+    limit: int = 20,
     manager: EmbeddingManager = Depends(get_embedding_manager)
 ) -> JSONResponse:
     """Search for embedding models on HuggingFace."""
@@ -41,7 +40,7 @@ async def search_embedding_models(
 
 @router.get("/{repo_id}/files")
 async def get_embedding_files(
-    repo_id: str, 
+    repo_id: str,
     manager: EmbeddingManager = Depends(get_embedding_manager)
 ) -> JSONResponse:
     """Get files for an embedding model repo."""

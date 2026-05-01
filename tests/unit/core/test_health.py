@@ -4,11 +4,12 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, patch
 
+import httpx
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from src.core.health import check_llama_cpp, check_qdrant, check_all
+from src.core.health import check_all, check_llama_cpp, check_qdrant
 
 
 @pytest.fixture
@@ -43,7 +44,7 @@ class TestCheckLlamaCpp:
     async def test_llama_cpp_down(self, mock_client: AsyncMock) -> None:
         """Given llama.cpp is down, when check_llama_cpp called, then returns inactive status (NFR14)."""
         mock_instance = AsyncMock()
-        mock_instance.get.side_effect = Exception("Connection refused")
+        mock_instance.get.side_effect = httpx.ConnectError("Connection refused")
         mock_client.return_value.__aenter__.return_value = mock_instance
 
         result = await check_llama_cpp()
@@ -72,7 +73,7 @@ class TestCheckQdrant:
     async def test_qdrant_down(self, mock_client: AsyncMock) -> None:
         """Given Qdrant is down, when check_qdrant called, then returns inactive status (NFR14)."""
         mock_instance = AsyncMock()
-        mock_instance.get.side_effect = Exception("Connection refused")
+        mock_instance.get.side_effect = httpx.ConnectError("Connection refused")
         mock_client.return_value.__aenter__.return_value = mock_instance
 
         result = await check_qdrant()
@@ -119,10 +120,9 @@ class TestHealthCheckTimeout:
     @patch("src.core.health.httpx.AsyncClient")
     async def test_health_check_timeout(self, mock_client: AsyncMock) -> None:
         """Given service timeout, when check called, then returns inactive within 5s (NFR4)."""
-        import asyncio
 
         mock_instance = AsyncMock()
-        mock_instance.get.side_effect = asyncio.TimeoutError()
+        mock_instance.get.side_effect = httpx.TimeoutException("timeout")
         mock_client.return_value.__aenter__.return_value = mock_instance
 
         result = await check_llama_cpp()

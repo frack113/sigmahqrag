@@ -44,6 +44,7 @@ venv.bak/
 .ruff_cache/
 .ruff.toml
 
+_bmad-output/
 data/
 logs/
 *.log

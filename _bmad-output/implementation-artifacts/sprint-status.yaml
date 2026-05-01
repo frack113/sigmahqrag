@@ -60,12 +60,11 @@ development_status:
   2-6-system-logs-installation-documentation: backlog
   epic-2-retrospective: optional
   
-  # Epic 3: Local Architecture & Reproducibility (MVP Priority 0 - Foundation)
+   # Epic 3: Local Architecture & Reproducibility (MVP Priority 0 - Foundation)
   epic-3: in-progress
-   3-1-action-based-api-endpoints: done
-   3-2-idempotent-stateless-api: ready-for-dev
-  3-2-idempotent-stateless-api: backlog
-  3-3-local-services-setup-llama-cpp-qdrant: backlog
-  3-4-hardware-detection-model-support: backlog
-  3-5-tdd-strict-version-pinning: backlog
+  3-1-action-based-api-endpoints: done
+  3-2-idempotent-stateless-api: done
+  3-3-local-services-setup-llama-cpp-qdrant: done
+  3-4-hardware-detection-model-support: ready-for-dev
+    3-5-tdd-strict-version-pinning: done
   epic-3-retrospective: optional

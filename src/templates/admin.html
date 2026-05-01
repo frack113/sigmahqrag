@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block title %}Admin - Sigmahqrag{% endblock %}
+
+{% block content %}
+<main>
+    <h2>Admin Dashboard</h2>
+    
+    <section id="github">
+        <h3>GitHub Repositories</h3>
+        <div id="github_status" class="{% if github_status == 'running' %}status-active{% elif github_status == 'stopped' %}status-inactive{% else %}status-unknown{% endif %}">
+            Status: {{ github_status }}
+        </div>
+        <button onclick="updateRepos()">Update All Repositories</button>
+    </section>
+
+    <section id="system_prompt">
+        <h3>System Prompt</h3>
+        <div id="prompt_status" class="{% if prompt_status == 'running' %}status-active{% elif prompt_status == 'stopped' %}status-inactive{% else %}status-unknown{% endif %}">
+            Status: {{ prompt_status }}
+        </div>
+    </section>
+
+    <section id="llama_cpp">
+        <h3>llama.cpp</h3>
+        <div id="llama_status" class="{% if llama_status == 'running' %}status-active{% elif llama_status == 'stopped' %}status-inactive{% else %}status-unknown{% endif %}">
+            Status: {{ llama_status }}
+        </div>
+        <button onclick="restartLlama()">Restart</button>
+    </section>
+
+    <section id="qdrant">
+        <h3>Qdrant</h3>
+        <div id="qdrant_status" class="{% if qdrant_status == 'running' %}status-active{% elif qdrant_status == 'stopped' %}status-inactive{% else %}status-unknown{% endif %}">
+            Status: {{ qdrant_status }}
+        </div>
+    </section>
+
+    <section id="logs">
+        <h3>System Logs</h3>
+        <pre id="log_content">{{ logs }}</pre>
+    </section>
+
+    <section id="llm_models">
+        <h3>LLM Models</h3>
+        <ul id="model_list">
+            {% for model in llm_models %}
+                <li>{{ model.name }} - {{ model.status }}</li>
+            {% endfor %}
+        </ul>
+    </section>
+
+    <section id="embedding_models">
+        <h3>Embedding Models</h3>
+        <ul id="embedding_list">
+            {% for model in embedding_models %}
+                <li>{{ model.name }} - {{ model.status }}</li>
+            {% endfor %}
+        </ul>
+    </section>
+
+    <section id="mapper">
+        <h3>Mapper</h3>
+        <p>Mapper configuration and status.</p>
+    </section>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', path='/js/admin.js') }}"></script>
+{% endblock %}

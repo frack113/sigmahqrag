@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from src.config import LLAMA_BIN_PATH, QDRANT_BIN_PATH, LOGS_DIR, DATA_DIR, QDRANT_STORAGE_DIR
+from src.config import DATA_DIR, LLAMA_BIN_PATH, LOGS_DIR, QDRANT_BIN_PATH, QDRANT_STORAGE_DIR
 
 logger = logging.getLogger(__name__)
 

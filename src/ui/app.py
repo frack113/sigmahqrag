@@ -11,9 +11,6 @@ import gradio as gr
 from src.rag.search import SearchEngine
 from src.ui.chat import SearchInterface
 from src.ui.components.details_panel import DetailsPanel
-from src.ui.components.result_card import ResultCard
-from src.ui.components.search_bar import SearchBar
-from src.ui.mode import ChatMode
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +86,7 @@ def create_gradio_ui() -> gr.Blocks:
                     clear_btn = gr.Button("Effacer")
 
             with gr.Column(scale=1):
-                mode_radio = gr.Radio(
+                gr.Radio(
                     choices=["search", "coverage", "explain"],
                     value="search",
                     label="Mode",
@@ -131,7 +128,7 @@ def create_gradio_ui() -> gr.Blocks:
             outputs=[details],
         )
 
-        def clear_search() -> tuple[list, str, ""]:
+        def clear_search() -> tuple[list, str, str]:
             """Clear search state."""
             return [], DetailsPanel.format_empty_state(), ""
 

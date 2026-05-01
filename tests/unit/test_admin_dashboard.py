@@ -1,9 +1,10 @@
 """Tests for admin dashboard enhancements."""
 
-import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
-from src.admin.version_manager import get_current_version, check_for_updates
+import pytest
+
+from src.admin.version_manager import check_for_updates, get_current_version
 
 
 @pytest.mark.asyncio

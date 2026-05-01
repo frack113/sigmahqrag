@@ -1,7 +1,6 @@
 """Sigma rule domain model."""
 
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass
@@ -11,8 +10,8 @@ class SigmaRuleModel:
     id: str
     title: str
     detection: dict
-    status: Optional[str] = None
-    level: Optional[str] = None
+    status: str | None = None
+    level: str | None = None
     tags: list[str] | None = None
 
     def __post_init__(self) -> None:

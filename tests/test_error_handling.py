@@ -136,8 +136,9 @@ class TestGenericExceptionHandler:
         This test verifies that when an uncaught exception occurs,
         the response does NOT expose internal error details.
         """
-        from src.main import create_app
         from fastapi.testclient import TestClient
+
+        from src.main import create_app
 
         app = create_app()
 

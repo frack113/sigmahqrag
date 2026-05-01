@@ -2,10 +2,10 @@
 
 import logging
 
-from fastapi import APIRouter, Depends, Header, Response, status
+from fastapi import APIRouter, Depends, Header, Response
 from fastapi.responses import JSONResponse
 
-from src.feedback.models import FeedbackIn, FeedbackResponse, FeedbackStats
+from src.feedback.models import FeedbackIn, FeedbackResponse
 from src.feedback.service import FeedbackService
 
 logger = logging.getLogger(__name__)

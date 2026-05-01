@@ -65,7 +65,7 @@ class SearchInterface:
             details = DetailsPanel.format_details(results[0])
             return card_htmls, details
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.error(f"Search timeout for: {query}")
             return [], f"**Timeout:** Search exceeded {SEARCH_TIMEOUT}s"
         except Exception as e:

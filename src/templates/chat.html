@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}Chat - Sigma Rule Analysis{% endblock %}
+
+{% block content %}
+<section>
+    <h2>Upload Sigma Rule</h2>
+    <form action="/api/v1/chat" method="post" enctype="multipart/form-data">
+        <div>
+            <label for="sigma_file">Select Sigma Rule YAML:</label>
+            <input type="file" id="sigma_file" name="file" accept=".yml,.yaml" required>
+        </div>
+        <button type="submit">Explain Rule</button>
+    </form>
+</section>
+
+<section>
+    <h2>Explanation</h2>
+    <div id="explanation_result">
+        {% if explanation %}
+            {{ explanation | safe }}
+        {% else %}
+            <p>Upload a Sigma rule to get an explanation.</p>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}

@@ -5,6 +5,7 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from src.api.v1.admin import router
@@ -13,8 +14,6 @@ from src.api.v1.admin import router
 @pytest.fixture
 def app() -> FastAPI:
     """Create FastAPI test app with admin router."""
-    from fastapi import FastAPI
-
     test_app = FastAPI()
     test_app.include_router(router)
     return test_app
