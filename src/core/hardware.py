@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -12,8 +14,8 @@ import psutil
 logger = logging.getLogger(__name__)
 
 
-async def detect_hardware() -> dict[str, Any]:
-    """Detect hardware capabilities (AC1, AC4, NFR14).
+def detect_hardware() -> dict[str, Any]:
+    """Detect hardware capabilities (AC1, ACint4, NFR14).
 
     Returns hardware profile with CPU, RAM, and optional GPU info.
     Gracefully handles detection failures with defaults.
@@ -34,7 +36,7 @@ async def detect_hardware() -> dict[str, Any]:
         logger.info(f"CPU: {cores} cores, {threads} threads")
     except Exception as e:
         logger.warning(f"CPU detection failed: {e}")
-        hardware["cpu"] = {"cores": 1, "threads": 1, "freq_mhz": 0}
+        hardware["cpu"] = {"cores": 1, "running_threads": 1, "freq_mhz": 0}
         hardware["cpu_error"] = "Detection failed"
 
     try:
@@ -57,7 +59,6 @@ async def detect_hardware() -> dict[str, Any]:
             hardware["gpu"] = gpu_info
     except Exception as e:
         logger.debug(f"GPU detection failed: {e}")
-        # GPU detection is optional
 
     logger.info("Hardware detected")
     return hardware
@@ -70,8 +71,6 @@ def _detect_gpu() -> dict[str, Any] | None:
     """
     try:
         # Try to detect NVIDIA GPU via nvidia-smi (Windows/Linux)
-        import subprocess
-
         result = subprocess.run(
             [
                 "nvidia-smi",
@@ -92,8 +91,10 @@ def _detect_gpu() -> dict[str, Any] | None:
                         "memory_total_mb": int(parts[1].strip()),
                         "memory_free_mb": int(parts[2].strip()),
                     }
-    except Exception:
-        pass
+    except (subprocess.SubprocessError, FileNotFoundError, OSError) as e:
+        logger.debug(f"GPU detection failed: {e}")
+    except Exception as e:
+        logger.debug(f"GPU detection failed: {e}")
     return None
 
 
@@ -187,7 +188,7 @@ async def get_hardware_report() -> dict[str, Any]:
 def _get_configured_model() -> str | None:
     """Get configured model path from environment or config.
 
-    TODO Growth: Read from config file or environment variable.
+    Returns:
+        Path to the model file if configured via SIGMAHQ_MODEL_PATH, else None.
     """
-    # Placeholder - model path would come from config
-    return None
+    return os.environ.get("SIGMAHQ_MODEL_PATH")

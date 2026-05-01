@@ -8,6 +8,7 @@ import gradio as gr
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from src.errors import (
     ModelNotFoundError,
@@ -51,6 +52,7 @@ def create_app() -> FastAPI:
     from src.api.routes.embeddings import router as embeddings_router
     from src.api.routes.feedback import router as feedback_router
     from src.api.v1.admin import router as admin_v1_router
+    from src.api.routes.admin_pages import router as admin_pages_router
 
     app = FastAPI(
         title="SigmaHQ RAG",
@@ -59,6 +61,7 @@ def create_app() -> FastAPI:
     )
 
     app.add_middleware(CorrelationIDMiddleware)
+    app.mount("/static", StaticFiles(directory="src/static"), name="static")
 
     app.include_router(admin_router)
     app.include_router(documents_router)
@@ -70,6 +73,7 @@ def create_app() -> FastAPI:
     app.include_router(admin_prompts_router)
     app.include_router(admin_github_router)
     app.include_router(admin_v1_router)
+    app.include_router(admin_pages_router)
 
     @app.exception_handler(SigmaError)
     async def sigma_error_handler(request: Request, exc: SigmaError) -> JSONResponse:
@@ -143,6 +147,7 @@ def create_app() -> FastAPI:
         )
 
     return app
+
 
 
 def _log_error_with_context(request: Request, exc: SigmaError) -> None:
