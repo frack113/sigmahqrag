@@ -50,14 +50,14 @@ story_location: "{project-root}/_bmad-output/implementation-artifacts"
     1-4-test-suite: done
   epic-1-retrospective: optional
   
-  # Epic 2: Admin UI & System Management (MVP Priority 2)
-  epic-2: in-progress
-    2-1-admin-page-mpa-structure: in-progress
-    2-2-health-checks-foundation: backlog
-    2-3-dynamic-tab-colors-status-indicators: backlog
-    2-4-bulk-actions-api: backlog
-    2-5-progress-animations-toast-notifications: backlog
-    2-6-system-logs-installation-documentation: backlog
+   # Epic 2: Admin UI & System Management (MVP Priority 2)
+  epic-2: done
+    2-1-admin-page-mpa-structure: done
+    2-2-health-checks-foundation: done
+    2-3-dynamic-tab-colors-status-indicators: done
+    2-4-bulk-actions-api: done
+    2-5-progress-animations-toast-notifications: done
+    2-6-system-logs-installation-documentation: done
   epic-2-retrospective: optional
   
    # Epic 3: Local Architecture & Reproducibility (MVP Priority 0 - Foundation)

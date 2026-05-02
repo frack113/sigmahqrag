@@ -115,6 +115,151 @@ body {
     font-weight: bold;
 }
 
+/* Status dots with animations */
+.status-dot {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-right: 8px;
+    transition: background 0.3s ease;
+}
+
+.status-dot.status-ok {
+    background: #27ae60;
+    box-shadow: 0 0 8px rgba(39, 174, 96, 0.6);
+}
+
+.status-dot.status-warning {
+    background: #f39c12;
+    box-shadow: 0 0 8px rgba(243, 156, 18, 0.6);
+    animation: pulse 2s infinite;
+}
+
+.status-dot.status-error {
+    background: #e74c3c;
+    box-shadow: 0 0 8px rgba(231, 76, 60, 0.6);
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+/* Global status bar */
+.status-bar {
+    padding: 10px 20px;
+    margin-bottom: 20px;
+    border-radius: 4px;
+    font-size: 0.9em;
+    transition: all 0.3s ease;
+}
+
+.status-bar.status-ok {
+    background: #d5f4e6;
+    color: #27ae60;
+    border: 1px solid #27ae60;
+}
+
+.status-bar.status-warning {
+    background: #fef9e7;
+    color: #f39c12;
+    border: 1px solid #f39c12;
+}
+
+.status-bar.status-error {
+    background: #fadbd8;
+    color: #e74c3c;
+    border: 1px solid #e74c3c;
+}
+
+/* Toast notifications */
+.toast-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+}
+
+.toast {
+    padding: 12px 20px;
+    margin-bottom: 10px;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    animation: slideIn 0.3s ease;
+    min-width: 250px;
+}
+
+.toast.toast-success {
+    background: #27ae60;
+    color: #fff;
+}
+
+.toast.toast-error {
+    background: #e74c3c;
+    color: #fff;
+}
+
+.toast.toast-info {
+    background: #3498db;
+    color: #fff;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+/* Progress bar */
+.progress-container {
+    width: 100%;
+    height: 8px;
+    background: #ecf0f1;
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 10px 0;
+}
+
+.progress-bar {
+    height: 100%;
+    background: #3498db;
+    transition: width 0.3s ease;
+    background-image: linear-gradient(
+        45deg,
+        rgba(255, 255, 255, 0.2) 25%,
+        transparent 25%,
+        transparent 50%,
+        rgba(255, 255, 255, 0.2) 50%,
+        rgba(255, 255, 255, 0.2) 75%,
+        transparent 75%
+    );
+    background-size: 20px 20px;
+    animation: progress-stripes 2s linear infinite;
+}
+
+.progress-bar.progress-complete {
+    background: #27ae60;
+}
+
+@keyframes progress-stripes {
+    0% {
+        background-position: 20px 0;
+    }
+    100% {
+        background-position: 0 0;
+    }
+}
+
 /* Buttons */
 .btn {
     display: inline-block;

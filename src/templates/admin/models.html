@@ -5,124 +5,42 @@
 {% block header %}Model Management{% endblock %}
 
 {% block content %}
-<div class="card">
-    <h2>Download LLM Model</h2>
-    <form id="download-form" onsubmit="downloadModel(event)">
-        <div class="form-group">
-            <label>Repo ID</label>
-            <input type="text" id="repo-id" placeholder="e.g., leliuga/gemma-2b-it-GGUF" required>
-        </div>
-        <div class="form-group">
-            <label>Quantization</label>
-            <select id="file-select">
-                <option value="">Search for a repo first...</option>
-            </select>
-        </div>
-        <button type="submit" class="btn btn-primary">Download</button>
-    </form>
-    <div id="download-status" class="alert" style="display:none;"></div>
+<div class="content-header">
+    <h2>Model Management</h2>
 </div>
-
 <div class="card">
-    <h2>Installed Models</h2>
-    <div id="installed-models">
-        <p>Loading models...</p>
+    <div class="card-header">
+        <h3>Installed Models</h3>
+        <div class="bulk-actions">
+            <input type="checkbox" id="select-all-models"> Select All
+            <button id="bulk-delete-btn" class="btn btn-danger" disabled onclick="bulkDeleteModels()">Delete (0)</button>
+        </div>
+    </div>
+    <div class="card-body">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Select</th>
+                    <th>Repo ID</th>
+                    <th>Filename</th>
+                    <th>Size</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for model in models %}
+                <tr data-repo-id="{{ model.repo_id }}" data-filename="{{ model.filename }}">
+                    <td><input type="checkbox" class="model-checkbox"></td>
+                    <td>{{ model.repo_id }}</td>
+                    <td>{{ model.filename }}</td>
+                    <td>{{ model.size_mb }} MB</td>
+                    <td>
+                        <button class="btn btn-sm btn-danger">Delete</button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
 </div>
-
-<script>
-async function searchFiles() {
-    const repoId = document.getElementById('repo-id').value;
-    if (!repoId) return;
-
-    const resp = await fetch('/api/v1/admin/download', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({repo_id: repoId})
-    });
-    const data = await resp.json();
-
-    const select = document.getElementById('file-select');
-    select.innerHTML = '';
-    if (data.files && data.files.length > 0) {
-        data.files.forEach(f => {
-            const opt = document.createElement('option');
-            opt.value = f.filename;
-            opt.textContent = `${f.filename} (${Math.round(f.size_mb)}MB)`;
-            select.appendChild(opt);
-        });
-    }
-}
-
-async function downloadModel(event) {
-    event.preventDefault();
-    const repoId = document.getElementById('repo-id').value;
-    const filename = document.getElementById('file-select').value;
-
-    if (!repoId || !filename) {
-        showStatus('Please enter repo ID and select a file', 'error');
-        return;
-    }
-
-    const resp = await fetch('/api/v1/admin/download', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({repo_id: repoId, filename: filename})
-    });
-    const data = await resp.json();
-
-    if (data.status === 'processing') {
-        showStatus(`Download started! Job ID: ${data.job_id}`, 'success');
-        setTimeout(loadInstalledModels, 5000);
-    } else {
-        showStatus(data.message || 'Download failed', 'error');
-    }
-}
-
-async function loadInstalledModels() {
-    const resp = await fetch('/api/v1/admin/models');
-    const data = await resp.json();
-
-    const container = document.getElementById('installed-models');
-    if (data.models && data.models.length > 0) {
-        let html = '<table><tr><th>Model</th><th>Size</th><th>Action</th></tr>';
-        data.models.forEach(m => {
-            html += `<tr>
-                <td>${m.repo_id}/${m.filename}</td>
-                <td>${Math.round(m.size_mb)}MB</td>
-                <td><button class="btn btn-danger" onclick="deleteModel('${m.repo_id}', '${m.filename}')">Delete</button></td>
-            </tr>`;
-        });
-        html += '</table>';
-        container.innerHTML = html;
-    } else {
-        container.innerHTML = '<p>No models installed.</p>';
-    }
-}
-
-async function deleteModel(repoId, filename) {
-    if (!confirm('Delete this model?')) return;
-
-    const resp = await fetch('/api/v1/admin/models/delete', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({repo_id: repoId, filename: filename})
-    });
-    const data = await resp.json();
-    alert(data.message || 'Deleted');
-    loadInstalledModels();
-}
-
-function showStatus(message, type) {
-    const el = document.getElementById('download-status');
-    el.style.display = 'block';
-    el.className = `alert alert-${type}`;
-    el.textContent = message;
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-    document.querySelector('#repo-id + button')?.addEventListener('click', searchFiles);
-    loadInstalledModels();
-});
-</script>
 {% endblock %}

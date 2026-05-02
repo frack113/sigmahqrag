@@ -91,6 +91,8 @@ def create_app() -> FastAPI:
     from src.api.routes.admin_pages import router as admin_pages_router
     from src.api.routes.admin_prompts import router as admin_prompts_router
     from src.api.routes.admin_service import router as admin_router
+    from src.api.routes.admin_bulk import router as admin_bulk_router
+    from src.api.routes.admin_logs import router as admin_logs_router
     from src.api.routes.chat import router as chat_router
     from src.api.routes.documents import router as documents_router
     from src.api.routes.embeddings import router as embeddings_router
@@ -110,15 +112,8 @@ def create_app() -> FastAPI:
     app.mount("/static", StaticFiles(directory="src/static"), name="static")
 
     app.include_router(admin_router)
-    app.include_router(documents_router)
-    app.include_router(embeddings_router)
-    app.include_router(admin_embedding_router)
-    app.include_router(feedback_router)
-    app.include_router(admin_llm_router)
-    app.include_router(admin_backend_router)
-    app.include_router(admin_prompts_router)
-    app.include_router(admin_github_router)
-    app.include_router(admin_v1_router)
+    app.include_router(admin_bulk_router)
+    app.include_router(admin_logs_router)
     app.include_router(admin_pages_router)
     app.include_router(chat_router)
 
