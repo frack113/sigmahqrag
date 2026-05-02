@@ -7,8 +7,8 @@ from contextvars import ContextVar
 import gradio as gr
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
-from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from src.errors import (
     ModelNotFoundError,
@@ -20,6 +20,48 @@ from src.errors import (
 logger = logging.getLogger(__name__)
 
 correlation_id_var: ContextVar[str | None] = ContextVar("correlation_id", default=None)
+
+
+def _validate_services() -> None:
+    """Validate external services at startup (LLM, Qdrant)."""
+    import httpx
+
+    from src.config import load_config
+
+    config = load_config()
+
+    # Check LLM service
+    llm_config = config.get("services", {}).get("llama", {})
+    llm_url = llm_config.get("base_url", "http://localhost:11434")
+
+    try:
+        response = httpx.get(f"{llm_url}/api/tags", timeout=5.0)
+        if response.status_code == 200:
+            logger.info(f"LLM service available at {llm_url}")
+        else:
+            logger.warning(f"LLM service returned status {response.status_code} at {llm_url}")
+    except httpx.ConnectError:
+        logger.warning(f"LLM service NOT available at {llm_url} - chat features will use fallback")
+    except Exception as e:
+        logger.warning(f"LLM service check failed: {e}")
+
+    # Check Qdrant collection
+    qdrant_config = config.get("services", {}).get("qdrant", {})
+    qdrant_host = qdrant_config.get("host", "localhost")
+    qdrant_port = qdrant_config.get("port", 6333)
+    collection = qdrant_config.get("collection_name", "sigma_rules")
+
+    try:
+        from qdrant_client import QdrantClient
+
+        client = QdrantClient(host=qdrant_host, port=qdrant_port, timeout=5.0)
+        collections = client.get_collections().collections
+        if any(c.name == collection for c in collections):
+            logger.info(f"Qdrant collection '{collection}' exists")
+        else:
+            logger.warning(f"Qdrant collection '{collection}' NOT found - search will return empty")
+    except Exception as e:
+        logger.warning(f"Qdrant check failed: {e} - search features may be unavailable")
 
 
 class CorrelationIDMiddleware(BaseHTTPMiddleware):
@@ -46,13 +88,17 @@ def create_app() -> FastAPI:
     from src.api.routes.admin_embedding import router as admin_embedding_router
     from src.api.routes.admin_github import router as admin_github_router
     from src.api.routes.admin_llm import router as admin_llm_router
+    from src.api.routes.admin_pages import router as admin_pages_router
     from src.api.routes.admin_prompts import router as admin_prompts_router
     from src.api.routes.admin_service import router as admin_router
+    from src.api.routes.chat import router as chat_router
     from src.api.routes.documents import router as documents_router
     from src.api.routes.embeddings import router as embeddings_router
     from src.api.routes.feedback import router as feedback_router
     from src.api.v1.admin import router as admin_v1_router
-    from src.api.routes.admin_pages import router as admin_pages_router
+
+    # Startup validation
+    _validate_services()
 
     app = FastAPI(
         title="SigmaHQ RAG",
@@ -74,6 +120,7 @@ def create_app() -> FastAPI:
     app.include_router(admin_github_router)
     app.include_router(admin_v1_router)
     app.include_router(admin_pages_router)
+    app.include_router(chat_router)
 
     @app.exception_handler(SigmaError)
     async def sigma_error_handler(request: Request, exc: SigmaError) -> JSONResponse:
