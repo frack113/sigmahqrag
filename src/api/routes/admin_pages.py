@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["admin-pages"])
 
-templates = Jinja2Templates(directory="src/templates")
+templates = Jinja2Templates(directory="src/front/templates")
 
 health_service = HealthCheckService()
 
@@ -36,3 +36,21 @@ async def admin_models(request: Request) -> HTMLResponse:
 async def admin_settings(request: Request) -> HTMLResponse:
     """Serve settings page."""
     return templates.TemplateResponse(request=request, name="admin/settings.html")
+
+
+@router.get("/admin/health")
+async def admin_health(request: Request) -> HTMLResponse:
+    """Serve health check page."""
+    return templates.TemplateResponse(request=request, name="admin/health.html")
+
+
+@router.get("/admin/logs")
+async def admin_logs(request: Request) -> HTMLResponse:
+    """Serve logs page."""
+    return templates.TemplateResponse(request=request, name="admin/logs.html")
+
+
+@router.get("/admin/hardware")
+async def admin_hardware(request: Request) -> HTMLResponse:
+    """Serve hardware page."""
+    return templates.TemplateResponse(request=request, name="admin/hardware.html")

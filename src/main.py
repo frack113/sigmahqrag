@@ -1,10 +1,9 @@
-"""SigmaHQ RAG - FastAPI + Gradio application."""
+"""SigmaHQ RAG - FastAPI application."""
 
 import logging
 import uuid
 from contextvars import ContextVar
 
-import gradio as gr
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -109,7 +108,7 @@ def create_app() -> FastAPI:
     )
 
     app.add_middleware(CorrelationIDMiddleware)
-    app.mount("/static", StaticFiles(directory="src/static"), name="static")
+    app.mount("/static", StaticFiles(directory="src/front/static"), name="static")
 
     app.include_router(admin_router)
     app.include_router(admin_bulk_router)

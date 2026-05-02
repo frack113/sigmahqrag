@@ -16,7 +16,7 @@ from src.services.chat_service import ChatService
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["chat"])
-templates = Jinja2Templates(directory="src/templates")
+templates = Jinja2Templates(directory="src/front/templates")
 chat_service = ChatService()
 
 
