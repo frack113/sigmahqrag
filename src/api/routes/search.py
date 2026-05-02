@@ -93,3 +93,31 @@ async def search_rules_get(query: str, limit: int = 10) -> SearchResponse:
     """Search for Sigma rules matching the query (GET version)."""
     request = SearchRequest(query=query, limit=limit)
     return await search_rules(request)
+
+
+class SuggestionsResponse(BaseModel):
+    """Suggestions response."""
+
+    suggestions: list[str] = Field(default_factory=list)
+
+
+@router.get("/api/search-suggestions", response_model=SuggestionsResponse)
+async def search_suggestions(query: str, limit: int = 5) -> SuggestionsResponse:
+    """Get search suggestions based on query."""
+    if not query or len(query.strip()) < 2:
+        return SuggestionsResponse(suggestions=[])
+
+    try:
+        results = await asyncio.wait_for(
+            _search_with_timeout(query, limit),
+            timeout=SEARCH_TIMEOUT,
+        )
+        suggestions = []
+        for result in results:
+            title = result.get("metadata", {}).get("title", "")
+            if title and title not in suggestions:
+                suggestions.append(title)
+        return SuggestionsResponse(suggestions=suggestions[:limit])
+    except Exception as e:
+        logger.error(f"Suggestions error: {e}")
+        return SuggestionsResponse(suggestions=[])
