@@ -41,23 +41,23 @@ project_key: NOKEY
 tracking_system: file-system
 story_location: "{project-root}/_bmad-output/implementation-artifacts"
 
-development_status:
+ development_status:
   # Epic 1: Chat RAG Core (MVP Priority 1)
-  epic-1: backlog
-  1-1-sigma-yaml-upload-chat-interface: backlog
-  1-2-ai-mentor-rag-pipeline: backlog
-  1-3-reproducibility-validation: backlog
-  1-4-rag-test-suite-accuracy-validation: backlog
+  epic-1: done
+    1-1-chat-rag-ui: done
+    1-2-ai-mentor-rag: done
+    1-3-reproducibility-validation: done
+    1-4-test-suite: done
   epic-1-retrospective: optional
   
   # Epic 2: Admin UI & System Management (MVP Priority 2)
-  epic-2: backlog
-  2-1-admin-page-mpa-structure: backlog
-  2-2-health-checks-foundation: backlog
-  2-3-dynamic-tab-colors-status-indicators: backlog
-  2-4-bulk-actions-api: backlog
-  2-5-progress-animations-toast-notifications: backlog
-  2-6-system-logs-installation-documentation: backlog
+  epic-2: in-progress
+    2-1-admin-page-mpa-structure: in-progress
+    2-2-health-checks-foundation: backlog
+    2-3-dynamic-tab-colors-status-indicators: backlog
+    2-4-bulk-actions-api: backlog
+    2-5-progress-animations-toast-notifications: backlog
+    2-6-system-logs-installation-documentation: backlog
   epic-2-retrospective: optional
   
    # Epic 3: Local Architecture & Reproducibility (MVP Priority 0 - Foundation)

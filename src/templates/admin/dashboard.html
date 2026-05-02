@@ -1,8 +1,91 @@
 {% extends "admin/base.html" %}
 
-{% block title %}Admin Dashboard{% endblock %}
+{% block title %}Dashboard | Admin | SigmaHQ RAG{% endblock %}
+
+{% block header %}System Dashboard{% endblock %}
 
 {% block content %}
-    <h2>Welcome to the Admin Dashboard</h2>
-    <p>Select a module from the sidebar to begin managing your system.</p>
+<div class="card">
+    <h2>System Status</h2>
+    <div id="status-cards">
+        <p>Loading status...</p>
+    </div>
+</div>
+
+<div class="card">
+    <h2>Hardware Information</h2>
+    <div id="hardware-info">
+        <p>Loading hardware info...</p>
+    </div>
+</div>
+
+<div class="card">
+    <h2>Installed Models</h2>
+    <div id="models-list">
+        <p>Loading models...</p>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Load system status
+    fetch('/api/v1/admin/status')
+        .then(r => r.json())
+        .then(data => {
+            const html = `
+                <p>LLM: <span class="status-${data.llm.status}">${data.llm.status}</span></p>
+                <p>Qdrant: <span class="status-${data.qdrant.status}">${data.qdrant.status}</span></p>
+            `;
+            document.getElementById('status-cards').innerHTML = html;
+        });
+
+    // Load hardware info
+    fetch('/api/v1/admin/hardware')
+        .then(r => r.json())
+        .then(data => {
+            const hw = data.hardware;
+            const html = `
+                <p>CPU: ${hw.cpu}</p>
+                <p>RAM: ${hw.memory}</p>
+                <p>GPU: ${hw.gpu_detected ? hw.gpu_type : 'Not detected'}</p>
+            `;
+            document.getElementById('hardware-info').innerHTML = html;
+        });
+
+    // Load models
+    fetch('/api/v1/admin/models')
+        .then(r => r.json())
+        .then(data => {
+            if (data.models && data.models.length > 0) {
+                let html = '<table><tr><th>Model</th><th>Size</th><th>Action</th></tr>';
+                data.models.forEach(m => {
+                    html += `<tr>
+                        <td>${m.repo_id}/${m.filename}</td>
+                        <td>${m.size_mb}MB</td>
+                        <td><button class="btn btn-danger" onclick="deleteModel('${m.repo_id}', '${m.filename}')">Delete</button></td>
+                    </tr>`;
+                });
+                html += '</table>';
+                document.getElementById('models-list').innerHTML = html;
+            } else {
+                document.getElementById('models-list').innerHTML = '<p>No models installed.</p>';
+            }
+        });
+});
+
+function deleteModel(repoId, filename) {
+    if (!confirm('Delete this model?')) return;
+
+    fetch('/api/v1/admin/models/delete', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({repo_id: repoId, filename: filename})
+    })
+    .then(r => r.json())
+    .then(data => {
+        alert(data.message || 'Deleted successfully');
+        location.reload();
+    });
+}
+</script>
 {% endblock %}

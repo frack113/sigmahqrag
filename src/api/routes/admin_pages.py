@@ -1,21 +1,34 @@
+"""Admin page routes for Jinja2 templates."""
+
+from __future__ import annotations
+
+import logging
+from typing import Any
+
 from fastapi import APIRouter, Request
 from fastapi.templating import Jinja2Templates
+from fastapi.responses import HTMLResponse
 
-router = APIRouter(prefix="/admin", tags=["admin-pages"])
+logger = logging.getLogger(__name__)
+
+router = APIRouter(tags=["admin-pages"])
+
 templates = Jinja2Templates(directory="src/templates")
 
-@router.get("/")
-async def admin_dashboard(request: Request):
-    return templates.TemplateResponse("admin/dashboard.html", {"request": request})
 
-@router.get("/health")
-async def admin_health(request: Request):
-    return templates.TemplateResponse("admin/health.html", {"request": request})
+@router.get("/admin")
+async def admin_dashboard(request: Request) -> HTMLResponse:
+    """Serve admin dashboard page."""
+    return templates.TemplateResponse(request=request, name="admin/dashboard.html")
 
-@router.get("/hardware")
-async def admin_hardware(request: Request):
-    return templates.TemplateResponse("admin/hardware.html", {"request": request})
 
-@router.get("/logs")
-async def admin_logs(request: Request):
-    return templates.TemplateResponse("admin/logs.html", {"request": request})
+@router.get("/admin/models")
+async def admin_models(request: Request) -> HTMLResponse:
+    """Serve models management page."""
+    return templates.TemplateResponse(request=request, name="admin/models.html")
+
+
+@router.get("/admin/settings")
+async def admin_settings(request: Request) -> HTMLResponse:
+    """Serve settings page."""
+    return templates.TemplateResponse(request=request, name="admin/settings.html")

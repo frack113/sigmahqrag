@@ -3,42 +3,38 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Admin Dashboard{% endblock %}</title>
-    <link rel="stylesheet" href="{{ url_for('static', path='/css/main.css') }}">
-    <style>
-        body { display: flex; margin: 0; min-height: 100vh; font-family: sans-serif; }
-        aside { width: 250px; background: #f4f4f4; border-right: 1px solid #ddd; padding: 20px; }
-        main { flex: 1; padding: 20px; }
-        header { border-bottom: 1px solid #ddd; margin-bottom: 20px; padding-bottom: 10px; }
-        nav ul { list-style: none; padding: 0; }
-        nav li { margin-bottom: 10px; }
-        nav a { text-decoration: none; color: #333; }
-        nav a.active { font-weight: bold; color: #007bff; }
-        @media (max-width: 768px) {
-            body { flex-direction: column; }
-            aside { width: 100%; border-right: none; border-bottom: 1px solid #ddd; box-sizing: border-box; }
-        }
-    </style>
+    <title>{% block title %}Admin | SigmaHQ RAG{% endblock %}</title>
+    <link rel="stylesheet" href="/static/css/admin.css">
 </head>
 <body>
-    <aside>
-        <h2>Admin</h2>
-        <nav>
-            <ul>
-                <li><a href="/admin" class="{% if request.url.path == '/admin' %}active{% endif %}">Dashboard</a></li>
-                <li><a href="/admin/health" class="{% if request.url.path == '/admin/health' %}active{% endif %}">Health</a></li>
-                <li><a href="/admin/hardware" class="{% if request.url.path == '/admin/hardware' %}active{% endif %}">Hardware</a></li>
-                <li><a href="/admin/logs" class="{% if request.url.path == '/admin/logs' %}active{% endif %}">Logs</a></li>
-            </ul>
-        </nav>
-    </aside>
-    <main>
-        <header>
-            <h1>{% block header_title %}Admin Panel{% endblock %}</h1>
-        </header>
-        <section>
+    <div class="admin-layout">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h2>SigmaHQ RAG</h2>
+                <p>Admin Panel</p>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="/admin" class="{% if request.url.path == '/admin' %}active{% endif %}">
+                    Dashboard
+                </a>
+                <a href="/admin/models" class="{% if request.url.path.startswith('/admin/models') %}active{% endif %}">
+                    Models
+                </a>
+                <a href="/admin/settings" class="{% if request.url.path == '/admin/settings' %}active{% endif %}">
+                    Settings
+                </a>
+                <a href="/chat" class="nav-link">
+                    ← Back to Chat
+                </a>
+            </nav>
+        </aside>
+
+        <main class="main-content">
+            <header class="content-header">
+                <h1>{% block header %}Admin Dashboard{% endblock %}</h1>
+            </header>
             {% block content %}{% endblock %}
-        </section>
-    </main>
+        </main>
+    </div>
 </body>
 </html>
