@@ -9,11 +9,15 @@ from fastapi import APIRouter, Request
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
 
+from src.services.health_check import HealthCheckService
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["admin-pages"])
 
 templates = Jinja2Templates(directory="src/templates")
+
+health_service = HealthCheckService()
 
 
 @router.get("/admin")
