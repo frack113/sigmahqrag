@@ -114,7 +114,11 @@ def create_app() -> FastAPI:
     app.include_router(admin_bulk_router)
     app.include_router(admin_logs_router)
     app.include_router(admin_pages_router)
+    app.include_router(admin_v1_router)
     app.include_router(chat_router)
+    app.include_router(documents_router)
+    app.include_router(embeddings_router)
+    app.include_router(feedback_router)
 
     @app.exception_handler(SigmaError)
     async def sigma_error_handler(request: Request, exc: SigmaError) -> JSONResponse:

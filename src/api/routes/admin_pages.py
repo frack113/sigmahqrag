@@ -54,3 +54,21 @@ async def admin_logs(request: Request) -> HTMLResponse:
 async def admin_hardware(request: Request) -> HTMLResponse:
     """Serve hardware page."""
     return templates.TemplateResponse(request=request, name="admin/hardware.html")
+
+
+@router.get("/admin/llama")
+async def admin_llama(request: Request) -> HTMLResponse:
+    """Serve llama.cpp management page."""
+    return templates.TemplateResponse(request=request, name="admin/llama.html")
+
+
+@router.get("/admin/qdrant")
+async def admin_qdrant(request: Request) -> HTMLResponse:
+    """Serve Qdrant management page."""
+    return templates.TemplateResponse(request=request, name="admin/qdrant.html")
+
+
+@router.get("/admin/prompts")
+async def admin_prompts(request: Request) -> HTMLResponse:
+    """Serve prompts management page."""
+    return templates.TemplateResponse(request=request, name="admin/prompts.html")

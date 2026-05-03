@@ -336,3 +336,113 @@ async def services_post(
             status_code=500,
             content={"error": "Internal server error"},
         )
+
+
+class LlamaConfigRequest(BaseModel):
+    """Request model for llama.cpp configuration."""
+    os: str | None = None
+    gpu: str | None = None
+
+
+@router.get("/llama/config")
+async def get_llama_config() -> JSONResponse:
+    """Get llama.cpp configuration (OS, GPU)."""
+    from src.config import get_backend_gpu_type, load_config
+
+    try:
+        config = load_config()
+        gpu_type = get_backend_gpu_type()
+
+        return JSONResponse(content={
+            "gpu": gpu_type or "cpu",
+            "os": "windows",
+        })
+    except Exception as e:
+        logger.error(f"Failed to get llama config: {e}")
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+
+@router.post("/llama/config")
+async def set_llama_config(request: LlamaConfigRequest) -> JSONResponse:
+    """Set llama.cpp configuration (OS, GPU)."""
+    from src.config import set_backend_gpu_type
+
+    try:
+        if request.gpu:
+            set_backend_gpu_type(request.gpu)
+
+        return JSONResponse(content={
+            "success": True,
+            "message": f"GPU set to {request.gpu or 'cpu'}",
+        })
+    except Exception as e:
+        logger.error(f"Failed to set llama config: {e}")
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+
+@router.get("/llama/info")
+async def get_llama_info() -> JSONResponse:
+    """Get llama.cpp version and update info."""
+    from src.admin.version_manager import (
+        check_for_updates,
+        get_current_version,
+    )
+
+    try:
+        current = await get_current_version("llama.cpp")
+        update_info = await check_for_updates("llama.cpp")
+
+        return JSONResponse(content={
+            "current_version": current,
+            "update_available": update_info.get("update_available") if update_info else False,
+            "latest_version": update_info.get("latest_version") if update_info else None,
+        })
+    except Exception as e:
+        logger.error(f"Failed to get llama info: {e}")
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+
+@router.post("/llama/download")
+async def download_llama(
+    request: LlamaConfigRequest | None = None,
+) -> JSONResponse:
+    """Download llama.cpp binary."""
+    from src.admin.download_manager import create_download_manager
+
+    try:
+        dm = create_download_manager()
+        result = await dm.start_download("llama.cpp", "latest")
+
+        return JSONResponse(content={
+            "success": True,
+            "download_id": result.get("download_id"),
+            "message": "Download started",
+        })
+    except Exception as e:
+        logger.error(f"Failed to download llama.cpp: {e}")
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+
+@router.post("/llama/update")
+async def update_llama() -> JSONResponse:
+    """Update llama.cpp to latest version."""
+    from src.admin.download_manager import create_download_manager
+    from src.admin.version_manager import VersionManager
+
+    try:
+        vm = VersionManager()
+        release = await vm.get_release("llama.cpp", "latest")
+        latest = release.tag_name.lstrip("v") if release.tag_name else "latest"
+
+        dm = create_download_manager()
+        result = await dm.start_download("llama.cpp", latest)
+
+        return JSONResponse(content={
+            "success": True,
+            "download_id": result.get("download_id"),
+            "version": latest,
+            "message": f"Downloading llama.cpp v{latest}",
+        })
+    except Exception as e:
+        logger.error(f"Failed to update llama.cpp: {e}")
+        return JSONResponse(status_code=500, content={"error": str(e)})

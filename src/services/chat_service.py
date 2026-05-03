@@ -10,7 +10,7 @@ from src.rag.search import SearchEngine
 from src.services.llm_client import LLMClient
 from src.services.rag_pipeline import RAGPipeline
 from src.services.sigma_validator import SigmaValidator
-from src.ui.mode import ChatMode
+from src.schemas.chat_mode import ChatMode
 
 logger = logging.getLogger(__name__)
 

@@ -1,0 +1,136 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Qdrant | Admin | SigmaHQ RAG{% endblock %}
+
+{% block header %}Qdrant Management{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>Configuration</h2>
+    <form id="config-form">
+        <div class="form-group">
+            <label for="host-input">Host:</label>
+            <input type="text" id="host-input" value="localhost" readonly>
+        </div>
+        <div class="form-group">
+            <label for="port-input">Port:</label>
+            <input type="text" id="port-input" value="6333" readonly>
+        </div>
+    </form>
+</div>
+
+<div class="card">
+    <h2>Version <button class="btn btn-secondary" onclick="loadQdrantInfo()" style="float:right;">Refresh</button></h2>
+    <div id="qdrant-info">
+        <p>Loading...</p>
+    </div>
+    <div style="margin-top: 15px;">
+        <button class="btn btn-primary" onclick="downloadQdrant()">Download / Update</button>
+        <button class="btn btn-success" onclick="startQdrant()">Start</button>
+        <button class="btn btn-danger" onclick="stopQdrant()">Stop</button>
+    </div>
+    <div id="download-status" class="status-message"></div>
+</div>
+
+<script>
+function loadQdrantInfo() {
+    fetch('/admin/health')
+        .then(r => r.json())
+        .then(data => {
+            const qdrant = data.services?.find(s => s.name === 'qdrant') || {};
+            let html = '<p><strong>Status:</strong> ' + (qdrant.status || 'unknown') + '</p>';
+            html += '<p><strong>Port:</strong> ' + (qdrant.port || '6333') + '</p>';
+            html += '<p><strong>URL:</strong> ' + (qdrant.url || 'http://localhost:6333') + '</p>';
+            if (qdrant.message) {
+                html += '<p><strong>Message:</strong> ' + qdrant.message + '</p>';
+            }
+            document.getElementById('qdrant-info').innerHTML = html;
+        })
+        .catch(err => {
+            document.getElementById('qdrant-info').innerHTML = '<p class="error">Failed to load info: ' + err + '</p>';
+        });
+}
+
+function downloadQdrant() {
+    document.getElementById('download-status').textContent = 'Starting download...';
+    document.getElementById('download-status').className = 'status-message';
+
+    fetch('/admin/backend/?action=download&service=qdrant', {
+        method: 'POST'
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success || data.status === 'started') {
+            document.getElementById('download-status').textContent = 'Download started: ' + data.download_id;
+            document.getElementById('download-status').className = 'status-message success';
+            loadQdrantInfo();
+        } else {
+            document.getElementById('download-status').textContent = data.error || 'Download failed';
+            document.getElementById('download-status').className = 'status-message error';
+        }
+    })
+    .catch(err => {
+        document.getElementById('download-status').textContent = 'Error: ' + err;
+        document.getElementById('download-status').className = 'status-message error';
+    });
+}
+
+function startQdrant() {
+    fetch('/admin/services/?action=start&service=qdrant', {
+        method: 'POST'
+    })
+    .then(r => r.json())
+    .then(data => {
+        alert(data.message || data.error || 'Started');
+        loadQdrantInfo();
+    })
+    .catch(err => alert('Error: ' + err));
+}
+
+function stopQdrant() {
+    fetch('/admin/services/?action=stop&service=qdrant', {
+        method: 'POST'
+    })
+    .then(r => r.json())
+    .then(data => {
+        alert(data.message || data.error || 'Stopped');
+        loadQdrantInfo();
+    })
+    .catch(err => alert('Error: ' + err));
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadQdrantInfo();
+});
+</script>
+
+<style>
+.form-group {
+    margin-bottom: 15px;
+}
+.form-group label {
+    display: inline-block;
+    width: 120px;
+    font-weight: bold;
+}
+.form-group input {
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    min-width: 150px;
+}
+.status-message {
+    margin-top: 15px;
+    padding: 10px;
+    border-radius: 4px;
+}
+.status-message.success {
+    background: #d4edda;
+    color: #155724;
+}
+.status-message.error {
+    background: #f8d7da;
+    color: #721c24;
+}
+</style>
+{% endblock %}

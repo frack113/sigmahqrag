@@ -14,17 +14,21 @@ async def test_admin_dashboard_route(app: Any):
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         response = await ac.get("/admin")
         assert response.status_code == 200
-        # We expect some admin specific content in the HTML
-        assert "Admin Dashboard" in response.text
+        # We expect HTML content (not JSON)
+        assert response.headers["content-type"].startswith("text/html")
+        assert "SigmaHQ" in response.text
+
 
 @pytest.mark.asyncio
 async def test_admin_health_route(app: Any):
-    """Test that /admin/health returns the health view."""
+    """Test that /admin/health returns JSON (from admin_service router)."""
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         response = await ac.get("/admin/health")
         assert response.status_code == 200
-        assert "Health" in response.text
+        # Returns JSON (from admin_service.py router)
+        assert response.headers["content-type"].startswith("application/json")
+        assert "services" in response.text
 
 @pytest.mark.asyncio
 async def test_admin_hardware_route(app: Any):

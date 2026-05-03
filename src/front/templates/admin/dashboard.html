@@ -5,6 +5,8 @@
 {% block header %}System Dashboard{% endblock %}
 
 {% block content %}
+<div id="update-banner"></div>
+
 <div class="card">
     <h2>System Status <button class="btn btn-primary" onclick="refreshStatus()" style="float:right;">Refresh</button></h2>
     <div id="status-cards">
@@ -30,26 +32,90 @@
 let pollInterval;
 
 function loadStatus() {
-    fetch('/api/v1/admin/status')
+    Promise.all([
+        fetch('/admin/health').then(r => r.json()),
+        fetch('/admin/llama/info').then(r => r.json()).catch(() => ({})),
+        fetch('/api/v1/admin/status').then(r => r.json()).catch(() => ({}))
+    ])
+    .then(([healthData, llamaInfo, v1Status]) => {
+        const services = healthData.services || [];
+        const llama = services.find(s => s.name === 'llama.cpp') || {};
+        const qdrant = services.find(s => s.name === 'qdrant') || {};
+        
+        // Determine status class
+        const getStatusClass = (status) => {
+            if (status === 'running') return 'ok';
+            if (status === 'stopped') return 'error';
+            return 'warning';
+        };
+        
+        const html = `
+            <div class="service-row">
+                <div class="service-name">llama.cpp</div>
+                <div class="service-status">
+                    <span class="status-dot status-${getStatusClass(llama.status)}"></span>
+                    <span class="status-text">${llama.status || 'unknown'}</span>
+                    ${llamaInfo.current_version ? `<span class="version">v${llamaInfo.current_version}</span>` : ''}
+                </div>
+                <div class="service-actions">
+                    <button class="btn btn-sm btn-success" onclick="startService('llama')">Start</button>
+                    <button class="btn btn-sm btn-danger" onclick="stopService('llama')">Stop</button>
+                    <button class="btn btn-sm" onclick="showLogs('llama')">Logs</button>
+                </div>
+            </div>
+            <div class="service-row">
+                <div class="service-name">Qdrant</div>
+                <div class="service-status">
+                    <span class="status-dot status-${getStatusClass(qdrant.status)}"></span>
+                    <span class="status-text">${qdrant.status || 'unknown'}</span>
+                    ${qdrant.version ? `<span class="version">v${qdrant.version}</span>` : ''}
+                </div>
+                <div class="service-actions">
+                    <button class="btn btn-sm btn-success" onclick="startService('qdrant')">Start</button>
+                    <button class="btn btn-sm btn-danger" onclick="stopService('qdrant')">Stop</button>
+                    <button class="btn btn-sm" onclick="showLogs('qdrant')">Logs</button>
+                </div>
+            </div>
+        `;
+        document.getElementById('status-cards').innerHTML = html;
+        
+        // Update banner
+        let bannerHtml = '';
+        if (llamaInfo.update_available) {
+            bannerHtml += `<div class="update-alert">Update available for llama.cpp: v${llamaInfo.latest_version}</div>`;
+        }
+        document.getElementById('update-banner').innerHTML = bannerHtml;
+    })
+    .catch(err => {
+        document.getElementById('status-cards').innerHTML = '<p class="error">Failed to load status</p>';
+    });
+}
+
+function startService(service) {
+    fetch(`/admin/services/?action=start&service=${service}`, {method: 'POST'})
         .then(r => r.json())
         .then(data => {
-            const llm = data.llm || {};
-            const qdrant = data.qdrant || {};
-            const html = `
-                <div class="status-item">
-                    <span class="status-dot status-${llm.status}"></span>
-                    <strong>LLM:</strong> ${llm.status}
-                    ${llm.response_time ? `( ${llm.response_time}s)` : ''}
-                    ${llm.error ? `<br><small>${llm.error}</small>` : ''}
-                </div>
-                <div class="status-item">
-                    <span class="status-dot status-${qdrant.status}"></span>
-                    <strong>Qdrant:</strong> ${qdrant.status}
-                    ${qdrant.response_time ? `( ${qdrant.response_time}s)` : ''}
-                    ${qdrant.error ? `<br><small>${qdrant.error}</small>` : ''}
-                </div>
-            `;
-            document.getElementById('status-cards').innerHTML = html;
+            alert(data.message || data.error || 'Started');
+            loadStatus();
+        });
+}
+
+function stopService(service) {
+    if (!confirm(`Stop ${service}?`)) return;
+    fetch(`/admin/services/?action=stop&service=${service}`, {method: 'POST'})
+        .then(r => r.json())
+        .then(data => {
+            alert(data.message || data.error || 'Stopped');
+            loadStatus();
+        });
+}
+
+function showLogs(service) {
+    fetch(`/admin/services/?action=logs&service=${service}`)
+        .then(r => r.json())
+        .then(data => {
+            const logs = data.logs || 'No logs available';
+            alert(logs.slice(-2000)); // Last 2000 chars
         });
 }
 

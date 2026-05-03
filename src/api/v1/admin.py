@@ -10,6 +10,8 @@ from fastapi import APIRouter, Header
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
+from src.config import load_config
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/admin", tags=["admin-v1"])
@@ -248,3 +250,84 @@ async def cancel_action(
         _idempotency_store[f"cancel:{x_idempotency_key}"] = (response_content, time.time(), "cancel")
 
     return JSONResponse(content=response_content)
+
+
+@router.get("/hardware")
+async def get_hardware() -> JSONResponse:
+    """GET /api/v1/admin/hardware - Return hardware info."""
+    from src.core.hardware import get_hardware_report
+
+    report = await get_hardware_report()
+    return JSONResponse(content={"status": "success", "data": report})
+
+
+@router.get("/models")
+async def get_models() -> JSONResponse:
+    """GET /api/v1/admin/models - Return installed models list."""
+    from src.api.dependencies import get_model_manager
+
+    try:
+        mm = get_model_manager()
+        models = await mm.list_installed_models()
+
+        model_list = []
+        for m in models:
+            for filename, f in m.files.items():
+                model_list.append({
+                    "repo_id": m.repo_id,
+                    "filename": filename,
+                    "size_mb": f.file_size / (1024 * 1024) if f.file_size else 0,
+                    "status": m.status.value,
+                })
+
+        return JSONResponse(content={"status": "success", "data": {"models": model_list}})
+    except Exception as e:
+        logger.error(f"Failed to list models: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "error": str(e)},
+        )
+
+
+@router.post("/models/delete")
+async def delete_model(request: dict) -> JSONResponse:
+    """POST /api/v1/admin/models/delete - Delete a model."""
+    from src.api.dependencies import get_model_manager
+    from src.core.services.manager import ModelNotFoundError
+
+    try:
+        repo_id = request.get("repo_id")
+        filename = request.get("filename")
+
+        if not repo_id or not filename:
+            return JSONResponse(
+                status_code=400,
+                content={"status": "error", "error": "repo_id and filename required"},
+            )
+
+        mm = get_model_manager()
+        await mm.delete_model(repo_id, filename)
+
+        return JSONResponse(content={"status": "success", "message": f"Deleted {repo_id}/{filename}"})
+    except ModelNotFoundError as e:
+        return JSONResponse(status_code=404, content={"status": "error", "error": str(e)})
+    except Exception as e:
+        logger.error(f"Failed to delete model: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "error": str(e)},
+        )
+
+
+@router.get("/config")
+async def get_config() -> JSONResponse:
+    """GET /api/v1/admin/config - Return app config."""
+    try:
+        config = load_config()
+        return JSONResponse(content={"status": "success", "data": config})
+    except Exception as e:
+        logger.error(f"Failed to load config: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"status": "error", "error": str(e)},
+        )

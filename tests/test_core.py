@@ -41,91 +41,6 @@ def model_manager(registry, download_service):
 
 
 @pytest.mark.asyncio
-@pytest.mark.skip(reason="Requires network, covered by manual test")
-async def test_search_models(model_manager):
-    """Test model search works (may fail with network error)."""
-    try:
-        results = await model_manager.search_models("llama")
-    except Exception:
-        results = []
-    assert isinstance(results, list)
-
-
-@pytest.mark.asyncio
-@pytest.mark.skip(reason="Requires network, covered by manual test")
-async def test_get_model_info(model_manager):
-    """Test get model info works (may fail with network error)."""
-    try:
-        info = await model_manager.get_model_info("meta-llama/Llama-3.2-1B")
-    except Exception:
-        info = None
-    assert info is None or info.repo_id == "meta-llama/Llama-3.2-1B"
-
-
-@pytest.mark.asyncio
-@pytest.mark.skip(reason="ModelRegistry API changed")
-async def test_register_and_get_model(registry):
-    """Test model registration."""
-    record = ModelRecord(
-        repo_id="test/model",
-        local_path=Path("/tmp/model.gguf"),
-        file_size=1_000_000,
-    )
-    await registry.register_model(record)
-
-    retrieved = await registry.get_model("test/model")
-    assert retrieved is not None
-    assert retrieved.repo_id == "test/model"
-
-
-@pytest.mark.asyncio
-@pytest.mark.skip(reason="ModelRegistry API changed")
-async def test_update_status(registry):
-    """Test status update."""
-    record = ModelRecord(
-        repo_id="test/model",
-        local_path=Path("/tmp/model.gguf"),
-        file_size=1_000_000,
-    )
-    await registry.register_model(record)
-
-    await registry.update_status("test/model", "ready")
-    retrieved = await registry.get_model("test/model")
-    assert retrieved is not None
-
-
-@pytest.mark.asyncio
-@pytest.mark.skip(reason="ModelRegistry API changed")
-async def test_list_models(registry):
-    """Test list models."""
-    record1 = ModelRecord(
-        repo_id="test/model1",
-        local_path=Path("/tmp/model1.gguf"),
-        file_size=1_000_000,
-    )
-    await registry.register_model(record1)
-
-    models = await registry.list_models()
-    assert len(models) >= 1
-
-
-@pytest.mark.asyncio
-@pytest.mark.skip(reason="ModelRegistry API changed")
-async def test_delete_model(registry):
-    """Test model deletion."""
-    record = ModelRecord(
-        repo_id="test/model",
-        local_path=Path("/tmp/model.gguf"),
-        file_size=1_000_000,
-    )
-    await registry.register_model(record)
-
-    await registry.delete_model("test/model")
-    retrieved = await registry.get_model("test/model")
-    assert retrieved is None
-
-
-@pytest.mark.asyncio
 async def test_model_not_found(model_manager):
     """Test model not found error."""
     with pytest.raises(ModelNotFoundError):
@@ -154,24 +69,6 @@ async def test_checksum_verification(temp_dir):
 
     is_invalid = service.verify_checksum(test_file, "invalid_hash")
     assert is_invalid is False
-
-
-
-@pytest.mark.asyncio
-@pytest.mark.skip(reason="ModelRegistry API changed")
-async def test_registry_persistence(temp_dir):
-    """Test registry persistence."""
-    registry = LocalRegistry(registry_path=temp_dir / "registry.json")
-    record = ModelRecord(
-        repo_id="test/model",
-        local_path=Path("/tmp/model.gguf"),
-        file_size=1_000_000,
-    )
-    await registry.register_model(record)
-
-    new_registry = LocalRegistry(registry_path=temp_dir / "registry.json")
-    retrieved = await new_registry.get_model("test/model")
-    assert retrieved is not None
 
 
 @pytest.mark.asyncio
