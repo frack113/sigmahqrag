@@ -49,3 +49,5 @@ data/
 logs/
 *.log
 *.tmp
+
+workflow.md

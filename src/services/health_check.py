@@ -33,7 +33,6 @@ class HealthCheckService:
         results = {
             "llm": await self._check_llm(config),
             "qdrant": await self._check_qdrant(config),
-            "hardware": self._get_hardware_info(),
             "timestamp": time.time(),
         }
         return results
@@ -120,25 +119,6 @@ class HealthCheckService:
 
         self._set_cached("qdrant", result)
         return result
-
-    def _get_hardware_info(self) -> dict[str, Any]:
-        """Get hardware information."""
-        try:
-            from src.core.hardware import detect_hardware
-
-            hw = detect_hardware()
-            return {
-                "status": "ok",
-                "cpu": hw.get("cpu", "Unknown"),
-                "memory": hw.get("memory", "Unknown"),
-                "gpu_detected": hw.get("gpu_detected", False),
-                "gpu_type": hw.get("gpu_type", None),
-            }
-        except Exception as e:
-            return {
-                "status": "error",
-                "error": str(e),
-            }
 
     def _get_cached(self, key: str) -> dict[str, Any] | None:
         """Get cached result if not expired."""

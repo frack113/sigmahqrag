@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException, Request, UploadFile, status
 from fastapi.responses import StreamingResponse
@@ -46,7 +46,7 @@ async def send_chat_message(req: ChatMessageRequest) -> ChatMessageResponse:
 
         return ChatMessageResponse(
             response=response_text,
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
             citations=citations,
             mode=req.mode,
         )

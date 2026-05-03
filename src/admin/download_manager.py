@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 import shutil
 import uuid
 import zipfile
@@ -113,8 +112,8 @@ class DownloadManager:
             )
 
         download_id = str(uuid.uuid4())
-        temp_path = self.temp_manager.create_temp_file(download_id, extension=".zip")
         file_ext = ".zip" if asset.name.endswith(".zip") else ".tar.gz"
+        temp_path = self.temp_manager.create_temp_file(download_id, extension=file_ext)
         target_path = BIN_DIR / f"{service.replace('.', '-')}{file_ext}"
 
         cancel_event = asyncio.Event()
@@ -142,6 +141,7 @@ class DownloadManager:
             "status": "started",
             "service": service,
             "version": release.tag_name,
+            "file_name": asset.name,
             "target_path": str(target_path),
         }
 
@@ -262,85 +262,101 @@ class DownloadManager:
         # Clean up existing service directory
         if service_dir.exists():
             try:
+                # On Windows, first try to remove read-only files
+                for item in service_dir.rglob("*"):
+                    try:
+                        if item.is_file():
+                            item.chmod(0o777)
+                    except Exception:
+                        pass
                 shutil.rmtree(service_dir)
                 logger.info(f"Cleaned existing directory: {service_dir}")
             except Exception as e:
                 logger.warning(f"Could not clean {service_dir}: {e}")
+                # Try alternative: rename old dir and create new one
+                try:
+                    import time
+                    old_dir = service_dir.with_suffix(f".old.{int(time.time())}")
+                    service_dir.rename(old_dir)
+                    logger.info(f"Renamed old dir to {old_dir}")
+                except Exception:
+                    pass
+
+        # Create fresh directory
+        service_dir.mkdir(parents=True, exist_ok=True)
+        logger.info(f"Created service directory: {service_dir}")
 
         try:
             BIN_DIR.mkdir(parents=True, exist_ok=True)
 
             if temp_path.suffix == ".zip":
-                with zipfile.ZipFile(temp_path, "r") as zf:
-                    members = zf.namelist()
-                    top_level = set()
-                    for name in members:
-                        parts = Path(name).parts
-                        if len(parts) > 0 and parts[0]:
-                            top_level.add(parts[0])
+                logger.info(f"Extracting ZIP: {temp_path}")
+                # Extract to a temp location first
+                import tempfile
+                with tempfile.TemporaryDirectory() as tmp_dir:
+                    with zipfile.ZipFile(temp_path, "r") as zf:
+                        zf.extractall(tmp_dir)
 
-                    logger.info(f"ZIP top-level dirs: {top_level}")
-
-                    # Extract all to BIN_DIR first
-                    zf.extractall(BIN_DIR)
-                    logger.info(f"Extracted ZIP: {temp_path.name}")
-
-                    # Find and move the extracted directory to service_dir
-                    for extracted_name in top_level:
-                        extracted_dir = BIN_DIR / extracted_name
-                        if extracted_dir.exists() and extracted_dir.is_dir():
-                            if extracted_dir != service_dir:
-                                service_dir.mkdir(parents=True, exist_ok=True)
-                                for f in os.listdir(extracted_dir):
-                                    src = extracted_dir / f
-                                    dst = service_dir / f
-                                    src.rename(dst)
-                                shutil.rmtree(extracted_dir)
-                                logger.info(f"Moved files from {extracted_name} to {service_dir}")
-                            break
-
-                    # If no top-level dir found, files are in root - move them to service_dir
-                    if not top_level:
-                        service_dir.mkdir(parents=True, exist_ok=True)
-                        for f in os.listdir(BIN_DIR):
-                            src = BIN_DIR / f
-                            if src.is_file() and src != temp_path:
-                                dst = service_dir / f
-                                src.rename(dst)
-                        logger.info(f"Moved root files to {service_dir}")
+                    # Find the top-level directory in the zip
+                    items = list(Path(tmp_dir).iterdir())
+                    logger.info(f"ZIP contains {len(items)} items: {[i.name for i in items]}")
+                    if len(items) == 1 and items[0].is_dir():
+                        # Single directory - copy contents to service_dir
+                        extracted_dir = items[0]
+                        logger.info(f"Copying from subdirectory: {extracted_dir.name}")
+                        for f in extracted_dir.iterdir():
+                            dst = service_dir / f.name
+                            logger.info(f"Copying {f.name} to {dst}")
+                            if f.is_file():
+                                shutil.copy2(f, dst)
+                            elif f.is_dir():
+                                shutil.copytree(f, dst, dirs_exist_ok=True)
+                        logger.info(f"Copied files from {extracted_dir.name} to {service_dir}")
+                    else:
+                        # Direct files - copy to service_dir
+                        for f in items:
+                            dst = service_dir / f.name
+                            if f.is_file():
+                                shutil.copy2(f, dst)
+                            elif f.is_dir():
+                                shutil.copytree(f, dst, dirs_exist_ok=True)
+                logger.info(f"Extracted to: {service_dir}")
 
             else:
                 # tar.gz handling
-                result = subprocess.run(
-                    ["tar", "-tf", str(temp_path)],
-                    capture_output=True,
-                    text=True,
-                )
-                top_level = set()
-                for name in result.stdout.splitlines()[:10]:
-                    parts = name.split("/")
-                    if parts and parts[0]:
-                        top_level.add(parts[0])
+                import tempfile
+                with tempfile.TemporaryDirectory() as tmp_dir:
+                    result = subprocess.run(
+                        ["tar", "-xf", str(temp_path), "-C", tmp_dir],
+                        capture_output=True,
+                        text=True,
+                    )
+                    if result.returncode != 0:
+                        raise RuntimeError(f"Failed to extract tar.gz: {result.stderr}")
 
-                result = subprocess.run(
-                    ["tar", "-xf", str(temp_path), "-C", str(BIN_DIR)],
-                    capture_output=True,
-                    text=True,
-                )
-                if result.returncode != 0:
-                    raise RuntimeError(f"Failed to extract tar.gz: {result.stderr}")
-
-                extracted_names = list(top_level - {"", ".", "__MACOSX"})
-                if extracted_names:
-                    extracted_dir = BIN_DIR / extracted_names[0]
-                    if extracted_dir.exists() and extracted_dir.is_dir() and extracted_dir != service_dir:
-                        service_dir.mkdir(parents=True, exist_ok=True)
-                        for f in os.listdir(extracted_dir):
-                            src = extracted_dir / f
-                            dst = service_dir / f
-                            src.rename(dst)
-                        shutil.rmtree(extracted_dir)
-                        logger.info(f"Moved files from {extracted_names[0]} to {service_dir}")
+                    # Find the top-level directory
+                    items = list(Path(tmp_dir).iterdir())
+                    logger.info(f"TAR.GZ contains {len(items)} items: {[i.name for i in items]}")
+                    if len(items) == 1 and items[0].is_dir():
+                        extracted_dir = items[0]
+                        logger.info(f"Copying from subdirectory: {extracted_dir.name}")
+                        for f in extracted_dir.iterdir():
+                            dst = service_dir / f.name
+                            logger.info(f"Copying {f.name} to {dst}")
+                            if f.is_file():
+                                shutil.copy2(f, dst)
+                            elif f.is_dir():
+                                shutil.copytree(f, dst, dirs_exist_ok=True)
+                        logger.info(f"Copied files from {extracted_dir.name} to {service_dir}")
+                    else:
+                        # Direct files
+                        for f in Path(tmp_dir).iterdir():
+                            dst = service_dir / f.name
+                            if f.is_file():
+                                shutil.copy2(f, dst)
+                            elif f.is_dir():
+                                shutil.copytree(f, dst, dirs_exist_ok=True)
+                logger.info(f"Extracted tar.gz to: {service_dir}")
 
             # Verify extraction success
             if not service_dir.exists():

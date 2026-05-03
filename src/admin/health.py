@@ -35,7 +35,7 @@ class ServiceStatus(StrEnum):
     UNKNOWN = "unknown"
 
 
-@dataclass(frozen=True)
+@dataclass
 class ServiceHealth:
     """Health status for a service."""
 
@@ -127,6 +127,13 @@ class HealthChecker:
                 message=str(e),
             )
 
+        # Add system dashboard context to the health data
+        if hasattr(health, 'message') and health.message:
+            if "Connection refused" in health.message:
+                health.message = "Service not running or unavailable. Check logs for details."
+            elif "HTTP" in health.message:
+                health.message = f"Health check endpoint returned status code: {health.message.split()[1]}"
+
         self._cache["llama"] = (health, time.time())
         return health
 
@@ -183,6 +190,13 @@ class HealthChecker:
                 message=str(e),
             )
 
+        # Add system dashboard context to the health data
+        if hasattr(health, 'message') and health.message:
+            if "Connection refused" in health.message:
+                health.message = "Service not running or unavailable. Check logs for details."
+            elif "HTTP" in health.message:
+                health.message = f"Health check endpoint returned status code: {health.message.split()[1]}"
+
         self._cache["qdrant"] = (health, time.time())
         return health
 
@@ -190,15 +204,35 @@ class HealthChecker:
         """Check health of all services.
 
         Returns:
-            Dict mapping service name to health status
+            Dict mapping service name to health status and unified dashboard view
         """
         self._cache.clear()
         llama_health = await self.check_llama()
         qdrant_health = await self.check_qdrant()
 
+        # Add a unified status for the system dashboard
+        unified_status = {
+            "status": "running" if (llama_health.status == ServiceStatus.RUNNING and qdrant_health.status == ServiceStatus.RUNNING) else "partial",
+            "details": {
+                "llama.cpp": {
+                    "status": llama_health.status,
+                    "port": llama_health.port,
+                    "url": llama_health.url,
+                    "message": llama_health.message if llama_health.message else "Healthy"
+                },
+                "qdrant": {
+                    "status": qdrant_health.status,
+                    "port": qdrant_health.port,
+                    "url": qdrant_health.url,
+                    "message": qdrant_health.message if qdrant_health.message else "Healthy"
+                }
+            }
+        }
+
         return {
             "llama": llama_health,
             "qdrant": qdrant_health,
+            "unified": unified_status
         }
 
     def clear_cache(self) -> None:

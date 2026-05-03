@@ -18,7 +18,7 @@ from src.admin.health import (
 from src.admin.service_manager import (
     create_service_manager,
 )
-from src.config import LLAMA_BIN_PATH, LOGS_DIR, MODELS_DIR, QDRANT_BIN_PATH
+from src.config import LLAMA_BIN_PATH, LOGS_DIR, QDRANT_BIN_PATH
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +70,7 @@ VALID_POST_ACTIONS = {"start", "stop"}
 @router.get(
     "/health",
 )
+
 async def get_admin_health() -> JSONResponse:
     """Get health status of all services for admin page."""
     try:
@@ -93,9 +94,9 @@ async def get_admin_health() -> JSONResponse:
         )
 
 
-def _normalize_params(action: str, service: str) -> tuple[str, str]:
+def _normalize_params(action: str, service: str | None) -> tuple[str, str | None]:
     """Normalize action and service to lowercase for case-insensitive matching."""
-    return action.lower(), service.lower()
+    return action.lower(), service.lower() if service else None
 
 
 @router.get(
@@ -103,11 +104,11 @@ def _normalize_params(action: str, service: str) -> tuple[str, str]:
 )
 async def services_get(
     action: str = Query(..., description="Action: logs"),
-    service: str = Query(..., description="Service: llama, qdrant"),
+    service: str | None = Query(None, description="Service: llama, qdrant (optional for unified actions)"),
 ) -> JSONResponse:
-    """Unified GET endpoint for service operations (logs)."""
+    """Unified GET endpoint for service operations (logs). Supports both individual and batch log retrieval."""
     try:
-        action, service = _normalize_params(action, service)
+        action = _normalize_params(action, None)[0]
 
         if action not in VALID_GET_ACTIONS:
             return JSONResponse(
@@ -115,7 +116,47 @@ async def services_get(
                 content={"error": "Invalid action"},
             )
 
-        if service not in ALLOWED_SERVICES:
+        # If no service specified, assume unified log retrieval for all services
+        if not service:
+            manager = create_service_manager()
+            result = {"success": True, "logs": {}}
+
+            try:
+                logs_llama = manager.get_logs("llama.cpp")
+                result["logs"]["llama.cpp"] = {
+                    "service": "llama.cpp",
+                    "log_file": str(LOGS_DIR / "llama.cpp.log"),
+                    "logs": logs_llama,
+                }
+            except Exception as e:
+                logger.error(f"Failed to read llama.cpp logs: {e}")
+                result["logs"]["llama.cpp"] = {
+                    "service": "llama.cpp",
+                    "log_file": str(LOGS_DIR / "llama.cpp.log"),
+                    "logs": "Error reading logs",
+                    "error": str(e)
+                }
+
+            try:
+                logs_qdrant = manager.get_logs("qdrant")
+                result["logs"]["qdrant"] = {
+                    "service": "qdrant",
+                    "log_file": str(LOGS_DIR / "qdrant.log"),
+                    "logs": logs_qdrant,
+                }
+            except Exception as e:
+                logger.error(f"Failed to read qdrant logs: {e}")
+                result["logs"]["qdrant"] = {
+                    "service": "qdrant",
+                    "log_file": str(LOGS_DIR / "qdrant.log"),
+                    "logs": "Error reading logs",
+                    "error": str(e)
+                }
+
+            return JSONResponse(content=result)
+
+        # Proceed with individual service logic if a specific service is provided
+        elif service not in ALLOWED_SERVICES:
             return JSONResponse(
                 status_code=400,
                 content={"error": "Invalid service"},
@@ -166,12 +207,11 @@ async def services_get(
 )
 async def services_post(
     action: str = Query(..., description="Action: start, stop"),
-    service: str = Query(..., description="Service: llama, qdrant"),
-    request: StartRequest | None = None,
+    service: str | None = Query(None, description="Service: llama, qdrant (optional for unified actions)"),
 ) -> JSONResponse:
-    """Unified POST endpoint for service operations (start, stop)."""
+    """Unified POST endpoint for service operations (start, stop). Supports both individual and batch service management."""
     try:
-        action, service = _normalize_params(action, service)
+        action = _normalize_params(action, None)[0]
 
         if action not in VALID_POST_ACTIONS:
             return JSONResponse(
@@ -179,7 +219,59 @@ async def services_post(
                 content={"error": "Invalid action"},
             )
 
-        if service not in ALLOWED_SERVICES:
+        # If no service specified, assume batch operation for all services
+        if not service:
+            manager = create_service_manager()
+
+            match action:
+                case "start":
+                    results = {"success": True, "details": []}
+
+                    # Start llama.cpp
+                    checker = create_health_checker()
+                    health = await checker.check_all()
+                    if health["llama"].status.value == "running":
+                        results["details"].append({"service": "llama.cpp", "error": "Already running"})
+                    else:
+                        result_llama = await manager.start_llama(model_path=str(LLAMA_BIN_PATH))
+                        if not result_llama.get("success"):
+                            results["details"].append({"service": "llama.cpp", "error": result_llama.get("error", "Failed to start")})
+
+                    # Start Qdrant
+                    if health["qdrant"].status.value == "running":
+                        results["details"].append({"service": "Qdrant", "error": "Already running"})
+                    else:
+                        result_qdrant = await manager.start_qdrant()
+                        if not result_qdrant.get("success"):
+                            results["details"].append({"service": "Qdrant", "error": result_qdrant.get("error", "Failed to start")})
+
+                    return JSONResponse(content=results)
+
+                case "stop":
+                    results = {"success": True, "details": []}
+
+                    # Stop llama.cpp if running
+                    checker = create_health_checker()
+                    health = await checker.check_all()
+                    if health["llama"].status.value == "running":
+                        result_llama = await manager.stop_llama()
+                        if not result_llama.get("success"):
+                            results["details"].append({"service": "llama.cpp", "error": result_llama.get("error", "Failed to stop")})
+                    else:
+                        results["details"].append({"service": "llama.cpp", "message": "Not running"})
+
+                    # Stop Qdrant if running
+                    if health["qdrant"].status.value == "running":
+                        result_qdrant = await manager.stop_qdrant()
+                        if not result_qdrant.get("success"):
+                            results["details"].append({"service": "Qdrant", "error": result_qdrant.get("error", "Failed to stop")})
+                    else:
+                        results["details"].append({"service": "Qdrant", "message": "Not running"})
+
+                    return JSONResponse(content=results)
+
+        # Proceed with individual service logic if a specific service is provided
+        elif service not in ALLOWED_SERVICES:
             return JSONResponse(
                 status_code=400,
                 content={"error": "Invalid service"},
@@ -192,32 +284,11 @@ async def services_post(
                 match service:
                     case "llama":
                         model_path = str(LLAMA_BIN_PATH)
-                        if request and request.model_path:
-                            candidate = Path(request.model_path)
-                            # Validate: must be absolute path under MODELS_DIR
-                            try:
-                                resolved = candidate.resolve()
-                                if not resolved.is_relative_to(MODELS_DIR):
-                                    return JSONResponse(
-                                        status_code=400,
-                                        content={"success": False, "error": "Invalid model path"},
-                                    )
-                                if not resolved.is_file():
-                                    return JSONResponse(
-                                        status_code=400,
-                                        content={"success": False, "error": "Model file not found"},
-                                    )
-                                model_path = str(resolved)
-                            except (ValueError, RuntimeError):
-                                return JSONResponse(
-                                    status_code=400,
-                                    content={"success": False, "error": "Invalid model path"},
-                                )
 
                         # Pre-check: is service already running?
                         checker = create_health_checker()
                         health = await checker.check_all()
-                        if service == "llama" and health["llama"].status.value == "running":
+                        if health["llama"].status.value == "running":
                             return JSONResponse(
                                 status_code=400,
                                 content={"success": False, "error": "llama.cpp is already running"},
@@ -347,15 +418,15 @@ class LlamaConfigRequest(BaseModel):
 @router.get("/llama/config")
 async def get_llama_config() -> JSONResponse:
     """Get llama.cpp configuration (OS, GPU)."""
-    from src.config import get_backend_gpu_type, load_config
+    from src.config import get_backend_gpu_type, get_os_type
 
     try:
-        config = load_config()
         gpu_type = get_backend_gpu_type()
+        os_type = get_os_type()
 
         return JSONResponse(content={
             "gpu": gpu_type or "cpu",
-            "os": "windows",
+            "os": os_type,
         })
     except Exception as e:
         logger.error(f"Failed to get llama config: {e}")
@@ -365,15 +436,18 @@ async def get_llama_config() -> JSONResponse:
 @router.post("/llama/config")
 async def set_llama_config(request: LlamaConfigRequest) -> JSONResponse:
     """Set llama.cpp configuration (OS, GPU)."""
-    from src.config import set_backend_gpu_type
+    from src.config import set_backend_gpu_type, set_os_type
 
     try:
         if request.gpu:
             set_backend_gpu_type(request.gpu)
 
+        if request.os:
+            set_os_type(request.os)
+
         return JSONResponse(content={
             "success": True,
-            "message": f"GPU set to {request.gpu or 'cpu'}",
+            "message": f"GPU and OS settings updated. GPU: {request.gpu or 'cpu'}, OS: {request.os or 'windows'}",
         })
     except Exception as e:
         logger.error(f"Failed to set llama config: {e}")
@@ -416,10 +490,31 @@ async def download_llama(
         return JSONResponse(content={
             "success": True,
             "download_id": result.get("download_id"),
-            "message": "Download started",
+            "file_name": result.get("file_name"),
+            "message": "Download started: " + (result.get("file_name") or "unknown"),
         })
     except Exception as e:
         logger.error(f"Failed to download llama.cpp: {e}")
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+
+@router.post("/qdrant/download")
+async def download_qdrant() -> JSONResponse:
+    """Download Qdrant binary."""
+    from src.admin.download_manager import create_download_manager
+
+    try:
+        dm = create_download_manager()
+        result = await dm.start_download("qdrant", "latest")
+
+        return JSONResponse(content={
+            "success": True,
+            "download_id": result.get("download_id"),
+            "file_name": result.get("file_name"),
+            "message": "Download started: " + (result.get("file_name") or "unknown"),
+        })
+    except Exception as e:
+        logger.error(f"Failed to download Qdrant: {e}")
         return JSONResponse(status_code=500, content={"error": str(e)})
 
 

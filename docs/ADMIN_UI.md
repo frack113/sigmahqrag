@@ -9,7 +9,6 @@
 | GET /admin/settings | Settings |
 | GET /admin/health | Health check |
 | GET /admin/logs | Logs |
-| GET /admin/hardware | Hardware |
 | GET /admin/llama | llama.cpp management |
 | GET /admin/qdrant | Qdrant management |
 | GET /admin/prompts | System prompts |

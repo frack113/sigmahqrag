@@ -3,14 +3,13 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from src.rag.search import SearchEngine
-from src.services.llm_client import LLMClient
+from src.schemas.chat_mode import ChatMode
 from src.services.rag_pipeline import RAGPipeline
 from src.services.sigma_validator import SigmaValidator
-from src.schemas.chat_mode import ChatMode
 
 logger = logging.getLogger(__name__)
 
@@ -148,7 +147,7 @@ class ChatService:
             {
                 "role": role,
                 "content": content,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
         )
         if len(self._history) > MAX_HISTORY:

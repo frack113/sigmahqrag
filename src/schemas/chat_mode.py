@@ -1,9 +1,9 @@
 """Chat mode enum."""
 
-from enum import Enum
+from enum import StrEnum
 
 
-class ChatMode(str, Enum):
+class ChatMode(StrEnum):
     """Chat operation modes."""
 
     SEARCH = "search"

@@ -214,7 +214,21 @@ class ServiceManager:
         if self._qdrant_process.is_running:
             return {"success": False, "error": "Qdrant already running"}
 
-        if not self.qdrant_bin.exists():
+        qdrant_path = self.qdrant_bin
+        # On Windows, check for .exe
+        if not qdrant_path.exists() and qdrant_path.suffix != ".exe":
+            qdrant_path_exe = qdrant_path.with_suffix(".exe")
+            if qdrant_path_exe.exists():
+                qdrant_path = qdrant_path_exe
+
+        if not qdrant_path.exists():
+            # Check if it's a directory (Qdrant extracts to a directory with the exe inside)
+            if self.qdrant_bin.is_dir():
+                exe_in_dir = self.qdrant_bin / "qdrant.exe"
+                if exe_in_dir.exists():
+                    qdrant_path = exe_in_dir
+
+        if not qdrant_path.exists():
             return {
                 "success": False,
                 "error": f"Qdrant binary not found: {self.qdrant_bin}",
@@ -231,7 +245,7 @@ class ServiceManager:
 
         try:
             cmd = [
-                str(self.qdrant_bin),
+                str(qdrant_path),
                 "--storage",
                 storage_path,
             ]

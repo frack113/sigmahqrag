@@ -252,15 +252,6 @@ async def cancel_action(
     return JSONResponse(content=response_content)
 
 
-@router.get("/hardware")
-async def get_hardware() -> JSONResponse:
-    """GET /api/v1/admin/hardware - Return hardware info."""
-    from src.core.hardware import get_hardware_report
-
-    report = await get_hardware_report()
-    return JSONResponse(content={"status": "success", "data": report})
-
-
 @router.get("/models")
 async def get_models() -> JSONResponse:
     """GET /api/v1/admin/models - Return installed models list."""

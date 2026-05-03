@@ -84,14 +84,11 @@ class CorrelationIDMiddleware(BaseHTTPMiddleware):
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
     from src.api.routes.admin_backend import router as admin_backend_router
-    from src.api.routes.admin_embedding import router as admin_embedding_router
-    from src.api.routes.admin_github import router as admin_github_router
-    from src.api.routes.admin_llm import router as admin_llm_router
+    from src.api.routes.admin_bulk import router as admin_bulk_router
+    from src.api.routes.admin_logs import router as admin_logs_router
     from src.api.routes.admin_pages import router as admin_pages_router
     from src.api.routes.admin_prompts import router as admin_prompts_router
     from src.api.routes.admin_service import router as admin_router
-    from src.api.routes.admin_bulk import router as admin_bulk_router
-    from src.api.routes.admin_logs import router as admin_logs_router
     from src.api.routes.chat import router as chat_router
     from src.api.routes.documents import router as documents_router
     from src.api.routes.embeddings import router as embeddings_router
@@ -111,9 +108,11 @@ def create_app() -> FastAPI:
     app.mount("/static", StaticFiles(directory="src/front/static"), name="static")
 
     app.include_router(admin_router)
+    app.include_router(admin_backend_router)
     app.include_router(admin_bulk_router)
     app.include_router(admin_logs_router)
     app.include_router(admin_pages_router)
+    app.include_router(admin_prompts_router)
     app.include_router(admin_v1_router)
     app.include_router(chat_router)
     app.include_router(documents_router)
@@ -123,10 +122,9 @@ def create_app() -> FastAPI:
     @app.exception_handler(SigmaError)
     async def sigma_error_handler(request: Request, exc: SigmaError) -> JSONResponse:
         """Handle SigmaError exceptions."""
-        _log_error_with_context(request, exc)
+        logger.error(f"SigmaError occurred: {exc}")
         return JSONResponse(
             status_code=exc.http_status,
-            content=exc.to_dict(),
         )
 
     @app.exception_handler(ServiceUnavailableError)
@@ -134,25 +132,29 @@ def create_app() -> FastAPI:
         request: Request, exc: ServiceUnavailableError
     ) -> JSONResponse:
         """Handle ServiceUnavailableError exceptions."""
-        _log_error_with_context(request, exc)
+        logger.error(f"Service unavailable error occurred: {exc}")
         return JSONResponse(
             status_code=exc.http_status,
             content=exc.to_dict(),
         )
 
     @app.exception_handler(ModelNotFoundError)
-    async def model_not_found_handler(request: Request, exc: ModelNotFoundError) -> JSONResponse:
+    async def model_not_found_handler(
+        request: Request, exc: ModelNotFoundError
+    ) -> JSONResponse:
         """Handle ModelNotFoundError exceptions."""
-        _log_error_with_context(request, exc)
+        logger.error(f"Model not found error occurred: {exc}")
         return JSONResponse(
             status_code=exc.http_status,
             content=exc.to_dict(),
         )
 
     @app.exception_handler(ValidationError)
-    async def validation_error_handler(request: Request, exc: ValidationError) -> JSONResponse:
+    async def validation_error_handler(
+        request: Request, exc: ValidationError
+    ) -> JSONResponse:
         """Handle ValidationError exceptions."""
-        _log_error_with_context(request, exc)
+        logger.error(f"Validation error occurred: {exc}")
         return JSONResponse(
             status_code=exc.http_status,
             content=exc.to_dict(),
@@ -194,8 +196,5 @@ def create_app() -> FastAPI:
     return app
 
 
-if __name__ == "__main__":
-    import uvicorn
-
-    app = create_app()
-    uvicorn.run(app, host="0.0.0.0", port=7860)
+# Export the app for use in Uvicorn or other ASGI servers
+app = create_app()

@@ -271,24 +271,6 @@ Returns component health status.
 }
 ```
 
-### Get Hardware
-
-```
-GET /api/v1/admin/hardware
-```
-
-Returns hardware info.
-
-**Response:**
-```json
-{
-  "status": "success",
-  "data": {
-    "hardware": {...},
-    "model_compatibility": {...}
-  }
-}
-```
 
 ### Get Models
 
@@ -367,7 +349,6 @@ POST /api/v1/admin/cancel
 | GET /admin/settings | Settings page |
 | GET /admin/health | Health check page |
 | GET /admin/logs | Logs page |
-| GET /admin/hardware | Hardware page |
 | GET /admin/llama | llama.cpp management |
 
 ---

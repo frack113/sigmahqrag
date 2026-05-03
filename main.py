@@ -1,5 +1,3 @@
 if __name__ == "__main__":
     import uvicorn
-    from src.main import create_app
-    app = create_app()
-    uvicorn.run(app, host="0.0.0.0", port=7860)
+    uvicorn.run("src.main:create_app", host="0.0.0.0", port=7860, reload=True, factory=True)

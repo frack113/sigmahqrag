@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any
 
 from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
@@ -36,12 +35,12 @@ async def get_logs(
         )
 
     try:
-        with open(LOG_PATH, "r", encoding="utf-8") as f:
+        with open(LOG_PATH, encoding="utf-8") as f:
             all_lines = f.readlines()
 
         # Filter by level if specified
         if level:
-            filtered = [l for l in all_lines if f" {level}:" in l]
+            filtered = [line for line in all_lines if f" {level}:" in line]
         else:
             filtered = all_lines
 

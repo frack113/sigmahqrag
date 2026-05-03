@@ -80,29 +80,68 @@ class VersionManager:
             Tuple of (os, arch, preferred_gpu_type)
             preferred_gpu_type: None, "hip", "cuda", or "cpu"
         """
-        system = platform.system().lower()
-        machine = platform.machine().lower()
+        # First try to read OS from config (user's choice)
+        os_name = self._read_os_preference()
 
-        if system == "windows":
-            os_name = "windows"
-        elif system == "darwin":
-            os_name = "macos"
-        elif system == "linux":
-            os_name = "linux"
-        else:
-            os_name = system
+        # If no config, detect from system
+        if not os_name:
+            system = platform.system().lower()
+            machine = platform.machine().lower()
 
-        if machine in ("x86_64", "amd64"):
-            arch = "x64"
-        elif machine in ("aarch64", "arm64"):
-            arch = "arm64"
+            if system == "windows":
+                os_name = "windows"
+            elif system == "darwin":
+                os_name = "macos"
+            elif system == "linux":
+                os_name = "linux"
+            else:
+                os_name = system
+
+            if machine in ("x86_64", "amd64"):
+                arch = "x64"
+            elif machine in ("aarch64", "arm64"):
+                arch = "arm64"
+            else:
+                arch = machine
         else:
-            arch = machine
+            # Use config OS, detect architecture
+            machine = platform.machine().lower()
+            if machine in ("x86_64", "amd64"):
+                arch = "x64"
+            elif machine in ("aarch64", "arm64"):
+                arch = "arm64"
+            else:
+                arch = machine
 
         # Read preferred GPU type from config file
         preferred_gpu_type = self._read_gpu_preference()
 
+        logger.info(f"Platform detection result: os={os_name}, arch={arch}, gpu={preferred_gpu_type}")
+
         return os_name, arch, preferred_gpu_type
+
+    def _read_os_preference(self) -> str | None:
+        """Read OS preference from config file.
+
+        Returns:
+            "windows", "linux", "macos", or None if not specified
+        """
+        try:
+            from src.config import get_backend_os, load_config
+            config = load_config()
+            print(f"DEBUG: Full config: {config}")
+            os_val = config.get("backend", {}).get("os")
+            print(f"DEBUG: OS from backend config: {os_val}")
+            if not os_val:
+                os_val = get_backend_os()
+                print(f"DEBUG: OS from get_backend_os: {os_val}")
+            logger.info(f"OS from config: {os_val}")
+            return os_val
+        except Exception as e:
+            logger.error(f"Could not read OS preference from config: {e}")
+            import traceback
+            traceback.print_exc()
+        return None
 
     def _read_gpu_preference(self) -> str | None:
         """Read GPU preference from config file.
@@ -217,10 +256,23 @@ class VersionManager:
                     return asset
 
             elif service == "qdrant":
-                # Try pattern match
-                for pattern in patterns:
-                    if re.search(pattern, asset_name):
-                        logger.info(f"Matched pattern {pattern} for {asset.name}")
+                # For Qdrant, prioritize OS-specific match
+                logger.info(f"QDRANT: Looking for {os_name} asset, asset_name={asset_name}")
+
+                if os_name == "windows":
+                    # Look for windows-msvc first
+                    for pattern in [r"x86_64-pc-windows-msvc"]:
+                        if re.search(pattern, asset_name):
+                            logger.info(f"QDRANT: Matched Windows pattern '{pattern}' for asset '{asset.name}'")
+                            return asset
+                elif os_name == "linux":
+                    for pattern in [r"x86_64-unknown-linux-musl", r"aarch64-unknown-linux-musl"]:
+                        if re.search(pattern, asset_name):
+                            logger.info(f"QDRANT: Matched Linux pattern '{pattern}' for asset '{asset.name}'")
+                            return asset
+                elif os_name == "macos":
+                    if "macos" in asset_name or "apple" in asset_name:
+                        logger.info(f"QDRANT: Matched macOS pattern for asset '{asset.name}'")
                         return asset
 
                 # Fallback: check for OS in asset name

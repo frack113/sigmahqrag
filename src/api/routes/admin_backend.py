@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/admin", tags=["admin-backend"])
 
 ALLOWED_SERVICES = {"llama", "qdrant"}
-VALID_GET_ACTIONS = {"progress", "status"}
+VALID_GET_ACTIONS = {"progress", "status", "debug"}
 VALID_POST_ACTIONS = {"download", "cancel"}
 
 
@@ -87,7 +87,37 @@ async def backend_get(
             case "status":
                 update_service = create_update_service()
                 result = await update_service.get_status()
+
+                # Add active downloads (optionally filtered by service)
+                dm = create_download_manager()
+                downloads = {}
+                service_normalized = service.replace(".","") if service else None
+                for dl_id, task in dm.active_downloads.items():
+                    task_service_normalized = task.service.replace(".","") if task.service else None
+                    if service and task_service_normalized != service_normalized:
+                        continue
+                    downloads[dl_id] = {
+                        "service": task.service,
+                        "status": task.status,
+                        "bytes_downloaded": task.bytes_downloaded,
+                        "total_bytes": task.total_bytes,
+                    }
+                result["downloads"] = downloads
                 return JSONResponse(content=result)
+
+            case "debug":
+                dm = create_download_manager()
+                return JSONResponse(content={
+                    "active_downloads": {
+                        dl_id: {
+                            "service": task.service,
+                            "status": task.status,
+                            "bytes_downloaded": task.bytes_downloaded,
+                            "total_bytes": task.total_bytes,
+                        }
+                        for dl_id, task in dm.active_downloads.items()
+                    }
+                })
 
             case _:
                 return JSONResponse(
@@ -108,18 +138,18 @@ async def backend_get(
 )
 async def backend_post(
     action: str = Query(..., description="Action: download, cancel"),
-    service: str | None = Query(None, description="Service: llama, qdrant"),
+    service: str | None = Query(None, description="Service: llama, qdrant (optional for unified actions)"),
     version: str | None = Query(None, description="Version for download (default: latest)"),
     download_id: str | None = Query(None, description="Download ID for cancel"),
 ) -> JSONResponse:
-    """Unified POST endpoint for backend operations (download, cancel)."""
+    """Unified POST endpoint for backend operations (download, cancel). Supports both individual and batch service management."""
     try:
-        action, service = _normalize_params(action, service)
+        action, _ = _normalize_params(action, None)
 
         if action not in VALID_POST_ACTIONS:
             return JSONResponse(
                 status_code=400,
-                content={"error": "Invalid action"},
+                content={"error": f"Invalid action: {action}. Allowed actions are: {VALID_POST_ACTIONS}"},
             )
 
         match action:
@@ -127,15 +157,27 @@ async def backend_post(
                 if not service or service not in ALLOWED_SERVICES:
                     return JSONResponse(
                         status_code=400,
-                        content={"error": "Valid service required (llama, qdrant)"},
+                        content={"error": f"Valid service required (llama, qdrant). Got: {service}"},
                     )
 
+                # Map service names to their actual values (e.g., 'llama' -> 'llama.cpp')
                 service_name = "llama.cpp" if service == "llama" else "qdrant"
                 manager = create_download_manager()
                 result = await manager.start_download(
                     service=service_name,
                     version=version or "latest",
                 )
+                return JSONResponse(content=result)
+
+            case "cancel":
+                if not download_id:
+                    return JSONResponse(
+                        status_code=400,
+                        content={"error": "download_id required for action=cancel"},
+                    )
+
+                manager = create_download_manager()
+                result = await manager.cancel_download(download_id)
                 return JSONResponse(content=result)
 
             case "cancel":
@@ -159,5 +201,5 @@ async def backend_post(
         logger.error(f"Backend POST action {action} failed: {e}")
         return JSONResponse(
             status_code=500,
-            content={"error": "Internal server error"},
+            content={"error": f"Internal server error: {str(e)}"},
         )

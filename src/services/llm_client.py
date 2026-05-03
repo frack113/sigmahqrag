@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, AsyncGenerator
+from collections.abc import AsyncGenerator
 
 import httpx
 

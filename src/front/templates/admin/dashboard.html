@@ -14,20 +14,6 @@
     </div>
 </div>
 
-<div class="card">
-    <h2>Hardware Information</h2>
-    <div id="hardware-info">
-        <p>Loading hardware info...</p>
-    </div>
-</div>
-
-<div class="card">
-    <h2>Installed Models</h2>
-    <div id="models-list">
-        <p>Loading models...</p>
-    </div>
-</div>
-
 <script>
 let pollInterval;
 
@@ -119,19 +105,6 @@ function showLogs(service) {
         });
 }
 
-function loadHardware() {
-    fetch('/api/v1/admin/hardware')
-        .then(r => r.json())
-        .then(data => {
-            const hw = data.hardware || {};
-            const html = `
-                <p><strong>CPU:</strong> ${hw.cpu || 'Unknown'}</p>
-                <p><strong>RAM:</strong> ${hw.memory || 'Unknown'}</p>
-                <p><strong>GPU:</strong> ${hw.gpu_detected ? hw.gpu_type : 'Not detected'}</p>
-            `;
-            document.getElementById('hardware-info').innerHTML = html;
-        });
-}
 
 function loadModels() {
     fetch('/api/v1/admin/models')
@@ -156,7 +129,6 @@ function loadModels() {
 
 function refreshStatus() {
     loadStatus();
-    loadHardware();
 }
 
 function deleteModel(repoId, filename) {
@@ -176,7 +148,6 @@ function deleteModel(repoId, filename) {
 
 document.addEventListener('DOMContentLoaded', function() {
     loadStatus();
-    loadHardware();
     loadModels();
 
     // Poll every 30 seconds

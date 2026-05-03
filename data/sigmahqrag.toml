@@ -1,4 +1,6 @@
 [backend]
 gpu_type = "hip"
+os = "windows"
 
 [system_prompts]
+analyste-sigma = "Tu es un expert en écriture de règle sigma"

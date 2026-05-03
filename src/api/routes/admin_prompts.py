@@ -37,7 +37,7 @@ class SetActiveRequest(BaseModel):
 
 @router.get("/")
 async def prompts_get(
-    action: str = Query(..., description="Action: list, get, active"),
+    action: str = Query("list", description="Action: list, get, active"),
     name: str | None = Query(None, description="Prompt name"),
 ) -> JSONResponse:
     """Unified GET endpoint for system prompt operations."""
@@ -45,7 +45,7 @@ async def prompts_get(
         match action:
             case "list":
                 prompts = list_prompts()
-                return JSONResponse(content={"prompts": prompts})
+                return JSONResponse(content=prompts)
 
             case "get":
                 if not name:
@@ -87,7 +87,7 @@ async def prompts_get(
 
 @router.post("/")
 async def prompts_post(
-    action: str = Query(..., description="Action: add, delete, set_active"),
+    action: str = Query("add", description="Action: add, delete, set_active"),
     request: AddPromptRequest | SetActiveRequest | None = None,
 ) -> JSONResponse:
     """Unified POST endpoint for system prompt write operations."""

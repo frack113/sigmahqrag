@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import platform
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -26,6 +27,7 @@ DATA_DIR = BASE_DIR
 DEFAULT_CONFIG = {
     "backend": {
         "gpu_type": "cpu",  # hip, cuda, cpu
+        "os": None,  # windows, linux, macos (auto-detected if None)
     },
     "models": {
         "llm_dir": "data/models/llm",
@@ -83,6 +85,9 @@ def load_config() -> dict[str, Any]:
     else:
         logger.info(f"Config file {CONFIG_FILE} not found, using defaults")
 
+    if "os" not in config:
+        config["os"] = platform.system().lower()
+
     return config
 
 
@@ -104,12 +109,46 @@ def get_backend_gpu_type() -> str:
     return load_config().get("backend", {}).get("gpu_type", "cpu")
 
 
+def get_backend_os() -> str:
+    """Get OS from config (windows, linux, macos)."""
+    return load_config().get("backend", {}).get("os", "windows")
+
+
 def set_backend_gpu_type(gpu_type: str) -> None:
     """Set GPU type in config (only in memory for this session)."""
     config = load_config()
     if "backend" not in config:
         config["backend"] = {}
     config["backend"]["gpu_type"] = gpu_type
+
+    # Persist the change to the TOML file (if needed)
+    _persist_config(config)
+
+
+def get_os_type() -> str:
+    """Get OS type from config (windows, linux, macos)."""
+    return load_config().get("backend", {}).get("os", platform.system().lower())
+
+
+def set_os_type(os_type: str) -> None:
+    """Set OS type in config (only in memory for this session)."""
+    config = load_config()
+    if "backend" not in config:
+        config["backend"] = {}
+    config["backend"]["os"] = os_type
+
+    # Persist the change to the TOML file (if needed)
+    _persist_config(config)
+
+
+def _persist_config(config: dict) -> None:
+    """Persist the updated configuration to the TOML file."""
+    try:
+        CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with open(CONFIG_FILE, "wb") as f:
+            tomllib.dump(config, f)
+    except Exception as e:
+        logger.error(f"Failed to persist config: {e}")
 
 
 def get_llama_config() -> dict[str, Any]:
