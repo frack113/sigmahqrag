@@ -101,11 +101,27 @@ async def check_all() -> dict[str, Any]:
         }
     except TimeoutError:
         return {
-            "llama_cpp": {"status": "inactive", "component": "llama.cpp", "message": "timeout"},
-            "qdrant": {"status": "inactive", "component": "qdrant", "message": "timeout"},
+            "llama_cpp": {
+                "status": "inactive",
+                "component": "llama.cpp",
+                "message": "timeout",
+            },
+            "qdrant": {
+                "status": "inactive",
+                "component": "qdrant",
+                "message": "timeout",
+            },
         }
     except httpx.HTTPError:
         return {
-            "llama_cpp": {"status": "inactive", "component": "llama.cpp", "message": "HTTP error"},
-            "qdrant": {"status": "inactive", "component": "qdrant", "message": "HTTP error"},
+            "llama_cpp": {
+                "status": "inactive",
+                "component": "llama.cpp",
+                "message": "HTTP error",
+            },
+            "qdrant": {
+                "status": "inactive",
+                "component": "qdrant",
+                "message": "HTTP error",
+            },
         }

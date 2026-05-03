@@ -21,4 +21,5 @@ class TestAirGappedConfig:
         """Test env var is handled."""
         # Just verify module loads
         from src.rag import embeddings
+
         assert embeddings is not None

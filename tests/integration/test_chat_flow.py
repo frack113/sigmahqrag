@@ -5,10 +5,10 @@ from __future__ import annotations
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from src.services.chat_service import ChatService
-from src.services.llm_client import LLMClient
-from src.services.rag_pipeline import RAGPipeline
-from src.services.sigma_validator import SigmaValidator
+from src.core.services.chat_service import ChatService
+from src.core.services.llm_client import LLMClient
+from src.core.services.rag_pipeline import RAGPipeline
+from src.core.services.sigma_validator import SigmaValidator
 
 
 @pytest.fixture
@@ -72,10 +72,12 @@ detection:
 async def test_search_flow(chat_service: ChatService) -> None:
     """Test search mode flow with LLM response."""
     # Mock search results
-    chat_service.search_engine.search = AsyncMock(return_value=[
-        {"text": "Rule 1 content", "citation": "sigma:rule_1", "score": 0.95},
-        {"text": "Rule 2 content", "citation": "sigma:rule_2", "score": 0.85},
-    ])
+    chat_service.search_engine.search = AsyncMock(
+        return_value=[
+            {"text": "Rule 1 content", "citation": "sigma:rule_1", "score": 0.95},
+            {"text": "Rule 2 content", "citation": "sigma:rule_2", "score": 0.85},
+        ]
+    )
 
     # Mock RAG pipeline response
     chat_service.rag_pipeline.answer_search_query = AsyncMock(
@@ -98,9 +100,11 @@ async def test_coverage_flow(chat_service: ChatService) -> None:
     }
 
     # Mock search results
-    chat_service.search_engine.search = AsyncMock(return_value=[
-        {"text": "Related rule 1", "citation": "sigma:rule_2"},
-    ])
+    chat_service.search_engine.search = AsyncMock(
+        return_value=[
+            {"text": "Related rule 1", "citation": "sigma:rule_2"},
+        ]
+    )
 
     # Mock RAG pipeline response
     chat_service.rag_pipeline.analyze_coverage = AsyncMock(
@@ -136,9 +140,11 @@ async def test_fallback_when_llm_unavailable(chat_service: ChatService) -> None:
     )
 
     # Mock search results
-    chat_service.search_engine.search = AsyncMock(return_value=[
-        {"text": "Some rule content", "score": 0.9},
-    ])
+    chat_service.search_engine.search = AsyncMock(
+        return_value=[
+            {"text": "Some rule content", "score": 0.9},
+        ]
+    )
 
     response = await chat_service._handle_search("test query")
     # Should return fallback (not exception)

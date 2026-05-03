@@ -33,8 +33,7 @@ def _cleanup_expired_entries() -> None:
     """Remove expired entries (Patch 2: TTL support)."""
     now = time.time()
     expired_keys = [
-        k for k, (_, ts, _) in _idempotency_store.items()
-        if now - ts > _IDEMPOTENCY_TTL
+        k for k, (_, ts, _) in _idempotency_store.items() if now - ts > _IDEMPOTENCY_TTL
     ]
     for k in expired_keys:
         del _idempotency_store[k]
@@ -42,10 +41,9 @@ def _cleanup_expired_entries() -> None:
     if len(_idempotency_store) > _IDEMPOTENCY_MAX_SIZE:
         # Remove oldest entries
         sorted_keys = sorted(
-            _idempotency_store.keys(),
-            key=lambda k: _idempotency_store[k][1]
+            _idempotency_store.keys(), key=lambda k: _idempotency_store[k][1]
         )
-        for k in sorted_keys[:len(sorted_keys) // 2]:
+        for k in sorted_keys[: len(sorted_keys) // 2]:
             del _idempotency_store[k]
 
 
@@ -70,7 +68,10 @@ async def check_service_health() -> dict[str, Any]:
         async def check_llama():
             try:
                 response = await client.get(llama_url, timeout=2.0)
-                if response.status_code == 200 and response.json().get("status") == "healthy":
+                if (
+                    response.status_code == 200
+                    and response.json().get("status") == "healthy"
+                ):
                     result["llama_cpp"]["status"] = "active"
                 else:
                     result["llama_cpp"]["status"] = "inactive"
@@ -80,7 +81,10 @@ async def check_service_health() -> dict[str, Any]:
         async def check_qdrant():
             try:
                 response = await client.get(qdrant_url, timeout=2.0)
-                if response.status_code == 200 and response.json().get("status") == "healthy":
+                if (
+                    response.status_code == 200
+                    and response.json().get("status") == "healthy"
+                ):
                     result["qdrant"]["status"] = "active"
                 else:
                     result["qdrant"]["status"] = "inactive"
@@ -94,17 +98,20 @@ async def check_service_health() -> dict[str, Any]:
 
 class DownloadRequest(BaseModel):
     """Request model for download action (Patch 13: Pydantic model)."""
+
     repo_url: str | None = None
     target_dir: str | None = None
 
 
 class CancelRequest(BaseModel):
     """Request model for cancel action (Patch 13: Pydantic model)."""
+
     job_id: str
 
 
 class JobResponse(BaseModel):
     """Response model for job actions (Patch 13: Pydantic model)."""
+
     job_id: str
     status: str
 
@@ -164,7 +171,11 @@ async def download_action(
         )
         # Patch 4: Cache error responses too
         if _is_valid_idempotency_key(x_idempotency_key):
-            _idempotency_store[f"download:{x_idempotency_key}"] = (response.content, time.time(), "download")
+            _idempotency_store[f"download:{x_idempotency_key}"] = (
+                response.content,
+                time.time(),
+                "download",
+            )
         return response
 
     if health["qdrant"]["status"] != "active":
@@ -176,7 +187,11 @@ async def download_action(
         )
         # Patch 4: Cache error responses too
         if _is_valid_idempotency_key(x_idempotency_key):
-            _idempotency_store[f"download:{x_idempotency_key}"] = (response.content, time.time(), "download")
+            _idempotency_store[f"download:{x_idempotency_key}"] = (
+                response.content,
+                time.time(),
+                "download",
+            )
         return response
 
     # Process download action
@@ -186,7 +201,11 @@ async def download_action(
 
     # Patch 2,5: Store idempotency result with timestamp
     if _is_valid_idempotency_key(x_idempotency_key):
-        _idempotency_store[f"download:{x_idempotency_key}"] = (response_content, time.time(), "download")
+        _idempotency_store[f"download:{x_idempotency_key}"] = (
+            response_content,
+            time.time(),
+            "download",
+        )
 
     return JSONResponse(content=response_content)
 
@@ -235,7 +254,11 @@ async def cancel_action(
         )
         # Patch 4: Cache error responses too
         if _is_valid_idempotency_key(x_idempotency_key):
-            _idempotency_store[f"cancel:{x_idempotency_key}"] = (response.content, time.time(), "cancel")
+            _idempotency_store[f"cancel:{x_idempotency_key}"] = (
+                response.content,
+                time.time(),
+                "cancel",
+            )
         return response
 
     # Process cancel action
@@ -247,7 +270,11 @@ async def cancel_action(
 
     # Patch 2,5: Store with timestamp and namespace
     if _is_valid_idempotency_key(x_idempotency_key):
-        _idempotency_store[f"cancel:{x_idempotency_key}"] = (response_content, time.time(), "cancel")
+        _idempotency_store[f"cancel:{x_idempotency_key}"] = (
+            response_content,
+            time.time(),
+            "cancel",
+        )
 
     return JSONResponse(content=response_content)
 
@@ -264,14 +291,18 @@ async def get_models() -> JSONResponse:
         model_list = []
         for m in models:
             for filename, f in m.files.items():
-                model_list.append({
-                    "repo_id": m.repo_id,
-                    "filename": filename,
-                    "size_mb": f.file_size / (1024 * 1024) if f.file_size else 0,
-                    "status": m.status.value,
-                })
+                model_list.append(
+                    {
+                        "repo_id": m.repo_id,
+                        "filename": filename,
+                        "size_mb": f.file_size / (1024 * 1024) if f.file_size else 0,
+                        "status": m.status.value,
+                    }
+                )
 
-        return JSONResponse(content={"status": "success", "data": {"models": model_list}})
+        return JSONResponse(
+            content={"status": "success", "data": {"models": model_list}}
+        )
     except Exception as e:
         logger.error(f"Failed to list models: {e}")
         return JSONResponse(
@@ -283,8 +314,9 @@ async def get_models() -> JSONResponse:
 @router.post("/models/delete")
 async def delete_model(request: dict) -> JSONResponse:
     """POST /api/v1/admin/models/delete - Delete a model."""
-    from src.api.dependencies import get_model_manager
     from src.core.services.manager import ModelNotFoundError
+
+    from src.api.dependencies import get_model_manager
 
     try:
         repo_id = request.get("repo_id")
@@ -299,9 +331,13 @@ async def delete_model(request: dict) -> JSONResponse:
         mm = get_model_manager()
         await mm.delete_model(repo_id, filename)
 
-        return JSONResponse(content={"status": "success", "message": f"Deleted {repo_id}/{filename}"})
+        return JSONResponse(
+            content={"status": "success", "message": f"Deleted {repo_id}/{filename}"}
+        )
     except ModelNotFoundError as e:
-        return JSONResponse(status_code=404, content={"status": "error", "error": str(e)})
+        return JSONResponse(
+            status_code=404, content={"status": "error", "error": str(e)}
+        )
     except Exception as e:
         logger.error(f"Failed to delete model: {e}")
         return JSONResponse(

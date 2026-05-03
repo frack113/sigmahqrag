@@ -128,4 +128,6 @@ class TestHealthCheckTimeout:
         result = await check_llama_cpp()
 
         assert result["status"] == "inactive"
-        assert "timeout" in result.get("message", "").lower() or True  # May or may not have message
+        assert (
+            "timeout" in result.get("message", "").lower() or True
+        )  # May or may not have message

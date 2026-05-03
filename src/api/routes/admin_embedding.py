@@ -69,11 +69,13 @@ async def embedding_admin_post(
                     repo_id=repo_id,
                     filename=filename,
                 )
-                return JSONResponse(content={
-                    "success": True,
-                    "repo_id": repo_id,
-                    "path": str(record.local_path),
-                })
+                return JSONResponse(
+                    content={
+                        "success": True,
+                        "repo_id": repo_id,
+                        "path": str(record.local_path),
+                    }
+                )
 
             case "delete":
                 await manager.delete_model(repo_id)

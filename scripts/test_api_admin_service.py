@@ -69,14 +69,29 @@ def main() -> None:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     p_start = subparsers.add_parser("start", help="Start a service")
-    p_start.add_argument("--service", default="llama", choices=["llama", "qdrant"], help="Service to start")
+    p_start.add_argument(
+        "--service",
+        default="llama",
+        choices=["llama", "qdrant"],
+        help="Service to start",
+    )
     p_start.add_argument("--model-path", help="Model path for llama")
 
     p_stop = subparsers.add_parser("stop", help="Stop a service")
-    p_stop.add_argument("--service", default="llama", choices=["llama", "qdrant"], help="Service to stop")
+    p_stop.add_argument(
+        "--service",
+        default="llama",
+        choices=["llama", "qdrant"],
+        help="Service to stop",
+    )
 
     p_logs = subparsers.add_parser("logs", help="Get service logs")
-    p_logs.add_argument("--service", default="llama", choices=["llama", "qdrant"], help="Service to get logs for")
+    p_logs.add_argument(
+        "--service",
+        default="llama",
+        choices=["llama", "qdrant"],
+        help="Service to get logs for",
+    )
 
     args = parser.parse_args()
 

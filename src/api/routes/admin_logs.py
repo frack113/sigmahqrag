@@ -30,9 +30,7 @@ async def get_logs(
         JSON with log entries
     """
     if not LOG_PATH.exists():
-        return JSONResponse(
-            content={"logs": [], "message": "Log file not found"}
-        )
+        return JSONResponse(content={"logs": [], "message": "Log file not found"})
 
     try:
         with open(LOG_PATH, encoding="utf-8") as f:
@@ -55,7 +53,4 @@ async def get_logs(
 
     except Exception as e:
         logger.error(f"Failed to read logs: {e}")
-        return JSONResponse(
-            status_code=500,
-            content={"error": str(e)}
-        )
+        return JSONResponse(status_code=500, content={"error": str(e)})

@@ -9,7 +9,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from src.config import load_config
-from src.services.health_check import HealthCheckService
+from src.core.services.health_check import HealthCheckService
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +23,9 @@ health_service = HealthCheckService()
 @router.get("/admin")
 async def admin_dashboard(request: Request) -> HTMLResponse:
     """Serve admin backend page."""
-    return templates.TemplateResponse(request=request, name="admin/backend.html", context={"config": load_config()})
+    return templates.TemplateResponse(
+        request=request, name="admin/backend.html", context={"config": load_config()}
+    )
 
 
 @router.get("/admin/models")

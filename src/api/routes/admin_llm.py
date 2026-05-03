@@ -38,23 +38,26 @@ async def llm_endpoint(
 
             case "installed":
                 models = await mm.list_installed_models()
-                return JSONResponse(content={
-                    "models": [
-                        {
-                            "repo_id": m.repo_id,
-                            "files": [
-                                {
-                                    "filename": fn,
-                                    "path": str(f.local_path),
-                                    "size": f.file_size,
-                                    "status": f.status,
-                                }
-                                for fn, f in m.files.items()
-                            ],
-                            "status": m.status,
-                        } for m in models
-                    ]
-                })
+                return JSONResponse(
+                    content={
+                        "models": [
+                            {
+                                "repo_id": m.repo_id,
+                                "files": [
+                                    {
+                                        "filename": fn,
+                                        "path": str(f.local_path),
+                                        "size": f.file_size,
+                                        "status": f.status,
+                                    }
+                                    for fn, f in m.files.items()
+                                ],
+                                "status": m.status,
+                            }
+                            for m in models
+                        ]
+                    }
+                )
 
             case "info":
                 if not repo_id:
@@ -83,20 +86,24 @@ async def llm_endpoint(
                             size = f.size
                             if size is None:
                                 size = 0
-                            siblings.append({
-                                "filename": f.rfilename,
-                                "size": size,
-                            })
+                            siblings.append(
+                                {
+                                    "filename": f.rfilename,
+                                    "size": size,
+                                }
+                            )
 
-                return JSONResponse(content={
-                    "repo_id": repo_id,
-                    "id": info.id,
-                    "author": info.author,
-                    "sha": info.sha,
-                    "last_modified": to_iso(info.last_modified),
-                    "tags": list(info.tags) if info.tags else [],
-                    "siblings": siblings,
-                })
+                return JSONResponse(
+                    content={
+                        "repo_id": repo_id,
+                        "id": info.id,
+                        "author": info.author,
+                        "sha": info.sha,
+                        "last_modified": to_iso(info.last_modified),
+                        "tags": list(info.tags) if info.tags else [],
+                        "siblings": siblings,
+                    }
+                )
 
             case _:
                 return JSONResponse(
@@ -129,16 +136,20 @@ async def llm_post_endpoint(
                     filename=filename,
                     expected_hash=expected_hash,
                 )
-                return JSONResponse(content={
-                    "success": True,
-                    "repo_id": repo_id,
-                    "path": str(record.local_path),
-                    "size": record.file_size,
-                })
+                return JSONResponse(
+                    content={
+                        "success": True,
+                        "repo_id": repo_id,
+                        "path": str(record.local_path),
+                        "size": record.file_size,
+                    }
+                )
 
             case "delete":
                 await mm.delete_model(repo_id, filename)
-                return JSONResponse(content={"success": True, "repo_id": repo_id, "filename": filename})
+                return JSONResponse(
+                    content={"success": True, "repo_id": repo_id, "filename": filename}
+                )
 
             case _:
                 return JSONResponse(

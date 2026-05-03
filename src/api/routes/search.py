@@ -75,7 +75,9 @@ async def search_rules(request: SearchRequest) -> SearchResponse:
         )
 
     except TimeoutError:
-        logger.error(f"Search timeout after {SEARCH_TIMEOUT}s for query: {request.query}")
+        logger.error(
+            f"Search timeout after {SEARCH_TIMEOUT}s for query: {request.query}"
+        )
         raise HTTPException(
             status_code=status.HTTP_504_GATEWAY_TIMEOUT,
             detail=f"Search timeout (>{SEARCH_TIMEOUT}s)",

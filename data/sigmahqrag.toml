@@ -1,6 +1,27 @@
+os = "windows"
+
 [backend]
 gpu_type = "hip"
 os = "windows"
 
-[system_prompts]
-analyste-sigma = "Tu es un expert en écriture de règle sigma"
+[models]
+llm_dir = "data/models/llm"
+embeddings_dir = "data/models/embeddings"
+
+[services.llama]
+base_url = "http://127.0.0.1:8080"
+
+[services.qdrant]
+host = "127.0.0.1"
+port = 6333
+collection_name = "sigma_rules"
+vector_size = 384
+
+[paths]
+bin_dir = "data/bin"
+models_dir = "data/models"
+logs_dir = "logs"
+backup_dir = "backups"
+
+[logging]
+level = "INFO"

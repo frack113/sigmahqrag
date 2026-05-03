@@ -89,12 +89,16 @@ class TestIdempotencyMiddleware:
         # Different keys should not share cache
         assert response1.json()["data"]["job_id"] != response2.json()["data"]["job_id"]
 
-    def test_no_idempotency_key_processes_normally(
-        self, client: TestClient
-    ) -> None:
+    def test_no_idempotency_key_processes_normally(self, client: TestClient) -> None:
         """Given request has no idempotency key, when API receives it, then processes normally (NFR20)."""
-        with patch("src.api.v1.admin.check_service_health", new_callable=AsyncMock) as mock_health, \
-             patch("src.api.v1.admin.start_download", new_callable=AsyncMock) as mock_start:
+        with (
+            patch(
+                "src.api.v1.admin.check_service_health", new_callable=AsyncMock
+            ) as mock_health,
+            patch(
+                "src.api.v1.admin.start_download", new_callable=AsyncMock
+            ) as mock_start,
+        ):
             mock_start.return_value = {"job_id": "job-789", "status": "started"}
             mock_health.return_value = {
                 "llama_cpp": {"status": "active"},
@@ -128,12 +132,16 @@ class TestIdempotencyMiddleware:
         # Should not cache GET requests
         assert "data" in response.json()
 
-    def test_empty_idempotency_key(
-        self, client: TestClient
-    ) -> None:
+    def test_empty_idempotency_key(self, client: TestClient) -> None:
         """Given POST with empty idempotency key, when key is empty string, then processes normally (no caching)."""
-        with patch("src.api.v1.admin.check_service_health", new_callable=AsyncMock) as mock_health, \
-             patch("src.api.v1.admin.start_download", new_callable=AsyncMock) as mock_start:
+        with (
+            patch(
+                "src.api.v1.admin.check_service_health", new_callable=AsyncMock
+            ) as mock_health,
+            patch(
+                "src.api.v1.admin.start_download", new_callable=AsyncMock
+            ) as mock_start,
+        ):
             mock_start.return_value = {"job_id": "job-empty", "status": "started"}
             mock_health.return_value = {
                 "llama_cpp": {"status": "active"},

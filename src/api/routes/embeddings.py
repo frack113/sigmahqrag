@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 class EmbeddingEmbedRequest(BaseModel):
     """Request to generate embeddings."""
+
     text: list[str]
     model_name: str | None = None
 
@@ -27,7 +28,7 @@ router = APIRouter(prefix="/embeddings", tags=["embeddings"])
 async def search_embedding_models(
     query: str,
     limit: int = 20,
-    manager: EmbeddingManager = Depends(get_embedding_manager)
+    manager: EmbeddingManager = Depends(get_embedding_manager),
 ) -> JSONResponse:
     """Search for embedding models on HuggingFace."""
     try:
@@ -40,8 +41,7 @@ async def search_embedding_models(
 
 @router.get("/{repo_id}/files")
 async def get_embedding_files(
-    repo_id: str,
-    manager: EmbeddingManager = Depends(get_embedding_manager)
+    repo_id: str, manager: EmbeddingManager = Depends(get_embedding_manager)
 ) -> JSONResponse:
     """Get files for an embedding model repo."""
     try:
@@ -56,7 +56,7 @@ async def get_embedding_files(
 
 @router.get("/installed")
 async def list_installed_embeddings(
-    manager: EmbeddingManager = Depends(get_embedding_manager)
+    manager: EmbeddingManager = Depends(get_embedding_manager),
 ) -> JSONResponse:
     """List installed embedding models."""
     try:
@@ -70,7 +70,7 @@ async def list_installed_embeddings(
 @router.post("/embed")
 async def embed_text(
     request: EmbeddingEmbedRequest,
-    manager: EmbeddingManager = Depends(get_embedding_manager)
+    manager: EmbeddingManager = Depends(get_embedding_manager),
 ) -> JSONResponse:
     """Generate embeddings for the provided text."""
     try:

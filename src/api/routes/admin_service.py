@@ -10,15 +10,13 @@ from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from src.admin.health import (
+from src.config import LLAMA_BIN_PATH, LOGS_DIR, QDRANT_BIN_PATH
+from src.core.health import (
     ServiceHealth,
     ServiceStatus,
     create_health_checker,
 )
-from src.admin.service_manager import (
-    create_service_manager,
-)
-from src.config import LLAMA_BIN_PATH, LOGS_DIR, QDRANT_BIN_PATH
+from src.core.service_manager import create_service_manager
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +68,6 @@ VALID_POST_ACTIONS = {"start", "stop"}
 @router.get(
     "/health",
 )
-
 async def get_admin_health() -> JSONResponse:
     """Get health status of all services for admin page."""
     try:
@@ -104,7 +101,9 @@ def _normalize_params(action: str, service: str | None) -> tuple[str, str | None
 )
 async def services_get(
     action: str = Query(..., description="Action: logs"),
-    service: str | None = Query(None, description="Service: llama, qdrant (optional for unified actions)"),
+    service: str | None = Query(
+        None, description="Service: llama, qdrant (optional for unified actions)"
+    ),
 ) -> JSONResponse:
     """Unified GET endpoint for service operations (logs). Supports both individual and batch log retrieval."""
     try:
@@ -134,7 +133,7 @@ async def services_get(
                     "service": "llama.cpp",
                     "log_file": str(LOGS_DIR / "llama.cpp.log"),
                     "logs": "Error reading logs",
-                    "error": str(e)
+                    "error": str(e),
                 }
 
             try:
@@ -150,7 +149,7 @@ async def services_get(
                     "service": "qdrant",
                     "log_file": str(LOGS_DIR / "qdrant.log"),
                     "logs": "Error reading logs",
-                    "error": str(e)
+                    "error": str(e),
                 }
 
             return JSONResponse(content=result)
@@ -207,7 +206,9 @@ async def services_get(
 )
 async def services_post(
     action: str = Query(..., description="Action: start, stop"),
-    service: str | None = Query(None, description="Service: llama, qdrant (optional for unified actions)"),
+    service: str | None = Query(
+        None, description="Service: llama, qdrant (optional for unified actions)"
+    ),
 ) -> JSONResponse:
     """Unified POST endpoint for service operations (start, stop). Supports both individual and batch service management."""
     try:
@@ -231,19 +232,39 @@ async def services_post(
                     checker = create_health_checker()
                     health = await checker.check_all()
                     if health["llama"].status.value == "running":
-                        results["details"].append({"service": "llama.cpp", "error": "Already running"})
+                        results["details"].append(
+                            {"service": "llama.cpp", "error": "Already running"}
+                        )
                     else:
-                        result_llama = await manager.start_llama(model_path=str(LLAMA_BIN_PATH))
+                        result_llama = await manager.start_llama(
+                            model_path=str(LLAMA_BIN_PATH)
+                        )
                         if not result_llama.get("success"):
-                            results["details"].append({"service": "llama.cpp", "error": result_llama.get("error", "Failed to start")})
+                            results["details"].append(
+                                {
+                                    "service": "llama.cpp",
+                                    "error": result_llama.get(
+                                        "error", "Failed to start"
+                                    ),
+                                }
+                            )
 
                     # Start Qdrant
                     if health["qdrant"].status.value == "running":
-                        results["details"].append({"service": "Qdrant", "error": "Already running"})
+                        results["details"].append(
+                            {"service": "Qdrant", "error": "Already running"}
+                        )
                     else:
                         result_qdrant = await manager.start_qdrant()
                         if not result_qdrant.get("success"):
-                            results["details"].append({"service": "Qdrant", "error": result_qdrant.get("error", "Failed to start")})
+                            results["details"].append(
+                                {
+                                    "service": "Qdrant",
+                                    "error": result_qdrant.get(
+                                        "error", "Failed to start"
+                                    ),
+                                }
+                            )
 
                     return JSONResponse(content=results)
 
@@ -256,17 +277,35 @@ async def services_post(
                     if health["llama"].status.value == "running":
                         result_llama = await manager.stop_llama()
                         if not result_llama.get("success"):
-                            results["details"].append({"service": "llama.cpp", "error": result_llama.get("error", "Failed to stop")})
+                            results["details"].append(
+                                {
+                                    "service": "llama.cpp",
+                                    "error": result_llama.get(
+                                        "error", "Failed to stop"
+                                    ),
+                                }
+                            )
                     else:
-                        results["details"].append({"service": "llama.cpp", "message": "Not running"})
+                        results["details"].append(
+                            {"service": "llama.cpp", "message": "Not running"}
+                        )
 
                     # Stop Qdrant if running
                     if health["qdrant"].status.value == "running":
                         result_qdrant = await manager.stop_qdrant()
                         if not result_qdrant.get("success"):
-                            results["details"].append({"service": "Qdrant", "error": result_qdrant.get("error", "Failed to stop")})
+                            results["details"].append(
+                                {
+                                    "service": "Qdrant",
+                                    "error": result_qdrant.get(
+                                        "error", "Failed to stop"
+                                    ),
+                                }
+                            )
                     else:
-                        results["details"].append({"service": "Qdrant", "message": "Not running"})
+                        results["details"].append(
+                            {"service": "Qdrant", "message": "Not running"}
+                        )
 
                     return JSONResponse(content=results)
 
@@ -291,7 +330,10 @@ async def services_post(
                         if health["llama"].status.value == "running":
                             return JSONResponse(
                                 status_code=400,
-                                content={"success": False, "error": "llama.cpp is already running"},
+                                content={
+                                    "success": False,
+                                    "error": "llama.cpp is already running",
+                                },
                             )
 
                         result = await manager.start_llama(model_path=model_path)
@@ -321,7 +363,10 @@ async def services_post(
                         if health["qdrant"].status.value == "running":
                             return JSONResponse(
                                 status_code=400,
-                                content={"success": False, "error": "Qdrant is already running"},
+                                content={
+                                    "success": False,
+                                    "error": "Qdrant is already running",
+                                },
                             )
 
                         result = await manager.start_qdrant()
@@ -353,7 +398,10 @@ async def services_post(
                         if health["llama"].status.value != "running":
                             return JSONResponse(
                                 status_code=400,
-                                content={"success": False, "error": "llama.cpp is not running"},
+                                content={
+                                    "success": False,
+                                    "error": "llama.cpp is not running",
+                                },
                             )
 
                         result = await manager.stop_llama()
@@ -380,7 +428,10 @@ async def services_post(
                         if health["qdrant"].status.value != "running":
                             return JSONResponse(
                                 status_code=400,
-                                content={"success": False, "error": "Qdrant is not running"},
+                                content={
+                                    "success": False,
+                                    "error": "Qdrant is not running",
+                                },
                             )
 
                         result = await manager.stop_qdrant()
@@ -409,55 +460,10 @@ async def services_post(
         )
 
 
-class LlamaConfigRequest(BaseModel):
-    """Request model for llama.cpp configuration."""
-    os: str | None = None
-    gpu: str | None = None
-
-
-@router.get("/llama/config")
-async def get_llama_config() -> JSONResponse:
-    """Get llama.cpp configuration (OS, GPU)."""
-    from src.config import get_backend_gpu_type, get_os_type
-
-    try:
-        gpu_type = get_backend_gpu_type()
-        os_type = get_os_type()
-
-        return JSONResponse(content={
-            "gpu": gpu_type or "cpu",
-            "os": os_type,
-        })
-    except Exception as e:
-        logger.error(f"Failed to get llama config: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
-
-
-@router.post("/llama/config")
-async def set_llama_config(request: LlamaConfigRequest) -> JSONResponse:
-    """Set llama.cpp configuration (OS, GPU)."""
-    from src.config import set_backend_gpu_type, set_os_type
-
-    try:
-        if request.gpu:
-            set_backend_gpu_type(request.gpu)
-
-        if request.os:
-            set_os_type(request.os)
-
-        return JSONResponse(content={
-            "success": True,
-            "message": f"GPU and OS settings updated. GPU: {request.gpu or 'cpu'}, OS: {request.os or 'windows'}",
-        })
-    except Exception as e:
-        logger.error(f"Failed to set llama config: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
-
-
 @router.get("/llama/info")
 async def get_llama_info() -> JSONResponse:
     """Get llama.cpp version and update info."""
-    from src.admin.version_manager import (
+    from src.core.version_manager import (
         check_for_updates,
         get_current_version,
     )
@@ -466,33 +472,40 @@ async def get_llama_info() -> JSONResponse:
         current = await get_current_version("llama.cpp")
         update_info = await check_for_updates("llama.cpp")
 
-        return JSONResponse(content={
-            "current_version": current,
-            "update_available": update_info.get("update_available") if update_info else False,
-            "latest_version": update_info.get("latest_version") if update_info else None,
-        })
+        return JSONResponse(
+            content={
+                "current_version": current,
+                "update_available": (
+                    update_info.get("update_available") if update_info else False
+                ),
+                "latest_version": (
+                    update_info.get("latest_version") if update_info else None
+                ),
+            }
+        )
     except Exception as e:
         logger.error(f"Failed to get llama info: {e}")
         return JSONResponse(status_code=500, content={"error": str(e)})
 
 
 @router.post("/llama/download")
-async def download_llama(
-    request: LlamaConfigRequest | None = None,
-) -> JSONResponse:
+async def download_llama() -> JSONResponse:
     """Download llama.cpp binary."""
-    from src.admin.download_manager import create_download_manager
+    from src.core.download_manager import create_download_manager
 
     try:
         dm = create_download_manager()
         result = await dm.start_download("llama.cpp", "latest")
 
-        return JSONResponse(content={
-            "success": True,
-            "download_id": result.get("download_id"),
-            "file_name": result.get("file_name"),
-            "message": "Download started: " + (result.get("file_name") or "unknown"),
-        })
+        return JSONResponse(
+            content={
+                "success": True,
+                "download_id": result.get("download_id"),
+                "file_name": result.get("file_name"),
+                "message": "Download started: "
+                + (result.get("file_name") or "unknown"),
+            }
+        )
     except Exception as e:
         logger.error(f"Failed to download llama.cpp: {e}")
         return JSONResponse(status_code=500, content={"error": str(e)})
@@ -501,18 +514,21 @@ async def download_llama(
 @router.post("/qdrant/download")
 async def download_qdrant() -> JSONResponse:
     """Download Qdrant binary."""
-    from src.admin.download_manager import create_download_manager
+    from src.core.download_manager import create_download_manager
 
     try:
         dm = create_download_manager()
         result = await dm.start_download("qdrant", "latest")
 
-        return JSONResponse(content={
-            "success": True,
-            "download_id": result.get("download_id"),
-            "file_name": result.get("file_name"),
-            "message": "Download started: " + (result.get("file_name") or "unknown"),
-        })
+        return JSONResponse(
+            content={
+                "success": True,
+                "download_id": result.get("download_id"),
+                "file_name": result.get("file_name"),
+                "message": "Download started: "
+                + (result.get("file_name") or "unknown"),
+            }
+        )
     except Exception as e:
         logger.error(f"Failed to download Qdrant: {e}")
         return JSONResponse(status_code=500, content={"error": str(e)})
@@ -521,8 +537,8 @@ async def download_qdrant() -> JSONResponse:
 @router.post("/llama/update")
 async def update_llama() -> JSONResponse:
     """Update llama.cpp to latest version."""
-    from src.admin.download_manager import create_download_manager
-    from src.admin.version_manager import VersionManager
+    from src.core.download_manager import create_download_manager
+    from src.core.version_manager import VersionManager
 
     try:
         vm = VersionManager()
@@ -532,12 +548,14 @@ async def update_llama() -> JSONResponse:
         dm = create_download_manager()
         result = await dm.start_download("llama.cpp", latest)
 
-        return JSONResponse(content={
-            "success": True,
-            "download_id": result.get("download_id"),
-            "version": latest,
-            "message": f"Downloading llama.cpp v{latest}",
-        })
+        return JSONResponse(
+            content={
+                "success": True,
+                "download_id": result.get("download_id"),
+                "version": latest,
+                "message": f"Downloading llama.cpp v{latest}",
+            }
+        )
     except Exception as e:
         logger.error(f"Failed to update llama.cpp: {e}")
         return JSONResponse(status_code=500, content={"error": str(e)})

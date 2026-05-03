@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["explain"])
 
+
 @router.post("/explain-rule")
 async def explain_rule(rule_id: str, text: str) -> dict:
     """Explain a Sigma rule using the backend service."""
@@ -29,7 +30,9 @@ async def explain_rule(rule_id: str, text: str) -> dict:
                     "text": text,
                 }
             else:
-                raise HTTPException(status_code=response.status_code, detail="Backend returned error")
+                raise HTTPException(
+                    status_code=response.status_code, detail="Backend returned error"
+                )
     except Exception as e:
         logger.error(f"Explain error: {e}")
         raise HTTPException(status_code=500, detail=str(e))

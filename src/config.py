@@ -15,8 +15,8 @@ BIN_DIR = BASE_DIR / "bin"
 MODELS_DIR = BASE_DIR / "models"
 LLM_DIR = MODELS_DIR / "llm"
 EMBEDDINGS_DIR = MODELS_DIR / "embeddings"
-LOGS_DIR = Path("logs")
-BACKUP_DIR = Path("backups")
+LOGS_DIR = BASE_DIR / "logs"
+BACKUP_DIR = BASE_DIR / "backups"
 MAX_BACKUPS = 5
 LLAMA_BIN_PATH = BIN_DIR / "llama.cpp"
 QDRANT_BIN_PATH = BIN_DIR / "qdrant"
@@ -48,8 +48,8 @@ DEFAULT_CONFIG = {
     "paths": {
         "bin_dir": "data/bin",
         "models_dir": "data/models",
-        "logs_dir": "logs",
-        "backup_dir": "backups",
+        "logs_dir": "data/logs",
+        "backup_dir": "data/backups",
     },
     "logging": {
         "level": "INFO",  # DEBUG, INFO, WARNING, ERROR
@@ -62,6 +62,11 @@ try:
     import tomllib
 except ModuleNotFoundError:
     import tomli as tomllib
+
+try:
+    import tomli_w
+except ModuleNotFoundError:
+    import tomllib_w as tomli_w
 
 
 @lru_cache(maxsize=1)
@@ -94,11 +99,7 @@ def load_config() -> dict[str, Any]:
 def _deep_merge(base: dict, override: dict) -> None:
     """Deep merge override into base (modifies base in place)."""
     for key, value in override.items():
-        if (
-            key in base
-            and isinstance(base[key], dict)
-            and isinstance(value, dict)
-        ):
+        if key in base and isinstance(base[key], dict) and isinstance(value, dict):
             _deep_merge(base[key], value)
         else:
             base[key] = value
@@ -141,12 +142,22 @@ def set_os_type(os_type: str) -> None:
     _persist_config(config)
 
 
+def _remove_none(obj):
+    """Remove None values recursively (TOML cannot serialize None)."""
+    if isinstance(obj, dict):
+        return {k: _remove_none(v) for k, v in obj.items() if v is not None}
+    elif isinstance(obj, list):
+        return [_remove_none(item) for item in obj if item is not None]
+    return obj
+
+
 def _persist_config(config: dict) -> None:
     """Persist the updated configuration to the TOML file."""
     try:
         CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
+        clean = _remove_none(config)
         with open(CONFIG_FILE, "wb") as f:
-            tomllib.dump(config, f)
+            tomli_w.dump(clean, f)
     except Exception as e:
         logger.error(f"Failed to persist config: {e}")
 

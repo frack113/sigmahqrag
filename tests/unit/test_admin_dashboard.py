@@ -4,13 +4,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.admin.version_manager import check_for_updates, get_current_version
+from src.core.version_manager import check_for_updates, get_current_version
 
 
 @pytest.mark.asyncio
 async def test_get_current_version_returns_version():
     """Test that get_current_version returns version from backup manager."""
-    with patch("src.admin.backup_manager.create_backup_manager") as mock_create:
+    with patch("src.core.backup_manager.create_backup_manager") as mock_create:
         mock_mgr = MagicMock()
         mock_mgr.get_current_version.return_value = "1.0.0"
         mock_create.return_value = mock_mgr
@@ -24,7 +24,7 @@ async def test_get_current_version_returns_version():
 @pytest.mark.asyncio
 async def test_get_current_version_returns_none():
     """Test that get_current_version returns None when no version."""
-    with patch("src.admin.backup_manager.create_backup_manager") as mock_create:
+    with patch("src.core.backup_manager.create_backup_manager") as mock_create:
         mock_mgr = MagicMock()
         mock_mgr.get_current_version.return_value = None
         mock_create.return_value = mock_mgr
@@ -37,8 +37,12 @@ async def test_get_current_version_returns_none():
 @pytest.mark.asyncio
 async def test_check_for_updates_update_available():
     """Test check_for_updates returns update available."""
-    with patch("src.admin.version_manager.get_current_version", new_callable=AsyncMock) as mock_ver, \
-         patch("src.admin.version_manager.VersionManager") as mock_vm_class:
+    with (
+        patch(
+            "src.core.version_manager.get_current_version", new_callable=AsyncMock
+        ) as mock_ver,
+        patch("src.core.version_manager.VersionManager") as mock_vm_class,
+    ):
 
         mock_ver.return_value = "1.0.0"
 
@@ -59,8 +63,12 @@ async def test_check_for_updates_update_available():
 @pytest.mark.asyncio
 async def test_check_for_updates_no_update():
     """Test check_for_updates returns no update when already latest."""
-    with patch("src.admin.version_manager.get_current_version", new_callable=AsyncMock) as mock_ver, \
-         patch("src.admin.version_manager.VersionManager") as mock_vm_class:
+    with (
+        patch(
+            "src.core.version_manager.get_current_version", new_callable=AsyncMock
+        ) as mock_ver,
+        patch("src.core.version_manager.VersionManager") as mock_vm_class,
+    ):
 
         mock_ver.return_value = "2.0.0"
 
@@ -81,7 +89,9 @@ async def test_check_for_updates_no_update():
 @pytest.mark.asyncio
 async def test_check_for_updates_no_current_version():
     """Test check_for_updates returns None when no current version."""
-    with patch("src.admin.version_manager.get_current_version", new_callable=AsyncMock) as mock_ver:
+    with patch(
+        "src.core.version_manager.get_current_version", new_callable=AsyncMock
+    ) as mock_ver:
         mock_ver.return_value = None
 
         result = await check_for_updates("llama.cpp")

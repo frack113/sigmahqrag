@@ -59,7 +59,9 @@ def main() -> None:
 
     p_download = subparsers.add_parser("download", help="Start a binary download")
     p_download.add_argument("--service", default="llama", choices=["llama", "qdrant"])
-    p_download.add_argument("--version", default="latest", help="Version to download (default: latest)")
+    p_download.add_argument(
+        "--version", default="latest", help="Version to download (default: latest)"
+    )
 
     p_cancel = subparsers.add_parser("cancel", help="Cancel a download")
     p_cancel.add_argument("--download-id", required=True, help="Download ID to cancel")

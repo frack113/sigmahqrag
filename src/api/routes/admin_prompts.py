@@ -8,7 +8,7 @@ from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from src.admin.admin_prompts import (
+from src.core.admin_prompts import (
     add_prompt,
     delete_prompt,
     get_active_prompt,
@@ -69,10 +69,12 @@ async def prompts_get(
                         content={"error": "No active prompt set"},
                     )
                 content = get_prompt_content(active)
-                return JSONResponse(content={
-                    "active": active,
-                    "content": content or "",
-                })
+                return JSONResponse(
+                    content={
+                        "active": active,
+                        "content": content or "",
+                    }
+                )
 
             case _:
                 return JSONResponse(
@@ -151,10 +153,12 @@ async def get_active() -> JSONResponse:
                 content={"error": "No active prompt set"},
             )
         content = get_prompt_content(active)
-        return JSONResponse(content={
-            "active": active,
-            "content": content or "",
-        })
+        return JSONResponse(
+            content={
+                "active": active,
+                "content": content or "",
+            }
+        )
     except Exception as e:
         logger.error(f"Failed to get active prompt: {e}")
         return JSONResponse(status_code=500, content={"error": str(e)})

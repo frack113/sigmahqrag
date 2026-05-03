@@ -9,16 +9,17 @@ import pytest
 
 @pytest.fixture
 def health_service():
-    from src.services.health_check import HealthCheckService
+    from src.core.services.health_check import HealthCheckService
 
     return HealthCheckService()
 
 
 @pytest.mark.asyncio
 async def test_check_all_success(health_service):
-    with patch("httpx.get") as mock_get, patch(
-        "qdrant_client.QdrantClient"
-    ) as mock_qdrant_cls:
+    with (
+        patch("httpx.get") as mock_get,
+        patch("qdrant_client.QdrantClient") as mock_qdrant_cls,
+    ):
         mock_get.return_value = Mock(status_code=200)
 
         mock_collection = Mock()
@@ -36,9 +37,10 @@ async def test_check_all_success(health_service):
 
 @pytest.mark.asyncio
 async def test_check_all_qdrant_success(health_service):
-    with patch("httpx.get") as mock_get, patch(
-        "qdrant_client.QdrantClient"
-    ) as mock_qdrant_cls:
+    with (
+        patch("httpx.get") as mock_get,
+        patch("qdrant_client.QdrantClient") as mock_qdrant_cls,
+    ):
         mock_get.return_value = Mock(status_code=200)
 
         mock_collection = Mock()
@@ -54,9 +56,10 @@ async def test_check_all_qdrant_success(health_service):
 
 @pytest.mark.asyncio
 async def test_check_all_qdrant_failure(health_service):
-    with patch("httpx.get") as mock_get, patch(
-        "qdrant_client.QdrantClient"
-    ) as mock_qdrant_cls:
+    with (
+        patch("httpx.get") as mock_get,
+        patch("qdrant_client.QdrantClient") as mock_qdrant_cls,
+    ):
         mock_get.return_value = Mock(status_code=200)
         mock_qdrant_cls.side_effect = Exception("Connection refused")
 
@@ -66,9 +69,11 @@ async def test_check_all_qdrant_failure(health_service):
 
 @pytest.mark.asyncio
 async def test_check_all_caching(health_service):
-    with patch("httpx.get") as mock_get, patch(
-        "qdrant_client.QdrantClient"
-    ) as mock_qdrant_cls, patch("time.time") as mock_time:
+    with (
+        patch("httpx.get") as mock_get,
+        patch("qdrant_client.QdrantClient") as mock_qdrant_cls,
+        patch("time.time") as mock_time,
+    ):
         mock_get.return_value = Mock(status_code=200)
         mock_client = Mock()
         mock_client.get_collections.return_value.collections = []

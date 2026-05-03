@@ -9,9 +9,9 @@ from fastapi import APIRouter, HTTPException, Request, UploadFile, status
 from fastapi.responses import StreamingResponse
 from fastapi.templating import Jinja2Templates
 
+from src.core.services.chat_service import ChatService
 from src.errors import ValidationError
 from src.schemas.chat import ChatMessageRequest, ChatMessageResponse
-from src.services.chat_service import ChatService
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +68,7 @@ async def upload_sigma_rule(file: UploadFile) -> dict:
         )
 
     valid_extensions = (".yaml", ".yml")
-    ext = file.filename[file.filename.rfind("."):]
+    ext = file.filename[file.filename.rfind(".") :]
     if ext.lower() not in valid_extensions:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

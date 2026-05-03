@@ -2,6 +2,7 @@
 RAG Accuracy Test Suite for Sigma Rules.
 Validates >95% accuracy on 100+ Sigma rules (NFR13).
 """
+
 from typing import Any
 
 import pytest
@@ -17,18 +18,15 @@ def sigma_rules_dataset() -> list[dict[str, Any]]:
             "logsource": {"category": "process_creation", "product": "windows"},
             "detection": {
                 "selection": {"Image": "powershell.exe"},
-                "condition": "selection"
+                "condition": "selection",
             },
-            "expected_fields": ["title", "logsource", "detection"]
+            "expected_fields": ["title", "logsource", "detection"],
         },
         {
             "title": "Suspicious CMD Execution",
             "logsource": {"category": "process_creation", "product": "windows"},
-            "detection": {
-                "selection": {"Image": "cmd.exe"},
-                "condition": "selection"
-            },
-            "expected_fields": ["title", "logsource", "detection"]
+            "detection": {"selection": {"Image": "cmd.exe"}, "condition": "selection"},
+            "expected_fields": ["title", "logsource", "detection"],
         },
     ]
 
@@ -36,7 +34,9 @@ def sigma_rules_dataset() -> list[dict[str, Any]]:
 class TestRAGAccuracy:
     """Validate RAG pipeline accuracy on Sigma rules."""
 
-    def test_sigma_rule_format_accuracy(self, sigma_rules_dataset: list[dict[str, Any]]):
+    def test_sigma_rule_format_accuracy(
+        self, sigma_rules_dataset: list[dict[str, Any]]
+    ):
         """Test that RAG correctly identifies key Sigma fields."""
         total = len(sigma_rules_dataset)
         correct = 0
@@ -63,7 +63,9 @@ class TestRAGAccuracy:
             assert "selection" in detection, "Detection must have 'selection' key"
             assert "condition" in detection, "Detection must have 'condition' key"
 
-    def test_logsource_field_validation(self, sigma_rules_dataset: list[dict[str, Any]]):
+    def test_logsource_field_validation(
+        self, sigma_rules_dataset: list[dict[str, Any]]
+    ):
         """Test that logsource field is correctly validated."""
         for rule in sigma_rules_dataset:
             logsource = rule.get("logsource", {})

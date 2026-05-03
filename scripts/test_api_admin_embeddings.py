@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Test Embeddings Admin API endpoints."""
+
 import argparse
 
 import requests
@@ -47,10 +48,7 @@ def cmd_download(url: str, repo_id: str, force: bool) -> None:
 
     params = {"action": "download", "repo_id": repo_id}
 
-    response = requests.post(
-        f"{url}/admin/embeddings/",
-        params=params
-    )
+    response = requests.post(f"{url}/admin/embeddings/", params=params)
     print(f"Status: {response.status_code}")
     data = response.json()
     if response.status_code == 200:
@@ -71,10 +69,7 @@ def cmd_delete(url: str, repo_id: str, force: bool) -> None:
 
     params = {"action": "delete", "repo_id": repo_id}
 
-    response = requests.post(
-        f"{url}/admin/embeddings/",
-        params=params
-    )
+    response = requests.post(f"{url}/admin/embeddings/", params=params)
     print(f"Status: {response.status_code}")
     data = response.json()
     print(f"Response: {data}")
@@ -90,15 +85,25 @@ def main() -> None:
     _ = p_installed
 
     p_info = subparsers.add_parser("info", help="Get model info")
-    p_info.add_argument("repo_id", nargs="?", default="sentence-transformers/all-MiniLM-L6-v2")
+    p_info.add_argument(
+        "repo_id", nargs="?", default="sentence-transformers/all-MiniLM-L6-v2"
+    )
 
     p_download = subparsers.add_parser("download", help="Download a model")
-    p_download.add_argument("--force", "-f", action="store_true", help="Skip confirmation")
-    p_download.add_argument("repo_id", nargs="?", default="sentence-transformers/all-MiniLM-L6-v2")
+    p_download.add_argument(
+        "--force", "-f", action="store_true", help="Skip confirmation"
+    )
+    p_download.add_argument(
+        "repo_id", nargs="?", default="sentence-transformers/all-MiniLM-L6-v2"
+    )
 
     p_delete = subparsers.add_parser("delete", help="Delete a model")
-    p_delete.add_argument("--force", "-f", action="store_true", help="Skip confirmation")
-    p_delete.add_argument("repo_id", nargs="?", default="sentence-transformers/all-MiniLM-L6-v2")
+    p_delete.add_argument(
+        "--force", "-f", action="store_true", help="Skip confirmation"
+    )
+    p_delete.add_argument(
+        "repo_id", nargs="?", default="sentence-transformers/all-MiniLM-L6-v2"
+    )
 
     args = parser.parse_args()
 

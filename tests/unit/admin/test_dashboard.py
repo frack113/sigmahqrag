@@ -3,9 +3,11 @@ from typing import Any
 from httpx import AsyncClient, ASGITransport
 from src.main import create_app
 
+
 @pytest.fixture
 def app() -> Any:
     return create_app()
+
 
 @pytest.mark.asyncio
 async def test_admin_dashboard_route(app: Any):
@@ -29,6 +31,7 @@ async def test_admin_health_route(app: Any):
         # Returns JSON (from admin_service.py router)
         assert response.headers["content-type"].startswith("application/json")
         assert "services" in response.text
+
 
 @pytest.mark.asyncio
 async def test_admin_logs_route(app: Any):

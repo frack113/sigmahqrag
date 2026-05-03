@@ -7,7 +7,7 @@ import pytest
 
 def test_llm_client_init():
     """Test LLM client can be instantiated."""
-    from src.services.llm_client import LLMClient
+    from src.core.services.llm_client import LLMClient
 
     client = LLMClient()
     assert client is not None
@@ -16,7 +16,7 @@ def test_llm_client_init():
 
 def test_llm_client_has_generate_method():
     """Test LLM client has generate method."""
-    from src.services.llm_client import LLMClient
+    from src.core.services.llm_client import LLMClient
 
     client = LLMClient()
     assert hasattr(client, "generate")
@@ -25,7 +25,7 @@ def test_llm_client_has_generate_method():
 
 def test_llm_client_has_stream_method():
     """Test LLM client has generate_stream method."""
-    from src.services.llm_client import LLMClient
+    from src.core.services.llm_client import LLMClient
 
     client = LLMClient()
     assert hasattr(client, "generate_stream")
@@ -34,7 +34,7 @@ def test_llm_client_has_stream_method():
 
 def test_llm_client_config():
     """Test LLM client has correct config."""
-    from src.services.llm_client import LLMClient
+    from src.core.services.llm_client import LLMClient
 
     client = LLMClient()
     assert client.base_url is not None

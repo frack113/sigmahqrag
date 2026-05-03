@@ -64,4 +64,3 @@ class ValidationError(SigmaError):
             message=message,
             details={"field": field},
         )
-

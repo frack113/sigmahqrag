@@ -228,11 +228,11 @@ function loadStatus() {
 }
 
 function loadLlamaConfig() {
-    fetch('/admin/llama/config')
+    fetch('/v1/config')
         .then(r => r.json())
         .then(data => {
-            document.getElementById('os-select').value = data.os || 'windows';
-            document.getElementById('gpu-select').value = data.gpu || 'cpu';
+            document.getElementById('os-select').value = data.data.backend.os || 'windows';
+            document.getElementById('gpu-select').value = data.data.backend.gpu_type || 'cpu';
         });
 }
 
@@ -240,10 +240,10 @@ function saveConfig() {
     const os = document.getElementById('os-select').value;
     const gpu = document.getElementById('gpu-select').value;
 
-    fetch('/admin/llama/config', {
+    fetch('/v1/config', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({os: os, gpu: gpu})
+        body: JSON.stringify({backend: {os: os, gpu_type: gpu}})
     })
     .then(r => r.json())
     .then(data => {

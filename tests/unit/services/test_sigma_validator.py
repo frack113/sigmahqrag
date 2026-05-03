@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from src.services.sigma_validator import SigmaValidator, MAX_FILE_SIZE
+from src.core.services.sigma_validator import SigmaValidator, MAX_FILE_SIZE
 from src.errors import ValidationError
 
 

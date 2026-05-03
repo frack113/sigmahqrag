@@ -10,10 +10,10 @@ from collections.abc import AsyncGenerator
 from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from src.admin.download_manager import (
+from src.core.download_manager import (
     create_download_manager,
 )
-from src.admin.update_manager import (
+from src.core.update_manager import (
     create_update_service,
 )
 
@@ -26,7 +26,9 @@ VALID_GET_ACTIONS = {"progress", "status", "debug"}
 VALID_POST_ACTIONS = {"download", "cancel"}
 
 
-def _normalize_params(action: str, service: str | None = None) -> tuple[str, str | None]:
+def _normalize_params(
+    action: str, service: str | None = None
+) -> tuple[str, str | None]:
     """Normalize action and service to lowercase for case-insensitive matching."""
     normalized_action = action.lower()
     normalized_service = service.lower() if service else None
@@ -91,9 +93,11 @@ async def backend_get(
                 # Add active downloads (optionally filtered by service)
                 dm = create_download_manager()
                 downloads = {}
-                service_normalized = service.replace(".","") if service else None
+                service_normalized = service.replace(".", "") if service else None
                 for dl_id, task in dm.active_downloads.items():
-                    task_service_normalized = task.service.replace(".","") if task.service else None
+                    task_service_normalized = (
+                        task.service.replace(".", "") if task.service else None
+                    )
                     if service and task_service_normalized != service_normalized:
                         continue
                     downloads[dl_id] = {
@@ -107,17 +111,19 @@ async def backend_get(
 
             case "debug":
                 dm = create_download_manager()
-                return JSONResponse(content={
-                    "active_downloads": {
-                        dl_id: {
-                            "service": task.service,
-                            "status": task.status,
-                            "bytes_downloaded": task.bytes_downloaded,
-                            "total_bytes": task.total_bytes,
+                return JSONResponse(
+                    content={
+                        "active_downloads": {
+                            dl_id: {
+                                "service": task.service,
+                                "status": task.status,
+                                "bytes_downloaded": task.bytes_downloaded,
+                                "total_bytes": task.total_bytes,
+                            }
+                            for dl_id, task in dm.active_downloads.items()
                         }
-                        for dl_id, task in dm.active_downloads.items()
                     }
-                })
+                )
 
             case _:
                 return JSONResponse(
@@ -138,8 +144,12 @@ async def backend_get(
 )
 async def backend_post(
     action: str = Query(..., description="Action: download, cancel"),
-    service: str | None = Query(None, description="Service: llama, qdrant (optional for unified actions)"),
-    version: str | None = Query(None, description="Version for download (default: latest)"),
+    service: str | None = Query(
+        None, description="Service: llama, qdrant (optional for unified actions)"
+    ),
+    version: str | None = Query(
+        None, description="Version for download (default: latest)"
+    ),
     download_id: str | None = Query(None, description="Download ID for cancel"),
 ) -> JSONResponse:
     """Unified POST endpoint for backend operations (download, cancel). Supports both individual and batch service management."""
@@ -149,7 +159,9 @@ async def backend_post(
         if action not in VALID_POST_ACTIONS:
             return JSONResponse(
                 status_code=400,
-                content={"error": f"Invalid action: {action}. Allowed actions are: {VALID_POST_ACTIONS}"},
+                content={
+                    "error": f"Invalid action: {action}. Allowed actions are: {VALID_POST_ACTIONS}"
+                },
             )
 
         match action:
@@ -157,7 +169,9 @@ async def backend_post(
                 if not service or service not in ALLOWED_SERVICES:
                     return JSONResponse(
                         status_code=400,
-                        content={"error": f"Valid service required (llama, qdrant). Got: {service}"},
+                        content={
+                            "error": f"Valid service required (llama, qdrant). Got: {service}"
+                        },
                     )
 
                 # Map service names to their actual values (e.g., 'llama' -> 'llama.cpp')

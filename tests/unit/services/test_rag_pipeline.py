@@ -5,14 +5,16 @@ from __future__ import annotations
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from src.services.rag_pipeline import RAGPipeline
+from src.core.services.rag_pipeline import RAGPipeline
 
 
 @pytest.fixture
 def rag_pipeline() -> RAGPipeline:
     """Create RAG pipeline with fully mocked dependencies."""
-    with patch("src.services.rag_pipeline.SearchEngine") as mock_search, \
-         patch("src.services.rag_pipeline.LLMClient") as mock_llm:
+    with (
+        patch("src.core.services.rag_pipeline.SearchEngine") as mock_search,
+        patch("src.core.services.rag_pipeline.LLMClient") as mock_llm,
+    ):
         pipeline = RAGPipeline()
         pipeline.search_engine = mock_search.return_value
         pipeline.llm_client = mock_llm.return_value

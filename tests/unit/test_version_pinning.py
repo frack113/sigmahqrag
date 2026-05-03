@@ -2,6 +2,7 @@
 Tests to validate exact version pinning in pyproject.toml.
 All dependencies MUST use == not >= for Air-Gap reproducibility.
 """
+
 import re
 from pathlib import Path
 
@@ -101,7 +102,7 @@ class TestVersionPinning:
                     dep = line.strip('", \n')
                     if dep:
                         # Parse package name and version
-                        match = re.match(r'([^=<>!]+)(==|>=|<=|~=|!=)(.+)', dep)
+                        match = re.match(r"([^=<>!]+)(==|>=|<=|~=|!=)(.+)", dep)
                         if match:
                             pkg_name = match.group(1).strip()
                             operator = match.group(2)
@@ -110,15 +111,17 @@ class TestVersionPinning:
 
         # Check that critical packages use ==
         for pkg, expected_ver in critical_packages.items():
-            assert pkg in deps_dict, f"Critical package '{pkg}' not found in dependencies"
+            assert (
+                pkg in deps_dict
+            ), f"Critical package '{pkg}' not found in dependencies"
             operator, version = deps_dict[pkg]
-            assert operator == "==", (
-                f"Package '{pkg}' uses '{operator}' but must use '==' for Air-Gap reproducibility"
-            )
+            assert (
+                operator == "=="
+            ), f"Package '{pkg}' uses '{operator}' but must use '==' for Air-Gap reproducibility"
             if expected_ver:
-                assert version == expected_ver, (
-                    f"Package '{pkg}' version mismatch: expected '{expected_ver}', got '{version}'"
-                )
+                assert (
+                    version == expected_ver
+                ), f"Package '{pkg}' version mismatch: expected '{expected_ver}', got '{version}'"
 
     def test_uv_lock_not_in_gitignore(self):
         """Validate that uv.lock is NOT in .gitignore."""

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Test LLM API endpoints."""
+
 import argparse
 
 import requests
@@ -69,10 +70,7 @@ def cmd_download(url: str, repo_id: str, filename: str | None, force: bool) -> N
     if filename:
         params["filename"] = filename
 
-    response = requests.post(
-        f"{url}/admin/llm/",
-        params=params
-    )
+    response = requests.post(f"{url}/admin/llm/", params=params)
     print(f"Status: {response.status_code}")
     data = response.json()
     if response.status_code == 200:
@@ -98,10 +96,7 @@ def cmd_delete(url: str, repo_id: str, filename: str | None, force: bool) -> Non
     if filename:
         params["filename"] = filename
 
-    response = requests.post(
-        f"{url}/admin/llm/",
-        params=params
-    )
+    response = requests.post(f"{url}/admin/llm/", params=params)
     print(f"Status: {response.status_code}")
     data = response.json()
     print(f"Response: {data}")
@@ -114,23 +109,37 @@ def main() -> None:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     p_list = subparsers.add_parser("list", help="List GGUF files")
-    p_list.add_argument("repo_id", nargs="?", default="meta-llama/Llama-3.2-1B-Instruct-GGUF")
+    p_list.add_argument(
+        "repo_id", nargs="?", default="meta-llama/Llama-3.2-1B-Instruct-GGUF"
+    )
 
     p_installed = subparsers.add_parser("installed", help="List installed models")
     _ = p_installed
 
     p_info = subparsers.add_parser("info", help="Get model info")
-    p_info.add_argument("repo_id", nargs="?", default="meta-llama/Llama-3.2-1B-Instruct-GGUF")
+    p_info.add_argument(
+        "repo_id", nargs="?", default="meta-llama/Llama-3.2-1B-Instruct-GGUF"
+    )
 
     p_download = subparsers.add_parser("download", help="Download a model")
     p_download.add_argument("--filename", "-n", help="Specific filename")
-    p_download.add_argument("--force", "-f", action="store_true", help="Skip confirmation")
-    p_download.add_argument("repo_id", nargs="?", default="meta-llama/Llama-3.2-1B-Instruct-GGUF")
-    p_download.add_argument("filename", nargs="?", help="Specific filename (alternative to --filename)")
+    p_download.add_argument(
+        "--force", "-f", action="store_true", help="Skip confirmation"
+    )
+    p_download.add_argument(
+        "repo_id", nargs="?", default="meta-llama/Llama-3.2-1B-Instruct-GGUF"
+    )
+    p_download.add_argument(
+        "filename", nargs="?", help="Specific filename (alternative to --filename)"
+    )
 
     p_delete = subparsers.add_parser("delete", help="Delete a model")
-    p_delete.add_argument("--force", "-f", action="store_true", help="Skip confirmation")
-    p_delete.add_argument("repo_id", nargs="?", default="meta-llama/Llama-3.2-1B-Instruct-GGUF")
+    p_delete.add_argument(
+        "--force", "-f", action="store_true", help="Skip confirmation"
+    )
+    p_delete.add_argument(
+        "repo_id", nargs="?", default="meta-llama/Llama-3.2-1B-Instruct-GGUF"
+    )
     p_delete.add_argument("filename", nargs="?", help="Specific filename to delete")
 
     args = parser.parse_args()

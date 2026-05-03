@@ -104,8 +104,14 @@ class TestPostAdminDownload:
         self, client: TestClient
     ) -> None:
         """Given request has no idempotency key, when API receives it, then processes normally (backward compatible, NFR20)."""
-        with patch("src.api.v1.admin.check_service_health", new_callable=AsyncMock) as mock_health, \
-             patch("src.api.v1.admin.start_download", new_callable=AsyncMock) as mock_start:
+        with (
+            patch(
+                "src.api.v1.admin.check_service_health", new_callable=AsyncMock
+            ) as mock_health,
+            patch(
+                "src.api.v1.admin.start_download", new_callable=AsyncMock
+            ) as mock_start,
+        ):
             mock_start.return_value = {"job_id": "job-789", "status": "started"}
             mock_health.return_value = {
                 "llama_cpp": {"status": "active", "component": "llama.cpp"},

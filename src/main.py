@@ -38,9 +38,13 @@ def _validate_services() -> None:
         if response.status_code == 200:
             logger.info(f"LLM service available at {llm_url}")
         else:
-            logger.warning(f"LLM service returned status {response.status_code} at {llm_url}")
+            logger.warning(
+                f"LLM service returned status {response.status_code} at {llm_url}"
+            )
     except httpx.ConnectError:
-        logger.warning(f"LLM service NOT available at {llm_url} - chat features will use fallback")
+        logger.warning(
+            f"LLM service NOT available at {llm_url} - chat features will use fallback"
+        )
     except Exception as e:
         logger.warning(f"LLM service check failed: {e}")
 
@@ -58,7 +62,9 @@ def _validate_services() -> None:
         if any(c.name == collection for c in collections):
             logger.info(f"Qdrant collection '{collection}' exists")
         else:
-            logger.warning(f"Qdrant collection '{collection}' NOT found - search will return empty")
+            logger.warning(
+                f"Qdrant collection '{collection}' NOT found - search will return empty"
+            )
     except Exception as e:
         logger.warning(f"Qdrant check failed: {e} - search features may be unavailable")
 
@@ -94,6 +100,7 @@ def create_app() -> FastAPI:
     from src.api.routes.embeddings import router as embeddings_router
     from src.api.routes.feedback import router as feedback_router
     from src.api.v1.admin import router as admin_v1_router
+    from src.api.v1.config import router as config_v1_router
 
     # Startup validation
     _validate_services()
@@ -114,6 +121,7 @@ def create_app() -> FastAPI:
     app.include_router(admin_pages_router)
     app.include_router(admin_prompts_router)
     app.include_router(admin_v1_router)
+    app.include_router(config_v1_router)
     app.include_router(chat_router)
     app.include_router(documents_router)
     app.include_router(embeddings_router)
@@ -161,7 +169,9 @@ def create_app() -> FastAPI:
         )
 
     @app.exception_handler(Exception)
-    async def generic_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    async def generic_exception_handler(
+        request: Request, exc: Exception
+    ) -> JSONResponse:
         """Handle uncaught exceptions - returns 500 with clean message."""
         logger.exception(
             f"Unhandled exception: {exc}",
