@@ -9,25 +9,21 @@ from src.core.version_manager import check_for_updates, get_current_version
 
 @pytest.mark.asyncio
 async def test_get_current_version_returns_version():
-    """Test that get_current_version returns version from backup manager."""
-    with patch("src.core.backup_manager.create_backup_manager") as mock_create:
-        mock_mgr = MagicMock()
-        mock_mgr.get_current_version.return_value = "1.0.0"
-        mock_create.return_value = mock_mgr
+    """Test that get_current_version returns version from backend module."""
+    with patch("src.core.backend.llamacpp.get_version") as mock_get:
+        mock_get.return_value = "1.0.0"
 
         result = await get_current_version("llama.cpp")
 
         assert result == "1.0.0"
-        mock_mgr.get_current_version.assert_called_once_with("llama.cpp")
+        mock_get.assert_called_once()
 
 
 @pytest.mark.asyncio
 async def test_get_current_version_returns_none():
     """Test that get_current_version returns None when no version."""
-    with patch("src.core.backup_manager.create_backup_manager") as mock_create:
-        mock_mgr = MagicMock()
-        mock_mgr.get_current_version.return_value = None
-        mock_create.return_value = mock_mgr
+    with patch("src.core.backend.llamacpp.get_version") as mock_get:
+        mock_get.return_value = None
 
         result = await get_current_version("llama.cpp")
 

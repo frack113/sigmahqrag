@@ -1,8 +1,8 @@
-os = "windows"
-
 [backend]
-gpu_type = "hip"
 os = "windows"
+gpu_type = "cpu"
+llamacpp_version = "b9016"
+qdrant_version = ""
 
 [models]
 llm_dir = "data/models/llm"
@@ -14,14 +14,13 @@ base_url = "http://127.0.0.1:8080"
 [services.qdrant]
 host = "127.0.0.1"
 port = 6333
-collection_name = "sigma_rules"
+collection_name = "sigma"
 vector_size = 384
 
 [paths]
 bin_dir = "data/bin"
 models_dir = "data/models"
-logs_dir = "logs"
-backup_dir = "backups"
+logs_dir = "data/logs"
 
 [logging]
 level = "INFO"

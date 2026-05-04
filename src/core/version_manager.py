@@ -351,10 +351,15 @@ async def get_current_version(service: str) -> str | None:
     Returns:
         Version string or None
     """
-    from src.admin.backup_manager import create_backup_manager
+    if service in ("llama", "llama.cpp"):
+        from src.core.backend.llamacpp import get_version
 
-    backup_mgr = create_backup_manager()
-    return backup_mgr.get_current_version(service)
+        return get_version()
+    elif service in ("qdrant", "qdrant_db"):
+        from src.core.backend.qdrant import get_version
+
+        return get_version()
+    return None
 
 
 async def check_for_updates(service: str) -> dict | None:

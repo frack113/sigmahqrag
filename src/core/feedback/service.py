@@ -2,8 +2,8 @@
 
 import logging
 
-from src.feedback.models import Feedback, FeedbackIn, FeedbackResponse, FeedbackStats
-from src.feedback.repository import FeedbackRepository
+from src.core.feedback.models import Feedback, FeedbackIn, FeedbackResponse, FeedbackStats
+from src.core.feedback.repository import FeedbackRepository
 
 logger = logging.getLogger(__name__)
 

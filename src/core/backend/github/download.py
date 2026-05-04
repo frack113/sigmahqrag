@@ -70,9 +70,16 @@ class DownloadManager:
         else:
             version_to_check = version.lstrip("v")
 
-        from src.admin.backup_manager import create_backup_manager
+        if service in ("llama", "llama.cpp"):
+            from src.core.backend.llamacpp import get_version
 
-        current_version = create_backup_manager().get_current_version(service)
+            current_version = get_version()
+        elif service in ("qdrant", "qdrant_db"):
+            from src.core.backend.qdrant import get_version
+
+            current_version = get_version()
+        else:
+            current_version = None
 
         if current_version and current_version == version_to_check:
             logger.info(f"Version {version_to_check} already installed for {service}")
@@ -218,6 +225,16 @@ class DownloadManager:
                                 "file_path": str(task.target_path),
                             }
                         )
+
+                    version_str = task.version.lstrip("v")
+                    if task.service in ("llama", "llama.cpp"):
+                        from src.core.backend.llamacpp import set_version as set_llama_version
+
+                        set_llama_version(version_str)
+                    elif task.service in ("qdrant", "qdrant_db"):
+                        from src.core.backend.qdrant import set_version as set_qdrant_version
+
+                        set_qdrant_version(version_str)
 
                     logger.info(f"Download {download_id} completed: {task.target_path}")
 

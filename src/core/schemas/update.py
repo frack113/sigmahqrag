@@ -43,9 +43,6 @@ class UpdateRollbackResponse(BaseModel):
     error: str | None = Field(None, description="Error message if failed")
 
 
- bytes")
-
-
 class ServiceVersionInfo(BaseModel):
     """Version information for a service."""
 

@@ -10,12 +10,26 @@ from llama_index.vector_stores.qdrant import QdrantVectorStore
 
 from .health import check_health
 from .storage import search, store_embeddings
+from src.config import get_qdrant_version, set_qdrant_version
+
+
+def get_version() -> str | None:
+    """Get current qdrant version."""
+    return get_qdrant_version()
+
+
+def set_version(version: str) -> None:
+    """Set qdrant version."""
+    set_qdrant_version(version)
+
 
 __all__ = [
     "QdrantService",
     "check_health",
     "store_embeddings",
     "search",
+    "get_version",
+    "set_version",
 ]
 
 logger = logging.getLogger(__name__)

@@ -9,9 +9,9 @@ from fastapi import APIRouter, HTTPException, Request, UploadFile, status
 from fastapi.responses import StreamingResponse
 from fastapi.templating import Jinja2Templates
 
-from src.core.services.chat_service import ChatService
+from src.core.backend.services.chat_service import ChatService
 from src.errors import ValidationError
-from src.schemas.chat import ChatMessageRequest, ChatMessageResponse
+from src.core.schemas.chat import ChatMessageRequest, ChatMessageResponse
 
 logger = logging.getLogger(__name__)
 

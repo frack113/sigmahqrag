@@ -6,10 +6,10 @@ import logging
 from datetime import UTC, datetime
 from typing import Any
 
-from src.core.services.rag_pipeline import RAGPipeline
-from src.core.services.sigma_validator import SigmaValidator
-from src.rag.search import SearchEngine
-from src.schemas.chat_mode import ChatMode
+from src.core.backend.services.rag_pipeline import RAGPipeline
+from src.core.backend.services.sigma_validator import SigmaValidator
+from src.core.rag.search import SearchEngine
+from src.core.schemas.chat_mode import ChatMode
 
 logger = logging.getLogger(__name__)
 

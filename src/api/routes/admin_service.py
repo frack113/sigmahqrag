@@ -16,7 +16,7 @@ from src.core.health import (
     ServiceStatus,
     create_health_checker,
 )
-from src.core.service_manager import create_service_manager
+from src.core.backend.service_manager import create_service_manager
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +76,7 @@ async def get_admin_health() -> JSONResponse:
 
         result: dict[str, Any] = {
             "services": [
-                _get_status_display(all_health["llama"], LLAMA_BIN_PATH),
+                _get_status_display(all_health["llamacpp"], LLAMA_BIN_PATH),
                 _get_status_display(all_health["qdrant"], QDRANT_BIN_PATH),
             ],
         }
@@ -231,7 +231,7 @@ async def services_post(
                     # Start llama.cpp
                     checker = create_health_checker()
                     health = await checker.check_all()
-                    if health["llama"].status.value == "running":
+                    if health["llamacpp"].status.value == "running":
                         results["details"].append(
                             {"service": "llama.cpp", "error": "Already running"}
                         )
@@ -274,7 +274,7 @@ async def services_post(
                     # Stop llama.cpp if running
                     checker = create_health_checker()
                     health = await checker.check_all()
-                    if health["llama"].status.value == "running":
+                    if health["llamacpp"].status.value == "running":
                         result_llama = await manager.stop_llama()
                         if not result_llama.get("success"):
                             results["details"].append(
@@ -327,7 +327,7 @@ async def services_post(
                         # Pre-check: is service already running?
                         checker = create_health_checker()
                         health = await checker.check_all()
-                        if health["llama"].status.value == "running":
+                        if health["llamacpp"].status.value == "running":
                             return JSONResponse(
                                 status_code=400,
                                 content={
@@ -395,7 +395,7 @@ async def services_post(
                         # Pre-check: is service running?
                         checker = create_health_checker()
                         health = await checker.check_all()
-                        if health["llama"].status.value != "running":
+                        if health["llamacpp"].status.value != "running":
                             return JSONResponse(
                                 status_code=400,
                                 content={
@@ -459,33 +459,6 @@ async def services_post(
             content={"error": "Internal server error"},
         )
 
-
-@router.get("/llama/info")
-async def get_llama_info() -> JSONResponse:
-    """Get llama.cpp version and update info."""
-    from src.core.version_manager import (
-        check_for_updates,
-        get_current_version,
-    )
-
-    try:
-        current = await get_current_version("llama.cpp")
-        update_info = await check_for_updates("llama.cpp")
-
-        return JSONResponse(
-            content={
-                "current_version": current,
-                "update_available": (
-                    update_info.get("update_available") if update_info else False
-                ),
-                "latest_version": (
-                    update_info.get("latest_version") if update_info else None
-                ),
-            }
-        )
-    except Exception as e:
-        logger.error(f"Failed to get llama info: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
 
 
 @router.post("/llama/download")

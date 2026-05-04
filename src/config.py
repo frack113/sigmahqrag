@@ -27,6 +27,8 @@ DEFAULT_CONFIG = {
     "backend": {
         "gpu_type": "cpu",  # hip, cuda, cpu
         "os": None,  # windows, linux, macos (auto-detected if None)
+        "llamacpp_version": None,  # installed llama.cpp version
+        "qdrant_version": None,  # installed qdrant version
     },
     "models": {
         "llm_dir": "data/models/llm",
@@ -137,6 +139,34 @@ def set_os_type(os_type: str) -> None:
     config["backend"]["os"] = os_type
 
     # Persist the change to the TOML file (if needed)
+    _persist_config(config)
+
+
+def get_llamacpp_version() -> str | None:
+    """Get installed llama.cpp version from config."""
+    return load_config().get("backend", {}).get("llamacpp_version")
+
+
+def set_llamacpp_version(version: str) -> None:
+    """Set llama.cpp version in config."""
+    config = load_config()
+    if "backend" not in config:
+        config["backend"] = {}
+    config["backend"]["llamacpp_version"] = version
+    _persist_config(config)
+
+
+def get_qdrant_version() -> str | None:
+    """Get installed qdrant version from config."""
+    return load_config().get("backend", {}).get("qdrant_version")
+
+
+def set_qdrant_version(version: str) -> None:
+    """Set qdrant version in config."""
+    config = load_config()
+    if "backend" not in config:
+        config["backend"] = {}
+    config["backend"]["qdrant_version"] = version
     _persist_config(config)
 
 

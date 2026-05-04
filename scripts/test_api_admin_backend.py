@@ -42,9 +42,11 @@ def cmd_progress(url: str, download_id: str) -> None:
             print(line.decode())
 
 
-def cmd_status(url: str) -> None:
+def cmd_status(url: str, service: str | None = None) -> None:
     """Get update status."""
     params = {"action": "status"}
+    if service:
+        params["service"] = service
     response = requests.get(f"{url}/admin/backend/", params=params)
     print(f"Status: {response.status_code}")
     data = response.json()
@@ -69,7 +71,8 @@ def main() -> None:
     p_progress = subparsers.add_parser("progress", help="Get download progress")
     p_progress.add_argument("--download-id", required=True, help="Download ID")
 
-    _ = subparsers.add_parser("status", help="Get update status")
+    p_status = subparsers.add_parser("status", help="Get update status")
+    p_status.add_argument("--service", choices=["llama", "qdrant"], help="Service to check")
 
     args = parser.parse_args()
 
@@ -81,7 +84,7 @@ def main() -> None:
         case "progress":
             cmd_progress(args.url, args.download_id)
         case "status":
-            cmd_status(args.url)
+            cmd_status(args.url, args.service)
 
 
 if __name__ == "__main__":

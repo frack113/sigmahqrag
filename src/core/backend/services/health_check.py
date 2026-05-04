@@ -111,3 +111,15 @@ class HealthCheckService:
         """Cache a result."""
         self._cache[key] = value
         self._cache_timestamps[key] = time.time()
+
+    def get_current_version(self, service: str) -> str | None:
+        """Get current version of a service."""
+        if service in ("llama", "llama.cpp", "llama_cpp"):
+            from src.core.backend.llamacpp import get_version
+
+            return get_version()
+        elif service in ("qdrant", "qdrant_db"):
+            from src.core.backend.qdrant import get_version
+
+            return get_version()
+        return None

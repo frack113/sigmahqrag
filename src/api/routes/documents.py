@@ -8,14 +8,14 @@ import os
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
-from src.documents.indexing import index_sigma_rules
-from src.documents.models import (
+from src.core.documents.indexing import index_sigma_rules
+from src.core.documents.models import (
     IngestRequest,
     IngestResponse,
     IngestResult,
 )
-from src.documents.parser import parse_sigma_rule, scan_directory
-from src.documents.validator import validate_sigma_rule
+from src.core.documents.parser import parse_sigma_rule, scan_directory
+from src.core.documents.validator import validate_sigma_rule
 
 logger = logging.getLogger(__name__)
 

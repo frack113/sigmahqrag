@@ -4,6 +4,7 @@ from functools import lru_cache
 
 from src.core.backend.huggingface import EmbeddingManager
 from src.core.backend.github import RepositoryManager
+from src.core.backend.services.manager import ModelManager
 
 
 @lru_cache

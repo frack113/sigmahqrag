@@ -1,8 +1,8 @@
 """Feedback module."""
 
-from src.feedback.models import Feedback, FeedbackIn, FeedbackResponse, FeedbackStats
-from src.feedback.repository import FeedbackRepository
-from src.feedback.service import FeedbackService
+from src.core.feedback.models import Feedback, FeedbackIn, FeedbackResponse, FeedbackStats
+from src.core.feedback.repository import FeedbackRepository
+from src.core.feedback.service import FeedbackService
 
 __all__ = [
     "Feedback",

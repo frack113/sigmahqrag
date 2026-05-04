@@ -8,8 +8,8 @@ from fastapi import APIRouter, Depends, Query
 from fastapi.responses import JSONResponse
 
 from src.api.dependencies import get_model_manager
-from src.core.services.download import DownloadError
-from src.core.services.manager import ModelManager, ModelNotFoundError
+from src.core.backend.services.download import DownloadError
+from src.core.backend.services.manager import ModelManager, ModelNotFoundError
 from src.core.types import HFRepo
 
 logger = logging.getLogger(__name__)

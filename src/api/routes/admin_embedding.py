@@ -8,7 +8,6 @@ from fastapi import APIRouter, Depends, Query
 from fastapi.responses import JSONResponse
 
 from src.api.dependencies import get_embedding_manager
-from src.core.services.embedding import EmbeddingManager
 
 logger = logging.getLogger(__name__)
 

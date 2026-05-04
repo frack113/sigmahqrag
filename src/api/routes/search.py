@@ -7,8 +7,8 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 
-from src.rag.search import SearchEngine, format_search_result, get_citation
-from src.schemas.search import SearchRequest, SearchResponse
+from src.core.rag.search import SearchEngine, format_search_result, get_citation
+from src.core.schemas.search import SearchRequest, SearchResponse
 
 logger = logging.getLogger(__name__)
 

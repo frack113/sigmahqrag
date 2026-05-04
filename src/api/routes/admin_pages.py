@@ -9,7 +9,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from src.config import load_config
-from src.core.services.health_check import HealthCheckService
+from src.core.backend.services.health_check import HealthCheckService
 
 logger = logging.getLogger(__name__)
 

@@ -54,7 +54,7 @@ class UpdateService:
         """
         from datetime import datetime
 
-        from src.schemas.update import ServiceVersionInfo
+        from src.core.schemas.update import ServiceVersionInfo
 
         services_status = {}
 

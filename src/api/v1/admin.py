@@ -314,7 +314,7 @@ async def get_models() -> JSONResponse:
 @router.post("/models/delete")
 async def delete_model(request: dict) -> JSONResponse:
     """POST /api/v1/admin/models/delete - Delete a model."""
-    from src.core.services.manager import ModelNotFoundError
+    from src.core.backend.services.manager import ModelNotFoundError
 
     from src.api.dependencies import get_model_manager
 
