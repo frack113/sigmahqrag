@@ -22,31 +22,22 @@ correlation_id_var: ContextVar[str | None] = ContextVar("correlation_id", defaul
 
 
 def _validate_services() -> None:
-    """Validate external services at startup (LLM, Qdrant)."""
-    import httpx
+    """Validate external services at startup (llama.cpp, Qdrant)."""
+    import asyncio
 
     from src.config import load_config
+    from src.core.backend.llamacpp.health import check_health
 
     config = load_config()
 
-    # Check LLM service
-    llm_config = config.get("services", {}).get("llama", {})
-    llm_url = llm_config.get("base_url", "http://localhost:11434")
-
-    try:
-        response = httpx.get(f"{llm_url}/api/tags", timeout=5.0)
-        if response.status_code == 200:
-            logger.info(f"LLM service available at {llm_url}")
-        else:
-            logger.warning(
-                f"LLM service returned status {response.status_code} at {llm_url}"
-            )
-    except httpx.ConnectError:
+    # Check llama.cpp service
+    result = asyncio.run(check_health(port=8080))
+    if result["status"] == "active":
+        logger.info("llama.cpp service available at port 8080")
+    else:
         logger.warning(
-            f"LLM service NOT available at {llm_url} - chat features will use fallback"
+            "llama.cpp service NOT available at port 8080 - chat features will use fallback"
         )
-    except Exception as e:
-        logger.warning(f"LLM service check failed: {e}")
 
     # Check Qdrant collection
     qdrant_config = config.get("services", {}).get("qdrant", {})

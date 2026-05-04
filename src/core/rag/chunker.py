@@ -8,7 +8,7 @@ from typing import Any
 
 import yaml
 from llama_index.core.schema import Document
-from src.schemas.sigma_rule import SigmaRule
+from src.core.schemas.sigma_rule import SigmaRule
 
 logger = logging.getLogger(__name__)
 

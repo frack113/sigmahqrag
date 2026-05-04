@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import re
 
-from src.documents.models import SigmaRule, ValidationError, ValidationResult
+from src.core.documents.models import SigmaRule, ValidationError, ValidationResult
 
 logger = logging.getLogger(__name__)
 

@@ -15,12 +15,9 @@ import httpx
 
 from src.config import BIN_DIR
 from src.core.temp_manager import create_temp_manager
-from src.core.version_manager import (
-    ReleaseAsset,
-    VersionManager,
-    create_version_manager,
-)
 from src.exceptions import DownloadError
+
+from .version import ReleaseAsset, VersionManager, create_version_manager
 
 logger = logging.getLogger(__name__)
 
@@ -51,12 +48,7 @@ class DownloadManager:
         version_manager: VersionManager | None = None,
         temp_manager_manager: Any | None = None,
     ) -> None:
-        """Initialize download manager.
-
-        Args:
-            version_manager: Version manager for GitHub API
-            temp_manager: Temp file manager
-        """
+        """Initialize download manager."""
         self.version_manager = version_manager or create_version_manager()
         self.temp_manager = temp_manager_manager or create_temp_manager()
         self.active_downloads: dict[str, DownloadTask] = {}
@@ -68,20 +60,10 @@ class DownloadManager:
         version: str,
         github_token: str | None = None,
     ) -> dict[str, Any]:
-        """Start a binary download.
-
-        Args:
-            service: Service name (llama.cpp, qdrant)
-            version: Version tag or "latest"
-            github_token: Optional GitHub token
-
-        Returns:
-            Dict with download_id, status, service, version, target_path
-        """
+        """Start a binary download."""
         if service not in ("llama.cpp", "qdrant"):
             raise DownloadError(f"Unsupported service: {service}")
 
-        # Check if requested version is already installed
         if version == "latest":
             release = await self.version_manager.get_release(service, version)
             version_to_check = release.tag_name.lstrip("v")
@@ -90,8 +72,7 @@ class DownloadManager:
 
         from src.admin.backup_manager import create_backup_manager
 
-        backup_mgr = create_backup_manager()
-        current_version = backup_mgr.get_current_version(service)
+        current_version = create_backup_manager().get_current_version(service)
 
         if current_version and current_version == version_to_check:
             logger.info(f"Version {version_to_check} already installed for {service}")
@@ -148,12 +129,7 @@ class DownloadManager:
     async def _download_file(
         self, download_id: str, github_token: str | None = None
     ) -> None:
-        """Download a file with progress tracking.
-
-        Args:
-            download_id: Download ID
-            github_token: Optional GitHub token
-        """
+        """Download a file with progress tracking."""
         task = self.active_downloads.get(download_id)
         if not task:
             return
@@ -190,9 +166,7 @@ class DownloadManager:
                                 self.temp_manager.cleanup(task.temp_path)
                                 if task.progress_queue:
                                     await task.progress_queue.put(
-                                        {
-                                            "status": "cancelled",
-                                        }
+                                        {"status": "cancelled"}
                                     )
                                 del self.active_downloads[download_id]
                                 return
@@ -262,21 +236,13 @@ class DownloadManager:
     async def _extract_and_install(
         self, temp_path: Path, target_path: Path, service: str
     ) -> None:
-        """Extract archive and install to bin directory.
-
-        Args:
-            temp_path: Path to downloaded archive
-            target_path: Target path for the service binary/directory
-            service: Service name (llama.cpp, qdrant)
-        """
+        """Extract archive and install to bin directory."""
         import subprocess
 
         service_dir = BIN_DIR / service.replace(".", "-")
 
-        # Clean up existing service directory
         if service_dir.exists():
             try:
-                # On Windows, first try to remove read-only files
                 for item in service_dir.rglob("*"):
                     try:
                         if item.is_file():
@@ -287,7 +253,6 @@ class DownloadManager:
                 logger.info(f"Cleaned existing directory: {service_dir}")
             except Exception as e:
                 logger.warning(f"Could not clean {service_dir}: {e}")
-                # Try alternative: rename old dir and create new one
                 try:
                     import time
 
@@ -297,7 +262,6 @@ class DownloadManager:
                 except Exception:
                     pass
 
-        # Create fresh directory
         service_dir.mkdir(parents=True, exist_ok=True)
         logger.info(f"Created service directory: {service_dir}")
 
@@ -306,20 +270,17 @@ class DownloadManager:
 
             if temp_path.suffix == ".zip":
                 logger.info(f"Extracting ZIP: {temp_path}")
-                # Extract to a temp location first
                 import tempfile
 
                 with tempfile.TemporaryDirectory() as tmp_dir:
                     with zipfile.ZipFile(temp_path, "r") as zf:
                         zf.extractall(tmp_dir)
 
-                    # Find the top-level directory in the zip
                     items = list(Path(tmp_dir).iterdir())
                     logger.info(
                         f"ZIP contains {len(items)} items: {[i.name for i in items]}"
                     )
                     if len(items) == 1 and items[0].is_dir():
-                        # Single directory - copy contents to service_dir
                         extracted_dir = items[0]
                         logger.info(f"Copying from subdirectory: {extracted_dir.name}")
                         for f in extracted_dir.iterdir():
@@ -333,7 +294,6 @@ class DownloadManager:
                             f"Copied files from {extracted_dir.name} to {service_dir}"
                         )
                     else:
-                        # Direct files - copy to service_dir
                         for f in items:
                             dst = service_dir / f.name
                             if f.is_file():
@@ -343,7 +303,6 @@ class DownloadManager:
                 logger.info(f"Extracted to: {service_dir}")
 
             else:
-                # tar.gz handling
                 import tempfile
 
                 with tempfile.TemporaryDirectory() as tmp_dir:
@@ -355,7 +314,6 @@ class DownloadManager:
                     if result.returncode != 0:
                         raise RuntimeError(f"Failed to extract tar.gz: {result.stderr}")
 
-                    # Find the top-level directory
                     items = list(Path(tmp_dir).iterdir())
                     logger.info(
                         f"TAR.GZ contains {len(items)} items: {[i.name for i in items]}"
@@ -374,7 +332,6 @@ class DownloadManager:
                             f"Copied files from {extracted_dir.name} to {service_dir}"
                         )
                     else:
-                        # Direct files
                         for f in Path(tmp_dir).iterdir():
                             dst = service_dir / f.name
                             if f.is_file():
@@ -383,7 +340,6 @@ class DownloadManager:
                                 shutil.copytree(f, dst, dirs_exist_ok=True)
                 logger.info(f"Extracted tar.gz to: {service_dir}")
 
-            # Verify extraction success
             if not service_dir.exists():
                 raise RuntimeError(f"Extraction failed: {service_dir} does not exist")
 
@@ -391,7 +347,6 @@ class DownloadManager:
 
         except Exception as e:
             logger.error(f"Extraction failed for {service}: {e}")
-            # Clean up partial extraction
             if service_dir.exists():
                 try:
                     shutil.rmtree(service_dir)
@@ -404,14 +359,7 @@ class DownloadManager:
             logger.info(f"Cleaned temp file: {temp_path}")
 
     async def cancel_download(self, download_id: str) -> dict[str, Any]:
-        """Cancel an active download.
-
-        Args:
-            download_id: Download ID to cancel
-
-        Returns:
-            Dict with download_id, status, message
-        """
+        """Cancel an active download."""
         task = self.active_downloads.get(download_id)
         if not task:
             return {
@@ -437,25 +385,11 @@ class DownloadManager:
         }
 
     def get_progress(self, download_id: str) -> DownloadTask | None:
-        """Get download task for progress tracking.
-
-        Args:
-            download_id: Download ID
-
-        Returns:
-            DownloadTask or None
-        """
+        """Get download task for progress tracking."""
         return self.active_downloads.get(download_id)
 
     def get_progress_stream(self, download_id: str) -> asyncio.Queue | None:
-        """Get progress queue for SSE streaming.
-
-        Args:
-            download_id: Download ID
-
-        Returns:
-            asyncio.Queue or None
-        """
+        """Get progress queue for SSE streaming."""
         task = self.active_downloads.get(download_id)
         if task:
             return task.progress_queue

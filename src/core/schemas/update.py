@@ -21,7 +21,6 @@ class UpdateApplyResponse(BaseModel):
     status: str = Field(..., description="Update status (success, failed)")
     service: str = Field(..., description="Service updated")
     version: str = Field(..., description="New version applied")
-    backup_id: str | None = Field(None, description="Backup ID created")
     previous_version: str | None = Field(None, description="Previous version")
     health_check: str | None = Field(None, description="Health check result")
     error: str | None = Field(None, description="Error message if failed")
@@ -40,19 +39,11 @@ class UpdateRollbackResponse(BaseModel):
     status: str = Field(..., description="Rollback status (success, failed)")
     service: str = Field(..., description="Service rolled back")
     version: str | None = Field(None, description="Version restored to")
-    backup_id: str | None = Field(None, description="Backup ID used")
     health_check: str | None = Field(None, description="Health check result")
     error: str | None = Field(None, description="Error message if failed")
 
 
-class BackupInfo(BaseModel):
-    """Information about a backup."""
-
-    backup_id: str = Field(..., description="Backup identifier")
-    service: str = Field(..., description="Service backed up")
-    version: str = Field(..., description="Version backed up")
-    created: datetime = Field(..., description="Backup creation time")
-    size_bytes: int | None = Field(None, description="Backup size in bytes")
+ bytes")
 
 
 class ServiceVersionInfo(BaseModel):
@@ -76,7 +67,6 @@ def create_apply_response(
     status: str,
     service: str,
     version: str,
-    backup_id: str | None = None,
     previous_version: str | None = None,
     health_check: str | None = None,
     error: str | None = None,
@@ -88,7 +78,6 @@ def create_apply_response(
         status: Update status
         service: Service name
         version: Version applied
-        backup_id: Backup ID
         previous_version: Previous version
         health_check: Health check result
         error: Error message
@@ -102,8 +91,6 @@ def create_apply_response(
         "service": service,
         "version": version,
     }
-    if backup_id is not None:
-        result["backup_id"] = backup_id
     if previous_version is not None:
         result["previous_version"] = previous_version
     if health_check is not None:
@@ -120,7 +107,6 @@ def create_rollback_response(
     status: str,
     service: str,
     version: str | None = None,
-    backup_id: str | None = None,
     health_check: str | None = None,
     error: str | None = None,
 ) -> dict[str, Any]:
@@ -130,7 +116,6 @@ def create_rollback_response(
         status: Rollback status
         service: Service name
         version: Version restored
-        backup_id: Backup ID used
         health_check: Health check result
         error: Error message
 
@@ -143,8 +128,6 @@ def create_rollback_response(
     }
     if version is not None:
         result["version"] = version
-    if backup_id is not None:
-        result["backup_id"] = backup_id
     if health_check is not None:
         result["health_check"] = health_check
     if error is not None:

@@ -6,8 +6,6 @@ import logging
 import time
 from typing import Any
 
-import httpx
-
 from src.config import load_config
 
 logger = logging.getLogger(__name__)
@@ -31,51 +29,24 @@ class HealthCheckService:
         """
         config = load_config()
         results = {
-            "llm": await self._check_llm(config),
+            "llamacpp": await self._check_llamacpp(config),
             "qdrant": await self._check_qdrant(config),
             "timestamp": time.time(),
         }
         return results
 
-    async def _check_llm(self, config: dict) -> dict[str, Any]:
-        """Check LLM service health."""
-        cached = self._get_cached("llm")
+    async def _check_llamacpp(self, config: dict) -> dict[str, Any]:
+        """Check llama.cpp service health."""
+        cached = self._get_cached("llamacpp")
         if cached:
             return cached
 
-        llm_config = config.get("services", {}).get("llama", {})
-        llm_url = llm_config.get("base_url", "http://localhost:11434")
+        from src.core.backend.llamacpp.health import check_health
 
         start = time.time()
-        try:
-            response = httpx.get(f"{llm_url}/api/tags", timeout=TIMEOUT)
-            elapsed = time.time() - start
-            result = {
-                "status": "ok" if response.status_code == 200 else "error",
-                "url": llm_url,
-                "response_time": round(elapsed, 3),
-                "error": (
-                    None
-                    if response.status_code == 200
-                    else f"HTTP {response.status_code}"
-                ),
-            }
-        except httpx.ConnectError:
-            result = {
-                "status": "error",
-                "url": llm_url,
-                "response_time": TIMEOUT,
-                "error": "Connection refused",
-            }
-        except Exception as e:
-            result = {
-                "status": "error",
-                "url": llm_url,
-                "response_time": TIMEOUT,
-                "error": str(e),
-            }
-
-        self._set_cached("llm", result)
+        result = await check_health(port=8080)
+        result["response_time"] = round(time.time() - start, 3)
+        self._set_cached("llamacpp", result)
         return result
 
     async def _check_qdrant(self, config: dict) -> dict[str, Any]:
@@ -89,40 +60,39 @@ class HealthCheckService:
         port = qdrant_config.get("port", 6333)
         collection = qdrant_config.get("collection_name", "sigma_rules")
 
+        from src.core.backend.qdrant.health import check_health
+
+        basic_check = await check_health(port=port)
         start = time.time()
-        try:
-            from qdrant_client import QdrantClient
 
-            client = QdrantClient(host=host, port=port, timeout=TIMEOUT)
-            collections = client.get_collections().collections
-            elapsed = time.time() - start
+        if basic_check["status"] == "active":
+            try:
+                from qdrant_client import QdrantClient
 
-            collection_exists = any(c.name == collection for c in collections)
+                client = QdrantClient(host=host, port=port, timeout=TIMEOUT)
+                collections = client.get_collections().collections
+                collection_exists = any(c.name == collection for c in collections)
+                result = {
+                    "status": "ok" if collection_exists else "warning",
+                    "host": f"{host}:{port}",
+                    "collection": collection,
+                    "collection_exists": collection_exists,
+                    "response_time": round(time.time() - start, 3),
+                }
+            except Exception as e:
+                result = {
+                    "status": "warning",
+                    "host": f"{host}:{port}",
+                    "response_time": round(time.time() - start, 3),
+                    "error": str(e),
+                }
+        else:
             result = {
-                "status": "ok" if collection_exists else "warning",
+                "status": "error",
                 "host": f"{host}:{port}",
                 "collection": collection,
-                "collection_exists": collection_exists,
-                "response_time": round(elapsed, 3),
-                "error": (
-                    None
-                    if collection_exists
-                    else f"Collection '{collection}' not found"
-                ),
-            }
-        except ImportError:
-            result = {
-                "status": "error",
-                "host": f"{host}:{port}",
-                "error": "qdrant_client not installed",
-                "response_time": 0,
-            }
-        except Exception as e:
-            result = {
-                "status": "error",
-                "host": f"{host}:{port}",
-                "response_time": time.time() - start,
-                "error": str(e),
+                "response_time": round(time.time() - start, 3),
+                "error": basic_check.get("message", "Service unavailable"),
             }
 
         self._set_cached("qdrant", result)

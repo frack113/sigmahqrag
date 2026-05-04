@@ -5,9 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from src.core.backup_manager import BackupManager, create_backup_manager
-
-from src.core.health import HealthChecker, create_health_checker
+from src.core.backend.services.health_check import HealthCheckService
 
 logger = logging.getLogger(__name__)
 
@@ -17,17 +15,14 @@ class UpdateService:
 
     def __init__(
         self,
-        backup_manager: BackupManager | None = None,
-        health_checker: HealthChecker | None = None,
+        health_checker: HealthCheckService | None = None,
     ) -> None:
         """Initialize update service.
 
         Args:
-            backup_manager: Manager for backups (FR20)
             health_checker: Manager for health checks (FR18)
         """
-        self.backup_manager = backup_manager or create_backup_manager()
-        self.health_checker = health_checker or create_health_checker()
+        self.health_checker = health_checker or HealthCheckService()
 
     async def _check_service_health(self, service: str) -> bool:
         """Check service health.
@@ -59,35 +54,20 @@ class UpdateService:
         """
         from datetime import datetime
 
-        from src.schemas.update import BackupInfo, ServiceVersionInfo
+        from src.schemas.update import ServiceVersionInfo
 
         services_status = {}
 
         for service in ("llama.cpp", "qdrant"):
-            version = self.backup_manager.get_current_version(service)
+            version = self.health_checker.get_current_version(service)
             version_info = ServiceVersionInfo(
                 current_version=version or "unknown",
                 last_updated=datetime.now() if version else None,
             )
             services_status[service.replace(".", "_")] = version_info.dict()
 
-        all_backups = []
-        for service in ("llama.cpp", "qdrant"):
-            backups = await self.backup_manager.list_backups(service)
-            for backup in backups:
-                all_backups.append(
-                    BackupInfo(
-                        backup_id=backup.backup_id,
-                        service=backup.service,
-                        version=backup.version,
-                        created=backup.created,
-                        size_bytes=backup.size_bytes,
-                    ).dict()
-                )
-
         return {
             "services": services_status,
-            "available_backups": all_backups,
         }
 
 

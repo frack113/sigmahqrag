@@ -1,5 +1,5 @@
 """Document ingestion module."""
 
-from src.documents.models import SigmaRule, ValidationResult
+from src.core.documents.models import SigmaRule, ValidationResult
 
 __all__ = ["SigmaRule", "ValidationResult"]

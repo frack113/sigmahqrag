@@ -3,10 +3,28 @@
 from __future__ import annotations
 
 from src.config import LLM_DIR
+from src.core.backend.huggingface import HFDownloadService
+from src.core.backend.llamacpp.vram import VRAMEstimator
 
-from .download import DownloadError, HFDownloadService
-from .registry import LocalRegistry, ModelFile, ModelRecord
-from .vram import VRAMEstimator
+
+class DownloadError(Exception):
+    """Download operation error."""
+    pass
+
+
+class LocalRegistry:
+    """Local registry for models."""
+    pass
+
+
+class ModelFile:
+    """Model file."""
+    pass
+
+
+class ModelRecord:
+    """Model record."""
+    pass
 
 
 class ModelNotFoundError(Exception):

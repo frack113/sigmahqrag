@@ -7,82 +7,20 @@ from typing import Any
 
 import httpx
 
-# TODO Growth: Make configurable via environment or config file
-LLAMA_URL = "http://localhost:8080/health"
-QDRANT_URL = "http://localhost:6333/health"
-MAX_TOTAL_TIMEOUT = 5.0  # AC4: all checks within 5s
+from src.core.backend.llamacpp.health import check_health as check_llamacpp_health
+from src.core.backend.qdrant.health import check_health as check_qdrant_health
+
+MAX_TOTAL_TIMEOUT = 5.0
 
 
 async def check_llama_cpp(timeout: float = 2.0) -> dict[str, Any]:
-    """Check health of llama.cpp service on port 8080 (FR18, NFR4, NFR14)."""
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(LLAMA_URL, timeout=timeout)
-        if response.status_code == 200:
-            return {"status": "active", "component": "llama.cpp", "port": 8080}
-        return {
-            "status": "inactive",
-            "component": "llama.cpp",
-            "port": 8080,
-            "message": f"HTTP {response.status_code}",
-        }
-    except httpx.TimeoutException:
-        return {
-            "status": "inactive",
-            "component": "llama.cpp",
-            "port": 8080,
-            "message": "timeout",
-        }
-    except httpx.ConnectError:
-        return {
-            "status": "inactive",
-            "component": "llama.cpp",
-            "port": 8080,
-            "message": "Connection refused",
-        }
-    except httpx.HTTPError:
-        return {
-            "status": "inactive",
-            "component": "llama.cpp",
-            "port": 8080,
-            "message": "HTTP error",
-        }
+    """Check health of llama.cpp service on port 8080."""
+    return await check_llamacpp_health(timeout=timeout, port=8080)
 
 
 async def check_qdrant(timeout: float = 2.0) -> dict[str, Any]:
-    """Check health of Qdrant service on port 6333 (FR18, NFR4, NFR14)."""
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(QDRANT_URL, timeout=timeout)
-        if response.status_code == 200:
-            return {"status": "active", "component": "qdrant", "port": 6333}
-        return {
-            "status": "inactive",
-            "component": "qdrant",
-            "port": 6333,
-            "message": f"HTTP {response.status_code}",
-        }
-    except httpx.TimeoutException:
-        return {
-            "status": "inactive",
-            "component": "qdrant",
-            "port": 6333,
-            "message": "timeout",
-        }
-    except httpx.ConnectError:
-        return {
-            "status": "inactive",
-            "component": "qdrant",
-            "port": 6333,
-            "message": "Connection refused",
-        }
-    except httpx.HTTPError:
-        return {
-            "status": "inactive",
-            "component": "qdrant",
-            "port": 6333,
-            "message": "HTTP error",
-        }
+    """Check health of Qdrant service on port 6333."""
+    return await check_qdrant_health(timeout=timeout, port=6333)
 
 
 async def check_all() -> dict[str, Any]:

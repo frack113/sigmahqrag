@@ -16,8 +16,7 @@ MODELS_DIR = BASE_DIR / "models"
 LLM_DIR = MODELS_DIR / "llm"
 EMBEDDINGS_DIR = MODELS_DIR / "embeddings"
 LOGS_DIR = BASE_DIR / "logs"
-BACKUP_DIR = BASE_DIR / "backups"
-MAX_BACKUPS = 5
+
 LLAMA_BIN_PATH = BIN_DIR / "llama.cpp"
 QDRANT_BIN_PATH = BIN_DIR / "qdrant"
 QDRANT_STORAGE_DIR = BASE_DIR / "qdrant_storage"
@@ -49,7 +48,6 @@ DEFAULT_CONFIG = {
         "bin_dir": "data/bin",
         "models_dir": "data/models",
         "logs_dir": "data/logs",
-        "backup_dir": "data/backups",
     },
     "logging": {
         "level": "INFO",  # DEBUG, INFO, WARNING, ERROR

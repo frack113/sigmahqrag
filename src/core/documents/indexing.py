@@ -7,8 +7,9 @@ import os
 from typing import Any
 
 from llama_index.core.schema import TextNode
-from src.core.services.qdrant_service import QdrantService
-from src.documents.models import SigmaRule
+from src.core.documents.models import SigmaRule
+
+from src.core.backend.qdrant import QdrantService
 
 logger = logging.getLogger(__name__)
 

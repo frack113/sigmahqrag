@@ -1,4 +1,4 @@
-"""QdrantService - High-level Qdrant vector store wrapper using llama-index."""
+"""Qdrant backend package."""
 
 from __future__ import annotations
 
@@ -7,6 +7,16 @@ from typing import Any
 
 import qdrant_client
 from llama_index.vector_stores.qdrant import QdrantVectorStore
+
+from .health import check_health
+from .storage import search, store_embeddings
+
+__all__ = [
+    "QdrantService",
+    "check_health",
+    "store_embeddings",
+    "search",
+]
 
 logger = logging.getLogger(__name__)
 

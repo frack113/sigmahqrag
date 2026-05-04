@@ -6,9 +6,11 @@ import logging
 from typing import Any
 
 from jinja2 import Environment, FileSystemLoader
-from src.core.services.cache import ResponseCache
-from src.core.services.llm_client import LLMClient
-from src.rag.search import SearchEngine
+
+from src.core.backend.llamacpp import LlamaService
+from src.core.rag.search import SearchEngine
+
+from .cache import ResponseCache
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +22,7 @@ class RAGPipeline:
 
     def __init__(self) -> None:
         self.search_engine = SearchEngine()
-        self.llm_client = LLMClient()
+        self.llm_client = LlamaService()
         self.cache = ResponseCache()
         self.env = Environment(
             loader=FileSystemLoader(PROMPT_DIR),

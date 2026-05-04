@@ -9,6 +9,8 @@ from typing import Any
 
 from llama_index.core.schema import Document
 
+from src.core.backend.qdrant.storage import store_embeddings as _store_embeddings
+
 logger = logging.getLogger(__name__)
 
 BATCH_SIZE = 32
@@ -115,46 +117,21 @@ def store_embeddings(
     embeddings: list[list[float]],
     collection_name: str = "sigma_rules",
 ) -> bool:
-    """Store embeddings in Qdrant.
+    """Store embeddings in Qdrant."""
+    import asyncio
 
-    Args:
-        documents: Original documents
-        embeddings: Embedding vectors
-        collection_name: Qdrant collection name
+    texts = [doc.text for doc in documents]
+    metadata = [doc.metadata for doc in documents]
 
-    Returns:
-        True if successful
-    """
-    if len(documents) != len(embeddings):
-        logger.error("Document count must match embedding count")
-        return False
-
-    try:
-        import asyncio
-
-        from src.core.services.qdrant_service import QdrantService
-
-        async def _store() -> bool:
-            service = QdrantService(
-                collection_name=collection_name,
-                vector_size=EMBEDDING_DIM,
-            )
-            await service.initialize()
-
-            texts = [doc.text for doc in documents]
-            metadata = [doc.metadata for doc in documents]
-
-            await service.add_vectors(
-                embeddings=embeddings,
-                documents=texts,
-                metadata=metadata,
-            )
-            return True
-
-        return asyncio.run(_store())
-    except Exception as e:
-        logger.error(f"Failed to store embeddings: {e}")
-        return False
+    return asyncio.run(
+        _store_embeddings(
+            embeddings=embeddings,
+            documents=texts,
+            metadata=metadata,
+            collection_name=collection_name,
+            vector_size=EMBEDDING_DIM,
+        )
+    )
 
 
 class EmbeddingGenerator:

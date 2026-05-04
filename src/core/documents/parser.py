@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from src.documents.models import SigmaRule
+from src.core.documents.models import SigmaRule
 
 logger = logging.getLogger(__name__)
 

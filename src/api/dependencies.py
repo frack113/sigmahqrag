@@ -2,9 +2,8 @@
 
 from functools import lru_cache
 
-from src.core.services.embedding import EmbeddingManager
-from src.core.services.manager import ModelManager
-from src.git.repo_manager import RepositoryManager
+from src.core.backend.huggingface import EmbeddingManager
+from src.core.backend.github import RepositoryManager
 
 
 @lru_cache

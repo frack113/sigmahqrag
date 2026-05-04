@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -38,10 +39,10 @@ class LlamaService:
         if self._llm is None:
             await self.initialize()
 
-        response = await self._llm.acomplete(prompt)  # type: ignore[union-attr]
+        response = await self._llm.acomplete(prompt)
         return str(response)
 
-    async def chat(self, messages: list[dict[str, str]]) -> str:
+    async def chat(self, messages: list[dict[str, Any]]) -> str:
         """Generate chat completion."""
         if self._llm is None:
             await self.initialize()
@@ -52,7 +53,7 @@ class LlamaService:
         if active_content and (not messages or messages[0].get("role") != "system"):
             messages = [{"role": "system", "content": active_content}] + messages
 
-        response = await self._llm.achat(messages)  # type: ignore[union-attr]
+        response = await self._llm.achat(messages)
         return str(response)
 
     async def health_check(self) -> bool:
@@ -61,7 +62,7 @@ class LlamaService:
             await self.initialize()
 
         try:
-            await self._llm.is_busy()  # type: ignore[union-attr]
+            await self._llm.is_busy()
             return True
         except Exception as e:
             logger.debug(f"Health check failed: {e}")
