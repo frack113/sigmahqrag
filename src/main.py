@@ -23,18 +23,21 @@ correlation_id_var: ContextVar[str | None] = ContextVar("correlation_id", defaul
 
 def _validate_services() -> None:
     """Validate external services at startup (llama.cpp, Qdrant)."""
-    import asyncio
-
     from src.config import load_config
-    from src.core.backend.llamacpp.health import check_health
 
     config = load_config()
 
-    # Check llama.cpp service
-    result = asyncio.run(check_health(port=8080))
-    if result["status"] == "active":
-        logger.info("llama.cpp service available at port 8080")
-    else:
+    # Check llama.cpp service (sync check)
+    try:
+        import httpx
+        response = httpx.get("http://localhost:8080/health", timeout=2.0)
+        if response.status_code == 200:
+            logger.info("llama.cpp service available at port 8080")
+        else:
+            logger.warning(
+                f"llama.cpp service returned {response.status_code} - chat features will use fallback"
+            )
+    except Exception:
         logger.warning(
             "llama.cpp service NOT available at port 8080 - chat features will use fallback"
         )
@@ -91,7 +94,10 @@ def create_app() -> FastAPI:
     from src.api.routes.embeddings import router as embeddings_router
     from src.api.routes.feedback import router as feedback_router
     from src.api.v1.admin import router as admin_v1_router
+    from src.api.v1.backend import router as backend_v1_router
     from src.api.v1.config import router as config_v1_router
+    from src.api.v1.llamacpp import router as llama_router
+    from src.api.v1.qdrant import router as qdrant_router
 
     # Startup validation
     _validate_services()
@@ -112,7 +118,10 @@ def create_app() -> FastAPI:
     app.include_router(admin_pages_router)
     app.include_router(admin_prompts_router)
     app.include_router(admin_v1_router)
+    app.include_router(backend_v1_router)
     app.include_router(config_v1_router)
+    app.include_router(llama_router)
+    app.include_router(qdrant_router)
     app.include_router(chat_router)
     app.include_router(documents_router)
     app.include_router(embeddings_router)
@@ -189,9 +198,9 @@ def create_app() -> FastAPI:
 
     @app.get("/")
     async def root() -> HTMLResponse:
-        """Root endpoint - redirect to admin dashboard."""
+        """Root endpoint - redirect to chat page."""
         return HTMLResponse(
-            content="<html><head><meta http-equiv='refresh' content='0;url=/admin'></head></html>"
+            content="<html><head><meta http-equiv='refresh' content='0;url=/chat'></head></html>"
         )
 
     return app
