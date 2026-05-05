@@ -5,9 +5,13 @@
 {% block header %}Model Management{% endblock %}
 
 {% block content %}
+
+<div style="text-align: center; margin-bottom: 20px;">
+    <button class="btn btn-secondary" onclick="loadModels()">Refresh local models</button>
+</div>
+
 <div class="card">
     <h3>Installed LLM Models</h3>
-    <button class="btn btn-secondary" onclick="loadModels()" style="float:right;">Refresh</button>
     <div id="llm-models">
         <p>Loading...</p>
     </div>
@@ -23,31 +27,52 @@
 <div class="card">
     <h3>Download New Model from HuggingFace</h3>
     <div class="form-group">
-        <label for="model-search">Search:</label>
-        <input type="text" id="model-search" placeholder="ex: llama, gemma, qwen">
-        <button class="btn btn-primary" onclick="searchModels()">Search</button>
+        <label for="model-type">Type:</label>
+        <select id="model-type" onchange="onModelTypeChange()">
+            <option value="llm">LLM Model</option>
+            <option value="embedding">Embedding Model</option>
+        </select>
     </div>
-    <div id="search-results"></div>
+    <div class="form-group">
+        <label for="hf-repo-id">HuggingFace ID:</label>
+        <input type="text" id="hf-repo-id" placeholder="ex: mistralai/Ministral-3-3B-Reasoning-2512-GGUF" style="width: 400px;">
+        <button type="button" class="btn btn-secondary btn-sm" onclick="loadFiles()">Load Files</button>
+    </div>
+    <div class="form-group" id="file-select-group">
+        <label for="model-file">Version:</label>
+        <select id="model-file" style="width: 400px;" disabled>
+            <option value="">Select a model ID and click Load Files</option>
+        </select>
+    </div>
+    <div class="form-group">
+        <button class="btn btn-primary" onclick="downloadModel()">Download</button>
+    </div>
+    <div id="progress-container" style="display: none;">
+        <progress id="download-progress" value="0" max="100" style="width: 100%;"></progress>
+        <p id="progress-text">Downloading... 0%</p>
+    </div>
     <div id="download-status" class="status-message"></div>
 </div>
 
 <script>
 function loadModels() {
-    fetch('/api/v1/admin/models')
+    fetch('/api/v1/model/llm/installed')
         .then(r => r.json())
         .then(data => {
-            const models = data.data?.models || [];
+            const models = data.models || [];
             if (models.length === 0) {
                 document.getElementById('llm-models').innerHTML = '<p>No models installed.</p>';
                 return;
             }
             let html = '<table><tr><th>Model</th><th>Size</th><th>Actions</th></tr>';
             models.forEach(m => {
-                html += `<tr>
-                    <td>${m.repo_id}</td>
-                    <td>${Math.round(m.size_mb)}MB</td>
-                    <td><button class="btn btn-danger btn-sm" onclick="deleteModel('${m.repo_id}', '${m.filename}')">Delete</button></td>
-                </tr>`;
+                for (const [filename, f] of Object.entries(m.files)) {
+                    html += `<tr>
+                        <td>${m.repo_id}/${filename}</td>
+                        <td>${Math.round(f.size / 1024 / 1024)}MB</td>
+                        <td><button class="btn btn-danger btn-sm" onclick="deleteModel('${m.repo_id}', '${filename}')">Delete</button></td>
+                    </tr>`;
+                }
             });
             html += '</table>';
             document.getElementById('llm-models').innerHTML = html;
@@ -55,9 +80,9 @@ function loadModels() {
         .catch(err => {
             document.getElementById('llm-models').innerHTML = '<p class="error">Failed to load models</p>';
         });
-    
+
     // Embeddings
-    fetch('/embeddings/installed')
+    fetch('/api/v1/model/embedding/installed')
         .then(r => r.json())
         .then(data => {
             const models = data.models || [];
@@ -80,50 +105,146 @@ function loadModels() {
         });
 }
 
-function searchModels() {
-    const query = document.getElementById('model-search').value.trim();
-    if (!query) return;
-    
-    document.getElementById('search-results').innerHTML = '<p>Searching...</p>';
-    
-    fetch(`/admin/llm/?action=list&repo_id=${encodeURIComponent(query)}`)
-        .then(r => r.json())
-        .then(data => {
-            const files = data.files || [];
-            if (files.length === 0) {
-                document.getElementById('search-results').innerHTML = '<p>No files found.</p>';
-                return;
-            }
-            let html = '<p><strong>Available files:</strong></p><ul>';
-            files.forEach(f => {
-                html += `<li>${f.filename} (${Math.round(f.size/1024/1024)}MB)</li>`;
+function onModelTypeChange() {
+    document.getElementById('file-select-group').style.display = 'none';
+    document.getElementById('hf-repo-id').value = '';
+}
+
+function loadFiles() {
+    const repoId = document.getElementById('hf-repo-id').value.trim();
+    const modelType = document.getElementById('model-type').value;
+    const fileSelect = document.getElementById('model-file');
+    const fileGroup = document.getElementById('file-select-group');
+
+    if (!repoId) return;
+
+    if (modelType === 'llm') {
+        fileGroup.style.display = 'block';
+        fileSelect.disabled = false;
+        fileSelect.innerHTML = '<option value="">Loading...</option>';
+
+        console.log('Fetching files for:', repoId);
+        fetch(`/api/v1/model/llm/files?repo_id=${encodeURIComponent(repoId)}`)
+            .then(r => r.json())
+            .then(data => {
+                console.log('Response:', data);
+                if (data.error) {
+                    fileSelect.innerHTML = '<option value="">Error: ' + data.error + '</option>';
+                    return;
+                }
+                const files = data.files || [];
+                if (files.length === 0) {
+                    fileSelect.innerHTML = '<option value="">No GGUF files found</option>';
+                    return;
+                }
+                fileSelect.innerHTML = files.map(f => {
+                    const sizeMB = f.size ? Math.round(f.size / 1024 / 1024) : '?';
+                    return `<option value="${f.filename}">${f.filename} (${sizeMB}MB)</option>`;
+                }).join('');
+            })
+            .catch(err => {
+                console.error('Error:', err);
+                fileSelect.innerHTML = '<option value="">Error loading files: ' + err + '</option>';
             });
-            html += '</ul>';
-            document.getElementById('search-results').innerHTML = html;
-        })
-        .catch(err => {
-            document.getElementById('search-results').innerHTML = '<p class="error">Search failed: ' + err + '</p>';
-        });
+    }
+}
+
+let currentRepoId = '';
+
+function downloadModel() {
+    const repoId = document.getElementById('hf-repo-id').value.trim();
+    const modelType = document.getElementById('model-type').value;
+    const filename = document.getElementById('model-file').value;
+
+    if (!repoId) {
+        alert('Please enter a HuggingFace model ID');
+        return;
+    }
+
+    if (modelType === 'llm' && !filename) {
+        alert('Please select a file to download');
+        return;
+    }
+
+    currentRepoId = repoId;
+    document.getElementById('progress-container').style.display = 'block';
+    document.getElementById('download-progress').value = 0;
+    document.getElementById('progress-text').textContent = 'Starting download...';
+
+    const basePath = modelType === 'embedding' ? '/api/v1/model/embedding' : '/api/v1/model/llm';
+    let url = `${basePath}/download?repo_id=${encodeURIComponent(repoId)}`;
+    if (filename) {
+        url += `&filename=${encodeURIComponent(filename)}`;
+    }
+
+    // Start polling for progress
+    const progressInterval = setInterval(() => {
+        fetch(`${basePath}/progress/${encodeURIComponent(repoId)}`)
+            .then(r => r.json())
+            .then(data => {
+                const progress = data.progress || 0;
+                document.getElementById('download-progress').value = progress;
+                document.getElementById('progress-text').textContent = `Downloading... ${progress}%`;
+                if (progress >= 100 || data.status === 'completed') {
+                    clearInterval(progressInterval);
+                    document.getElementById('progress-text').textContent = 'Download complete!';
+                    setTimeout(loadModels, 2000);
+                }
+            })
+            .catch(() => {});
+    }, 2000);
+
+    fetch(url, { method: 'POST' })
+    .then(r => r.json())
+    .then(data => {
+        clearInterval(progressInterval);
+        document.getElementById('download-progress').value = 100;
+        if (data.success) {
+            document.getElementById('progress-text').textContent = 'Download complete!';
+            setTimeout(() => {
+                document.getElementById('progress-container').style.display = 'none';
+            }, 3000);
+            setTimeout(loadModels, 2000);
+        } else {
+            document.getElementById('progress-text').textContent = 'Download failed: ' + data.error;
+        }
+    })
+    .catch(err => {
+        clearInterval(progressInterval);
+        document.getElementById('progress-text').textContent = 'Download failed: ' + err;
+    });
 }
 
 function deleteModel(repoId, filename) {
     if (!confirm(`Delete ${repoId}/${filename}?`)) return;
-    
-    fetch('/api/v1/admin/models/delete', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({repo_id: repoId, filename: filename})
+
+    fetch(`/api/v1/model/llm/${encodeURIComponent(repoId)}/file/${encodeURIComponent(filename)}`, {
+        method: 'DELETE'
     })
     .then(r => r.json())
     .then(data => {
-        alert(data.message || 'Deleted');
+        alert(data.success ? 'Deleted' : data.error);
         loadModels();
+    })
+    .catch(err => {
+        alert('Delete failed: ' + err);
     });
 }
 
 function deleteEmbedding(repoId) {
     if (!confirm(`Delete embedding ${repoId}?`)) return;
-    alert('Not implemented yet');
+
+    fetch(`/api/v1/model/embedding/${encodeURIComponent(repoId)}`, {
+        method: 'DELETE'
+    })
+    .then(r => r.json())
+    .then(data => {
+        alert(data.success ? 'Deleted' : data.error);
+        loadModels();
+    })
+    .catch(err => {
+        alert('Delete failed: ' + err);
+    });
 }
 
 document.addEventListener('DOMContentLoaded', function() {
