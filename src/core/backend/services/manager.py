@@ -45,7 +45,10 @@ class ModelManager:
         registry: LocalRegistry | None = None,
         download_service: HFDownloadService | None = None,
     ) -> None:
-        self.registry = registry or LocalRegistry()
+        from src.config import MODELS_DIR
+
+        registry_path = MODELS_DIR / "registry.json"
+        self.registry = registry or LocalRegistry(registry_path)
         self.download_service = download_service or HFDownloadService()
         self.vram_estimator = VRAMEstimator()
         self.llm_dir = LLM_DIR

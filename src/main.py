@@ -96,6 +96,7 @@ def create_app() -> FastAPI:
     from src.api.v1.admin import router as admin_v1_router
     from src.api.v1.config import router as config_v1_router
     from src.api.v1.llamacpp import router as llama_router
+    from src.api.v1.model import router as model_v1_router
     from src.api.v1.qdrant import router as qdrant_router
 
     # Startup validation
@@ -119,6 +120,7 @@ def create_app() -> FastAPI:
     app.include_router(config_v1_router)
     app.include_router(llama_router)
     app.include_router(qdrant_router)
+    app.include_router(model_v1_router)
     app.include_router(chat_router)
     app.include_router(documents_router)
     app.include_router(embeddings_router)

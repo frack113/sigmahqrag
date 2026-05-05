@@ -107,17 +107,20 @@ function showLogs(service) {
 
 
 function loadModels() {
-    fetch('/api/v1/admin/models')
+    fetch('/api/v1/model/llm/installed')
         .then(r => r.json())
         .then(data => {
-            if (data.models && data.models.length > 0) {
+            const models = data.models || [];
+            if (models.length > 0) {
                 let html = '<table><tr><th>Model</th><th>Size</th><th>Action</th></tr>';
-                data.models.forEach(m => {
-                    html += `<tr>
-                        <td>${m.repo_id}/${m.filename}</td>
-                        <td>${Math.round(m.size_mb)}MB</td>
-                        <td><button class="btn btn-danger" onclick="deleteModel('${m.repo_id}', '${m.filename}')">Delete</button></td>
-                    </tr>`;
+                models.forEach(m => {
+                    for (const [filename, f] of Object.entries(m.files)) {
+                        html += `<tr>
+                            <td>${m.repo_id}/${filename}</td>
+                            <td>${Math.round(f.size / 1024 / 1024)}MB</td>
+                            <td><button class="btn btn-danger" onclick="deleteModel('${m.repo_id}', '${filename}')">Delete</button></td>
+                        </tr>`;
+                    }
                 });
                 html += '</table>';
                 document.getElementById('models-list').innerHTML = html;
@@ -134,15 +137,16 @@ function refreshStatus() {
 function deleteModel(repoId, filename) {
     if (!confirm('Delete this model?')) return;
 
-    fetch('/api/v1/admin/models/delete', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({repo_id: repoId, filename: filename})
+    fetch(`/api/v1/model/llm/${encodeURIComponent(repoId)}/file/${encodeURIComponent(filename)}`, {
+        method: 'DELETE'
     })
     .then(r => r.json())
     .then(data => {
-        alert(data.message || 'Deleted successfully');
+        alert(data.success ? 'Deleted successfully' : data.error);
         loadModels();
+    })
+    .catch(err => {
+        alert('Delete failed: ' + err);
     });
 }
 

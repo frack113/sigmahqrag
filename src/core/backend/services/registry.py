@@ -67,6 +67,46 @@ class LocalRegistry:
             await self._load()
             self._loaded = True
 
+    async def sync_with_folder(self) -> None:
+        """Scan models folder and add any unregistered models."""
+        await self._ensure_loaded()
+
+        # Clean up invalid entries (those starting with "llm/")
+        invalid_keys = [k for k in self._models.keys() if k.startswith("llm/")]
+        for k in invalid_keys:
+            del self._models[k]
+
+        models_dir = self.registry_path.parent / "llm"
+        if not models_dir.exists():
+            return
+        for owner_dir in models_dir.iterdir():
+            if not owner_dir.is_dir() or owner_dir.name == "llm":
+                continue
+            for model_dir in owner_dir.iterdir():
+                if not model_dir.is_dir():
+                    continue
+                repo_id = f"{owner_dir.name}/{model_dir.name}"
+                if repo_id not in self._models:
+                    files = {}
+                    for f in model_dir.rglob("*.gguf"):
+                        rel_parts = f.relative_to(model_dir).parts
+                        if not any(part.startswith('.cache') or part.startswith('.') for part in rel_parts[:-1]):
+                            files[f.name] = ModelFile(
+                                filename=f.name,
+                                local_path=f,
+                                file_size=f.stat().st_size if f.exists() else 0,
+                                status="ready",
+                            )
+                    if files:
+                        self._models[repo_id] = ModelRecord(
+                            repo_id=repo_id,
+                            files=files,
+                            status="ready",
+                            created_at=datetime.now(),
+                            updated_at=datetime.now(),
+                        )
+        await self._save()
+
     async def _load(self) -> None:
         """Load registry from disk."""
         if self.registry_path.exists():

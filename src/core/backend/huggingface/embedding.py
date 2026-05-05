@@ -112,7 +112,26 @@ class EmbeddingManager:
 
     async def list_installed(self) -> dict:
         """List installed embedding models."""
+        await self._sync_with_folder()
         return await self._load_registry()
+
+    async def _sync_with_folder(self) -> None:
+        """Scan embeddings folder and add any unregistered models."""
+        registry = await self._load_registry()
+        if not self.embeddings_dir.exists():
+            return
+        for model_dir in self.embeddings_dir.iterdir():
+            if not model_dir.is_dir():
+                continue
+            repo_id = f"{model_dir.parent.name}/{model_dir.name}"
+            if repo_id not in registry:
+                files = list(model_dir.rglob("*"))
+                if files:
+                    registry[repo_id] = {
+                        "local_path": str(model_dir),
+                        "status": "ready",
+                    }
+        await self._save_registry(registry)
 
     async def get_repo_files(self, repo_id: str) -> list[str]:
         """Get list of files in an embedding model repo."""
