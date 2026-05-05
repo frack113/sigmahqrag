@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, Query
 from fastapi.responses import JSONResponse
 
 from src.api.dependencies import get_github_repo_manager
+from src.core.backend.github.repo import RepositoryManager
 
 logger = logging.getLogger(__name__)
 

@@ -20,7 +20,7 @@ let pollInterval;
 function loadStatus() {
     Promise.all([
         fetch('/admin/health').then(r => r.json()),
-        fetch('/admin/llama/info').then(r => r.json()).catch(() => ({})),
+        fetch('/api/v1/llamacpp/status').then(r => r.json()).catch(() => ({})),
         fetch('/api/v1/admin/status').then(r => r.json()).catch(() => ({}))
     ])
     .then(([healthData, llamaInfo, v1Status]) => {

@@ -16,6 +16,7 @@ MAX_TOTAL_TIMEOUT = 5.0
 
 class ServiceStatus(Enum):
     """Service status enum."""
+
     RUNNING = "running"
     STOPPED = "stopped"
     UNKNOWN = "unknown"

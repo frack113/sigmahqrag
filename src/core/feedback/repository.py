@@ -7,6 +7,7 @@ from datetime import datetime
 from pathlib import Path
 
 import aiosqlite
+
 from src.core.feedback.models import Feedback, FeedbackStats, hash_query
 
 logger = logging.getLogger(__name__)

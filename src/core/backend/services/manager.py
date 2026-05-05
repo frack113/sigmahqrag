@@ -9,21 +9,25 @@ from src.core.backend.llamacpp.vram import VRAMEstimator
 
 class DownloadError(Exception):
     """Download operation error."""
+
     pass
 
 
 class LocalRegistry:
     """Local registry for models."""
+
     pass
 
 
 class ModelFile:
     """Model file."""
+
     pass
 
 
 class ModelRecord:
     """Model record."""
+
     pass
 
 

@@ -52,13 +52,12 @@ let activeDownloadId = null;
 let progressPollInterval = null;
 
 function loadLlamaInfo() {
-    fetch('/admin/llama/info')
+    fetch('/api/v1/llamacpp/status')
         .then(r => r.json())
         .then(data => {
             let html = '<p><strong>Current Version:</strong> ' + (data.current_version || 'Not installed') + '</p>';
-            if (data.update_available) {
-                html += '<p><strong>Update Available:</strong> v' + data.latest_version + '</p>';
-                html += '<button class="btn btn-warning" onclick="updateLlama()">Update to v' + data.latest_version + '</button>';
+            if (data.downloads && Object.keys(data.downloads).length > 0) {
+                html += '<p class="warning">Download in progress</p>';
             }
             document.getElementById('llama-info').innerHTML = html;
         })
@@ -106,18 +105,20 @@ function downloadLlama() {
     document.getElementById('download-status').className = 'status-message';
     document.getElementById('progress-container').style.display = 'block';
 
-    fetch('/admin/llama/download', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({})
+    fetch('/api/v1/llamacpp/download', {
+        method: 'POST'
     })
     .then(r => r.json())
     .then(data => {
-        if (data.success || data.download_id) {
+        if (data.download_id) {
             activeDownloadId = data.download_id;
             document.getElementById('download-status').textContent = data.message || 'Download started: ' + activeDownloadId;
             document.getElementById('download-status').className = 'status-message success';
             startProgressPolling(activeDownloadId);
+        } else if (data.message) {
+            document.getElementById('download-status').textContent = data.message;
+            document.getElementById('download-status').className = 'status-message success';
+            document.getElementById('progress-container').style.display = 'none';
         } else {
             document.getElementById('download-status').textContent = data.error || 'Download failed';
             document.getElementById('download-status').className = 'status-message error';
@@ -135,7 +136,7 @@ function startProgressPolling(downloadId) {
     if (progressPollInterval) clearInterval(progressPollInterval);
     
     progressPollInterval = setInterval(() => {
-        fetch(`/admin/backend/?action=status&service=llama`)
+        fetch('/api/v1/llamacpp/status')
             .then(r => r.json())
             .then(data => {
                 const task = data.downloads?.[downloadId];

@@ -30,6 +30,7 @@ def _validate_services() -> None:
     # Check llama.cpp service (sync check)
     try:
         import httpx
+
         response = httpx.get("http://localhost:8080/health", timeout=2.0)
         if response.status_code == 200:
             logger.info("llama.cpp service available at port 8080")
@@ -83,7 +84,6 @@ class CorrelationIDMiddleware(BaseHTTPMiddleware):
 
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
-    from src.api.routes.admin_backend import router as admin_backend_router
     from src.api.routes.admin_bulk import router as admin_bulk_router
     from src.api.routes.admin_logs import router as admin_logs_router
     from src.api.routes.admin_pages import router as admin_pages_router
@@ -94,7 +94,6 @@ def create_app() -> FastAPI:
     from src.api.routes.embeddings import router as embeddings_router
     from src.api.routes.feedback import router as feedback_router
     from src.api.v1.admin import router as admin_v1_router
-    from src.api.v1.backend import router as backend_v1_router
     from src.api.v1.config import router as config_v1_router
     from src.api.v1.llamacpp import router as llama_router
     from src.api.v1.qdrant import router as qdrant_router
@@ -112,13 +111,11 @@ def create_app() -> FastAPI:
     app.mount("/static", StaticFiles(directory="src/front/static"), name="static")
 
     app.include_router(admin_router)
-    app.include_router(admin_backend_router)
     app.include_router(admin_bulk_router)
     app.include_router(admin_logs_router)
     app.include_router(admin_pages_router)
     app.include_router(admin_prompts_router)
     app.include_router(admin_v1_router)
-    app.include_router(backend_v1_router)
     app.include_router(config_v1_router)
     app.include_router(llama_router)
     app.include_router(qdrant_router)

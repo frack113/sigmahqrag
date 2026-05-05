@@ -35,4 +35,4 @@ async def explain_rule(rule_id: str, text: str) -> dict:
                 )
     except Exception as e:
         logger.error(f"Explain error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e

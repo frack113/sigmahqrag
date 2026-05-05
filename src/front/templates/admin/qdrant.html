@@ -34,36 +34,43 @@
 
 <script>
 function loadQdrantInfo() {
-    fetch('/admin/health')
-        .then(r => r.json())
-        .then(data => {
-            const qdrant = data.services?.find(s => s.name === 'qdrant') || {};
-            let html = '<p><strong>Status:</strong> ' + (qdrant.status || 'unknown') + '</p>';
-            html += '<p><strong>Port:</strong> ' + (qdrant.port || '6333') + '</p>';
-            html += '<p><strong>URL:</strong> ' + (qdrant.url || 'http://localhost:6333') + '</p>';
-            if (qdrant.message) {
-                html += '<p><strong>Message:</strong> ' + qdrant.message + '</p>';
-            }
-            document.getElementById('qdrant-info').innerHTML = html;
-        })
-        .catch(err => {
-            document.getElementById('qdrant-info').innerHTML = '<p class="error">Failed to load info: ' + err + '</p>';
-        });
+    Promise.all([
+        fetch('/admin/health').then(r => r.json()),
+        fetch('/api/v1/qdrant/status').then(r => r.json()).catch(() => ({}))
+    ])
+    .then(([healthData, v1Status]) => {
+        const qdrant = healthData.services?.find(s => s.name === 'qdrant') || {};
+        const version = v1Status.current_version || 'unknown';
+        let html = '<p><strong>Status:</strong> ' + (qdrant.status || 'unknown') + '</p>';
+        html += '<p><strong>Version:</strong> ' + version + '</p>';
+        html += '<p><strong>Port:</strong> ' + (qdrant.port || '6333') + '</p>';
+        html += '<p><strong>URL:</strong> ' + (qdrant.url || 'http://localhost:6333') + '</p>';
+        if (qdrant.message) {
+            html += '<p><strong>Message:</strong> ' + qdrant.message + '</p>';
+        }
+        document.getElementById('qdrant-info').innerHTML = html;
+    })
+    .catch(err => {
+        document.getElementById('qdrant-info').innerHTML = '<p class="error">Failed to load info: ' + err + '</p>';
+    });
 }
 
 function downloadQdrant() {
     document.getElementById('download-status').textContent = 'Starting download...';
     document.getElementById('download-status').className = 'status-message';
 
-    fetch('/admin/backend/?action=download&service=qdrant', {
+    fetch('/api/v1/qdrant/download', {
         method: 'POST'
     })
     .then(r => r.json())
     .then(data => {
-        if (data.success || data.status === 'started') {
+        if (data.download_id) {
             document.getElementById('download-status').textContent = 'Download started: ' + data.download_id;
             document.getElementById('download-status').className = 'status-message success';
             loadQdrantInfo();
+        } else if (data.message) {
+            document.getElementById('download-status').textContent = data.message;
+            document.getElementById('download-status').className = 'status-message success';
         } else {
             document.getElementById('download-status').textContent = data.error || 'Download failed';
             document.getElementById('download-status').className = 'status-message error';

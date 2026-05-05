@@ -8,9 +8,10 @@ from typing import Any
 import qdrant_client
 from llama_index.vector_stores.qdrant import QdrantVectorStore
 
+from src.config import get_qdrant_version, set_qdrant_version
+
 from .health import check_health
 from .storage import search, store_embeddings
-from src.config import get_qdrant_version, set_qdrant_version
 
 
 def get_version() -> str | None:

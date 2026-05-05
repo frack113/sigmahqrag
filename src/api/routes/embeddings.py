@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from src.api.dependencies import get_embedding_manager
-from src.core.backend.services.embedding import create_embedding_manager_service
+from src.core.backend.huggingface.embedding import EmbeddingManager
 
 logger = logging.getLogger(__name__)
 

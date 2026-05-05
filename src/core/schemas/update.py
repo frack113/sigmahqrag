@@ -50,6 +50,15 @@ class ServiceVersionInfo(BaseModel):
     last_updated: datetime | None = Field(None, description="Last update time")
 
 
+class BackupInfo(BaseModel):
+    """Information about a backup."""
+
+    name: str = Field(..., description="Backup name")
+    path: str = Field(..., description="Backup path")
+    size: int = Field(..., description="Backup size in bytes")
+    created_at: datetime = Field(..., description="Creation timestamp")
+
+
 class UpdateStatus(BaseModel):
     """Status response for update system."""
 

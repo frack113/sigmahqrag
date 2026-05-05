@@ -1,8 +1,10 @@
-[backend]
 os = "windows"
+
+[backend]
 gpu_type = "cpu"
+os = "windows"
 llamacpp_version = "b9016"
-qdrant_version = ""
+qdrant_version = "1.17.1"
 
 [models]
 llm_dir = "data/models/llm"

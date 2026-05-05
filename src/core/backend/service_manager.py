@@ -132,7 +132,19 @@ class ServiceManager:
         if not self.llama_bin.exists():
             return {
                 "success": False,
-                "error": f"llama.cpp binary not found: {self.llama_bin}",
+                "error": f"llama.cpp directory not found: {self.llama_bin}",
+            }
+
+        # Find the executable inside the directory
+        llama_exe = None
+        for exe in self.llama_bin.glob("*.exe"):
+            llama_exe = exe
+            break
+
+        if not llama_exe:
+            return {
+                "success": False,
+                "error": f"llama.cpp executable not found in {self.llama_bin}",
             }
 
         log_file = self.logs_dir / "llama.cpp.log"
@@ -146,7 +158,7 @@ class ServiceManager:
 
         try:
             cmd = [
-                str(self.llama_bin),
+                str(llama_exe),
                 "-m",
                 model_path,
                 "--port",
@@ -339,7 +351,7 @@ class ServiceManager:
         result = {"success": True, "details": {}}
 
         # Download/Update llama.cpp
-        llama_result = await self._download_or_update_binary(
+        await self._download_or_update_binary(
             name="llama.cpp",
             binary_path=self.llama_bin,
             download_url="https://github.com/ggerganov/llama.cpp/releases/download/b9010/cudart-llama-bin-win-cuda-12.4-x64.zip",

@@ -11,18 +11,29 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from src.config import LLAMA_BIN_PATH, LOGS_DIR, QDRANT_BIN_PATH
+from src.core.backend.service_manager import create_service_manager
 from src.core.health import (
     ServiceHealth,
     ServiceStatus,
     create_health_checker,
 )
-from src.core.backend.service_manager import create_service_manager
 
 logger = logging.getLogger(__name__)
 
 
 def _get_status_display(health: ServiceHealth, binary_path: Path) -> dict[str, Any]:
     """Get display data for a service health status."""
+    # Check first if the binary is installed
+    if not binary_path.exists():
+        return {
+            "name": health.name,
+            "status": "not installed",
+            "color": "yellow",
+            "port": health.port,
+            "url": health.url,
+            "message": "Binary not found",
+        }
+
     if health.status == ServiceStatus.RUNNING:
         color = "green"
         display_status = "running"
@@ -44,11 +55,6 @@ def _get_status_display(health: ServiceHealth, binary_path: Path) -> dict[str, A
     if health.message:
         result["message"] = health.message
 
-    if not binary_path.exists():
-        result["status"] = "not installed"
-        result["color"] = "yellow"
-        result["message"] = "Binary not found"
-
     return result
 
 
@@ -61,7 +67,7 @@ class StartRequest(BaseModel):
 router = APIRouter(prefix="/admin", tags=["admin-services"])
 
 ALLOWED_SERVICES = {"llama", "qdrant"}
-VALID_GET_ACTIONS = {"logs"}
+VALID_GET_ACTIONS = {"logs", "info"}
 VALID_POST_ACTIONS = {"start", "stop"}
 
 
@@ -164,6 +170,45 @@ async def services_get(
         manager = create_service_manager()
 
         match action:
+            case "info":
+                if service not in ALLOWED_SERVICES:
+                    return JSONResponse(
+                        status_code=400,
+                        content={"error": "Invalid service"},
+                    )
+
+                from src.config import LLAMA_BIN_PATH, QDRANT_BIN_PATH
+                from src.core.health import create_health_checker
+
+                checker = create_health_checker()
+                health = await checker.check_all()
+
+                if service == "llama":
+                    from src.core.backend.llamacpp import get_version
+                    version = get_version()
+                    h = health["llamacpp"]
+                    binary_path = LLAMA_BIN_PATH
+                else:
+                    from src.core.backend.qdrant import get_version
+                    version = get_version()
+                    h = health["qdrant"]
+                    binary_path = QDRANT_BIN_PATH
+
+                # Check if installed
+                is_installed = binary_path.exists()
+
+                return JSONResponse(
+                    content={
+                        "service": service,
+                        "current_version": version or "unknown",
+                        "status": h.status.value,
+                        "port": h.port,
+                        "url": h.url,
+                        "message": h.message,
+                        "is_installed": is_installed,
+                    }
+                )
+
             case "logs":
                 match service:
                     case "llama":
@@ -461,50 +506,6 @@ async def services_post(
 
 
 
-@router.post("/llama/download")
-async def download_llama() -> JSONResponse:
-    """Download llama.cpp binary."""
-    from src.core.download_manager import create_download_manager
-
-    try:
-        dm = create_download_manager()
-        result = await dm.start_download("llama.cpp", "latest")
-
-        return JSONResponse(
-            content={
-                "success": True,
-                "download_id": result.get("download_id"),
-                "file_name": result.get("file_name"),
-                "message": "Download started: "
-                + (result.get("file_name") or "unknown"),
-            }
-        )
-    except Exception as e:
-        logger.error(f"Failed to download llama.cpp: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
-
-
-@router.post("/qdrant/download")
-async def download_qdrant() -> JSONResponse:
-    """Download Qdrant binary."""
-    from src.core.download_manager import create_download_manager
-
-    try:
-        dm = create_download_manager()
-        result = await dm.start_download("qdrant", "latest")
-
-        return JSONResponse(
-            content={
-                "success": True,
-                "download_id": result.get("download_id"),
-                "file_name": result.get("file_name"),
-                "message": "Download started: "
-                + (result.get("file_name") or "unknown"),
-            }
-        )
-    except Exception as e:
-        logger.error(f"Failed to download Qdrant: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
 
 
 @router.post("/llama/update")
@@ -532,3 +533,6 @@ async def update_llama() -> JSONResponse:
     except Exception as e:
         logger.error(f"Failed to update llama.cpp: {e}")
         return JSONResponse(status_code=500, content={"error": str(e)})
+
+
+

@@ -1,9 +1,10 @@
 """Llama.cpp package."""
 
+from src.config import get_llamacpp_version, set_llamacpp_version
+
 from .client import LlamaClient
 from .health import check_health
 from .service import LlamaService
-from src.config import get_llamacpp_version, set_llamacpp_version
 
 
 def get_version() -> str | None:

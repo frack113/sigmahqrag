@@ -17,7 +17,7 @@ LLM_DIR = MODELS_DIR / "llm"
 EMBEDDINGS_DIR = MODELS_DIR / "embeddings"
 LOGS_DIR = BASE_DIR / "logs"
 
-LLAMA_BIN_PATH = BIN_DIR / "llama.cpp"
+LLAMA_BIN_PATH = BIN_DIR / "llama-cpp"
 QDRANT_BIN_PATH = BIN_DIR / "qdrant"
 QDRANT_STORAGE_DIR = BASE_DIR / "qdrant_storage"
 DATA_DIR = BASE_DIR

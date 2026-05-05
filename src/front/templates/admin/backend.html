@@ -79,19 +79,21 @@ function downloadLlama() {
     document.getElementById('llama-download-status').className = 'status-message';
     document.getElementById('llama-progress-container').style.display = 'block';
 
-    fetch('/admin/llama/download', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({})
+    fetch('/api/v1/llamacpp/download', {
+        method: 'POST'
     })
     .then(r => r.json())
     .then(data => {
-        if (data.success || data.download_id) {
+        if (data.download_id) {
             activeDownloadId = data.download_id;
             const fileName = data.file_name || 'unknown';
             document.getElementById('llama-download-status').textContent = `Download file ${fileName} id ${activeDownloadId}`;
             document.getElementById('llama-download-status').className = 'status-message success';
             startProgressPolling(activeDownloadId, 'llama');
+        } else if (data.message) {
+            document.getElementById('llama-download-status').textContent = data.message;
+            document.getElementById('llama-download-status').className = 'status-message success';
+            document.getElementById('llama-progress-container').style.display = 'none';
         } else {
             document.getElementById('llama-download-status').textContent = data.error || 'Download failed';
             document.getElementById('llama-download-status').className = 'status-message error';
@@ -110,19 +112,21 @@ function downloadQdrant() {
     document.getElementById('qdrant-download-status').className = 'status-message';
     document.getElementById('qdrant-progress-container').style.display = 'block';
 
-    fetch('/admin/qdrant/download', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({})
+    fetch('/api/v1/qdrant/download', {
+        method: 'POST'
     })
     .then(r => r.json())
     .then(data => {
-        if (data.success || data.download_id) {
+        if (data.download_id) {
             activeDownloadId = data.download_id;
             const fileName = data.file_name || 'unknown';
             document.getElementById('qdrant-download-status').textContent = `Download file ${fileName} id ${activeDownloadId}`;
             document.getElementById('qdrant-download-status').className = 'status-message success';
             startProgressPolling(activeDownloadId, 'qdrant');
+        } else if (data.message) {
+            document.getElementById('qdrant-download-status').textContent = data.message;
+            document.getElementById('qdrant-download-status').className = 'status-message success';
+            document.getElementById('qdrant-progress-container').style.display = 'none';
         } else {
             document.getElementById('qdrant-download-status').textContent = data.error || 'Download failed';
             document.getElementById('qdrant-download-status').className = 'status-message error';
@@ -145,7 +149,8 @@ function startProgressPolling(downloadId, service) {
     const containerId = service === 'llama' ? 'llama-progress-container' : 'qdrant-progress-container';
 
     progressPollInterval = setInterval(() => {
-        fetch(`/admin/backend/?action=status&service=${service}`)
+        const url = service === 'llama' ? '/api/v1/llamacpp/status' : '/api/v1/qdrant/status';
+        fetch(url)
             .then(r => r.json())
             .then(data => {
                 const task = data.downloads?.[downloadId];
@@ -178,9 +183,10 @@ function startProgressPolling(downloadId, service) {
 function loadStatus() {
     Promise.all([
         fetch('/admin/health').then(r => r.json()),
-        fetch('/admin/llama/info').then(r => r.json()).catch(() => ({}))
+        fetch('/api/v1/llamacpp/status').then(r => r.json()).catch(() => ({})),
+        fetch('/api/v1/qdrant/status').then(r => r.json()).catch(() => ({}))
     ])
-    .then(([healthData, llamaInfo]) => {
+    .then(([healthData, llamaInfo, qdrantInfo]) => {
         const services = healthData.services || [];
         const llama = services.find(s => s.name === 'llama.cpp') || {};
         const qdrant = services.find(s => s.name === 'qdrant') || {};
@@ -211,7 +217,7 @@ function loadStatus() {
             </div>
             <div class="status-row">
                 <span class="status-label">Version:</span>
-                <span>${qdrant.version || 'Unknown'}</span>
+                <span>${qdrantInfo.current_version || 'Not installed'}</span>
             </div>
         `;
 

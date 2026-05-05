@@ -52,7 +52,7 @@ uv run python scripts/test_api_admin_github.py delete sigmahq sigma-specificatio
 
 ### test_api_admin_backend.py
 
-Test script for the `/admin/backend` endpoint.
+Test script for the `/api/v1/{llama,qdrant}` endpoints (download, status, progress, cancel).
 
 ```bash
 uv run python scripts/test_api_admin_backend.py --help

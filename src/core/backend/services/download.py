@@ -13,4 +13,5 @@ def create_hf_download_service() -> HFDownloadService:
 
 class DownloadError(Exception):
     """Download operation error."""
+
     pass

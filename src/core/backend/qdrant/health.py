@@ -10,7 +10,9 @@ DEFAULT_PORT = 6333
 DEFAULT_URL = f"http://localhost:{DEFAULT_PORT}/health"
 
 
-async def check_health(timeout: float = 2.0, port: int = DEFAULT_PORT) -> dict[str, Any]:
+async def check_health(
+    timeout: float = 2.0, port: int = DEFAULT_PORT
+) -> dict[str, Any]:
     """Check health of Qdrant service."""
     url = f"http://localhost:{port}/health"
     try:
@@ -25,8 +27,23 @@ async def check_health(timeout: float = 2.0, port: int = DEFAULT_PORT) -> dict[s
             "message": f"HTTP {response.status_code}",
         }
     except httpx.TimeoutException:
-        return {"status": "inactive", "component": "qdrant", "port": port, "message": "timeout"}
+        return {
+            "status": "inactive",
+            "component": "qdrant",
+            "port": port,
+            "message": "timeout",
+        }
     except httpx.ConnectError:
-        return {"status": "inactive", "component": "qdrant", "port": port, "message": "Connection refused"}
+        return {
+            "status": "inactive",
+            "component": "qdrant",
+            "port": port,
+            "message": "Connection refused",
+        }
     except httpx.HTTPError:
-        return {"status": "inactive", "component": "qdrant", "port": port, "message": "HTTP error"}
+        return {
+            "status": "inactive",
+            "component": "qdrant",
+            "port": port,
+            "message": "HTTP error",
+        }

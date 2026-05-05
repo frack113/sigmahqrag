@@ -96,7 +96,6 @@ class UpdateError(SigmaError):
         )
 
 
-
 class BackupError(SigmaError):
     """Backup error."""
 
