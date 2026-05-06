@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}Chat - Sigma Rule Analysis{% endblock %}
+
+{% block styles %}
+<link rel="stylesheet" href="{{ url_for('static', path='/css/chat.css') }}">
+{% endblock %}
+
+{% block content %}
+<section class="chat-container">
+    <div class="chat-controls">
+        <fieldset class="mode-toggle">
+            <legend>Mode</legend>
+            <label><input type="radio" name="mode" value="search" checked> Search</label>
+            <label><input type="radio" name="mode" value="explain"> Explain</label>
+            <label><input type="radio" name="mode" value="coverage"> Coverage</label>
+        </fieldset>
+        <button id="clear-btn" type="button">Clear</button>
+    </div>
+
+    <div class="yaml-upload-zone" id="upload-zone">
+        <label for="sigma-file-input">Upload Sigma Rule (.yaml/.yml)</label>
+        <input type="file" id="sigma-file-input" accept=".yml,.yaml" hidden>
+        <span id="uploaded-filename">No file selected</span>
+    </div>
+
+    <section class="chat-history" id="chat-history" aria-label="Chat messages">
+    </section>
+
+    <form class="chat-input-form" id="chat-form">
+        <label for="message-input" class="sr-only">Message</label>
+        <textarea id="message-input" placeholder="Ask about Sigma rules..." rows="2"></textarea>
+        <button type="submit" id="send-btn">Send</button>
+    </form>
+
+    <div class="chat-status" id="chat-status" aria-live="polite"></div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', path='/js/chat.js') }}"></script>
+{% endblock %}

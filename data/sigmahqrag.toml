@@ -1,4 +1,28 @@
-[backend]
-gpu_type = "hip"
+os = "windows"
 
-[system_prompts]
+[backend]
+gpu_type = "cpu"
+os = "windows"
+llamacpp_version = "b9016"
+qdrant_version = "1.17.1"
+
+[models]
+llm_dir = "data/models/llm"
+embeddings_dir = "data/models/embeddings"
+
+[services.llama]
+base_url = "http://127.0.0.1:8080"
+
+[services.qdrant]
+host = "127.0.0.1"
+port = 6333
+collection_name = "sigma"
+vector_size = 384
+
+[paths]
+bin_dir = "data/bin"
+models_dir = "data/models"
+logs_dir = "data/logs"
+
+[logging]
+level = "INFO"

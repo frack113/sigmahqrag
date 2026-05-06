@@ -7,8 +7,8 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 
-from src.rag.search import SearchEngine, format_search_result, get_citation
-from src.schemas.search import SearchRequest, SearchResponse
+from src.core.rag.search import SearchEngine, format_search_result, get_citation
+from src.core.schemas.search import SearchRequest, SearchResponse
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +75,9 @@ async def search_rules(request: SearchRequest) -> SearchResponse:
         )
 
     except TimeoutError:
-        logger.error(f"Search timeout after {SEARCH_TIMEOUT}s for query: {request.query}")
+        logger.error(
+            f"Search timeout after {SEARCH_TIMEOUT}s for query: {request.query}"
+        )
         raise HTTPException(
             status_code=status.HTTP_504_GATEWAY_TIMEOUT,
             detail=f"Search timeout (>{SEARCH_TIMEOUT}s)",
@@ -93,3 +95,31 @@ async def search_rules_get(query: str, limit: int = 10) -> SearchResponse:
     """Search for Sigma rules matching the query (GET version)."""
     request = SearchRequest(query=query, limit=limit)
     return await search_rules(request)
+
+
+class SuggestionsResponse(BaseModel):
+    """Suggestions response."""
+
+    suggestions: list[str] = Field(default_factory=list)
+
+
+@router.get("/api/search-suggestions", response_model=SuggestionsResponse)
+async def search_suggestions(query: str, limit: int = 5) -> SuggestionsResponse:
+    """Get search suggestions based on query."""
+    if not query or len(query.strip()) < 2:
+        return SuggestionsResponse(suggestions=[])
+
+    try:
+        results = await asyncio.wait_for(
+            _search_with_timeout(query, limit),
+            timeout=SEARCH_TIMEOUT,
+        )
+        suggestions = []
+        for result in results:
+            title = result.get("metadata", {}).get("title", "")
+            if title and title not in suggestions:
+                suggestions.append(title)
+        return SuggestionsResponse(suggestions=suggestions[:limit])
+    except Exception as e:
+        logger.error(f"Suggestions error: {e}")
+        return SuggestionsResponse(suggestions=[])

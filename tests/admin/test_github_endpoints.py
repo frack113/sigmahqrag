@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 import json
-import shutil
-from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -103,7 +101,9 @@ class TestGitHubAdminGet:
         repo_path.mkdir(parents=True)
         (repo_path / ".git").mkdir()
 
-        response = client.get(f"/admin/github?action=info&org={org_name}&name={repo_name}")
+        response = client.get(
+            f"/admin/github?action=info&org={org_name}&name={repo_name}"
+        )
 
         assert response.status_code == 200
         data = response.json()
@@ -128,7 +128,9 @@ class TestGitHubAdminGet:
         with open(repo_path / "metadata.json", "w") as f:
             json.dump(metadata, f)
 
-        response = client.get(f"/admin/github?action=info&org={org_name}&name={repo_name}")
+        response = client.get(
+            f"/admin/github?action=info&org={org_name}&name={repo_name}"
+        )
 
         assert response.status_code == 200
         data = response.json()
@@ -211,7 +213,9 @@ class TestGitHubAdminPost:
             "branch": "main",
         }
 
-        response = client.post("/admin/github?action=update&org=test-org&name=test-repo")
+        response = client.post(
+            "/admin/github?action=update&org=test-org&name=test-repo"
+        )
 
         assert response.status_code == 200
         data = response.json()
@@ -233,7 +237,9 @@ class TestGitHubAdminPost:
             "error": "Repository not found",
         }
 
-        response = client.post("/admin/github?action=update&org=test-org&name=nonexistent")
+        response = client.post(
+            "/admin/github?action=update&org=test-org&name=nonexistent"
+        )
 
         assert response.status_code == 400
         data = response.json()
@@ -244,7 +250,9 @@ class TestGitHubAdminPost:
         """Test successful repo delete."""
         mock_delete.return_value = {"success": True}
 
-        response = client.post("/admin/github?action=delete&org=test-org&name=test-repo")
+        response = client.post(
+            "/admin/github?action=delete&org=test-org&name=test-repo"
+        )
 
         assert response.status_code == 200
         data = response.json()
@@ -266,7 +274,9 @@ class TestGitHubAdminPost:
             "error": "Repository not found",
         }
 
-        response = client.post("/admin/github?action=delete&org=test-org&name=nonexistent")
+        response = client.post(
+            "/admin/github?action=delete&org=test-org&name=nonexistent"
+        )
 
         assert response.status_code == 400
         data = response.json()

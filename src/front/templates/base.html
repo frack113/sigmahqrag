@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Sigmahqrag{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/main.css') }}">
+    {% block styles %}{% endblock %}
+</head>
+<body>
+    <header>
+        <h1>Sigmahqrag</h1>
+        <nav aria-label="Main navigation">
+            <ul>
+                <li><a href="/chat" {% if request.url.path == '/chat' or request.url.path == '/' %}class="active"{% endif %}>Chat</a></li>
+                <li><a href="/admin" {% if '/admin' in request.url.path %}class="active"{% endif %}>Admin</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer>
+        <p>&copy; 2026 Sigmahqrag - Local RAG for Sigma Rules</p>
+    </footer>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

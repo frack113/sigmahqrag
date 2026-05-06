@@ -1,0 +1,17 @@
+{
+  "embeddings/temp": {
+    "local_path": "data\\models\\embeddings\\temp",
+    "status": "ready"
+  },
+  "nvidia/omni-embed-nemotron-3b": {
+    "local_path": "data\\models\\embeddings\\nvidia\\omni-embed-nemotron-3b",
+    "file_size": 9423122767,
+    "status": "ready",
+    "dimension": 384,
+    "index_path": "data\\models\\embeddings\\nvidia\\index.npy"
+  },
+  "embeddings/nvidia": {
+    "local_path": "data\\models\\embeddings\\nvidia",
+    "status": "ready"
+  }
+}

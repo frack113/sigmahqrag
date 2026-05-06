@@ -1,6 +1,8 @@
+"""Core type definitions for SigmaHQ RAG."""
+
 from __future__ import annotations
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel
 
 
 class HFRepo(BaseModel):
@@ -18,8 +20,10 @@ class HFRepo(BaseModel):
     def from_string(cls, identifier: str) -> HFRepo:
         """Create an HFRepo from a string like 'owner/name'."""
         if "/" not in identifier:
-            raise ValueError(f"Invalid HF repository identifier: {identifier}. Expected 'owner/name'")
-        
+            raise ValueError(
+                f"Invalid HF repository identifier: {identifier}. Expected 'owner/name'"
+            )
+
         owner, name = identifier.split("/", 1)
         return cls(owner=owner, name=name)
 

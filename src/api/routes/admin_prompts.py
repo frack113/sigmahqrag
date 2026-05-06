@@ -8,7 +8,7 @@ from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from src.admin.admin_prompts import (
+from src.core.admin_prompts import (
     add_prompt,
     delete_prompt,
     get_active_prompt,
@@ -37,7 +37,7 @@ class SetActiveRequest(BaseModel):
 
 @router.get("/")
 async def prompts_get(
-    action: str = Query(..., description="Action: list, get, active"),
+    action: str = Query("list", description="Action: list, get, active"),
     name: str | None = Query(None, description="Prompt name"),
 ) -> JSONResponse:
     """Unified GET endpoint for system prompt operations."""
@@ -45,7 +45,7 @@ async def prompts_get(
         match action:
             case "list":
                 prompts = list_prompts()
-                return JSONResponse(content={"prompts": prompts})
+                return JSONResponse(content=prompts)
 
             case "get":
                 if not name:
@@ -69,10 +69,12 @@ async def prompts_get(
                         content={"error": "No active prompt set"},
                     )
                 content = get_prompt_content(active)
-                return JSONResponse(content={
-                    "active": active,
-                    "content": content or "",
-                })
+                return JSONResponse(
+                    content={
+                        "active": active,
+                        "content": content or "",
+                    }
+                )
 
             case _:
                 return JSONResponse(
@@ -87,7 +89,7 @@ async def prompts_get(
 
 @router.post("/")
 async def prompts_post(
-    action: str = Query(..., description="Action: add, delete, set_active"),
+    action: str = Query("add", description="Action: add, delete, set_active"),
     request: AddPromptRequest | SetActiveRequest | None = None,
 ) -> JSONResponse:
     """Unified POST endpoint for system prompt write operations."""
@@ -151,10 +153,12 @@ async def get_active() -> JSONResponse:
                 content={"error": "No active prompt set"},
             )
         content = get_prompt_content(active)
-        return JSONResponse(content={
-            "active": active,
-            "content": content or "",
-        })
+        return JSONResponse(
+            content={
+                "active": active,
+                "content": content or "",
+            }
+        )
     except Exception as e:
         logger.error(f"Failed to get active prompt: {e}")
         return JSONResponse(status_code=500, content={"error": str(e)})

@@ -1,6 +1,5 @@
 """Tests for search module."""
 
-
 import pytest
 
 

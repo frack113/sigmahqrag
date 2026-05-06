@@ -1,0 +1,163 @@
+/* chat.css - Chat interface styles */
+
+.chat-container {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 16px;
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.chat-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+}
+
+.mode-toggle {
+    border: 1px solid #333;
+    padding: 8px 16px;
+    display: flex;
+    gap: 16px;
+    align-items: center;
+}
+
+.mode-toggle legend {
+    font-weight: bold;
+    margin-right: 8px;
+}
+
+.mode-toggle label {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+}
+
+.chat-history {
+    flex: 1;
+    overflow-y: auto;
+    max-height: 500px;
+    padding: 16px;
+    border: 1px solid #333;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.chat-bubble {
+    max-width: 80%;
+    padding: 12px 16px;
+    line-height: 1.4;
+    word-wrap: break-word;
+}
+
+.chat-bubble.user {
+    align-self: flex-end;
+    background: #333;
+    border-radius: 16px 16px 0 16px;
+}
+
+.chat-bubble.assistant {
+    align-self: flex-start;
+    background: #2a2a2a;
+    border-radius: 16px 16px 16px 0;
+    border: 1px solid #444;
+}
+
+.chat-bubble .timestamp {
+    display: block;
+    font-size: 0.75em;
+    color: #888;
+    margin-top: 4px;
+}
+
+.chat-bubble.error {
+    background: #3a1a1a;
+    border-color: #ff4444;
+    color: #ff6666;
+}
+
+.yaml-upload-zone {
+    border: 2px dashed #555;
+    padding: 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+
+.yaml-upload-zone:hover,
+.yaml-upload-zone.dragover {
+    border-color: #00ff00;
+}
+
+.yaml-upload-zone label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: bold;
+}
+
+#uploaded-filename {
+    color: #00ff00;
+    font-size: 0.9em;
+}
+
+.chat-input-form {
+    display: flex;
+    gap: 8px;
+}
+
+.chat-input-form textarea {
+    flex: 1;
+    background: #2a2a2a;
+    color: #ffffff;
+    border: 1px solid #444;
+    padding: 8px 16px;
+    font-size: 16px;
+    font-family: inherit;
+    resize: vertical;
+}
+
+.chat-input-form textarea:focus {
+    outline: 2px solid #00ff00;
+    outline-offset: 2px;
+}
+
+.chat-input-form button {
+    align-self: flex-end;
+}
+
+.chat-status {
+    font-size: 0.85em;
+    color: #888;
+    min-height: 1.2em;
+}
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    border: 0;
+}
+
+@media (max-width: 600px) {
+    .chat-bubble {
+        max-width: 95%;
+    }
+
+    .mode-toggle {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .chat-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}

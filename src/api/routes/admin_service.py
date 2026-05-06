@@ -4,26 +4,36 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from typing import Any
 
 from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from src.admin.health import (
+from src.config import LLAMA_BIN_PATH, LOGS_DIR, QDRANT_BIN_PATH
+from src.core.backend.service_manager import create_service_manager
+from src.core.health import (
     ServiceHealth,
     ServiceStatus,
     create_health_checker,
 )
-from src.admin.service_manager import (
-    create_service_manager,
-)
-from src.config import LLAMA_BIN_PATH, QDRANT_BIN_PATH, LOGS_DIR, MODELS_DIR
 
 logger = logging.getLogger(__name__)
 
 
 def _get_status_display(health: ServiceHealth, binary_path: Path) -> dict[str, Any]:
     """Get display data for a service health status."""
+    # Check first if the binary is installed
+    if not binary_path.exists():
+        return {
+            "name": health.name,
+            "status": "not installed",
+            "color": "yellow",
+            "port": health.port,
+            "url": health.url,
+            "message": "Binary not found",
+        }
+
     if health.status == ServiceStatus.RUNNING:
         color = "green"
         display_status = "running"
@@ -45,11 +55,6 @@ def _get_status_display(health: ServiceHealth, binary_path: Path) -> dict[str, A
     if health.message:
         result["message"] = health.message
 
-    if not binary_path.exists():
-        result["status"] = "not installed"
-        result["color"] = "yellow"
-        result["message"] = "Binary not found"
-
     return result
 
 
@@ -62,7 +67,7 @@ class StartRequest(BaseModel):
 router = APIRouter(prefix="/admin", tags=["admin-services"])
 
 ALLOWED_SERVICES = {"llama", "qdrant"}
-VALID_GET_ACTIONS = {"logs"}
+VALID_GET_ACTIONS = {"logs", "info"}
 VALID_POST_ACTIONS = {"start", "stop"}
 
 
@@ -77,7 +82,7 @@ async def get_admin_health() -> JSONResponse:
 
         result: dict[str, Any] = {
             "services": [
-                _get_status_display(all_health["llama"], LLAMA_BIN_PATH),
+                _get_status_display(all_health["llamacpp"], LLAMA_BIN_PATH),
                 _get_status_display(all_health["qdrant"], QDRANT_BIN_PATH),
             ],
         }
@@ -92,9 +97,9 @@ async def get_admin_health() -> JSONResponse:
         )
 
 
-def _normalize_params(action: str, service: str) -> tuple[str, str]:
+def _normalize_params(action: str, service: str | None) -> tuple[str, str | None]:
     """Normalize action and service to lowercase for case-insensitive matching."""
-    return action.lower(), service.lower()
+    return action.lower(), service.lower() if service else None
 
 
 @router.get(
@@ -102,11 +107,13 @@ def _normalize_params(action: str, service: str) -> tuple[str, str]:
 )
 async def services_get(
     action: str = Query(..., description="Action: logs"),
-    service: str = Query(..., description="Service: llama, qdrant"),
+    service: str | None = Query(
+        None, description="Service: llama, qdrant (optional for unified actions)"
+    ),
 ) -> JSONResponse:
-    """Unified GET endpoint for service operations (logs)."""
+    """Unified GET endpoint for service operations (logs). Supports both individual and batch log retrieval."""
     try:
-        action, service = _normalize_params(action, service)
+        action = _normalize_params(action, None)[0]
 
         if action not in VALID_GET_ACTIONS:
             return JSONResponse(
@@ -114,7 +121,47 @@ async def services_get(
                 content={"error": "Invalid action"},
             )
 
-        if service not in ALLOWED_SERVICES:
+        # If no service specified, assume unified log retrieval for all services
+        if not service:
+            manager = create_service_manager()
+            result = {"success": True, "logs": {}}
+
+            try:
+                logs_llama = manager.get_logs("llama.cpp")
+                result["logs"]["llama.cpp"] = {
+                    "service": "llama.cpp",
+                    "log_file": str(LOGS_DIR / "llama.cpp.log"),
+                    "logs": logs_llama,
+                }
+            except Exception as e:
+                logger.error(f"Failed to read llama.cpp logs: {e}")
+                result["logs"]["llama.cpp"] = {
+                    "service": "llama.cpp",
+                    "log_file": str(LOGS_DIR / "llama.cpp.log"),
+                    "logs": "Error reading logs",
+                    "error": str(e),
+                }
+
+            try:
+                logs_qdrant = manager.get_logs("qdrant")
+                result["logs"]["qdrant"] = {
+                    "service": "qdrant",
+                    "log_file": str(LOGS_DIR / "qdrant.log"),
+                    "logs": logs_qdrant,
+                }
+            except Exception as e:
+                logger.error(f"Failed to read qdrant logs: {e}")
+                result["logs"]["qdrant"] = {
+                    "service": "qdrant",
+                    "log_file": str(LOGS_DIR / "qdrant.log"),
+                    "logs": "Error reading logs",
+                    "error": str(e),
+                }
+
+            return JSONResponse(content=result)
+
+        # Proceed with individual service logic if a specific service is provided
+        elif service not in ALLOWED_SERVICES:
             return JSONResponse(
                 status_code=400,
                 content={"error": "Invalid service"},
@@ -123,6 +170,45 @@ async def services_get(
         manager = create_service_manager()
 
         match action:
+            case "info":
+                if service not in ALLOWED_SERVICES:
+                    return JSONResponse(
+                        status_code=400,
+                        content={"error": "Invalid service"},
+                    )
+
+                from src.config import LLAMA_BIN_PATH, QDRANT_BIN_PATH
+                from src.core.health import create_health_checker
+
+                checker = create_health_checker()
+                health = await checker.check_all()
+
+                if service == "llama":
+                    from src.core.backend.llamacpp import get_version
+                    version = get_version()
+                    h = health["llamacpp"]
+                    binary_path = LLAMA_BIN_PATH
+                else:
+                    from src.core.backend.qdrant import get_version
+                    version = get_version()
+                    h = health["qdrant"]
+                    binary_path = QDRANT_BIN_PATH
+
+                # Check if installed
+                is_installed = binary_path.exists()
+
+                return JSONResponse(
+                    content={
+                        "service": service,
+                        "current_version": version or "unknown",
+                        "status": h.status.value,
+                        "port": h.port,
+                        "url": h.url,
+                        "message": h.message,
+                        "is_installed": is_installed,
+                    }
+                )
+
             case "logs":
                 match service:
                     case "llama":
@@ -165,12 +251,13 @@ async def services_get(
 )
 async def services_post(
     action: str = Query(..., description="Action: start, stop"),
-    service: str = Query(..., description="Service: llama, qdrant"),
-    request: StartRequest | None = None,
+    service: str | None = Query(
+        None, description="Service: llama, qdrant (optional for unified actions)"
+    ),
 ) -> JSONResponse:
-    """Unified POST endpoint for service operations (start, stop)."""
+    """Unified POST endpoint for service operations (start, stop). Supports both individual and batch service management."""
     try:
-        action, service = _normalize_params(action, service)
+        action = _normalize_params(action, None)[0]
 
         if action not in VALID_POST_ACTIONS:
             return JSONResponse(
@@ -178,7 +265,97 @@ async def services_post(
                 content={"error": "Invalid action"},
             )
 
-        if service not in ALLOWED_SERVICES:
+        # If no service specified, assume batch operation for all services
+        if not service:
+            manager = create_service_manager()
+
+            match action:
+                case "start":
+                    results = {"success": True, "details": []}
+
+                    # Start llama.cpp
+                    checker = create_health_checker()
+                    health = await checker.check_all()
+                    if health["llamacpp"].status.value == "running":
+                        results["details"].append(
+                            {"service": "llama.cpp", "error": "Already running"}
+                        )
+                    else:
+                        result_llama = await manager.start_llama(
+                            model_path=str(LLAMA_BIN_PATH)
+                        )
+                        if not result_llama.get("success"):
+                            results["details"].append(
+                                {
+                                    "service": "llama.cpp",
+                                    "error": result_llama.get(
+                                        "error", "Failed to start"
+                                    ),
+                                }
+                            )
+
+                    # Start Qdrant
+                    if health["qdrant"].status.value == "running":
+                        results["details"].append(
+                            {"service": "Qdrant", "error": "Already running"}
+                        )
+                    else:
+                        result_qdrant = await manager.start_qdrant()
+                        if not result_qdrant.get("success"):
+                            results["details"].append(
+                                {
+                                    "service": "Qdrant",
+                                    "error": result_qdrant.get(
+                                        "error", "Failed to start"
+                                    ),
+                                }
+                            )
+
+                    return JSONResponse(content=results)
+
+                case "stop":
+                    results = {"success": True, "details": []}
+
+                    # Stop llama.cpp if running
+                    checker = create_health_checker()
+                    health = await checker.check_all()
+                    if health["llamacpp"].status.value == "running":
+                        result_llama = await manager.stop_llama()
+                        if not result_llama.get("success"):
+                            results["details"].append(
+                                {
+                                    "service": "llama.cpp",
+                                    "error": result_llama.get(
+                                        "error", "Failed to stop"
+                                    ),
+                                }
+                            )
+                    else:
+                        results["details"].append(
+                            {"service": "llama.cpp", "message": "Not running"}
+                        )
+
+                    # Stop Qdrant if running
+                    if health["qdrant"].status.value == "running":
+                        result_qdrant = await manager.stop_qdrant()
+                        if not result_qdrant.get("success"):
+                            results["details"].append(
+                                {
+                                    "service": "Qdrant",
+                                    "error": result_qdrant.get(
+                                        "error", "Failed to stop"
+                                    ),
+                                }
+                            )
+                    else:
+                        results["details"].append(
+                            {"service": "Qdrant", "message": "Not running"}
+                        )
+
+                    return JSONResponse(content=results)
+
+        # Proceed with individual service logic if a specific service is provided
+        elif service not in ALLOWED_SERVICES:
             return JSONResponse(
                 status_code=400,
                 content={"error": "Invalid service"},
@@ -191,35 +368,17 @@ async def services_post(
                 match service:
                     case "llama":
                         model_path = str(LLAMA_BIN_PATH)
-                        if request and request.model_path:
-                            candidate = Path(request.model_path)
-                            # Validate: must be absolute path under MODELS_DIR
-                            try:
-                                resolved = candidate.resolve()
-                                if not resolved.is_relative_to(MODELS_DIR):
-                                    return JSONResponse(
-                                        status_code=400,
-                                        content={"success": False, "error": "Invalid model path"},
-                                    )
-                                if not resolved.is_file():
-                                    return JSONResponse(
-                                        status_code=400,
-                                        content={"success": False, "error": "Model file not found"},
-                                    )
-                                model_path = str(resolved)
-                            except (ValueError, RuntimeError):
-                                return JSONResponse(
-                                    status_code=400,
-                                    content={"success": False, "error": "Invalid model path"},
-                                )
 
                         # Pre-check: is service already running?
                         checker = create_health_checker()
                         health = await checker.check_all()
-                        if service == "llama" and health["llama"].status.value == "running":
+                        if health["llamacpp"].status.value == "running":
                             return JSONResponse(
                                 status_code=400,
-                                content={"success": False, "error": "llama.cpp is already running"},
+                                content={
+                                    "success": False,
+                                    "error": "llama.cpp is already running",
+                                },
                             )
 
                         result = await manager.start_llama(model_path=model_path)
@@ -249,7 +408,10 @@ async def services_post(
                         if health["qdrant"].status.value == "running":
                             return JSONResponse(
                                 status_code=400,
-                                content={"success": False, "error": "Qdrant is already running"},
+                                content={
+                                    "success": False,
+                                    "error": "Qdrant is already running",
+                                },
                             )
 
                         result = await manager.start_qdrant()
@@ -278,10 +440,13 @@ async def services_post(
                         # Pre-check: is service running?
                         checker = create_health_checker()
                         health = await checker.check_all()
-                        if health["llama"].status.value != "running":
+                        if health["llamacpp"].status.value != "running":
                             return JSONResponse(
                                 status_code=400,
-                                content={"success": False, "error": "llama.cpp is not running"},
+                                content={
+                                    "success": False,
+                                    "error": "llama.cpp is not running",
+                                },
                             )
 
                         result = await manager.stop_llama()
@@ -308,7 +473,10 @@ async def services_post(
                         if health["qdrant"].status.value != "running":
                             return JSONResponse(
                                 status_code=400,
-                                content={"success": False, "error": "Qdrant is not running"},
+                                content={
+                                    "success": False,
+                                    "error": "Qdrant is not running",
+                                },
                             )
 
                         result = await manager.stop_qdrant()
@@ -335,3 +503,36 @@ async def services_post(
             status_code=500,
             content={"error": "Internal server error"},
         )
+
+
+
+
+
+@router.post("/llama/update")
+async def update_llama() -> JSONResponse:
+    """Update llama.cpp to latest version."""
+    from src.core.download_manager import create_download_manager
+    from src.core.version_manager import VersionManager
+
+    try:
+        vm = VersionManager()
+        release = await vm.get_release("llama.cpp", "latest")
+        latest = release.tag_name.lstrip("v") if release.tag_name else "latest"
+
+        dm = create_download_manager()
+        result = await dm.start_download("llama.cpp", latest)
+
+        return JSONResponse(
+            content={
+                "success": True,
+                "download_id": result.get("download_id"),
+                "version": latest,
+                "message": f"Downloading llama.cpp v{latest}",
+            }
+        )
+    except Exception as e:
+        logger.error(f"Failed to update llama.cpp: {e}")
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+
+

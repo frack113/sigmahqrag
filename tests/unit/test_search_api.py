@@ -1,7 +1,8 @@
 """Tests for search API endpoint."""
 
+from unittest.mock import AsyncMock, patch
+
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
 
 
 class TestSearchAPI:
@@ -36,10 +37,12 @@ class TestSearchAPI:
     async def test_search_returns_citation(self):
         """Test search returns formatted citation."""
         from src.api.routes.search import search_rules
-        from src.schemas.search import SearchRequest
         from src.rag.search import SearchEngine
+        from src.schemas.search import SearchRequest
 
-        with patch.object(SearchEngine, "search", new_callable=AsyncMock) as mock_search:
+        with patch.object(
+            SearchEngine, "search", new_callable=AsyncMock
+        ) as mock_search:
             mock_search.return_value = [
                 {
                     "text": "test rule content",
@@ -62,15 +65,17 @@ class TestSearchAPI:
     @pytest.mark.asyncio
     async def test_search_timeout_raises_exception(self):
         """Test search timeout raises HTTPException."""
-        from src.api.routes.search import search_rules, SEARCH_TIMEOUT
-        from src.schemas.search import SearchRequest
-        from src.rag.search import SearchEngine
         from fastapi.exceptions import HTTPException
 
-        with patch.object(SearchEngine, "search", new_callable=AsyncMock) as mock_search:
-            import asyncio
+        from src.api.routes.search import search_rules
+        from src.rag.search import SearchEngine
+        from src.schemas.search import SearchRequest
 
-            mock_search.side_effect = asyncio.TimeoutError()
+        with patch.object(
+            SearchEngine, "search", new_callable=AsyncMock
+        ) as mock_search:
+
+            mock_search.side_effect = TimeoutError()
 
             request = SearchRequest(query="test", limit=10)
 

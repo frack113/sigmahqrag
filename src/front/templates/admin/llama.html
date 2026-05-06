@@ -1,0 +1,268 @@
+{% extends "admin/base.html" %}
+
+{% block title %}llama.cpp | Admin | SigmaHQ RAG{% endblock %}
+
+{% block header %}llama.cpp Management{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>Configuration</h2>
+    <form id="config-form">
+        <div class="form-group">
+            <label for="os-select">OS:</label>
+            <select id="os-select" name="os">
+                <option value="windows" {% if config.os == 'windows' %}selected{% endif %}>Windows</option>
+                <option value="linux" {% if config.os == 'linux' %}selected{% endif %}>Linux</option>
+                <option value="macos" {% if config.os == 'macos' %}selected{% endif %}>macOS</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="gpu-select">GPU Backend:</label>
+            <select id="gpu-select" name="gpu">
+                <option value="cpu">CPU</option>
+                <option value="cuda">CUDA</option>
+                <option value="hip">HIP (AMD)</option>
+                <option value="vulkan">Vulkan</option>
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary">Save Configuration</button>
+    </form>
+    <div id="config-status" class="status-message"></div>
+</div>
+
+<div class="card">
+    <h2>Version <button class="btn btn-secondary" onclick="loadLlamaInfo()" style="float:right;">Refresh</button></h2>
+    <div id="llama-info">
+        <p>Loading...</p>
+    </div>
+    <div style="margin-top: 15px;">
+        <button class="btn btn-primary" onclick="downloadLlama()">Download / Update</button>
+        <button class="btn btn-success" onclick="startLlama()">Start</button>
+        <button class="btn btn-danger" onclick="stopLlama()">Stop</button>
+    </div>
+    <div id="download-status" class="status-message"></div>
+    <div id="progress-container" style="display:none;">
+        <div class="progress-bar"><div id="progress-fill"></div></div>
+        <p id="progress-text">Downloading...</p>
+    </div>
+</div>
+
+<script>
+let activeDownloadId = null;
+let progressPollInterval = null;
+
+function loadLlamaInfo() {
+    fetch('/api/v1/llamacpp/status')
+        .then(r => r.json())
+        .then(data => {
+            let html = '<p><strong>Current Version:</strong> ' + (data.current_version || 'Not installed') + '</p>';
+            if (data.downloads && Object.keys(data.downloads).length > 0) {
+                html += '<p class="warning">Download in progress</p>';
+            }
+            document.getElementById('llama-info').innerHTML = html;
+        })
+        .catch(err => {
+            document.getElementById('llama-info').innerHTML = '<p class="error">Failed to load info: ' + err + '</p>';
+        });
+}
+
+function loadLlamaConfig() {
+    fetch('/v1/config')
+        .then(r => r.json())
+        .then(data => {
+            document.getElementById('os-select').value = data.data.backend.os || 'windows';
+            document.getElementById('gpu-select').value = data.data.backend.gpu_type || 'cpu';
+        });
+}
+
+function saveConfig() {
+    const os = document.getElementById('os-select').value;
+    const gpu = document.getElementById('gpu-select').value;
+
+    fetch('/v1/config', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({backend: {os: os, gpu_type: gpu}})
+    })
+    .then(r => r.json())
+    .then(data => {
+        document.getElementById('config-status').textContent = data.message || 'Saved';
+        document.getElementById('config-status').className = 'status-message success';
+    })
+    .catch(err => {
+        document.getElementById('config-status').textContent = 'Error: ' + err;
+        document.getElementById('config-status').className = 'status-message error';
+    });
+}
+
+document.getElementById('config-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    saveConfig();
+});
+
+function downloadLlama() {
+    document.getElementById('download-status').textContent = 'Starting download...';
+    document.getElementById('download-status').className = 'status-message';
+    document.getElementById('progress-container').style.display = 'block';
+
+    fetch('/api/v1/llamacpp/download', {
+        method: 'POST'
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.download_id) {
+            activeDownloadId = data.download_id;
+            document.getElementById('download-status').textContent = data.message || 'Download started: ' + activeDownloadId;
+            document.getElementById('download-status').className = 'status-message success';
+            startProgressPolling(activeDownloadId);
+        } else if (data.message) {
+            document.getElementById('download-status').textContent = data.message;
+            document.getElementById('download-status').className = 'status-message success';
+            document.getElementById('progress-container').style.display = 'none';
+        } else {
+            document.getElementById('download-status').textContent = data.error || 'Download failed';
+            document.getElementById('download-status').className = 'status-message error';
+            document.getElementById('progress-container').style.display = 'none';
+        }
+    })
+    .catch(err => {
+        document.getElementById('download-status').textContent = 'Error: ' + err;
+        document.getElementById('download-status').className = 'status-message error';
+        document.getElementById('progress-container').style.display = 'none';
+    });
+}
+
+function startProgressPolling(downloadId) {
+    if (progressPollInterval) clearInterval(progressPollInterval);
+    
+    progressPollInterval = setInterval(() => {
+        fetch('/api/v1/llamacpp/status')
+            .then(r => r.json())
+            .then(data => {
+                const task = data.downloads?.[downloadId];
+                if (!task) return;
+                
+                const bytesDownloaded = task.bytes_downloaded || 0;
+                const totalBytes = task.total_bytes || 1;
+                const percent = Math.round(bytesDownloaded / totalBytes * 100);
+                
+                document.getElementById('progress-fill').style.width = percent + '%';
+                document.getElementById('progress-text').textContent = 
+                    `${percent}% (${Math.round(bytesDownloaded/1024/1024)}MB / ${Math.round(totalBytes/1024/1024)}MB)`;
+                
+                if (task.status === 'completed') {
+                    clearInterval(progressPollInterval);
+                    document.getElementById('download-status').textContent = 'Download completed!';
+                    document.getElementById('progress-container').style.display = 'none';
+                    loadLlamaInfo();
+                } else if (task.status === 'failed') {
+                    clearInterval(progressPollInterval);
+                    document.getElementById('download-status').textContent = 'Download failed: ' + (task.error || 'Unknown error');
+                    document.getElementById('download-status').className = 'status-message error';
+                    document.getElementById('progress-container').style.display = 'none';
+                }
+            })
+            .catch(() => {});
+    }, 1000);
+}
+
+function updateLlama() {
+    document.getElementById('download-status').textContent = 'Updating...';
+    document.getElementById('download-status').className = 'status-message';
+
+    fetch('/admin/llama/update', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            document.getElementById('download-status').textContent = 'Updated to v' + data.version;
+            document.getElementById('download-status').className = 'status-message success';
+            loadLlamaInfo();
+        } else {
+            document.getElementById('download-status').textContent = data.error || 'Update failed';
+            document.getElementById('download-status').className = 'status-message error';
+        }
+    })
+    .catch(err => {
+        document.getElementById('download-status').textContent = 'Error: ' + err;
+        document.getElementById('download-status').className = 'status-message error';
+    });
+}
+
+function startLlama() {
+    fetch('/admin/services/?action=start&service=llama', {
+        method: 'POST'
+    })
+    .then(r => r.json())
+    .then(data => {
+        alert(data.message || data.error || 'Started');
+        loadLlamaInfo();
+    })
+    .catch(err => alert('Error: ' + err));
+}
+
+function stopLlama() {
+    fetch('/admin/services/?action=stop&service=llama', {
+        method: 'POST'
+    })
+    .then(r => r.json())
+    .then(data => {
+        alert(data.message || data.error || 'Stopped');
+        loadLlamaInfo();
+    })
+    .catch(err => alert('Error: ' + err));
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadLlamaConfig();
+    loadLlamaInfo();
+});
+</script>
+
+<style>
+.form-group {
+    margin-bottom: 15px;
+}
+.form-group label {
+    display: inline-block;
+    width: 120px;
+    font-weight: bold;
+}
+.form-group select {
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    min-width: 150px;
+}
+.status-message {
+    margin-top: 15px;
+    padding: 10px;
+    border-radius: 4px;
+}
+.status-message.success {
+    background: #d4edda;
+    color: #155724;
+}
+.status-message.error {
+    background: #f8d7da;
+    color: #721c24;
+}
+.progress-bar {
+    width: 100%;
+    height: 20px;
+    background: #e9ecef;
+    border-radius: 4px;
+    margin-top: 10px;
+    overflow: hidden;
+}
+.progress-bar #progress-fill {
+    height: 100%;
+    background: #0d6efd;
+    width: 0%;
+    transition: width 0.3s;
+}
+</style>
+{% endblock %}

@@ -1,0 +1,44 @@
+{% extends "admin/base.html" %}
+
+{% block header %}System Logs{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header">
+        <h3>System Logs</h3>
+        <div class="logs-controls">
+            <select id="log-level">
+                <option value="">All Levels</option>
+                <option value="INFO">INFO</option>
+                <option value="WARNING">WARNING</option>
+                <option value="ERROR">ERROR</option>
+            </select>
+            <input type="number" id="log-lines" value="100" min="10" max="500" class="form-control">
+            <button onclick="loadLogs()" class="btn btn-primary">Load Logs</button>
+        </div>
+    </div>
+    <div class="card-body">
+        <pre id="logs-output" class="logs-output"></pre>
+    </div>
+</div>
+
+<script>
+async function loadLogs() {
+    const level = document.getElementById('log-level').value;
+    const lines = document.getElementById('log-lines').value;
+    const params = new URLSearchParams({lines});
+    if (level) params.append('level', level);
+
+    try {
+        const response = await fetch(`/api/v1/admin/logs?${params}`);
+        const data = await response.json();
+        document.getElementById('logs-output').textContent = 
+            data.logs.map(l => l.text).join('\n') || 'No logs found';
+    } catch (error) {
+        console.error('Failed to load logs:', error);
+    }
+}
+
+loadLogs();
+</script>
+{% endblock %}

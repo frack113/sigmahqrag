@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, Query
 from fastapi.responses import JSONResponse
 
 from src.api.dependencies import get_github_repo_manager
-from src.git.repo_manager import RepositoryManager
+from src.core.backend.github.repo import RepositoryManager
 
 logger = logging.getLogger(__name__)
 
@@ -114,7 +114,9 @@ async def github_admin_post(
                 )
 
             metadata = manager.get_metadata(org, name)
-            branch_to_pull = branch or (metadata.get("branch") if metadata else None) or "main"
+            branch_to_pull = (
+                branch or (metadata.get("branch") if metadata else None) or "main"
+            )
 
             result = manager.update(org=org, name=name, branch=branch_to_pull)
             if not result.get("success"):
@@ -140,7 +142,9 @@ async def github_admin_post(
             if not org or not name:
                 return JSONResponse(
                     status_code=400,
-                    content={"error": "org and name required for action=update-metadata"},
+                    content={
+                        "error": "org and name required for action=update-metadata"
+                    },
                 )
 
             # Get existing metadata or create empty dict
@@ -180,9 +184,11 @@ async def github_admin_post(
                 status_code=200 if success else 400,
                 content={
                     "success": success,
-                    "message": f"Repository '{org}/{name}' deleted" if success else None,
+                    "message": (
+                        f"Repository '{org}/{name}' deleted" if success else None
+                    ),
                     "error": result.get("error") if not success else None,
-                }
+                },
             )
 
         case _:

@@ -3,11 +3,10 @@
 import os
 import tempfile
 import uuid
-from datetime import datetime, timedelta
 
 import pytest
 
-from src.feedback.models import Feedback, FeedbackIn, FeedbackResponse, FeedbackStats, hash_query
+from src.feedback.models import FeedbackIn, FeedbackResponse, FeedbackStats, hash_query
 from src.feedback.repository import FeedbackRepository
 from src.feedback.service import FeedbackService
 
@@ -103,7 +102,9 @@ class TestFeedbackRepository:
     """Tests for feedback repository."""
 
     @pytest.mark.asyncio
-    async def test_initialize_creates_table(self, feedback_repo: FeedbackRepository) -> None:
+    async def test_initialize_creates_table(
+        self, feedback_repo: FeedbackRepository
+    ) -> None:
         """Given new repository When initialize Then creates table."""
         await feedback_repo.initialize()
 
@@ -127,7 +128,9 @@ class TestFeedbackRepository:
         assert feedback.helpful is True
 
     @pytest.mark.asyncio
-    async def test_get_all_returns_created(self, feedback_repo: FeedbackRepository) -> None:
+    async def test_get_all_returns_created(
+        self, feedback_repo: FeedbackRepository
+    ) -> None:
         """Given created feedback When get_all Then includes it."""
         created = await feedback_repo.create(query="test", helpful=True)
         all_feedback = await feedback_repo.get_all()
@@ -192,7 +195,9 @@ class TestNoAuthRequired:
     """Tests for no authentication requirement (AC #3)."""
 
     @pytest.mark.asyncio
-    async def test_submit_without_session(self, feedback_repo: FeedbackRepository) -> None:
+    async def test_submit_without_session(
+        self, feedback_repo: FeedbackRepository
+    ) -> None:
         """Given no session ID When submit Then accepts anyway."""
         feedback = await feedback_repo.create(
             query="test query", helpful=True, session_id=None
@@ -206,7 +211,9 @@ class TestErrorHandling:
     """Tests for error handling."""
 
     @pytest.mark.asyncio
-    async def test_get_stats_divide_by_zero(self, feedback_repo: FeedbackRepository) -> None:
+    async def test_get_stats_divide_by_zero(
+        self, feedback_repo: FeedbackRepository
+    ) -> None:
         """Given no data When get_stats Then handles gracefully."""
         await feedback_repo.initialize()
         stats = await feedback_repo.get_stats()

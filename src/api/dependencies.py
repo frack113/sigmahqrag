@@ -2,9 +2,9 @@
 
 from functools import lru_cache
 
-from src.core.services.embedding import EmbeddingManager
-from src.core.services.manager import ModelManager
-from src.git.repo_manager import RepositoryManager
+from src.core.backend.github import RepositoryManager
+from src.core.backend.huggingface import EmbeddingManager
+from src.core.backend.services.manager import ModelManager
 
 
 @lru_cache
@@ -16,7 +16,11 @@ def get_embedding_manager() -> EmbeddingManager:
 @lru_cache
 def get_model_manager() -> ModelManager:
     """Get a singleton instance of the model manager."""
-    return ModelManager()
+    from src.config import MODELS_DIR
+    from src.core.backend.services.registry import LocalRegistry
+    registry_path = MODELS_DIR / "registry.json"
+    registry = LocalRegistry(registry_path)
+    return ModelManager(registry=registry)
 
 
 @lru_cache

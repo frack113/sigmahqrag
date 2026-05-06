@@ -1,0 +1,97 @@
+// Admin UI interactions
+document.addEventListener('DOMContentLoaded', () => {
+    if (document.getElementById('health-status')) {
+        pollHealthStatus();
+    }
+    initBulkActions();
+});
+
+async function pollHealthStatus() {
+    try {
+        const response = await fetch('/api/v1/admin/status');
+        const data = await response.json();
+        updateGlobalStatusBar(data);
+        updateSidebarDots(data);
+    } catch (error) {
+        console.error('Health poll failed:', error);
+    } finally {
+        setTimeout(pollHealthStatus, 30000);
+    }
+}
+
+function updateGlobalStatusBar(data) {
+    const statusBar = document.getElementById('global-status-bar');
+    if (!statusBar) return;
+    const isHealthy = data.llm_available && data.qdrant_available;
+    statusBar.className = `status-bar ${isHealthy ? 'status-ok' : 'status-error'}`;
+    statusBar.style.display = 'block';
+    statusBar.textContent = isHealthy ? 'All systems operational' : 'System issues detected';
+}
+
+function updateSidebarDots(data) {
+    const dotDashboard = document.getElementById('dot-dashboard');
+    if (dotDashboard) {
+        dotDashboard.className = `status-dot ${data.llm_available && data.qdrant_available ? 'status-ok' : 'status-error'}`;
+    }
+    const dotModels = document.getElementById('dot-models');
+    if (dotModels) {
+        dotModels.className = `status-dot ${data.installed_models_count > 0 ? 'status-ok' : 'status-warning'}`;
+    }
+}
+
+function showToast(message, type = 'info') {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.textContent = message;
+    container.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+}
+
+function initBulkActions() {
+    const selectAll = document.getElementById('select-all-models');
+    if (!selectAll) return;
+    selectAll.addEventListener('change', (e) => {
+        document.querySelectorAll('.model-checkbox').forEach(cb => cb.checked = e.target.checked);
+        updateBulkDeleteButton();
+    });
+    document.querySelectorAll('.model-checkbox').forEach(cb => {
+        cb.addEventListener('change', updateBulkDeleteButton);
+    });
+}
+
+function updateBulkDeleteButton() {
+    const checked = document.querySelectorAll('.model-checkbox:checked');
+    const btn = document.getElementById('bulk-delete-btn');
+    if (btn) {
+        btn.disabled = checked.length === 0;
+        btn.textContent = `Delete (${checked.length})`;
+    }
+}
+
+async function bulkDeleteModels() {
+    const checked = document.querySelectorAll('.model-checkbox:checked');
+    if (checked.length === 0 || !confirm(`Delete ${checked.length} model(s)?`)) return;
+    const payload = Array.from(checked).map(cb => {
+        const row = cb.closest('tr');
+        return { repo_id: row.dataset.repoId, filename: row.dataset.filename };
+    });
+    try {
+        const response = await fetch('/api/v1/admin/bulk-delete-models', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const result = await response.json();
+        if (result.deleted.length) {
+            showToast(`Deleted ${result.deleted.length} model(s)`, 'success');
+            checked.forEach(cb => cb.closest('tr').remove());
+        }
+        result.errors.forEach(err => showToast(err, 'error'));
+    } catch (error) {
+        showToast('Bulk delete failed', 'error');
+    } finally {
+        updateBulkDeleteButton();
+    }
+}
