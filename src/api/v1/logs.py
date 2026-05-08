@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 import os
-import traceback
 from pathlib import Path
 
 from fastapi import APIRouter, Query
@@ -56,7 +55,7 @@ async def get_logs(
     Returns:
         JSON with log entries
     """
-    from src.config import get_log_level, load_config
+    from src.config import load_config
 
     if not source:
         source = load_config().get("logging", {}).get("display_source", "system")
@@ -74,7 +73,9 @@ async def get_logs(
     logger.info(f"Reading logs from: {log_path}, exists={log_path.exists()}")
 
     if not log_path.exists():
-        return JSONResponse(content={"logs": [], "message": f"Log file not found: {log_path}"})
+        return JSONResponse(
+            content={"logs": [], "message": f"Log file not found: {log_path}"}
+        )
 
     try:
         all_lines = read_log_file(log_path)
@@ -90,9 +91,12 @@ async def get_logs(
         for line in recent:
             entries.append({"text": line.strip()})
 
-        return JSONResponse(content={"logs": entries, "total": len(entries), "source": source})
+        return JSONResponse(
+            content={"logs": entries, "total": len(entries), "source": source}
+        )
 
     except Exception as e:
         import traceback
+
         logger.error(f"Failed to read logs: {e}\n{traceback.format_exc()}")
         return JSONResponse(status_code=500, content={"error": str(e)})

@@ -182,14 +182,12 @@ function startProgressPolling(downloadId, service) {
 
 function loadStatus() {
     Promise.all([
-        fetch('/admin/health').then(r => r.json()),
         fetch('/api/v1/llamacpp/status').then(r => r.json()).catch(() => ({})),
         fetch('/api/v1/qdrant/status').then(r => r.json()).catch(() => ({}))
     ])
-    .then(([healthData, llamaInfo, qdrantInfo]) => {
-        const services = healthData.services || [];
-        const llama = services.find(s => s.name === 'llama.cpp') || {};
-        const qdrant = services.find(s => s.name === 'qdrant') || {};
+    .then(([llamaInfo, qdrantInfo]) => {
+        const llama = {status: llamaInfo.status || 'unknown', name: 'llama.cpp'};
+        const qdrant = {status: qdrantInfo.status || 'unknown', name: 'qdrant'};
 
         const getStatusClass = (status) => {
             if (status === 'running') return 'ok';
@@ -268,7 +266,8 @@ document.getElementById('config-form').addEventListener('submit', function(e) {
 });
 
 function startService(service) {
-    fetch(`/admin/services/?action=start&service=${service}`, {method: 'POST'})
+    const endpoint = service === 'llama' ? '/api/v1/llamacpp/start' : '/api/v1/qdrant/start';
+    fetch(endpoint, {method: 'POST'})
         .then(r => r.json())
         .then(data => {
             alert(data.message || data.error || 'Started');
@@ -278,7 +277,8 @@ function startService(service) {
 
 function stopService(service) {
     if (!confirm(`Stop ${service}?`)) return;
-    fetch(`/admin/services/?action=stop&service=${service}`, {method: 'POST'})
+    const endpoint = service === 'llama' ? '/api/v1/llamacpp/stop' : '/api/v1/qdrant/stop';
+    fetch(endpoint, {method: 'POST'})
         .then(r => r.json())
         .then(data => {
             alert(data.message || data.error || 'Stopped');
@@ -287,10 +287,11 @@ function stopService(service) {
 }
 
 function showLogs(service) {
-    fetch(`/admin/services/?action=logs&service=${service}`)
+    const source = service === 'llama' ? 'llamacpp' : 'qdrant';
+    fetch(`/api/v1/logs?source=${source}&lines=50`)
         .then(r => r.json())
         .then(data => {
-            const logs = data.logs || 'No logs available';
+            const logs = data.logs?.map(l => l.text).join('\n') || 'No logs available';
             alert(logs.slice(-2000));
         });
 }

@@ -1,128 +1,69 @@
-"""SigmaHQ RAG - FastAPI application."""
+"""Main application entry point."""
 
-import logging
-import uuid
-from contextvars import ContextVar
+from __future__ import annotations
 
-from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from starlette.middleware.base import BaseHTTPMiddleware
 
-from src.errors import (
-    ModelNotFoundError,
-    ServiceUnavailableError,
-    SigmaError,
-    ValidationError,
-)
+from src.api.routes.page_admin import router as admin_pages_router
+from src.api.routes.page_chat import router as chat_page_router
+from src.api.routes.page_data import router as data_page_router
+from src.api.v1.admin import router as admin_v1_router
+from src.api.v1.admin_prompts import router as prompts_v1_router
+from src.api.v1.chat import router as chat_v1_router
+from src.api.v1.config import router as config_v1_router
+from src.api.v1.coverage import router as coverage_v1_router
+from src.api.v1.documents import router as documents_v1_router
+from src.api.v1.embeddings import router as embeddings_v1_router
+from src.api.v1.explain import router as explain_v1_router
+from src.api.v1.feedback import router as feedback_v1_router
+from src.api.v1.github import router as github_v1_router
+from src.api.v1.llamacpp import router as llama_router
+from src.api.v1.logs import router as logs_v1_router
+from src.api.v1.model import router as model_v1_router
+from src.api.v1.qdrant import router as qdrant_router
+from src.api.v1.search import router as search_v1_router
 
-logger = logging.getLogger(__name__)
 
-correlation_id_var: ContextVar[str | None] = ContextVar("correlation_id", default=None)
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> None:
+    """Application lifespan handler."""
+    _validate_services()
+    yield
 
 
 def _validate_services() -> None:
-    """Validate external services at startup (llama.cpp, Qdrant)."""
+    """Validate required services are configured."""
     from src.config import load_config
 
     config = load_config()
-
-    # Check llama.cpp service (sync check)
-    try:
-        import httpx
-
-        response = httpx.get("http://localhost:8080/health", timeout=2.0)
-        if response.status_code == 200:
-            logger.info("llama.cpp service available at port 8080")
-        else:
-            logger.warning(
-                f"llama.cpp service returned {response.status_code} - chat features will use fallback"
-            )
-    except Exception:
-        logger.warning(
-            "llama.cpp service NOT available at port 8080 - chat features will use fallback"
-        )
-
-    # Check Qdrant collection
-    qdrant_config = config.get("services", {}).get("qdrant", {})
-    qdrant_host = qdrant_config.get("host", "localhost")
-    qdrant_port = qdrant_config.get("port", 6333)
-    collection = qdrant_config.get("collection_name", "sigma_rules")
-
-    try:
-        from qdrant_client import QdrantClient
-
-        client = QdrantClient(host=qdrant_host, port=qdrant_port, timeout=5.0)
-        collections = client.get_collections().collections
-        if any(c.name == collection for c in collections):
-            logger.info(f"Qdrant collection '{collection}' exists")
-        else:
-            logger.warning(
-                f"Qdrant collection '{collection}' NOT found - search will return empty"
-            )
-    except Exception as e:
-        logger.warning(f"Qdrant check failed: {e} - search features may be unavailable")
-
-
-class CorrelationIDMiddleware(BaseHTTPMiddleware):
-    """Middleware to add correlation ID to requests."""
-
-    async def dispatch(self, request: Request, call_next):
-        """Process request and add correlation ID."""
-        correlation_id = request.headers.get("X-Correlation-ID")
-        if not correlation_id:
-            correlation_id = str(uuid.uuid4())
-
-        correlation_id_var.set(correlation_id)
-        request.state.correlation_id = correlation_id
-
-        response = await call_next(request)
-        response.headers["X-Correlation-ID"] = correlation_id
-
-        return response
+    if not config.get("services", {}).get("llama", {}).get("base_url"):
+        raise ValueError("LLM service not configured")
+    if not config.get("services", {}).get("qdrant", {}).get("collection_name"):
+        raise ValueError("Qdrant service not configured")
 
 
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
-    from src.api.routes.admin_bulk import router as admin_bulk_router
-    from src.api.routes.admin_pages import router as admin_pages_router
-    from src.api.routes.admin_prompts import router as admin_prompts_router
-    from src.api.routes.admin_service import router as admin_router
-    from src.api.routes.chat import router as chat_page_router
-    from src.api.routes.data import router as data_page_router
-    from src.api.v1.admin import router as admin_v1_router
-    from src.api.v1.logs import router as logs_v1_router
-    from src.api.v1.chat import router as chat_v1_router
-    from src.api.v1.config import router as config_v1_router
-    from src.api.v1.documents import router as documents_v1_router
-    from src.api.v1.embeddings import router as embeddings_v1_router
-    from src.api.v1.feedback import router as feedback_v1_router
-    from src.api.v1.github import router as github_v1_router
-    from src.api.v1.llamacpp import router as llama_router
-    from src.api.v1.model import router as model_v1_router
-    from src.api.v1.qdrant import router as qdrant_router
-
-    # Startup validation
-    _validate_services()
-
     app = FastAPI(
         title="SigmaHQ RAG",
         version="0.1.0",
         description="Local RAG system for Sigma rules",
     )
 
-    app.add_middleware(CorrelationIDMiddleware)
     app.mount("/static", StaticFiles(directory="src/front/static"), name="static")
 
-    app.include_router(admin_router)
-    app.include_router(admin_bulk_router)
     app.include_router(admin_pages_router)
-    app.include_router(admin_prompts_router)
     app.include_router(admin_v1_router)
-    app.include_router(logs_v1_router)
     app.include_router(config_v1_router)
+    app.include_router(coverage_v1_router)
+    app.include_router(explain_v1_router)
+    app.include_router(search_v1_router)
     app.include_router(github_v1_router)
     app.include_router(llama_router)
+    app.include_router(logs_v1_router)
     app.include_router(qdrant_router)
     app.include_router(model_v1_router)
     app.include_router(chat_page_router)
@@ -131,85 +72,9 @@ def create_app() -> FastAPI:
     app.include_router(documents_v1_router)
     app.include_router(embeddings_v1_router)
     app.include_router(feedback_v1_router)
-
-    @app.exception_handler(SigmaError)
-    async def sigma_error_handler(request: Request, exc: SigmaError) -> JSONResponse:
-        """Handle SigmaError exceptions."""
-        logger.error(f"SigmaError occurred: {exc}")
-        return JSONResponse(
-            status_code=exc.http_status,
-        )
-
-    @app.exception_handler(ServiceUnavailableError)
-    async def service_unavailable_handler(
-        request: Request, exc: ServiceUnavailableError
-    ) -> JSONResponse:
-        """Handle ServiceUnavailableError exceptions."""
-        logger.error(f"Service unavailable error occurred: {exc}")
-        return JSONResponse(
-            status_code=exc.http_status,
-            content=exc.to_dict(),
-        )
-
-    @app.exception_handler(ModelNotFoundError)
-    async def model_not_found_handler(
-        request: Request, exc: ModelNotFoundError
-    ) -> JSONResponse:
-        """Handle ModelNotFoundError exceptions."""
-        logger.error(f"Model not found error occurred: {exc}")
-        return JSONResponse(
-            status_code=exc.http_status,
-            content=exc.to_dict(),
-        )
-
-    @app.exception_handler(ValidationError)
-    async def validation_error_handler(
-        request: Request, exc: ValidationError
-    ) -> JSONResponse:
-        """Handle ValidationError exceptions."""
-        logger.error(f"Validation error occurred: {exc}")
-        return JSONResponse(
-            status_code=exc.http_status,
-            content=exc.to_dict(),
-        )
-
-    @app.exception_handler(Exception)
-    async def generic_exception_handler(
-        request: Request, exc: Exception
-    ) -> JSONResponse:
-        """Handle uncaught exceptions - returns 500 with clean message."""
-        logger.exception(
-            f"Unhandled exception: {exc}",
-            extra={
-                "request_method": request.method,
-                "request_path": request.url.path,
-                "request_query_params": str(request.query_params),
-                "correlation_id": getattr(request.state, "correlation_id", None),
-            },
-        )
-        return JSONResponse(
-            status_code=500,
-            content={
-                "code": "INTERNAL_ERROR",
-                "message": "An internal error occurred",
-                "details": {},
-            },
-        )
-
-    @app.get("/health")
-    async def health_check() -> dict[str, str]:
-        """Health check endpoint."""
-        return {"status": "healthy"}
-
-    @app.get("/")
-    async def root() -> HTMLResponse:
-        """Root endpoint - redirect to chat page."""
-        return HTMLResponse(
-            content="<html><head><meta http-equiv='refresh' content='0;url=/chat'></head></html>"
-        )
+    app.include_router(prompts_v1_router)
 
     return app
 
 
-# Export the app for use in Uvicorn or other ASGI servers
 app = create_app()

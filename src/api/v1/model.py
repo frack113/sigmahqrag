@@ -52,11 +52,17 @@ async def list_installed_llm_models() -> JSONResponse:
                                 "filename": fn,
                                 "path": str(f.local_path),
                                 "size": f.file_size,
-                                "status": f.status if isinstance(f.status, str) else f.status.value,
+                                "status": (
+                                    f.status
+                                    if isinstance(f.status, str)
+                                    else f.status.value
+                                ),
                             }
                             for fn, f in m.files.items()
                         ],
-                        "status": m.status if isinstance(m.status, str) else m.status.value,
+                        "status": (
+                            m.status if isinstance(m.status, str) else m.status.value
+                        ),
                     }
                     for m in models
                 ]
@@ -211,7 +217,9 @@ async def list_installed_embedding_models() -> JSONResponse:
 @router.get("/embedding/progress/{repo_id}")
 async def get_embedding_progress(repo_id: str) -> JSONResponse:
     """Get embedding download progress."""
-    progress = _download_progress.get(f"emb_{repo_id}", {"progress": 0, "status": "idle"})
+    progress = _download_progress.get(
+        f"emb_{repo_id}", {"progress": 0, "status": "idle"}
+    )
     return JSONResponse(content=progress)
 
 

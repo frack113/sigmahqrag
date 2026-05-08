@@ -90,7 +90,10 @@ class LocalRegistry:
                     files = {}
                     for f in model_dir.rglob("*.gguf"):
                         rel_parts = f.relative_to(model_dir).parts
-                        if not any(part.startswith('.cache') or part.startswith('.') for part in rel_parts[:-1]):
+                        if not any(
+                            part.startswith(".cache") or part.startswith(".")
+                            for part in rel_parts[:-1]
+                        ):
                             files[f.name] = ModelFile(
                                 filename=f.name,
                                 local_path=f,

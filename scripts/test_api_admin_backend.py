@@ -73,7 +73,9 @@ def main() -> None:
     p_progress.add_argument("--download-id", required=True, help="Download ID")
 
     p_status = subparsers.add_parser("status", help="Get service status")
-    p_status.add_argument("--service", default="llama", choices=["llama", "qdrant"], required=True)
+    p_status.add_argument(
+        "--service", default="llama", choices=["llama", "qdrant"], required=True
+    )
 
     args = parser.parse_args()
 

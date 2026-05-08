@@ -19,14 +19,12 @@ let pollInterval;
 
 function loadStatus() {
     Promise.all([
-        fetch('/admin/health').then(r => r.json()),
         fetch('/api/v1/llamacpp/status').then(r => r.json()).catch(() => ({})),
-        fetch('/api/v1/admin/status').then(r => r.json()).catch(() => ({}))
+        fetch('/api/v1/qdrant/status').then(r => r.json()).catch(() => ({}))
     ])
-    .then(([healthData, llamaInfo, v1Status]) => {
-        const services = healthData.services || [];
-        const llama = services.find(s => s.name === 'llama.cpp') || {};
-        const qdrant = services.find(s => s.name === 'qdrant') || {};
+    .then(([llamaInfo, qdrantInfo]) => {
+        const llama = {status: llamaInfo.status || 'unknown', name: 'llama.cpp'};
+        const qdrant = {status: qdrantInfo.status || 'unknown', name: 'qdrant'};
         
         // Determine status class
         const getStatusClass = (status) => {
@@ -54,7 +52,7 @@ function loadStatus() {
                 <div class="service-status">
                     <span class="status-dot status-${getStatusClass(qdrant.status)}"></span>
                     <span class="status-text">${qdrant.status || 'unknown'}</span>
-                    ${qdrant.version ? `<span class="version">v${qdrant.version}</span>` : ''}
+                    ${qdrantInfo.current_version ? `<span class="version">v${qdrantInfo.current_version}</span>` : ''}
                 </div>
                 <div class="service-actions">
                     <button class="btn btn-sm btn-success" onclick="startService('qdrant')">Start</button>
@@ -78,7 +76,8 @@ function loadStatus() {
 }
 
 function startService(service) {
-    fetch(`/admin/services/?action=start&service=${service}`, {method: 'POST'})
+    const endpoint = service === 'llama' ? '/api/v1/llamacpp/start' : '/api/v1/qdrant/start';
+    fetch(endpoint, {method: 'POST'})
         .then(r => r.json())
         .then(data => {
             alert(data.message || data.error || 'Started');
@@ -88,7 +87,8 @@ function startService(service) {
 
 function stopService(service) {
     if (!confirm(`Stop ${service}?`)) return;
-    fetch(`/admin/services/?action=stop&service=${service}`, {method: 'POST'})
+    const endpoint = service === 'llama' ? '/api/v1/llamacpp/stop' : '/api/v1/qdrant/stop';
+    fetch(endpoint, {method: 'POST'})
         .then(r => r.json())
         .then(data => {
             alert(data.message || data.error || 'Stopped');
@@ -97,10 +97,11 @@ function stopService(service) {
 }
 
 function showLogs(service) {
-    fetch(`/admin/services/?action=logs&service=${service}`)
+    const source = service === 'llama' ? 'llamacpp' : 'qdrant';
+    fetch(`/api/v1/logs?source=${source}&lines=50`)
         .then(r => r.json())
         .then(data => {
-            const logs = data.logs || 'No logs available';
+            const logs = data.logs?.map(l => l.text).join('\n') || 'No logs available';
             alert(logs.slice(-2000)); // Last 2000 chars
         });
 }

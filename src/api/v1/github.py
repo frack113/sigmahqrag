@@ -54,7 +54,9 @@ def _run_sync_task(
 
 
 @router.get("/repos", response_model=list[RepositoryStatus])
-async def list_repos(manager: RepositoryManager = Depends(get_github_repo_manager)) -> list[RepositoryStatus]:
+async def list_repos(
+    manager: RepositoryManager = Depends(get_github_repo_manager),
+) -> list[RepositoryStatus]:
     """List all repositories."""
     repos = manager.list_with_metadata()
     result = []
@@ -150,7 +152,9 @@ async def get_repo(
     """Get repository details."""
     repo_path = manager.get_repo_path(org, name)
     if not repo_path:
-        raise HTTPException(status_code=404, detail=f"Repository '{org}/{name}' not found")
+        raise HTTPException(
+            status_code=404, detail=f"Repository '{org}/{name}' not found"
+        )
 
     metadata = manager.get_metadata(org, name) or {}
     return RepositoryStatus(

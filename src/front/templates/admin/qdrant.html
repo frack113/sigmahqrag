@@ -35,18 +35,16 @@
 <script>
 function loadQdrantInfo() {
     Promise.all([
-        fetch('/admin/health').then(r => r.json()),
         fetch('/api/v1/qdrant/status').then(r => r.json()).catch(() => ({}))
     ])
-    .then(([healthData, v1Status]) => {
-        const qdrant = healthData.services?.find(s => s.name === 'qdrant') || {};
+    .then(([v1Status]) => {
         const version = v1Status.current_version || 'unknown';
-        let html = '<p><strong>Status:</strong> ' + (qdrant.status || 'unknown') + '</p>';
+        let html = '<p><strong>Status:</strong> ' + (v1Status.status || 'unknown') + '</p>';
         html += '<p><strong>Version:</strong> ' + version + '</p>';
-        html += '<p><strong>Port:</strong> ' + (qdrant.port || '6333') + '</p>';
-        html += '<p><strong>URL:</strong> ' + (qdrant.url || 'http://localhost:6333') + '</p>';
-        if (qdrant.message) {
-            html += '<p><strong>Message:</strong> ' + qdrant.message + '</p>';
+        html += '<p><strong>Port:</strong> ' + (v1Status.port || '6333') + '</p>';
+        html += '<p><strong>URL:</strong> ' + (v1Status.url || 'http://localhost:6333') + '</p>';
+        if (v1Status.message) {
+            html += '<p><strong>Message:</strong> ' + v1Status.message + '</p>';
         }
         document.getElementById('qdrant-info').innerHTML = html;
     })
@@ -83,7 +81,7 @@ function downloadQdrant() {
 }
 
 function startQdrant() {
-    fetch('/admin/services/?action=start&service=qdrant', {
+    fetch('/api/v1/qdrant/start', {
         method: 'POST'
     })
     .then(r => r.json())
@@ -95,7 +93,7 @@ function startQdrant() {
 }
 
 function stopQdrant() {
-    fetch('/admin/services/?action=stop&service=qdrant', {
+    fetch('/api/v1/qdrant/stop', {
         method: 'POST'
     })
     .then(r => r.json())
