@@ -1,4 +1,4 @@
-"""Embedding model API routes."""
+"""Embeddings API v1."""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ class EmbeddingEmbedRequest(BaseModel):
     model_name: str | None = None
 
 
-router = APIRouter(prefix="/embeddings", tags=["embeddings"])
+router = APIRouter(prefix="/api/v1/embeddings", tags=["v1-embeddings"])
 
 
 @router.get("/search")
@@ -45,8 +45,6 @@ async def get_embedding_files(
 ) -> JSONResponse:
     """Get files for an embedding model repo."""
     try:
-        # This assumes manager.get_repo_files exists or we use HfApi directly if needed
-        # For now, let's keep it simple and see if the manager can handle it
         files = await manager.get_repo_files(repo_id)
         return JSONResponse(content={"files": files})
     except Exception as e:

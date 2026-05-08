@@ -85,16 +85,19 @@ class CorrelationIDMiddleware(BaseHTTPMiddleware):
 def create_app() -> FastAPI:
     """Create and configure the FastAPI application."""
     from src.api.routes.admin_bulk import router as admin_bulk_router
-    from src.api.routes.admin_logs import router as admin_logs_router
     from src.api.routes.admin_pages import router as admin_pages_router
     from src.api.routes.admin_prompts import router as admin_prompts_router
     from src.api.routes.admin_service import router as admin_router
-    from src.api.routes.chat import router as chat_router
-    from src.api.routes.documents import router as documents_router
-    from src.api.routes.embeddings import router as embeddings_router
-    from src.api.routes.feedback import router as feedback_router
+    from src.api.routes.chat import router as chat_page_router
+    from src.api.routes.data import router as data_page_router
     from src.api.v1.admin import router as admin_v1_router
+    from src.api.v1.logs import router as logs_v1_router
+    from src.api.v1.chat import router as chat_v1_router
     from src.api.v1.config import router as config_v1_router
+    from src.api.v1.documents import router as documents_v1_router
+    from src.api.v1.embeddings import router as embeddings_v1_router
+    from src.api.v1.feedback import router as feedback_v1_router
+    from src.api.v1.github import router as github_v1_router
     from src.api.v1.llamacpp import router as llama_router
     from src.api.v1.model import router as model_v1_router
     from src.api.v1.qdrant import router as qdrant_router
@@ -113,18 +116,21 @@ def create_app() -> FastAPI:
 
     app.include_router(admin_router)
     app.include_router(admin_bulk_router)
-    app.include_router(admin_logs_router)
     app.include_router(admin_pages_router)
     app.include_router(admin_prompts_router)
     app.include_router(admin_v1_router)
+    app.include_router(logs_v1_router)
     app.include_router(config_v1_router)
+    app.include_router(github_v1_router)
     app.include_router(llama_router)
     app.include_router(qdrant_router)
     app.include_router(model_v1_router)
-    app.include_router(chat_router)
-    app.include_router(documents_router)
-    app.include_router(embeddings_router)
-    app.include_router(feedback_router)
+    app.include_router(chat_page_router)
+    app.include_router(data_page_router)
+    app.include_router(chat_v1_router)
+    app.include_router(documents_v1_router)
+    app.include_router(embeddings_v1_router)
+    app.include_router(feedback_v1_router)
 
     @app.exception_handler(SigmaError)
     async def sigma_error_handler(request: Request, exc: SigmaError) -> JSONResponse:

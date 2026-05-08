@@ -19,7 +19,7 @@ from src.core.admin_prompts import (
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/admin/prompts", tags=["admin-prompts"])
+router = APIRouter(prefix="/api/v1/admin/prompts", tags=["admin-prompts"])
 
 
 class AddPromptRequest(BaseModel):

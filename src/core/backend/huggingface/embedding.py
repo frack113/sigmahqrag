@@ -18,7 +18,7 @@ class EmbeddingManager:
     def __init__(self, embeddings_dir: Path | None = None) -> None:
         self.embeddings_dir = embeddings_dir or EMBEDDINGS_DIR
         self.embeddings_dir.mkdir(parents=True, exist_ok=True)
-        self._registry_path = Path("models/embeddings_registry.json")
+        self._registry_path = self.embeddings_dir / "embeddings_registry.json"
         self.download_service = HFDownloadService()
 
     async def _load_registry(self) -> dict:
@@ -85,6 +85,10 @@ class EmbeddingManager:
         if create_index:
             index_path = await self._create_index(dest, dimension)
 
+        temp_parent = self.embeddings_dir / "temp"
+        if temp_parent.exists():
+            shutil.rmtree(temp_parent)
+
         record = ModelRecord(
             repo_id=repo_id,
             files={
@@ -120,10 +124,17 @@ class EmbeddingManager:
         registry = await self._load_registry()
         if not self.embeddings_dir.exists():
             return
-        for model_dir in self.embeddings_dir.iterdir():
+        for model_dir in self.embeddings_dir.rglob("*"):
             if not model_dir.is_dir():
                 continue
-            repo_id = f"{model_dir.parent.name}/{model_dir.name}"
+            if model_dir.name.startswith("."):
+                continue
+            if model_dir.name in ("cache", "temp"):
+                continue
+            parent_name = model_dir.parent.name
+            if parent_name == self.embeddings_dir.name:
+                continue
+            repo_id = f"{parent_name}/{model_dir.name}"
             if repo_id not in registry:
                 files = list(model_dir.rglob("*"))
                 if files:

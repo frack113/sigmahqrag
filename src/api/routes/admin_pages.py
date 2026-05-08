@@ -22,6 +22,18 @@ health_service = HealthCheckService()
 
 @router.get("/admin")
 async def admin_dashboard(request: Request) -> HTMLResponse:
+    """Serve admin overview page."""
+    return templates.TemplateResponse(request=request, name="admin/overview.html")
+
+
+@router.get("/admin/overview")
+async def admin_overview(request: Request) -> HTMLResponse:
+    """Serve admin overview page."""
+    return templates.TemplateResponse(request=request, name="admin/overview.html")
+
+
+@router.get("/admin/backend")
+async def admin_backend(request: Request) -> HTMLResponse:
     """Serve admin backend page."""
     return templates.TemplateResponse(
         request=request, name="admin/backend.html", context={"config": load_config()}

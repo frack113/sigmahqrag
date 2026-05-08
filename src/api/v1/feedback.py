@@ -1,4 +1,4 @@
-"""Feedback API routes."""
+"""Feedback API v1."""
 
 import logging
 
@@ -10,7 +10,7 @@ from src.core.feedback.service import FeedbackService
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/feedback", tags=["feedback"])
+router = APIRouter(prefix="/api/v1/feedback", tags=["v1-feedback"])
 
 
 def get_session_id(x_session_id: str | None = Header(None)) -> str | None:
@@ -33,7 +33,7 @@ async def submit_feedback(
 
 @router.get("")
 async def get_feedback() -> JSONResponse:
-    """Get all feedback (admin only in v1.0, now open)."""
+    """Get all feedback."""
     service = FeedbackService()
     feedbacks = await service.get_all_feedback()
     return JSONResponse(
@@ -51,7 +51,7 @@ async def get_feedback() -> JSONResponse:
 
 @router.get("/stats")
 async def get_feedback_stats() -> JSONResponse:
-    """Get feedback statistics (admin only in v1.0, now open)."""
+    """Get feedback statistics."""
     service = FeedbackService()
     stats = await service.get_feedback_stats()
     return JSONResponse(content=stats.model_dump())

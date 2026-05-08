@@ -1,0 +1,233 @@
+/* Shared Layout Pattern - Dark Theme */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: system-ui, -apple-system, sans-serif;
+    background: #1a1a1a;
+    color: #ffffff;
+    line-height: 1.5;
+}
+
+/* Layout containers */
+.app-layout,
+.admin-layout,
+.data-layout {
+    display: flex;
+    min-height: 100vh;
+}
+
+/* Sidebar */
+.app-sidebar {
+    width: 240px;
+    background: #2c3e50;
+    padding: 20px 0;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar-header {
+    padding: 0 20px 20px;
+    border-bottom: 1px solid #4a6280;
+    margin-bottom: 20px;
+}
+
+.sidebar-header h2 {
+    font-size: 1.2em;
+    margin-bottom: 4px;
+    color: #ffffff;
+}
+
+.sidebar-header p {
+    font-size: 0.85em;
+    color: #bdc3c7;
+}
+
+.sidebar-nav {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+}
+
+.sidebar-nav a {
+    color: #d5d5d5;
+    text-decoration: none;
+    padding: 14px 20px;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 0.95em;
+}
+
+.sidebar-nav a:hover {
+    background: #3d566e;
+    color: #ffffff;
+}
+
+.sidebar-nav a.active {
+    background: #3498db;
+    color: #ffffff;
+    font-weight: 500;
+}
+
+.sidebar-nav a.disabled {
+    color: #7f8c8d;
+    pointer-events: none;
+    opacity: 0.6;
+}
+
+/* Footer link in sidebar */
+.sidebar-footer {
+    margin-top: auto;
+    border-top: 1px solid #34495e;
+    padding-top: 10px;
+}
+
+.sidebar-footer a {
+    color: #bdc3c7;
+}
+
+/* Shared main content area */
+.app-content,
+.main-content,
+.data-content {
+    flex: 1;
+    padding: 24px;
+    background: #f5f5f5;
+    color: #1a1a1a;
+    overflow-y: auto;
+}
+
+.content-header {
+    margin-bottom: 24px;
+}
+
+.content-header h1 {
+    font-size: 1.5em;
+    color: #1a1a1a;
+}
+
+/* Page title */
+.page-title {
+    font-size: 1.5em;
+    margin-bottom: 16px;
+    color: #1a1a1a;
+}
+
+/* Cards */
+.card {
+    background: #2c3e50;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+.card h3 {
+    margin: 0 0 12px;
+    color: #ffffff;
+    font-size: 1.1em;
+}
+
+.card p {
+    color: #bdc3c7;
+    font-size: 0.9em;
+}
+
+/* Cards grid */
+.cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+}
+
+/* Status indicators */
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #7f8c8d;
+}
+
+.status-dot.active {
+    background: #27ae60;
+}
+
+.status-dot.error {
+    background: #e74c3c;
+}
+
+.status-dot.warning {
+    background: #f39c12;
+}
+
+/* Status badges */
+.status-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 0.75em;
+    font-weight: 500;
+}
+
+.status-badge.success {
+    background: #27ae60;
+    color: #ffffff;
+}
+
+.status-badge.error {
+    background: #e74c3c;
+    color: #ffffff;
+}
+
+.status-badge.warning {
+    background: #f39c12;
+    color: #1a1a1a;
+}
+
+/* Toast notifications */
+.toast-container {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.toast {
+    padding: 12px 20px;
+    border-radius: 4px;
+    color: #ffffff;
+    font-size: 0.9em;
+    animation: toast-in 0.3s ease;
+}
+
+.toast.success {
+    background: #27ae60;
+}
+
+.toast.error {
+    background: #e74c3c;
+}
+
+.toast.info {
+    background: #3498db;
+}
+
+@keyframes toast-in {
+    from {
+        opacity: 0;
+        transform: translateX(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}

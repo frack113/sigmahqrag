@@ -1,4 +1,4 @@
-"""Document ingestion API routes."""
+"""Documents API v1."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ from src.core.documents.validator import validate_sigma_rule
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/documents", tags=["documents"])
+router = APIRouter(prefix="/api/v1/documents", tags=["v1-documents"])
 
 
 def get_sigma_rules_dir() -> str:
@@ -34,14 +34,7 @@ def get_sigma_rules_dir() -> str:
 async def ingest_sigma_rules(
     request: IngestRequest | None = None,
 ) -> JSONResponse:
-    """Ingest Sigma rules from configured directory.
-
-    Args:
-        request: Optional IngestRequest with directory/recursive options
-
-    Returns:
-        JSONResponse with ingestion results (open in v0.1.0)
-    """
+    """Ingest Sigma rules from configured directory."""
     directory = request.directory if request else None
     recursive = request.recursive if request else True
 

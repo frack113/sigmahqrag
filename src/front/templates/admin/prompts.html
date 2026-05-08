@@ -45,8 +45,8 @@ let activePromptName = '';
 
 function loadPrompts() {
     Promise.all([
-        fetch('/admin/prompts/').then(r => r.json()).catch(() => []),
-        fetch('/admin/prompts/active').then(r => r.json()).catch(() => ({}))
+        fetch('/api/v1/admin/prompts/').then(r => r.json()).catch(() => []),
+        fetch('/api/v1/admin/prompts/?action=active').then(r => r.json()).catch(() => ({}))
     ])
     .then(([prompts, activeData]) => {
         currentPrompts = prompts;
@@ -80,7 +80,7 @@ function loadPromptContent() {
         return;
     }
     
-    fetch(`/admin/prompts/?action=content&name=${encodeURIComponent(name)}`)
+    fetch(`/api/v1/admin/prompts/?action=get&name=${encodeURIComponent(name)}`)
         .then(r => r.json())
         .then(data => {
             const content = data.content || '';
@@ -95,7 +95,7 @@ function activatePrompt() {
         return;
     }
     
-    fetch('/admin/prompts/', {
+    fetch('/api/v1/admin/prompts/', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({action: 'activate', name: name})
@@ -115,7 +115,7 @@ function deletePrompt() {
     }
     if (!confirm(`Delete prompt "${name}"?`)) return;
     
-    fetch('/admin/prompts/', {
+    fetch('/api/v1/admin/prompts/', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({action: 'delete', name: name})
@@ -142,7 +142,7 @@ function savePrompt() {
         return;
     }
     
-    fetch('/admin/prompts/', {
+    fetch('/api/v1/admin/prompts/', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({name: name, content: content})

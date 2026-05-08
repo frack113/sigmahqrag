@@ -26,3 +26,6 @@ logs_dir = "data/logs"
 
 [logging]
 level = "INFO"
+display_source = "system"
+display_level = ""
+display_nb_line = 25
