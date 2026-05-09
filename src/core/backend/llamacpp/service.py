@@ -18,7 +18,7 @@ class LlamaService:
     ) -> None:
         """Initialize LlamaService."""
         if base_url is None:
-            from src.config import get_llama_config
+            from src.share import get_llama_config
 
             config = get_llama_config()
             base_url = config.get("base_url", "http://127.0.0.1:8080")
@@ -47,7 +47,7 @@ class LlamaService:
         if self._llm is None:
             await self.initialize()
 
-        from src.core.admin_prompts import get_active_prompt_content
+        from src.core.system_prompt import get_active_prompt_content
 
         active_content = get_active_prompt_content()
         if active_content and (not messages or messages[0].get("role") != "system"):

@@ -6,7 +6,7 @@ import json
 import shutil
 from pathlib import Path
 
-from src.config import EMBEDDINGS_DIR
+from src.share import EMBEDDINGS_DIR
 
 from .download import HFDownloadService
 from .registry import ModelFile, ModelRecord

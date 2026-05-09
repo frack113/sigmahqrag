@@ -15,8 +15,8 @@
 <a href="/admin" {% if request.url.path == '/admin' or request.url.path == '/admin/' %}class="active"{% endif %}>Overview</a>
 <a href="/admin/backend" {% if '/admin/backend' in request.url.path %}class="active"{% endif %}>Backend</a>
 <a href="/admin/models" {% if '/admin/models' in request.url.path %}class="active"{% endif %}>Models</a>
+<a href="/admin/system-prompts" {% if '/admin/system-prompts' in request.url.path %}class="active"{% endif %}>Prompts</a>
 <a href="/admin/logs" {% if '/admin/logs' in request.url.path %}class="active"{% endif %}>Logs</a>
-<a href="/admin/prompts" {% if '/admin/prompts' in request.url.path %}class="active"{% endif %}>Prompts</a>
 <div class="sidebar-footer">
     <a href="/chat">← Chat</a>
     <a href="/data">Data</a>

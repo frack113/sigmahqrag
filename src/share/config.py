@@ -22,13 +22,12 @@ QDRANT_BIN_PATH = BIN_DIR / "qdrant"
 QDRANT_STORAGE_DIR = BASE_DIR / "qdrant_storage"
 DATA_DIR = BASE_DIR
 
-# Default configuration
 DEFAULT_CONFIG = {
     "backend": {
-        "gpu_type": "cpu",  # hip, cuda, cpu
-        "os": None,  # windows, linux, macos (auto-detected if None)
-        "llamacpp_version": None,  # installed llama.cpp version
-        "qdrant_version": None,  # installed qdrant version
+        "gpu_type": "cpu",
+        "os": None,
+        "llamacpp_version": None,
+        "qdrant_version": None,
     },
     "models": {
         "llm_dir": "data/models/llm",
@@ -52,21 +51,23 @@ DEFAULT_CONFIG = {
         "logs_dir": "data/logs",
     },
     "logging": {
-        "level": "INFO",  # DEBUG, INFO, WARNING, ERROR
+        "level": "INFO",
     },
 }
 
 CONFIG_FILE = Path("data/sigmahqrag.toml")
 
-try:
-    import tomllib
-except ModuleNotFoundError:
-    import tomli as tomllib
+_toml_service = None
 
-try:
-    import tomli_w
-except ModuleNotFoundError:
-    import tomllib_w as tomli_w
+
+def _get_toml_service():
+    """Get or create the TOML service singleton."""
+    global _toml_service
+    if _toml_service is None:
+        from src.share.toml_service import TOMLService
+
+        _toml_service = TOMLService(CONFIG_FILE)
+    return _toml_service
 
 
 @lru_cache(maxsize=1)
@@ -77,32 +78,16 @@ def load_config() -> dict[str, Any]:
         Dict with configuration (merged with defaults)
     """
     config = DEFAULT_CONFIG.copy()
+    toml_service = _get_toml_service()
+    file_config = toml_service.load()
 
-    if CONFIG_FILE.exists():
-        try:
-            with open(CONFIG_FILE, "rb") as f:
-                file_config = tomllib.load(f)
-                # Deep merge with defaults
-                _deep_merge(config, file_config)
-                logger.info(f"Loaded config from {CONFIG_FILE}")
-        except Exception as e:
-            logger.warning(f"Failed to load config from {CONFIG_FILE}: {e}")
-    else:
-        logger.info(f"Config file {CONFIG_FILE} not found, using defaults")
+    if file_config:
+        from src.share import deep_merge
 
-    if "os" not in config:
-        config["os"] = platform.system().lower()
+        deep_merge(config, file_config)
+        logger.info(f"Loaded config from {CONFIG_FILE}")
 
     return config
-
-
-def _deep_merge(base: dict, override: dict) -> None:
-    """Deep merge override into base (modifies base in place)."""
-    for key, value in override.items():
-        if key in base and isinstance(base[key], dict) and isinstance(value, dict):
-            _deep_merge(base[key], value)
-        else:
-            base[key] = value
 
 
 def get_backend_gpu_type() -> str:
@@ -116,13 +101,11 @@ def get_backend_os() -> str:
 
 
 def set_backend_gpu_type(gpu_type: str) -> None:
-    """Set GPU type in config (only in memory for this session)."""
+    """Set GPU type in config and persist to TOML."""
     config = load_config()
     if "backend" not in config:
         config["backend"] = {}
     config["backend"]["gpu_type"] = gpu_type
-
-    # Persist the change to the TOML file (if needed)
     _persist_config(config)
 
 
@@ -132,13 +115,11 @@ def get_os_type() -> str:
 
 
 def set_os_type(os_type: str) -> None:
-    """Set OS type in config (only in memory for this session)."""
+    """Set OS type in config and persist to TOML."""
     config = load_config()
     if "backend" not in config:
         config["backend"] = {}
     config["backend"]["os"] = os_type
-
-    # Persist the change to the TOML file (if needed)
     _persist_config(config)
 
 
@@ -170,24 +151,10 @@ def set_qdrant_version(version: str) -> None:
     _persist_config(config)
 
 
-def _remove_none(obj):
-    """Remove None values recursively (TOML cannot serialize None)."""
-    if isinstance(obj, dict):
-        return {k: _remove_none(v) for k, v in obj.items() if v is not None}
-    elif isinstance(obj, list):
-        return [_remove_none(item) for item in obj if item is not None]
-    return obj
-
-
-def _persist_config(config: dict) -> None:
+def _persist_config(config: dict[str, Any]) -> None:
     """Persist the updated configuration to the TOML file."""
-    try:
-        CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
-        clean = _remove_none(config)
-        with open(CONFIG_FILE, "wb") as f:
-            tomli_w.dump(clean, f)
-    except Exception as e:
-        logger.error(f"Failed to persist config: {e}")
+    toml_service = _get_toml_service()
+    toml_service.save(config)
 
 
 def get_llama_config() -> dict[str, Any]:

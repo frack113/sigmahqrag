@@ -9,7 +9,7 @@ from dataclasses import dataclass
 
 import httpx
 
-from src.config import BIN_DIR
+from src.share import BIN_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -129,7 +129,7 @@ class VersionManager:
             "windows", "linux", "macos", or None if not specified
         """
         try:
-            from src.config import get_backend_os, load_config
+            from src.share import get_backend_os, load_config
 
             config = load_config()
             print(f"DEBUG: Full config: {config}")
@@ -154,7 +154,7 @@ class VersionManager:
             "hip", "cuda", "cpu", or None if not specified
         """
         try:
-            from src.config import get_backend_gpu_type
+            from src.share import get_backend_gpu_type
 
             return get_backend_gpu_type()
         except Exception as e:

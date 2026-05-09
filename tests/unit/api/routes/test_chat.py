@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from fastapi.testclient import TestClient
+
 from src.main import create_app
-from src.schemas.chat import ChatMessageRequest, ChatUploadResponse
 
 
 def test_chat_page_loads() -> None:

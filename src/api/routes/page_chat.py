@@ -9,6 +9,7 @@ router = APIRouter(tags=["chat-page"])
 templates = Jinja2Templates(directory="src/front/templates")
 
 
+@router.get("/")
 @router.get("/chat")
 async def chat_page(request: Request):
     """Serve the chat page with Jinja2 template."""

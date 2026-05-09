@@ -6,10 +6,10 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
-
 from src.documents.models import SigmaRule
 from src.documents.parser import parse_sigma_rule, scan_directory
 from src.documents.validator import validate_sigma_rule
+
 from src.main import create_app
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"

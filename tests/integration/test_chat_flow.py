@@ -2,13 +2,10 @@
 
 from __future__ import annotations
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
+import pytest
 from src.core.services.chat_service import ChatService
-from src.core.services.llm_client import LLMClient
-from src.core.services.rag_pipeline import RAGPipeline
-from src.core.services.sigma_validator import SigmaValidator
 
 
 @pytest.fixture
@@ -44,7 +41,7 @@ def chat_service() -> ChatService:
         "detection": {"selection": {"EventID": 4625}},
     }
 
-    yield service
+    return service
 
 
 @pytest.mark.asyncio

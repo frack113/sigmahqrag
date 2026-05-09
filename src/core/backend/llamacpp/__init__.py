@@ -1,6 +1,6 @@
 """Llama.cpp package."""
 
-from src.config import get_llamacpp_version, set_llamacpp_version
+from src.share import get_llamacpp_version, set_llamacpp_version
 
 from .client import LlamaClient
 from .health import check_health

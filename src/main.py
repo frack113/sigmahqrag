@@ -11,7 +11,6 @@ from src.api.routes.page_admin import router as admin_pages_router
 from src.api.routes.page_chat import router as chat_page_router
 from src.api.routes.page_data import router as data_page_router
 from src.api.v1.admin import router as admin_v1_router
-from src.api.v1.admin_prompts import router as prompts_v1_router
 from src.api.v1.chat import router as chat_v1_router
 from src.api.v1.config import router as config_v1_router
 from src.api.v1.coverage import router as coverage_v1_router
@@ -25,6 +24,7 @@ from src.api.v1.logs import router as logs_v1_router
 from src.api.v1.model import router as model_v1_router
 from src.api.v1.qdrant import router as qdrant_router
 from src.api.v1.search import router as search_v1_router
+from src.api.v1.system_prompt import router as prompts_v1_router
 
 
 @asynccontextmanager
@@ -36,7 +36,7 @@ async def lifespan(app: FastAPI) -> None:
 
 def _validate_services() -> None:
     """Validate required services are configured."""
-    from src.config import load_config
+    from src.share import load_config
 
     config = load_config()
     if not config.get("services", {}).get("llama", {}).get("base_url"):

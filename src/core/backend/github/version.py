@@ -10,7 +10,7 @@ from pathlib import Path
 
 import httpx
 
-from src.config import BIN_DIR
+from src.share import BIN_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -122,7 +122,7 @@ class VersionManager:
     def _read_os_preference(self) -> str | None:
         """Read OS preference from config file."""
         try:
-            from src.config import get_backend_os, load_config
+            from src.share import get_backend_os, load_config
 
             config = load_config()
             os_val = config.get("backend", {}).get("os")
@@ -137,7 +137,7 @@ class VersionManager:
     def _read_gpu_preference(self) -> str | None:
         """Read GPU preference from config file."""
         try:
-            from src.config import get_backend_gpu_type
+            from src.share import get_backend_gpu_type
 
             return get_backend_gpu_type()
         except Exception as e:

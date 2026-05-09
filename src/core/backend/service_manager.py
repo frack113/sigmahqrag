@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from src.config import (
+from src.share import (
     DATA_DIR,
     LLAMA_BIN_PATH,
     LOGS_DIR,

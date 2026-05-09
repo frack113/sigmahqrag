@@ -7,7 +7,6 @@ from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
-
 from src.api.routes.admin_github import get_github_repo_manager, router
 from src.git.repo_manager import RepositoryManager
 

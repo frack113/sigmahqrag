@@ -16,8 +16,8 @@ def get_embedding_manager() -> EmbeddingManager:
 @lru_cache
 def get_model_manager() -> ModelManager:
     """Get a singleton instance of the model manager."""
-    from src.config import MODELS_DIR
     from src.core.backend.services.registry import LocalRegistry
+    from src.share import MODELS_DIR
 
     registry_path = MODELS_DIR / "registry.json"
     registry = LocalRegistry(registry_path)

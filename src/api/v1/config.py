@@ -9,7 +9,7 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from src.config import (
+from src.share import (
     load_config,
     set_backend_gpu_type,
     set_os_type,

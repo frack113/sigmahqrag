@@ -10,7 +10,7 @@ from fastapi.responses import StreamingResponse
 
 from src.core.backend.services.chat_service import ChatService
 from src.core.schemas.chat import ChatMessageRequest, ChatMessageResponse
-from src.errors import ValidationError
+from src.share.errors import ValidationError
 
 logger = logging.getLogger(__name__)
 

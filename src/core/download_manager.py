@@ -13,14 +13,14 @@ from typing import Any
 
 import httpx
 
-from src.config import BIN_DIR
 from src.core.temp_manager import create_temp_manager
 from src.core.version_manager import (
     ReleaseAsset,
     VersionManager,
     create_version_manager,
 )
-from src.exceptions import DownloadError
+from src.share import BIN_DIR
+from src.share.exceptions import DownloadError
 
 logger = logging.getLogger(__name__)
 

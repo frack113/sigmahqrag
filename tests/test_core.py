@@ -2,16 +2,12 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
-
 from src.core.services import (
     HFDownloadService,
     LocalRegistry,
     ModelManager,
     ModelNotFoundError,
-    ModelRecord,
     VRAMEstimator,
 )
 

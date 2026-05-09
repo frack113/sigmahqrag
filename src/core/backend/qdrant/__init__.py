@@ -8,7 +8,7 @@ from typing import Any
 import qdrant_client
 from llama_index.vector_stores.qdrant import QdrantVectorStore
 
-from src.config import get_qdrant_version, set_qdrant_version
+from src.share import get_qdrant_version, set_qdrant_version
 
 from .health import check_health
 from .storage import search, store_embeddings
@@ -47,7 +47,7 @@ class QdrantService:
         port: int | None = None,
     ) -> None:
         """Initialize QdrantService."""
-        from src.config import get_qdrant_config
+        from src.share import get_qdrant_config
 
         config = get_qdrant_config()
         self.collection_name = collection_name or config.get(

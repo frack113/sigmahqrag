@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from src.config import LLM_DIR
 from src.core.backend.huggingface import HFDownloadService
 from src.core.backend.llamacpp.vram import VRAMEstimator
+from src.share import LLM_DIR
 
 
 class DownloadError(Exception):
@@ -45,7 +45,7 @@ class ModelManager:
         registry: LocalRegistry | None = None,
         download_service: HFDownloadService | None = None,
     ) -> None:
-        from src.config import MODELS_DIR
+        from src.share import MODELS_DIR
 
         registry_path = MODELS_DIR / "registry.json"
         self.registry = registry or LocalRegistry(registry_path)

@@ -10,7 +10,7 @@ from fastapi import APIRouter, Header
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from src.config import load_config
+from src.share import load_config
 
 logger = logging.getLogger(__name__)
 
