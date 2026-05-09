@@ -55,7 +55,7 @@ async def get_logs(
     Returns:
         JSON with log entries
     """
-    from src.share import load_config
+    from src.shared import load_config
 
     if not source:
         source = load_config().get("logging", {}).get("display_source", "system")

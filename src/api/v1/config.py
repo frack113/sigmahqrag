@@ -9,10 +9,10 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from src.share import (
+from src.shared import (
     load_config,
     set_backend_gpu_type,
-    set_os_type,
+    set_backend_os_type,
 )
 
 logger = logging.getLogger(__name__)
@@ -50,7 +50,7 @@ async def update_config(request: ConfigUpdateRequest) -> JSONResponse:
             gpu_val = request.backend.get("gpu_type")
 
             if os_val:
-                set_os_type(os_val)
+                set_backend_os_type(os_val)
             if gpu_val:
                 set_backend_gpu_type(gpu_val)
 

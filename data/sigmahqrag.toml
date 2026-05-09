@@ -1,9 +1,9 @@
 os = "windows"
 
 [backend]
-gpu_type = "cpu"
+gpu_type = "hip"
 os = "windows"
-llamacpp_version = "b9016"
+llamacpp_version = "b9085"
 qdrant_version = "1.17.1"
 
 [models]
@@ -15,9 +15,10 @@ base_url = "http://127.0.0.1:8080"
 
 [services.qdrant]
 host = "127.0.0.1"
-port = 6333
+port = 6334
 collection_name = "sigma"
 vector_size = 384
+disable-telemetry = true
 
 [paths]
 bin_dir = "data/bin"

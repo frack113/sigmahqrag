@@ -8,14 +8,14 @@ import os
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
-from src.core.documents.indexing import index_sigma_rules
-from src.core.documents.models import (
+from src.back.documents.indexing import index_sigma_rules
+from src.back.documents.models import (
     IngestRequest,
     IngestResponse,
     IngestResult,
 )
-from src.core.documents.parser import parse_sigma_rule, scan_directory
-from src.core.documents.validator import validate_sigma_rule
+from src.back.documents.parser import parse_sigma_rule, scan_directory
+from src.back.documents.validator import validate_sigma_rule
 
 logger = logging.getLogger(__name__)
 
@@ -109,3 +109,4 @@ async def ingest_sigma_rules(
             results=results,
         ).model_dump()
     )
+

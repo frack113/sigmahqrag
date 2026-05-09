@@ -8,9 +8,9 @@ from collections.abc import AsyncGenerator
 from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from src.core.backend.service_manager import create_service_manager
-from src.core.backend.services.health_check import HealthCheckService
-from src.core.download_manager import create_download_manager
+from src.back.backend.service_manager import create_service_manager
+from src.back.backend.services.health_check import HealthCheckService
+from src.back.download_manager import create_download_manager
 
 logger = logging.getLogger(__name__)
 
@@ -159,3 +159,4 @@ async def llama_restart(
     except Exception as e:
         logger.error(f"Llama restart error: {e}")
         return JSONResponse(status_code=500, content={"error": str(e)})
+

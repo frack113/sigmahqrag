@@ -8,8 +8,8 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-from src.core.backend.services.health_check import HealthCheckService
-from src.share import load_config
+from src.back.backend.services.health_check import HealthCheckService
+from src.shared import load_config
 
 logger = logging.getLogger(__name__)
 
@@ -76,3 +76,4 @@ async def admin_qdrant(request: Request) -> HTMLResponse:
 async def admin_prompts(request: Request) -> HTMLResponse:
     """Serve system prompts management page."""
     return templates.TemplateResponse(request=request, name="admin/system_prompts.html")
+

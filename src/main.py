@@ -36,7 +36,7 @@ async def lifespan(app: FastAPI) -> None:
 
 def _validate_services() -> None:
     """Validate required services are configured."""
-    from src.share import load_config
+    from src.shared import load_config
 
     config = load_config()
     if not config.get("services", {}).get("llama", {}).get("base_url"):

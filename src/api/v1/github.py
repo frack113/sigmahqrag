@@ -9,7 +9,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from src.api.dependencies import get_github_repo_manager
-from src.core.backend.github.repo import RepositoryManager
+from src.back.backend.github.repo import RepositoryManager
 
 router = APIRouter(prefix="/api/v1/github", tags=["v1-github"])
 
@@ -265,3 +265,4 @@ def get_github_repo_manager() -> RepositoryManager:
     from src.api.dependencies import get_github_repo_manager as _get_manager
 
     return _get_manager()
+

@@ -8,9 +8,9 @@ from collections.abc import AsyncGenerator
 from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from src.core.backend.service_manager import create_service_manager
-from src.core.backend.services.health_check import HealthCheckService
-from src.core.download_manager import create_download_manager
+from src.back.backend.service_manager import create_service_manager
+from src.back.backend.services.health_check import HealthCheckService
+from src.back.download_manager import create_download_manager
 
 logger = logging.getLogger(__name__)
 
@@ -121,20 +121,15 @@ async def qdrant_start(
     storage_path: str | None = Query(
         None, description="Path to storage directory (optional)"
     ),
-    port: int = Query(6333, description="Port to listen on"),
 ):
     """Start the qdrant service."""
     try:
         if not storage_path:
-            return JSONResponse(
-                status_code=400,
-                content={"error": "storage_path is required to start the service"},
-            )
+            from src.shared import QDRANT_STORAGE_DIR
+            storage_path = str(QDRANT_STORAGE_DIR)
 
         service_manager = create_service_manager()
-        result = await service_manager.start_qdrant(
-            storage_path=storage_path, port=port
-        )
+        result = await service_manager.start_qdrant(storage_path=storage_path)
         return JSONResponse(content=result)
     except Exception as e:
         logger.error(f"Qdrant start error: {e}")
@@ -165,3 +160,4 @@ async def qdrant_restart(
     except Exception as e:
         logger.error(f"Qdrant restart error: {e}")
         return JSONResponse(status_code=500, content={"error": str(e)})
+

@@ -8,7 +8,7 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from src.core.system_prompt import (
+from src.back.system_prompt import (
     add_prompt,
     delete_prompt,
     get_active_prompt,
@@ -177,3 +177,4 @@ async def prompts_activate(prompt_id: str) -> JSONResponse:
     except Exception as e:
         logger.error(f"Prompts ACTIVATE failed: {e}")
         return JSONResponse(status_code=500, content={"error": "Internal server error"})
+

@@ -42,7 +42,6 @@
     <div style="margin-top: 15px;">
         <button class="btn btn-success" onclick="startService('llama')">Start</button>
         <button class="btn btn-danger" onclick="stopService('llama')">Stop</button>
-        <button class="btn btn-secondary" onclick="showLogs('llama')">Logs</button>
         <button class="btn btn-primary" onclick="downloadLlama()">Download / Update</button>
     </div>
     <div id="llama-download-status" class="status-message"></div>
@@ -60,7 +59,6 @@
     <div style="margin-top: 15px;">
         <button class="btn btn-success" onclick="startService('qdrant')">Start</button>
         <button class="btn btn-danger" onclick="stopService('qdrant')">Stop</button>
-        <button class="btn btn-secondary" onclick="showLogs('qdrant')">Logs</button>
         <button class="btn btn-primary" onclick="downloadQdrant()">Download / Update</button>
     </div>
     <div id="qdrant-download-status" class="status-message"></div>
@@ -79,21 +77,17 @@ function downloadLlama() {
     document.getElementById('llama-download-status').className = 'status-message';
     document.getElementById('llama-progress-container').style.display = 'block';
 
-    fetch('/api/v1/llamacpp/download', {
-        method: 'POST'
+    fetch('/api/v1/admin/download', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({service: 'llama'})
     })
     .then(r => r.json())
     .then(data => {
-        if (data.download_id) {
-            activeDownloadId = data.download_id;
-            const fileName = data.file_name || 'unknown';
-            document.getElementById('llama-download-status').textContent = `Download file ${fileName} id ${activeDownloadId}`;
+        if (data.status === 'success') {
+            document.getElementById('llama-download-status').textContent = data.message || 'Download started';
             document.getElementById('llama-download-status').className = 'status-message success';
-            startProgressPolling(activeDownloadId, 'llama');
-        } else if (data.message) {
-            document.getElementById('llama-download-status').textContent = data.message;
-            document.getElementById('llama-download-status').className = 'status-message success';
-            document.getElementById('llama-progress-container').style.display = 'none';
+            loadStatus();
         } else {
             document.getElementById('llama-download-status').textContent = data.error || 'Download failed';
             document.getElementById('llama-download-status').className = 'status-message error';
@@ -112,21 +106,17 @@ function downloadQdrant() {
     document.getElementById('qdrant-download-status').className = 'status-message';
     document.getElementById('qdrant-progress-container').style.display = 'block';
 
-    fetch('/api/v1/qdrant/download', {
-        method: 'POST'
+    fetch('/api/v1/admin/download', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({service: 'qdrant'})
     })
     .then(r => r.json())
     .then(data => {
-        if (data.download_id) {
-            activeDownloadId = data.download_id;
-            const fileName = data.file_name || 'unknown';
-            document.getElementById('qdrant-download-status').textContent = `Download file ${fileName} id ${activeDownloadId}`;
+        if (data.status === 'success') {
+            document.getElementById('qdrant-download-status').textContent = data.message || 'Download started';
             document.getElementById('qdrant-download-status').className = 'status-message success';
-            startProgressPolling(activeDownloadId, 'qdrant');
-        } else if (data.message) {
-            document.getElementById('qdrant-download-status').textContent = data.message;
-            document.getElementById('qdrant-download-status').className = 'status-message success';
-            document.getElementById('qdrant-progress-container').style.display = 'none';
+            loadStatus();
         } else {
             document.getElementById('qdrant-download-status').textContent = data.error || 'Download failed';
             document.getElementById('qdrant-download-status').className = 'status-message error';
@@ -140,103 +130,54 @@ function downloadQdrant() {
     });
 }
 
-function startProgressPolling(downloadId, service) {
-    if (progressPollInterval) clearInterval(progressPollInterval);
-
-    const fillId = service === 'llama' ? 'llama-progress-fill' : 'qdrant-progress-fill';
-    const textId = service === 'llama' ? 'llama-progress-text' : 'qdrant-progress-text';
-    const statusId = service === 'llama' ? 'llama-download-status' : 'qdrant-download-status';
-    const containerId = service === 'llama' ? 'llama-progress-container' : 'qdrant-progress-container';
-
-    progressPollInterval = setInterval(() => {
-        const url = service === 'llama' ? '/api/v1/llamacpp/status' : '/api/v1/qdrant/status';
-        fetch(url)
-            .then(r => r.json())
-            .then(data => {
-                const task = data.downloads?.[downloadId];
-                if (!task) return;
-
-                const bytesDownloaded = task.bytes_downloaded || 0;
-                const totalBytes = task.total_bytes || 1;
-                const percent = Math.round(bytesDownloaded / totalBytes * 100);
-
-                document.getElementById(fillId).style.width = percent + '%';
-                document.getElementById(textId).textContent =
-                    `${percent}% (${Math.round(bytesDownloaded/1024/1024)}MB / ${Math.round(totalBytes/1024/1024)}MB)`;
-
-                if (task.status === 'completed') {
-                    clearInterval(progressPollInterval);
-                    document.getElementById(statusId).textContent = 'Download completed!';
-                    document.getElementById(containerId).style.display = 'none';
-                    loadStatus();
-                } else if (task.status === 'failed') {
-                    clearInterval(progressPollInterval);
-                    document.getElementById(statusId).textContent = 'Download failed: ' + (task.error || 'Unknown error');
-                    document.getElementById(statusId).className = 'status-message error';
-                    document.getElementById(containerId).style.display = 'none';
-                }
-            })
-            .catch(() => {});
-    }, 1000);
-}
-
 function loadStatus() {
-    Promise.all([
-        fetch('/api/v1/llamacpp/status').then(r => r.json()).catch(() => ({})),
-        fetch('/api/v1/qdrant/status').then(r => r.json()).catch(() => ({}))
-    ])
-    .then(([llamaInfo, qdrantInfo]) => {
-        const llama = {status: llamaInfo.status || 'unknown', name: 'llama.cpp'};
-        const qdrant = {status: qdrantInfo.status || 'unknown', name: 'qdrant'};
-
-        const getStatusClass = (status) => {
-            if (status === 'running') return 'ok';
-            if (status === 'stopped') return 'error';
-            return 'warning';
-        };
-
-        document.getElementById('llama-status').innerHTML = `
-            <div class="status-row">
-                <span class="status-label">Status:</span>
-                <span class="status-dot status-${getStatusClass(llama.status)}"></span>
-                <span>${llama.status || 'unknown'}</span>
-            </div>
-            <div class="status-row">
-                <span class="status-label">Version:</span>
-                <span>${llamaInfo.current_version || 'Not installed'}</span>
-            </div>
-        `;
-
-        document.getElementById('qdrant-status').innerHTML = `
-            <div class="status-row">
-                <span class="status-label">Status:</span>
-                <span class="status-dot status-${getStatusClass(qdrant.status)}"></span>
-                <span>${qdrant.status || 'unknown'}</span>
-            </div>
-            <div class="status-row">
-                <span class="status-label">Version:</span>
-                <span>${qdrantInfo.current_version || 'Not installed'}</span>
-            </div>
-        `;
-
-        let bannerHtml = '';
-        if (llamaInfo.update_available) {
-            bannerHtml += `<div class="update-alert">Update available for llama.cpp: v${llamaInfo.latest_version}</div>`;
-        }
-        document.getElementById('update-banner').innerHTML = bannerHtml;
-    })
-    .catch(err => {
-        document.getElementById('llama-status').innerHTML = '<p class="error">Failed to load status</p>';
-        document.getElementById('qdrant-status').innerHTML = '<p class="error">Failed to load status</p>';
-    });
-}
-
-function loadLlamaConfig() {
-    fetch('/v1/config')
+    fetch('/api/v1/admin/backend')
         .then(r => r.json())
-        .then(data => {
-            document.getElementById('os-select').value = data.data.backend.os || 'windows';
-            document.getElementById('gpu-select').value = data.data.backend.gpu_type || 'cpu';
+        .then(response => {
+            const data = response.data || {};
+            const services = data.services || {};
+            const config = data.config || {};
+            const llama = services.llama_cpp || {};
+            const qdrant = services.qdrant || {};
+
+            const getStatusClass = (status) => {
+                if (status === 'active') return 'ok';
+                if (status === 'inactive') return 'error';
+                return 'warning';
+            };
+
+            document.getElementById('llama-status').innerHTML = `
+                <div class="status-row">
+                    <span class="status-label">Status:</span>
+                    <span class="status-dot status-${getStatusClass(llama.status)}"></span>
+                    <span>${llama.status || 'unknown'}</span>
+                </div>
+                <div class="status-row">
+                    <span class="status-label">Version:</span>
+                    <span>${llama.version || 'Not installed'}</span>
+                </div>
+            `;
+
+            document.getElementById('qdrant-status').innerHTML = `
+                <div class="status-row">
+                    <span class="status-label">Status:</span>
+                    <span class="status-dot status-${getStatusClass(qdrant.status)}"></span>
+                    <span>${qdrant.status || 'unknown'}</span>
+                </div>
+                <div class="status-row">
+                    <span class="status-label">Version:</span>
+                    <span>${qdrant.version || 'Not installed'}</span>
+                </div>
+            `;
+
+            // Load config
+            const backend = config.backend || {};
+            document.getElementById('os-select').value = backend.os || 'windows';
+            document.getElementById('gpu-select').value = backend.gpu_type || 'cpu';
+        })
+        .catch(err => {
+            document.getElementById('llama-status').innerHTML = '<p class="error">Failed to load status</p>';
+            document.getElementById('qdrant-status').innerHTML = '<p class="error">Failed to load status</p>';
         });
 }
 
@@ -261,43 +202,38 @@ function saveConfig() {
 }
 
 document.getElementById('config-form').addEventListener('submit', function(e) {
-    e.preventDefault();
+e.preventDefault();
     saveConfig();
 });
 
 function startService(service) {
-    const endpoint = service === 'llama' ? '/api/v1/llamacpp/start' : '/api/v1/qdrant/start';
-    fetch(endpoint, {method: 'POST'})
-        .then(r => r.json())
-        .then(data => {
-            alert(data.message || data.error || 'Started');
-            loadStatus();
-        });
+    fetch('/api/v1/admin/backend', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({action: 'start', service: service})
+    })
+    .then(r => r.json())
+    .then(data => {
+        alert(data.message || data.error || 'Started');
+        loadStatus();
+    });
 }
 
 function stopService(service) {
     if (!confirm(`Stop ${service}?`)) return;
-    const endpoint = service === 'llama' ? '/api/v1/llamacpp/stop' : '/api/v1/qdrant/stop';
-    fetch(endpoint, {method: 'POST'})
-        .then(r => r.json())
-        .then(data => {
-            alert(data.message || data.error || 'Stopped');
-            loadStatus();
-        });
-}
-
-function showLogs(service) {
-    const source = service === 'llama' ? 'llamacpp' : 'qdrant';
-    fetch(`/api/v1/logs?source=${source}&lines=50`)
-        .then(r => r.json())
-        .then(data => {
-            const logs = data.logs?.map(l => l.text).join('\n') || 'No logs available';
-            alert(logs.slice(-2000));
-        });
+    fetch('/api/v1/admin/backend', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({action: 'stop', service: service})
+    })
+    .then(r => r.json())
+    .then(data => {
+        alert(data.message || data.error || 'Stopped');
+        loadStatus();
+    });
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-    loadLlamaConfig();
     loadStatus();
 });
 </script>

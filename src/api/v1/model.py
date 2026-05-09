@@ -7,8 +7,8 @@ import logging
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
-from src.core.backend.services.manager import ModelNotFoundError
-from src.core.types import HFRepo
+from src.back.backend.services.manager import ModelNotFoundError
+from src.back.types import HFRepo
 
 logger = logging.getLogger(__name__)
 
@@ -270,3 +270,4 @@ async def delete_embedding_model(repo_id: str) -> JSONResponse:
     except Exception as e:
         logger.error(f"Delete failed: {e}")
         return JSONResponse(status_code=500, content={"error": str(e)})
+

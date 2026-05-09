@@ -5,8 +5,8 @@ import logging
 from fastapi import APIRouter, Depends, Header, Response
 from fastapi.responses import JSONResponse
 
-from src.core.feedback.models import FeedbackIn, FeedbackResponse
-from src.core.feedback.service import FeedbackService
+from src.back.feedback.models import FeedbackIn, FeedbackResponse
+from src.back.feedback.service import FeedbackService
 
 logger = logging.getLogger(__name__)
 
@@ -55,3 +55,4 @@ async def get_feedback_stats() -> JSONResponse:
     service = FeedbackService()
     stats = await service.get_feedback_stats()
     return JSONResponse(content=stats.model_dump())
+

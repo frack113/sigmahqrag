@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from src.api.dependencies import get_embedding_manager
-from src.core.backend.huggingface.embedding import EmbeddingManager
+from src.back.backend.huggingface.embedding import EmbeddingManager
 
 logger = logging.getLogger(__name__)
 
@@ -77,3 +77,4 @@ async def embed_text(
     except Exception as e:
         logger.error(f"Embedding failed: {e}")
         return JSONResponse(status_code=500, content={"error": str(e)})
+

@@ -8,9 +8,9 @@ from datetime import UTC, datetime
 from fastapi import APIRouter, HTTPException, UploadFile, status
 from fastapi.responses import StreamingResponse
 
-from src.core.backend.services.chat_service import ChatService
-from src.core.schemas.chat import ChatMessageRequest, ChatMessageResponse
-from src.share.errors import ValidationError
+from src.back.backend.services.chat_service import ChatService
+from src.shared.schemas.chat import ChatMessageRequest, ChatMessageResponse
+from src.shared.errors import ValidationError
 
 logger = logging.getLogger(__name__)
 
@@ -113,3 +113,4 @@ async def send_chat_message_stream(req: ChatMessageRequest):
         generate(),
         media_type="text/event-stream",
     )
+
