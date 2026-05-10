@@ -8,7 +8,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from src.back.types import HFRepo
+from src.back.backend.huggingface.types import HFRepo
 
 
 class DownloadError(Exception):

@@ -7,8 +7,8 @@ import logging
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
-from src.back.backend.services.manager import ModelNotFoundError
-from src.back.types import HFRepo
+from src.back.backend.huggingface.registry import ModelNotFoundError
+from src.back.backend.huggingface.types import HFRepo
 
 logger = logging.getLogger(__name__)
 

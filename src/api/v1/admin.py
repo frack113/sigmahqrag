@@ -389,7 +389,7 @@ async def get_models() -> JSONResponse:
 async def delete_model(request: dict) -> JSONResponse:
     """POST /api/v1/admin/models/delete - Delete a model."""
     from src.api.dependencies import get_model_manager
-    from src.back.backend.services.manager import ModelNotFoundError
+    from src.back.backend.huggingface.registry import ModelNotFoundError
 
     try:
         repo_id = request.get("repo_id")

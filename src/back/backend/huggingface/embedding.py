@@ -59,7 +59,7 @@ class EmbeddingManager:
         create_index: bool = True,
     ) -> ModelRecord:
         """Download an embedding model."""
-        from src.back.types import HFRepo
+        from src.back.backend.huggingface.types import HFRepo
 
         repo = HFRepo.from_string(repo_id)
         temp_dir = self.embeddings_dir / "temp" / repo.owner / repo.name
@@ -155,7 +155,7 @@ class EmbeddingManager:
 
     async def get_repo_files(self, repo_id: str) -> list[str]:
         """Get list of files in an embedding model repo."""
-        from src.back.types import HFRepo
+        from src.back.backend.huggingface.types import HFRepo
 
         repo = HFRepo.from_string(repo_id)
         api = self.download_service.get_model_info(repo)
