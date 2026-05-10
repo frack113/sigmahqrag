@@ -71,11 +71,11 @@ class DownloadManager:
             version_to_check = version.lstrip("v")
 
         if service in ("llama", "llama.cpp"):
-            from src.back.backend.llamacpp import get_version
+            from src.back.llamacpp import get_version
 
             current_version = get_version()
         elif service in ("qdrant", "qdrant_db"):
-            from src.back.backend.qdrant import get_version
+            from src.back.qdrant import get_version
 
             current_version = get_version()
         else:
@@ -228,13 +228,13 @@ class DownloadManager:
 
                     version_str = task.version.lstrip("v")
                     if task.service in ("llama", "llama.cpp"):
-                        from src.back.backend.llamacpp import (
+                        from src.back.llamacpp import (
                             set_version as set_llama_version,
                         )
 
                         set_llama_version(version_str)
                     elif task.service in ("qdrant", "qdrant_db"):
-                        from src.back.backend.qdrant import (
+                        from src.back.qdrant import (
                             set_version as set_qdrant_version,
                         )
 
@@ -426,4 +426,3 @@ def create_download_manager() -> DownloadManager:
     if _download_manager is None:
         _download_manager = DownloadManager()
     return _download_manager
-

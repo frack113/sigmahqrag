@@ -168,4 +168,3 @@ class ChatService:
         self._history.clear()
         self._uploaded_rule = None
         self._last_citations.clear()
-

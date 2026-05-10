@@ -8,9 +8,9 @@ from collections.abc import AsyncGenerator
 from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from src.back.backend.service_manager import create_service_manager
 from src.back.backend.services.health_check import HealthCheckService
 from src.back.download_manager import create_download_manager
+from src.back.llamacpp.service import create_llama_service
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +33,7 @@ async def _progress_generator(download_id: str) -> AsyncGenerator[str, None]:
             data = await asyncio.wait_for(queue.get(), timeout=30.0)
             yield f"data: {json.dumps(data)}\n\n"
 
-            if data.get("status") in ("completed", "cancelled", "failed"):
+            if data.get("status") in ("completed", "updated", "cancelled", "failed"):
                 break
         except TimeoutError:
             yield f"data: {json.dumps({'status': 'timeout'})}\n\n"
@@ -118,8 +118,8 @@ async def llama_start(
                 content={"error": "model_path is required to start the service"},
             )
 
-        service_manager = create_service_manager()
-        result = await service_manager.start_llama(model_path, port, context_size)
+        service = create_llama_service()
+        result = await service.start_llama(model_path, port, context_size)
         return JSONResponse(content=result)
     except Exception as e:
         logger.error(f"Llama start error: {e}")
@@ -130,8 +130,8 @@ async def llama_start(
 async def llama_stop():
     """Stop the llama.cpp server."""
     try:
-        service_manager = create_service_manager()
-        result = await service_manager.stop_llama()
+        service = create_llama_service()
+        result = await service.stop_llama()
         return JSONResponse(content=result)
     except Exception as e:
         logger.error(f"Llama stop error: {e}")
@@ -152,11 +152,10 @@ async def llama_restart(
                 content={"error": "model_path is required to restart the service"},
             )
 
-        service_manager = create_service_manager()
-        await service_manager.stop_llama()
-        result = await service_manager.start_llama(model_path, port, context_size)
+        service = create_llama_service()
+        await service.stop_llama()
+        result = await service.start_llama(model_path, port, context_size)
         return JSONResponse(content=result)
     except Exception as e:
         logger.error(f"Llama restart error: {e}")
         return JSONResponse(status_code=500, content={"error": str(e)})
-

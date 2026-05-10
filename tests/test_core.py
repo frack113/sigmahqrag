@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import pytest
-from src.core.services import (
-    HFDownloadService,
+
+from src.back.backend.huggingface.download import HFDownloadService
+from src.back.backend.services.manager import (
     LocalRegistry,
     ModelManager,
     ModelNotFoundError,
-    VRAMEstimator,
 )
+from src.back.llamacpp.vram import VRAMEstimator
 
 
 @pytest.fixture

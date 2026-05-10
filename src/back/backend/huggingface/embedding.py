@@ -183,4 +183,3 @@ class EmbeddingManager:
 def create_embedding_manager() -> EmbeddingManager:
     """Create an EmbeddingManager instance."""
     return EmbeddingManager()
-

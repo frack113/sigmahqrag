@@ -265,4 +265,3 @@ def get_github_repo_manager() -> RepositoryManager:
     from src.api.dependencies import get_github_repo_manager as _get_manager
 
     return _get_manager()
-

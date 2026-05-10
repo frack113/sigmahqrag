@@ -41,7 +41,7 @@ class HealthCheckService:
         if cached:
             return cached
 
-        from src.back.backend.llamacpp.health import check_health
+        from src.back.llamacpp.health import check_health
 
         start = time.time()
         result = await check_health(port=8080)
@@ -60,7 +60,7 @@ class HealthCheckService:
         port = qdrant_config.get("port", 6333)
         collection = qdrant_config.get("collection_name", "sigma_rules")
 
-        from src.back.backend.qdrant.health import check_health
+        from src.back.qdrant.health import check_health
 
         basic_check = await check_health(port=port)
         start = time.time()
@@ -115,12 +115,11 @@ class HealthCheckService:
     def get_current_version(self, service: str) -> str | None:
         """Get current version of a service."""
         if service in ("llama", "llama.cpp", "llama_cpp"):
-            from src.back.backend.llamacpp import get_version
+            from src.back.llamacpp import get_version
 
             return get_version()
         elif service in ("qdrant", "qdrant_db"):
-            from src.back.backend.qdrant import get_version
+            from src.back.qdrant import get_version
 
             return get_version()
         return None
-

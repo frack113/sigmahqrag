@@ -9,4 +9,3 @@ from src.back.backend.huggingface import (
 def create_embedding_manager_service() -> EmbeddingManager:
     """Create an EmbeddingManager instance."""
     return create_embedding_manager()
-

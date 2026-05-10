@@ -15,4 +15,3 @@ class DownloadError(Exception):
     """Download operation error."""
 
     pass
-

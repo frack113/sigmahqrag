@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from src.back.backend.qdrant import QdrantService
+from src.back.qdrant import QdrantService
 
 
 class VectorStoreClient:
@@ -46,4 +46,3 @@ class VectorStoreClient:
             documents=texts,
             metadata=metadata,
         )
-

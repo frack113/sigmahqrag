@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from src.back.backend.qdrant import QdrantService
+from src.back.qdrant import QdrantService
 from src.back.rag.embeddings import EMBEDDING_DIM, get_embedding_model
 
 logger = logging.getLogger(__name__)
@@ -131,4 +131,3 @@ class SearchEngine:
     def get_citation(self, result: dict[str, Any]) -> str:
         """Get citation for result."""
         return get_citation(result)
-

@@ -9,7 +9,7 @@ from typing import Any
 
 from llama_index.core.schema import Document
 
-from src.back.backend.qdrant.storage import store_embeddings as _store_embeddings
+from src.back.qdrant.storage import store_embeddings as _store_embeddings
 
 logger = logging.getLogger(__name__)
 
@@ -164,4 +164,3 @@ class EmbeddingGenerator:
     ) -> bool:
         """Store embeddings in Qdrant."""
         return store_embeddings(documents, embeddings)
-

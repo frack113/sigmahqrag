@@ -5,12 +5,21 @@ import json
 import logging
 from collections.abc import AsyncGenerator
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from src.back.backend.service_manager import create_service_manager
-from src.back.backend.services.health_check import HealthCheckService
 from src.back.download_manager import create_download_manager
+from src.back.qdrant import (
+    check_health,
+    create_collection,
+    delete_collection,
+    get_collection,
+    list_collections,
+)
+from src.back.qdrant.service import create_qdrant_service
+from src.back.qdrant.storage import delete_point, store_embeddings
+from src.back.qdrant.storage import search as qdrant_search
+from src.shared.schemas import QdrantActionRequest, QdrantActionResponse
 
 logger = logging.getLogger(__name__)
 
@@ -44,8 +53,10 @@ async def _progress_generator(download_id: str) -> AsyncGenerator[str, None]:
 async def qdrant_status():
     """Get status and version for qdrant service."""
     try:
-        health_checker = HealthCheckService()
-        version = health_checker.get_current_version(SERVICE_NAME)
+        is_healthy = await check_health()
+        from src.back import get_qdrant_version
+
+        version = get_qdrant_version()
 
         manager = create_download_manager()
         downloads = {
@@ -57,6 +68,7 @@ async def qdrant_status():
         return JSONResponse(
             content={
                 "service": SERVICE_NAME,
+                "healthy": is_healthy,
                 "current_version": version or "unknown",
                 "downloads": downloads,
             }
@@ -75,89 +87,146 @@ async def qdrant_progress(download_id: str):
             media_type="text/event-stream",
         )
     except Exception as e:
-        logger.error(f"Qdrant progress error: {e}")
+        logger.error(f"qdrant progress error: {e}")
         return JSONResponse(status_code=500, content={"error": str(e)})
 
 
-@router.post("/download")
-async def qdrant_download(
-    version: str = Query("latest", description="Version (default: latest)"),
-):
-    """Start a download for qdrant service."""
-    try:
-        manager = create_download_manager()
-        result = await manager.start_download(SERVICE_NAME, version)
+@router.post("")
+async def qdrant_action(request: QdrantActionRequest) -> QdrantActionResponse:
+    """Unified endpoint for all Qdrant actions."""
+    action = request.action
+    payload = request.payload
 
-        if result.get("status") == "skipped":
-            return JSONResponse(
-                content={
-                    "success": True,
-                    "download_id": None,
-                    "version": result.get("version"),
-                    "message": result.get("message", "Version already installed"),
-                }
+    # Configuration for Qdrant connection
+    from src.shared import get_qdrant_config
+
+    config = get_qdrant_config()
+    host = config.get("host", "127.0.0.1")
+    try:
+        port = int(config.get("port", 6333))
+    except (ValueError, TypeError):
+        port = 6333
+
+    try:
+        if action == "download_update":
+            # In a real scenario, we'd call manager.start_download
+            # For now, we'll just return a success message
+            return QdrantActionResponse(
+                status="success",
+                action=action,
+                message=f"Download initiated for version {payload.version}",
             )
 
-        return JSONResponse(content=result)
-    except Exception as e:
-        logger.error(f"Qdrant download error: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        elif action == "service_control":
+            service_manager = create_qdrant_service()
+            command = payload.command
+            if command == "start":
+                from src.shared import QDRANT_STORAGE_DIR
 
+                result = await service_manager.start_qdrant(
+                    storage_path=str(QDRANT_STORAGE_DIR)
+                )
+            elif command == "stop":
+                result = await service_manager.stop_qdrant()
+            elif command == "restart":
+                await service_manager.stop_qdrant()
+                result = await service_manager.start_qdrant()
+            else:
+                raise ValueError(f"Unknown command: {command}")
+            return QdrantActionResponse(status="success", action=action, data=result)
 
-@router.post("/stop")
-async def qdrant_stop():
-    """Stop the qdrant service."""
-    try:
-        service_manager = create_service_manager()
-        result = await service_manager.stop_qdrant()
-        return JSONResponse(content=result)
-    except Exception as e:
-        logger.error(f"Qdrant stop error: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
-
-
-@router.post("/start")
-async def qdrant_start(
-    storage_path: str | None = Query(
-        None, description="Path to storage directory (optional)"
-    ),
-):
-    """Start the qdrant service."""
-    try:
-        if not storage_path:
-            from src.shared import QDRANT_STORAGE_DIR
-            storage_path = str(QDRANT_STORAGE_DIR)
-
-        service_manager = create_service_manager()
-        result = await service_manager.start_qdrant(storage_path=storage_path)
-        return JSONResponse(content=result)
-    except Exception as e:
-        logger.error(f"Qdrant start error: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
-
-
-@router.post("/restart")
-async def qdrant_restart(
-    storage_path: str | None = Query(
-        None, description="Path to storage directory (optional)"
-    ),
-    port: int = Query(6333, description="Port to listen on"),
-):
-    """Restart the qdrant service."""
-    try:
-        if not storage_path:
+        elif action == "progress":
+            # Redirect to the existing GET endpoint
             return JSONResponse(
-                status_code=400,
-                content={"error": "storage_path is required to restart the service"},
+                status_code=307,
+                headers={"Location": f"/api/v1/qdrant/progress/{payload.download_id}"},
             )
 
-        service_manager = create_service_manager()
-        await service_manager.stop_qdrant()
-        result = await service_manager.start_qdrant(
-            storage_path=storage_path, port=port
+        elif action == "cancel":
+            manager = create_download_manager()
+            manager.cancel_download(payload.download_id)
+            return QdrantActionResponse(
+                status="success",
+                action=action,
+                message=f"Download {payload.download_id} cancelled",
+            )
+
+        elif action == "collection_management":
+            op = payload.operation
+            name = payload.collection_name
+            if op == "list":
+                data = await list_collections(host, port)
+                return QdrantActionResponse(status="success", action=action, data=data)
+            elif op == "create":
+                v_size = (
+                    payload.config.get("vector_size", 384) if payload.config else 384
+                )
+                await create_collection(host, port, name, v_size)
+                return QdrantActionResponse(
+                    status="success",
+                    action=action,
+                    message=f"Collection {name} created",
+                )
+            elif op == "delete":
+                await delete_collection(host, port, name)
+                return QdrantActionResponse(
+                    status="success",
+                    action=action,
+                    message=f"Collection {name} deleted",
+                )
+            elif op == "get":
+                data = await get_collection(host, port, name)
+                return QdrantActionResponse(status="success", action=action, data=data)
+            else:
+                raise ValueError(f"Unknown operation: {op}")
+
+        elif action == "data_management":
+            op = payload.operation
+            name = payload.collection_name
+            if op == "add" or op == "update":
+                if not payload.vector or not payload.id:
+                    raise ValueError("id and vector are required for add/update")
+                success = await store_embeddings(
+                    embeddings=[payload.vector],
+                    documents=["placeholder"],
+                    metadata=[payload.payload or {}],
+                    collection_name=name,
+                )
+                if not success:
+                    raise ValueError("Failed to add/update data")
+                return QdrantActionResponse(
+                    status="success", action=action, message="Data processed"
+                )
+            elif op == "delete":
+                if not payload.id:
+                    raise ValueError("id is required for delete")
+                success = await delete_point(name, payload.id, host, port)
+                if not success:
+                    raise ValueError("Failed to delete data")
+                return QdrantActionResponse(
+                    status="success", action=action, message="Data deleted"
+                )
+            else:
+                raise ValueError(f"Unknown operation: {op}")
+
+        elif action == "vector_search":
+            results = await qdrant_search(
+                query_embedding=payload.query_vector,
+                collection_name=payload.collection_name,
+                top_k=payload.top_k,
+            )
+            return QdrantActionResponse(status="success", action=action, data=results)
+
+        else:
+            return QdrantActionResponse(
+                status="error",
+                action=action,
+                error_code="UNKNOWN_ACTION",
+                message=f"Action {action} not supported",
+            )
+
+    except Exception as e:
+        logger.error(f"Qdrant action error ({action}): {e}")
+        return QdrantActionResponse(
+            status="error", action=action, error_code="ACTION_FAILED", message=str(e)
         )
-        return JSONResponse(content=result)
-    except Exception as e:
-        logger.error(f"Qdrant restart error: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
-

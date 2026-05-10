@@ -50,22 +50,38 @@ def _cleanup_expired_entries() -> None:
 async def check_service_health() -> dict[str, Any]:
     """Check health of llama.cpp and Qdrant services (AC3 - <500ms by parallel checks)."""
     import asyncio
+
     from httpx import AsyncClient
+
     from src.shared import get_llamacpp_version, get_qdrant_version
 
     llama_version = get_llamacpp_version() or "Not installed"
     qdrant_version = get_qdrant_version() or "Not installed"
 
     result: dict[str, Any] = {
-        "llama_cpp": {"status": "unknown", "component": "llama.cpp", "port": 8080, "version": llama_version},
-        "qdrant": {"status": "unknown", "component": "qdrant", "port": 6333, "version": qdrant_version},
+        "llama_cpp": {
+            "status": "unknown",
+            "component": "llama.cpp",
+            "port": 8080,
+            "version": llama_version,
+        },
+        "qdrant": {
+            "status": "unknown",
+            "component": "qdrant",
+            "port": 6333,
+            "version": qdrant_version,
+        },
     }
 
     async with AsyncClient() as client:
+
         async def check_llama():
             try:
                 response = await client.get("http://localhost:8080/health", timeout=2.0)
-                if response.status_code == 200 and response.json().get("status") == "healthy":
+                if (
+                    response.status_code == 200
+                    and response.json().get("status") == "healthy"
+                ):
                     result["llama_cpp"]["status"] = "active"
             except Exception:
                 result["llama_cpp"]["status"] = "inactive"
@@ -73,7 +89,10 @@ async def check_service_health() -> dict[str, Any]:
         async def check_qdrant():
             try:
                 response = await client.get("http://localhost:6333/health", timeout=2.0)
-                if response.status_code == 200 and response.json().get("status") == "healthy":
+                if (
+                    response.status_code == 200
+                    and response.json().get("status") == "healthy"
+                ):
                     result["qdrant"]["status"] = "active"
             except Exception:
                 result["qdrant"]["status"] = "inactive"
@@ -108,45 +127,67 @@ async def post_backend(request: dict) -> JSONResponse:
 
         if action == "start":
             if service == "llama":
-                from src.back.backend.service_manager import create_service_manager
                 from pathlib import Path
-                # Find any available model
+
                 from src.shared import LLM_DIR
+
+                # Find any available model
                 models = list(Path(LLM_DIR).rglob("*.gguf")) if LLM_DIR.exists() else []
                 model_path = str(models[0]) if models else None
 
                 if not model_path:
-                    return JSONResponse(content={"data": {"success": False, "error": "No model found in models/llm"}, "status": "error"})
+                    return JSONResponse(
+                        content={
+                            "data": {
+                                "success": False,
+                                "error": "No model found in models/llm",
+                            },
+                            "status": "error",
+                        }
+                    )
 
-                sm = create_service_manager()
-                result = await sm.start_llama(model_path=model_path, port=8080, context_size=4096)
+                from src.back.llamacpp.service import create_llama_service
+
+                service_manager = create_llama_service()
+                result = await service_manager.start_llama(
+                    model_path=model_path, port=8080, context_size=4096
+                )
 
             elif service == "qdrant":
-                from src.back.backend.service_manager import create_service_manager
-                from src.shared import QDRANT_STORAGE_DIR
                 from pathlib import Path
+
+                from src.back.qdrant.service import create_qdrant_service
+                from src.shared import QDRANT_STORAGE_DIR
+
                 storage_path = str(Path(QDRANT_STORAGE_DIR).resolve())
-                sm = create_service_manager()
-                result = await sm.start_qdrant(storage_path=storage_path)
+                service_manager = create_qdrant_service()
+                result = await service_manager.start_qdrant(storage_path=storage_path)
             else:
                 result = {"success": False, "error": f"Unknown service: {service}"}
 
         elif action == "stop":
             if service == "llama":
-                from src.back.backend.service_manager import create_service_manager
-                sm = create_service_manager()
-                result = await sm.stop_llama()
+                from src.back.llamacpp.service import create_llama_service
+
+                service_manager = create_llama_service()
+                result = await service_manager.stop_llama()
             elif service == "qdrant":
-                from src.back.backend.service_manager import create_service_manager
-                sm = create_service_manager()
-                result = await sm.stop_qdrant()
+                from src.back.qdrant.service import create_qdrant_service
+
+                service_manager = create_qdrant_service()
+                result = await service_manager.stop_qdrant()
             else:
                 result = {"success": False, "error": f"Unknown service: {service}"}
 
         else:
             result = {"success": False, "error": f"Unknown action: {action}"}
 
-        return JSONResponse(content={"data": result, "status": "success" if result.get("success") else "error"})
+        return JSONResponse(
+            content={
+                "data": result,
+                "status": "success" if result.get("success") else "error",
+            }
+        )
     except Exception as e:
         logger.error(f"Backend action error: {e}")
         return JSONResponse(status_code=500, content={"error": str(e)})
@@ -183,7 +224,14 @@ def start_download(service: str = None) -> dict[str, Any]:
     current_qdrant = get_qdrant_version() or "unknown"
     target_service = service or "qdrant"
 
-    return {"job_id": f"job-{uuid.uuid4().hex[:8]}", "status": "started", "service": target_service, "current_version": current_llama if target_service == "llama" else current_qdrant}
+    return {
+        "job_id": f"job-{uuid.uuid4().hex[:8]}",
+        "status": "started",
+        "service": target_service,
+        "current_version": (
+            current_llama if target_service == "llama" else current_qdrant
+        ),
+    }
 
 
 def _build_error_response(
@@ -383,4 +431,3 @@ async def get_config() -> JSONResponse:
             status_code=500,
             content={"status": "error", "error": str(e)},
         )
-

@@ -11,9 +11,15 @@ BASE_URL = "http://localhost:7860"
 
 def cmd_download(url: str, service: str, version: str) -> None:
     """Start a binary download."""
-    endpoint = f"{url}/api/v1/{service}/download"
-    params = {"version": version}
-    response = requests.post(endpoint, params=params)
+    if service == "qdrant":
+        endpoint = f"{url}/api/v1/qdrant"
+        payload = {"action": "download_update", "payload": {"version": version}}
+        response = requests.post(endpoint, json=payload)
+    else:
+        endpoint = f"{url}/api/v1/{service}/download"
+        params = {"version": version}
+        response = requests.post(endpoint, params=params)
+
     print(f"Status: {response.status_code}")
     data = response.json()
     print(json.dumps(data, indent=2))
@@ -45,8 +51,12 @@ def cmd_progress(url: str, service: str, download_id: str) -> None:
 
 def cmd_status(url: str, service: str) -> None:
     """Get service status."""
-    endpoint = f"{url}/api/v1/{service}/status"
-    response = requests.get(endpoint)
+    if service == "qdrant":
+        endpoint = f"{url}/api/v1/qdrant/status"
+        response = requests.get(endpoint)
+    else:
+        endpoint = f"{url}/api/v1/{service}/status"
+        response = requests.get(endpoint)
     print(f"Status: {response.status_code}")
     data = response.json()
     print(json.dumps(data, indent=2))

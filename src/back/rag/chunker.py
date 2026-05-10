@@ -173,4 +173,3 @@ class SigmaChunker:
             rule_chunks = chunk_sigma_rule(rule)
             chunks.extend(rule_chunks)
         return chunks
-

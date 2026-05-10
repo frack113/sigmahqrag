@@ -39,4 +39,3 @@ class FeedbackService:
     async def get_feedback_stats(self) -> FeedbackStats:
         """Get feedback statistics."""
         return await self.repository.get_stats()
-

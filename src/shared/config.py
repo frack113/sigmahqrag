@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import platform
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -16,6 +15,7 @@ MODELS_DIR = BASE_DIR / "models"
 LLM_DIR = MODELS_DIR / "llm"
 EMBEDDINGS_DIR = MODELS_DIR / "embeddings"
 LOGS_DIR = BASE_DIR / "logs"
+PID_DIR = BASE_DIR / "pids"
 
 LLAMA_BIN_PATH = BIN_DIR / "llama-cpp"
 QDRANT_BIN_PATH = BIN_DIR / "qdrant"
@@ -73,7 +73,7 @@ def _get_toml_service():
 @lru_cache(maxsize=1)
 def load_config() -> dict[str, Any]:
     """Load configuration from TOML file with defaults.
-    
+
     Returns:
         Dict with configuration (merged with defaults)
     """
@@ -81,12 +81,13 @@ def load_config() -> dict[str, Any]:
     config = DEFAULT_CONFIG.copy()
     toml_service = _get_toml_service()
     file_config = toml_service.load()
-    
+
     if file_config:
         from src.shared import deep_merge
+
         deep_merge(config, file_config)
         logger.info(f"Loaded config from {CONFIG_FILE}")
-    
+
     return config
 
 
@@ -107,6 +108,7 @@ def set_backend_gpu_type(gpu_type: str) -> None:
         config["backend"] = {}
     config["backend"]["gpu_type"] = gpu_type
     _persist_config(config)
+
 
 def set_backend_os_type(os_type: str) -> None:
     """Set OS type in config and persist to TOML."""
@@ -157,26 +159,25 @@ def ensure_qdrant_config() -> None:
         # We use _get_toml_service().load() to avoid recursion with load_config()
         toml_service = _get_toml_service()
         file_config = toml_service.load() or {}
-        
+
         # Get qdrant config from loaded file, or use defaults if not present
         qdrant_cfg = file_config.get("services", {}).get("qdrant", {})
         if not qdrant_cfg and "services" in DEFAULT_CONFIG:
-             qdrant_cfg = DEFAULT_CONFIG["services"].get("qdrant", {})
+            qdrant_cfg = DEFAULT_CONFIG["services"].get("qdrant", {})
 
         host = qdrant_cfg.get("host", "127.0.0.1")
         port = qdrant_cfg.get("port", 6333)
-        
+
         # Use absolute path for storage location to avoid ambiguity
         storage_path = QDRANT_STORAGE_DIR.resolve().as_posix()
-        
+
         yaml_content = f'storage:\n  location: "{storage_path}"\nservice:\n  host: "{host}"\n  port: {port}\n'
-        
+
         config_path = Path("data/config/qdrant.yaml")
         config_path.parent.mkdir(parents=True, exist_ok=True)
         config_path.write_text(yaml_content)
     except Exception as e:
         logger.error(f"Failed to ensure qdrant.yaml: {e}")
-
 
 
 def get_llama_config() -> dict[str, Any]:

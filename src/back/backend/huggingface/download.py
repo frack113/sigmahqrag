@@ -172,4 +172,3 @@ class HFDownloadService:
 def create_download_service() -> HFDownloadService:
     """Create an HFDownloadService instance."""
     return HFDownloadService()
-

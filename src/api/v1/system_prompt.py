@@ -177,4 +177,3 @@ async def prompts_activate(prompt_id: str) -> JSONResponse:
     except Exception as e:
         logger.error(f"Prompts ACTIVATE failed: {e}")
         return JSONResponse(status_code=500, content={"error": "Internal server error"})
-

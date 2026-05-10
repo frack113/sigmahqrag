@@ -5,6 +5,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+import qdrant_client
+
 logger = logging.getLogger(__name__)
 
 DEFAULT_VECTOR_SIZE = 384
@@ -34,7 +36,7 @@ async def store_embeddings(
         return False
 
     try:
-        from src.back.backend.qdrant import QdrantService
+        from src.back.qdrant import QdrantService
 
         service = QdrantService(
             collection_name=collection_name,
@@ -69,7 +71,7 @@ async def search(
         List of search results with text, metadata, and score
     """
     try:
-        from src.back.backend.qdrant import QdrantService
+        from src.back.qdrant import QdrantService
 
         service = QdrantService(collection_name=collection_name)
         await service.initialize()
@@ -82,3 +84,22 @@ async def search(
         logger.error(f"Search failed: {e}")
         return []
 
+
+async def delete_point(
+    collection_name: str,
+    point_id: str,
+    host: str = "127.0.0.1",
+    port: int = 6333,
+) -> bool:
+    """Delete a point from the collection."""
+    try:
+        client = qdrant_client.QdrantClient(host=host, port=port)
+        client.delete(
+            collection_name=collection_name,
+            points_selector=qdrant_client.models.PointIdsList(points=[point_id]),
+        )
+        logger.info(f"Deleted point {point_id} from {collection_name}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to delete point {point_id}: {e}")
+        return False

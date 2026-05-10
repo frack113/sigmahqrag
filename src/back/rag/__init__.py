@@ -19,4 +19,3 @@ __all__ = [
     "format_search_result",
     "get_citation",
 ]
-

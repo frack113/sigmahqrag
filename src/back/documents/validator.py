@@ -155,4 +155,3 @@ def validate_keys_lowercase(content: str) -> list[ValidationError]:
             )
 
     return errors
-

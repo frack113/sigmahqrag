@@ -1,9 +1,8 @@
 """VRAM estimation service (wrapper for backward compatibility)."""
 
-from src.back.backend.llamacpp.vram import VRAMEstimator
+from src.back.llamacpp.vram import VRAMEstimator
 
 
 def create_vram_estimator() -> VRAMEstimator:
     """Create a VRAMEstimator instance."""
     return VRAMEstimator()
-

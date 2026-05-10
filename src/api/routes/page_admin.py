@@ -76,4 +76,3 @@ async def admin_qdrant(request: Request) -> HTMLResponse:
 async def admin_prompts(request: Request) -> HTMLResponse:
     """Serve system prompts management page."""
     return templates.TemplateResponse(request=request, name="admin/system_prompts.html")
-

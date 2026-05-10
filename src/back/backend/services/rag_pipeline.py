@@ -7,7 +7,7 @@ from typing import Any
 
 from jinja2 import Environment, FileSystemLoader
 
-from src.back.backend.llamacpp import LlamaService
+from src.back.llamacpp import LlamaService
 from src.back.rag.search import SearchEngine
 
 from .cache import ResponseCache
@@ -196,4 +196,3 @@ class RAGPipeline:
             lines.append(f"{i}. {text}")
 
         return "\n\n".join(lines)
-

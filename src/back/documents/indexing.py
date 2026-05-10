@@ -8,8 +8,8 @@ from typing import Any
 
 from llama_index.core.schema import TextNode
 
-from src.back.backend.qdrant import QdrantService
 from src.back.documents.models import SigmaRule
+from src.back.qdrant import QdrantService
 
 logger = logging.getLogger(__name__)
 
@@ -202,4 +202,3 @@ async def check_duplicate(rule_id: str, collection: str) -> bool:
         pass
 
     return False
-

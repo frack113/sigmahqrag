@@ -270,4 +270,3 @@ async def delete_embedding_model(repo_id: str) -> JSONResponse:
     except Exception as e:
         logger.error(f"Delete failed: {e}")
         return JSONResponse(status_code=500, content={"error": str(e)})
-

@@ -80,4 +80,3 @@ def create_update_service() -> UpdateService:
     if _update_service is None:
         _update_service = UpdateService()
     return _update_service
-

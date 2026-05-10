@@ -28,4 +28,3 @@ def get_model_manager() -> ModelManager:
 def get_github_repo_manager() -> RepositoryManager:
     """Get a singleton instance of the GitHub repository manager."""
     return RepositoryManager(repos_dir="data/github")
-

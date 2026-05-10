@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from src.back.backend.huggingface import HFDownloadService
-from src.back.backend.llamacpp.vram import VRAMEstimator
+from src.back.llamacpp.vram import VRAMEstimator
 from src.shared import LLM_DIR
 
 
@@ -148,4 +148,3 @@ class ModelManager:
             model_size_bytes=size,
             context_length=context_length,
         )
-

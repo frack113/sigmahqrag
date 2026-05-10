@@ -55,4 +55,3 @@ async def get_feedback_stats() -> JSONResponse:
     service = FeedbackService()
     stats = await service.get_feedback_stats()
     return JSONResponse(content=stats.model_dump())
-

@@ -8,8 +8,8 @@ from typing import Any
 
 import httpx
 
-from src.back.backend.llamacpp.health import check_health as check_llamacpp_health
-from src.back.backend.qdrant.health import check_health as check_qdrant_health
+from src.back.llamacpp.health import check_health as check_llamacpp_health
+from src.back.qdrant.health import check_health as check_qdrant_health
 
 MAX_TOTAL_TIMEOUT = 5.0
 
@@ -144,4 +144,3 @@ async def check_all() -> dict[str, Any]:
                 "message": "HTTP error",
             },
         }
-

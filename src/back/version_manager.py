@@ -352,11 +352,11 @@ async def get_current_version(service: str) -> str | None:
         Version string or None
     """
     if service in ("llama", "llama.cpp"):
-        from src.back.backend.llamacpp import get_version
+        from src.back.llamacpp import get_version
 
         return get_version()
     elif service in ("qdrant", "qdrant_db"):
-        from src.back.backend.qdrant import get_version
+        from src.back.qdrant import get_version
 
         return get_version()
     return None
@@ -393,4 +393,3 @@ async def check_for_updates(service: str) -> dict | None:
         }
     except Exception:
         return None
-

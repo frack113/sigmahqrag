@@ -119,4 +119,3 @@ def scan_directory(directory: str, recursive: bool = True) -> list[str]:
     files = sorted(dir_path.glob(pattern))
 
     return [str(f) for f in files if f.is_file()]
-

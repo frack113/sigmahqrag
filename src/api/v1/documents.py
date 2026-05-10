@@ -109,4 +109,3 @@ async def ingest_sigma_rules(
             results=results,
         ).model_dump()
     )
-

@@ -6,10 +6,10 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
-from src.documents.models import SigmaRule
-from src.documents.parser import parse_sigma_rule, scan_directory
-from src.documents.validator import validate_sigma_rule
 
+from src.back.documents.models import SigmaRule
+from src.back.documents.parser import parse_sigma_rule, scan_directory
+from src.back.documents.validator import validate_sigma_rule
 from src.main import create_app
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
@@ -146,8 +146,8 @@ class TestDocumentsEndpoint:
         os.environ["SIGMA_RULES_DIR"] = str(FIXTURES_DIR)
         return TestClient(app)
 
-    @patch("src.api.routes.documents.scan_directory")
-    @patch("src.api.routes.documents.index_sigma_rules")
+    @patch("src.api.v1.documents.scan_directory")
+    @patch("src.api.v1.documents.index_sigma_rules")
     def test_ingest_success(
         self,
         mock_index: AsyncMock,

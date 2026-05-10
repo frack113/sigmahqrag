@@ -10,6 +10,12 @@ from llama_index.vector_stores.qdrant import QdrantVectorStore
 
 from src.shared import get_qdrant_version, set_qdrant_version
 
+from .collections import (
+    create_collection,
+    delete_collection,
+    get_collection,
+    list_collections,
+)
 from .health import check_health
 from .storage import search, store_embeddings
 
@@ -31,6 +37,10 @@ __all__ = [
     "search",
     "get_version",
     "set_version",
+    "list_collections",
+    "create_collection",
+    "delete_collection",
+    "get_collection",
 ]
 
 logger = logging.getLogger(__name__)

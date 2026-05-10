@@ -6,7 +6,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from src.errors import (
+from src.shared.errors import (
     ModelNotFoundError,
     ServiceUnavailableError,
     SigmaError,
