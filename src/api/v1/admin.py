@@ -149,7 +149,7 @@ async def post_backend(request: dict) -> JSONResponse:
                 from src.back.llamacpp.service import create_llama_service
 
                 service_manager = create_llama_service()
-                result = await service_manager.start_llama(
+                result = await service_manager.start(
                     model_path=model_path, port=8080, context_size=4096
                 )
 
@@ -161,7 +161,7 @@ async def post_backend(request: dict) -> JSONResponse:
 
                 storage_path = str(Path(QDRANT_STORAGE_DIR).resolve())
                 service_manager = create_qdrant_service()
-                result = await service_manager.start_qdrant(storage_path=storage_path)
+                result = await service_manager.start(storage_path=storage_path)
             else:
                 result = {"success": False, "error": f"Unknown service: {service}"}
 
@@ -170,12 +170,12 @@ async def post_backend(request: dict) -> JSONResponse:
                 from src.back.llamacpp.service import create_llama_service
 
                 service_manager = create_llama_service()
-                result = await service_manager.stop_llama()
+                result = await service_manager.stop()
             elif service == "qdrant":
                 from src.back.qdrant.service import create_qdrant_service
 
                 service_manager = create_qdrant_service()
-                result = await service_manager.stop_qdrant()
+                result = await service_manager.stop()
             else:
                 result = {"success": False, "error": f"Unknown service: {service}"}
 

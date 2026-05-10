@@ -33,7 +33,7 @@ async def create_collection(
                 size=vector_size, distance="Cosine"
             ),
         )
-        logger_info(f"Collection '{collection_name}' created successfully.")
+        logger.info(f"Collection '{collection_name}' created successfully.")
         return True
     except Exception as e:
         logger.error(f"Failed to create collection '{collection_name}': {e}")
@@ -65,7 +65,3 @@ async def get_collection(host: str, port: int, collection_name: str) -> dict[str
     except Exception as e:
         logger.error(f"Failed to get collection '{collection_name}': {e}")
         raise
-
-
-def logger_info(message: str):
-    logger.info(message)

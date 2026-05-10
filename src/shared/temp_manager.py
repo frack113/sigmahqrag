@@ -73,6 +73,12 @@ class TempManager:
         return count
 
 
+_temp_manager: TempManager | None = None
+
+
 def create_temp_manager() -> TempManager:
-    """Create a temp manager instance."""
-    return TempManager()
+    """Create a singleton temp manager instance."""
+    global _temp_manager
+    if _temp_manager is None:
+        _temp_manager = TempManager()
+    return _temp_manager

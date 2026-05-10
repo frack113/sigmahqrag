@@ -8,7 +8,6 @@ from collections.abc import AsyncGenerator
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from src.back.download_manager import create_download_manager
 from src.back.qdrant import (
     check_health,
     create_collection,
@@ -19,6 +18,7 @@ from src.back.qdrant import (
 from src.back.qdrant.service import create_qdrant_service
 from src.back.qdrant.storage import delete_point, store_embeddings
 from src.back.qdrant.storage import search as qdrant_search
+from src.shared.download_manager import create_download_manager
 from src.shared.schemas import QdrantActionRequest, QdrantActionResponse
 
 logger = logging.getLogger(__name__)
@@ -123,14 +123,14 @@ async def qdrant_action(request: QdrantActionRequest) -> QdrantActionResponse:
             if command == "start":
                 from src.shared import QDRANT_STORAGE_DIR
 
-                result = await service_manager.start_qdrant(
+                result = await service_manager.start(
                     storage_path=str(QDRANT_STORAGE_DIR)
                 )
             elif command == "stop":
-                result = await service_manager.stop_qdrant()
+                result = await service_manager.stop()
             elif command == "restart":
-                await service_manager.stop_qdrant()
-                result = await service_manager.start_qdrant()
+                await service_manager.stop()
+                result = await service_manager.start()
             else:
                 raise ValueError(f"Unknown command: {command}")
             return QdrantActionResponse(status="success", action=action, data=result)

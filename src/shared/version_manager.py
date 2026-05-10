@@ -351,14 +351,12 @@ async def get_current_version(service: str) -> str | None:
     Returns:
         Version string or None
     """
+    from src.shared import get_llamacpp_version, get_qdrant_version
+
     if service in ("llama", "llama.cpp"):
-        from src.back.llamacpp import get_version
-
-        return get_version()
+        return get_llamacpp_version()
     elif service in ("qdrant", "qdrant_db"):
-        from src.back.qdrant import get_version
-
-        return get_version()
+        return get_qdrant_version()
     return None
 
 

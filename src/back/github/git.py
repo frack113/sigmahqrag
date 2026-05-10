@@ -60,7 +60,10 @@ def clone_repo(
     """
     if url is None:
         if not org or not name:
-            return {"success": False, "error": "org and name required when url is not provided"}
+            return {
+                "success": False,
+                "error": "org and name required when url is not provided",
+            }
         url = f"https://github.com/{org}/{name}.git"
     else:
         url = url.rstrip("/")
@@ -72,7 +75,9 @@ def clone_repo(
 
     # Extract org/name from URL using gitpython's remote
     if org is None or name is None:
-        temp_clone = Repo.clone_from(url, repos_dir / "__temp__" / "__extract__", depth=1)
+        temp_clone = Repo.clone_from(
+            url, repos_dir / "__temp__" / "__extract__", depth=1
+        )
         try:
             remote_url = temp_clone.remote().url
             # git@github.com:org/name.git or https://github.com/org/name.git
@@ -93,12 +98,18 @@ def clone_repo(
 
     if dest_path.exists():
         if _is_valid_repo(dest_path):
-            return {"success": False, "error": f"Repository '{org}/{name}' already exists"}
+            return {
+                "success": False,
+                "error": f"Repository '{org}/{name}' already exists",
+            }
         shutil.rmtree(dest_path, ignore_errors=True)
 
     lockfile = dest_path / LOCKFILE
     if lockfile.exists():
-        return {"success": False, "error": f"Repository '{org}/{name}' is currently being cloned"}
+        return {
+            "success": False,
+            "error": f"Repository '{org}/{name}' is currently being cloned",
+        }
 
     try:
         dest_path.parent.mkdir(parents=True, exist_ok=True)

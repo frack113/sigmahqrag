@@ -19,6 +19,8 @@ from .collections import (
 from .health import check_health
 from .storage import search, store_embeddings
 
+logger = logging.getLogger(__name__)
+
 
 def get_version() -> str | None:
     """Get current qdrant version."""
@@ -30,23 +32,7 @@ def set_version(version: str) -> None:
     set_qdrant_version(version)
 
 
-__all__ = [
-    "QdrantService",
-    "check_health",
-    "store_embeddings",
-    "search",
-    "get_version",
-    "set_version",
-    "list_collections",
-    "create_collection",
-    "delete_collection",
-    "get_collection",
-]
-
-logger = logging.getLogger(__name__)
-
-
-class QdrantService:
+class QdrantVectorService:
     """High-level service wrapper for Qdrant vector store via llama-index."""
 
     def __init__(
@@ -56,7 +42,7 @@ class QdrantService:
         host: str | None = None,
         port: int | None = None,
     ) -> None:
-        """Initialize QdrantService."""
+        """Initialize QdrantVectorService."""
         from src.shared import get_qdrant_config
 
         config = get_qdrant_config()
@@ -83,7 +69,7 @@ class QdrantService:
                 collection_name=self.collection_name,
             )
             logger.info(
-                f"QdrantService initialized: {self.host}:{self.port}/{self.collection_name}"
+                f"QdrantVectorService initialized: {self.host}:{self.port}/{self.collection_name}"
             )
         except Exception as e:
             logger.error(f"Failed to initialize Qdrant client: {e}")
@@ -158,3 +144,21 @@ class QdrantService:
 
     def __repr__(self) -> str:
         return f"QdrantService(collection={self.collection_name}, host={self.host}:{self.port})"
+
+
+QdrantService = QdrantVectorService
+
+
+__all__ = [
+    "QdrantVectorService",
+    "QdrantService",
+    "check_health",
+    "store_embeddings",
+    "search",
+    "get_version",
+    "set_version",
+    "list_collections",
+    "create_collection",
+    "delete_collection",
+    "get_collection",
+]

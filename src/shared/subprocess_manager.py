@@ -175,8 +175,7 @@ class SubprocessManager:
                 process_info.log_handle.close()
                 process_info.log_handle = None
 
-            loggerary = logger
-            loggerary.info(f"Stopped {name}")
+            logger.info(f"Stopped {name}")
             process_info.is_running = False
             process_info.process = None
             process_info.pid = None

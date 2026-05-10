@@ -2,6 +2,12 @@
 
 from __future__ import annotations
 
+from .api import (
+    download_release_file,
+    info_release,
+    list_release_files,
+    list_releases,
+)
 from .git import (
     clone_repo,
     delete_repo,
@@ -9,12 +15,6 @@ from .git import (
     list_repos,
     save_metadata,
     update_repo,
-)
-from .service import (
-    download_release_file,
-    info_release,
-    list_release_files,
-    list_releases,
 )
 
 __all__ = [

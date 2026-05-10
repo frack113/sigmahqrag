@@ -4,7 +4,9 @@ from src.shared import get_llamacpp_version, set_llamacpp_version
 
 from .client import LlamaClient
 from .health import check_health
-from .service import LlamaService
+from .service import LlamaBinaryService
+
+LlamaService = LlamaBinaryService
 
 
 def get_version() -> str | None:
@@ -17,4 +19,11 @@ def set_version(version: str) -> None:
     set_llamacpp_version(version)
 
 
-__all__ = ["LlamaClient", "LlamaService", "check_health", "get_version", "set_version"]
+__all__ = [
+    "LlamaClient",
+    "LlamaBinaryService",
+    "LlamaService",
+    "check_health",
+    "get_version",
+    "set_version",
+]

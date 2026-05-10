@@ -13,14 +13,14 @@ from typing import Any
 
 import httpx
 
-from src.back.temp_manager import create_temp_manager
-from src.back.version_manager import (
+from src.shared import BIN_DIR
+from src.shared.exceptions import DownloadError
+from src.shared.temp_manager import create_temp_manager
+from src.shared.version_manager import (
     ReleaseAsset,
     VersionManager,
     create_version_manager,
 )
-from src.shared import BIN_DIR
-from src.shared.exceptions import DownloadError
 
 logger = logging.getLogger(__name__)
 
@@ -89,13 +89,13 @@ class DownloadManager:
             version_to_check = version.lstrip("v")
 
         if service in ("llama", "llama.cpp"):
-            from src.back.llamacpp import get_version
+            from src.shared import get_llamacpp_version
 
-            current_version = get_version()
+            current_version = get_llamacpp_version()
         elif service in ("qdrant", "qdrant_db"):
-            from src.back.qdrant import get_version
+            from src.shared import get_qdrant_version
 
-            current_version = get_version()
+            current_version = get_qdrant_version()
         else:
             current_version = None
 
@@ -253,15 +253,11 @@ class DownloadManager:
 
                     version_str = task.version.lstrip("v")
                     if task.service in ("llama", "llama.cpp"):
-                        from src.back.llamacpp import (
-                            set_version as set_llama_version,
-                        )
+                        from src.shared import set_llamacpp_version
 
-                        set_llama_version(version_str)
+                        set_llamacpp_version(version_str)
                     elif task.service in ("qdrant", "qdrant_db"):
-                        from src.back.qdrant import (
-                            set_version as set_qdrant_version,
-                        )
+                        from src.shared import set_qdrant_version
 
                         set_qdrant_version(version_str)
 

@@ -92,7 +92,9 @@ async def add_repo(
 
     existing = list_repos()
     if any(r["org"] == org and r["name"] == name for r in existing):
-        return RepositoryResponse(success=False, error=f"Repository '{org}/{name}' already exists")
+        return RepositoryResponse(
+            success=False, error=f"Repository '{org}/{name}' already exists"
+        )
 
     def clone_with_status() -> None:
         result = clone_repo(url=request.url, branch=request.branch)
@@ -138,7 +140,9 @@ async def get_repo(org: str, name: str) -> RepositoryStatus:
     """Get repository details."""
     repos = list_repos()
     if not any(r["org"] == org and r["name"] == name for r in repos):
-        raise HTTPException(status_code=404, detail=f"Repository '{org}/{name}' not found")
+        raise HTTPException(
+            status_code=404, detail=f"Repository '{org}/{name}' not found"
+        )
 
     metadata = get_metadata(org, name) or {}
     return RepositoryStatus(
@@ -166,7 +170,9 @@ async def sync_repo(
 
     repos = list_repos()
     if not any(r["org"] == org and r["name"] == name for r in repos):
-        return RepositoryResponse(success=False, error=f"Repository '{org}/{name}' not found")
+        return RepositoryResponse(
+            success=False, error=f"Repository '{org}/{name}' not found"
+        )
 
     def sync_with_status() -> dict[str, Any]:
         result = update_repo(org=org, name=name, branch=branch)
@@ -198,7 +204,9 @@ async def delete_repo_handler(
     """Delete a repository."""
     result = delete_repo(org, name)
     if result.get("success"):
-        return RepositoryResponse(success=True, message=f"Repository '{org}/{name}' deleted")
+        return RepositoryResponse(
+            success=True, message=f"Repository '{org}/{name}' deleted"
+        )
     return RepositoryResponse(success=False, error=result.get("error", "Delete failed"))
 
 
