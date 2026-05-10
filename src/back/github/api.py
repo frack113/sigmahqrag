@@ -7,7 +7,9 @@ import httpx
 GITHUB_API_URL = "https://api.github.com/repos"
 
 
-async def list_releases(owner: str, repo: str, github_token: str | None = None) -> list[dict]:
+async def list_releases(
+    owner: str, repo: str, github_token: str | None = None
+) -> list[dict]:
     """List all releases for a repository."""
     url = f"{GITHUB_API_URL}/{owner}/{repo}/releases"
     headers = {"Accept": "application/vnd.github+json"}

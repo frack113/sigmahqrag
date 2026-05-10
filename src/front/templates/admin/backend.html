@@ -60,6 +60,7 @@
         <button class="btn btn-success" onclick="startService('qdrant')">Start</button>
         <button class="btn btn-danger" onclick="stopService('qdrant')">Stop</button>
         <button class="btn btn-primary" onclick="downloadQdrant()">Download / Update</button>
+        <button class="btn btn-secondary" onclick="openQdrantUI()">Open Web UI</button>
     </div>
     <div id="qdrant-download-status" class="status-message"></div>
     <div id="qdrant-progress-container" style="display:none;">
@@ -109,25 +110,32 @@ function downloadQdrant() {
     fetch('/api/v1/admin/download', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({service: 'qdrant'})
+        body: JSON.stringify({service: 'qdrant', target: 'all'})
     })
     .then(r => r.json())
     .then(data => {
-        if (data.status === 'success') {
-            document.getElementById('qdrant-download-status').textContent = data.message || 'Download started';
-            document.getElementById('qdrant-download-status').className = 'status-message success';
-            loadStatus();
-        } else {
-            document.getElementById('qdrant-download-status').textContent = data.error || 'Download failed';
-            document.getElementById('qdrant-download-status').className = 'status-message error';
-            document.getElementById('qdrant-progress-container').style.display = 'none';
-        }
+        const info = data.data || {};
+        const status = data.status;
+        
+        let message = '';
+        if (info.binary_version) message += `Binary v${info.binary_version} `;
+        if (info.ui_version) message += `Web UI ${info.ui_version}`;
+        if (!message) message = status === 'partial' ? 'Partial update (some components skipped)' : 'Download failed';
+        
+        document.getElementById('qdrant-download-status').textContent = message;
+        document.getElementById('qdrant-download-status').className = 'status-message ' + (status === 'success' ? 'success' : 'warning');
+        document.getElementById('qdrant-progress-container').style.display = 'none';
+        loadStatus();
     })
     .catch(err => {
         document.getElementById('qdrant-download-status').textContent = 'Error: ' + err;
         document.getElementById('qdrant-download-status').className = 'status-message error';
         document.getElementById('qdrant-progress-container').style.display = 'none';
     });
+}
+
+function openQdrantUI() {
+    window.open('http://127.0.0.1:6333/dashboard', '_blank');
 }
 
 function loadStatus() {
@@ -165,8 +173,12 @@ function loadStatus() {
                     <span>${qdrant.status || 'unknown'}</span>
                 </div>
                 <div class="status-row">
-                    <span class="status-label">Version:</span>
+                    <span class="status-label">Binary:</span>
                     <span>${qdrant.version || 'Not installed'}</span>
+                </div>
+                <div class="status-row">
+                    <span class="status-label">Web UI:</span>
+                    <span>v0.2.11</span>
                 </div>
             `;
 

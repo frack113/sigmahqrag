@@ -53,22 +53,26 @@ async def check_service_health() -> dict[str, Any]:
 
     from httpx import AsyncClient
 
-    from src.shared import get_llamacpp_version, get_qdrant_version
+    from src.shared import get_llamacpp_version, get_qdrant_version, load_config
 
     llama_version = get_llamacpp_version() or "Not installed"
     qdrant_version = get_qdrant_version() or "Not installed"
+
+    config = load_config().get("services", {})
+    llama_port = config.get("llama", {}).get("port", 8080)
+    qdrant_port = config.get("qdrant", {}).get("port", 6333)
 
     result: dict[str, Any] = {
         "llama_cpp": {
             "status": "unknown",
             "component": "llama.cpp",
-            "port": 8080,
+            "port": llama_port,
             "version": llama_version,
         },
         "qdrant": {
             "status": "unknown",
             "component": "qdrant",
-            "port": 6333,
+            "port": qdrant_port,
             "version": qdrant_version,
         },
     }
@@ -77,7 +81,7 @@ async def check_service_health() -> dict[str, Any]:
 
         async def check_llama():
             try:
-                response = await client.get("http://localhost:8080/health", timeout=2.0)
+                response = await client.get(f"http://localhost:{llama_port}/health", timeout=2.0)
                 if (
                     response.status_code == 200
                     and response.json().get("status") == "healthy"
@@ -88,11 +92,8 @@ async def check_service_health() -> dict[str, Any]:
 
         async def check_qdrant():
             try:
-                response = await client.get("http://localhost:6333/health", timeout=2.0)
-                if (
-                    response.status_code == 200
-                    and response.json().get("status") == "healthy"
-                ):
+                response = await client.get(f"http://localhost:{qdrant_port}/readyz", timeout=2.0)
+                if response.status_code == 200:
                     result["qdrant"]["status"] = "active"
             except Exception:
                 result["qdrant"]["status"] = "inactive"
@@ -154,14 +155,10 @@ async def post_backend(request: dict) -> JSONResponse:
                 )
 
             elif service == "qdrant":
-                from pathlib import Path
-
                 from src.back.qdrant.service import create_qdrant_service
-                from src.shared import QDRANT_STORAGE_DIR
 
-                storage_path = str(Path(QDRANT_STORAGE_DIR).resolve())
                 service_manager = create_qdrant_service()
-                result = await service_manager.start(storage_path=storage_path)
+                result = await service_manager.start()
             else:
                 result = {"success": False, "error": f"Unknown service: {service}"}
 
@@ -196,9 +193,9 @@ async def post_backend(request: dict) -> JSONResponse:
 class DownloadRequest(BaseModel):
     """Request model for download action."""
 
-    service: str | None = None
-    repo_url: str | None = None
-    target_dir: str | None = None
+    action: str | None = "install"
+    service: str | None = "qdrant"
+    target: str | None = None
 
 
 class CancelRequest(BaseModel):
@@ -214,24 +211,47 @@ class JobResponse(BaseModel):
     status: str
 
 
-def start_download(service: str = None) -> dict[str, Any]:
+async def start_download(service: str = None, target: str = None) -> dict[str, Any]:
     """Start download action and return job info."""
     import uuid
 
-    from src.shared import get_llamacpp_version, get_qdrant_version
+    from src.back.qdrant.downloader import (
+        QDRANT_BINARY_VERSION,
+        QDRANT_UI_VERSION,
+        create_qdrant_installer,
+    )
 
-    current_llama = get_llamacpp_version() or "unknown"
-    current_qdrant = get_qdrant_version() or "unknown"
     target_service = service or "qdrant"
+    target_component = target or "all"
 
-    return {
-        "job_id": f"job-{uuid.uuid4().hex[:8]}",
-        "status": "started",
-        "service": target_service,
-        "current_version": (
-            current_llama if target_service == "llama" else current_qdrant
-        ),
-    }
+    job_id = f"job-{uuid.uuid4().hex[:8]}"
+
+    if target_service == "qdrant":
+        installer = create_qdrant_installer()
+
+        binary_result = {"success": False, "error": "skipped (binary running)"}
+        ui_result = {"success": False, "error": "skipped"}
+
+        if target_component in ("binary", "all"):
+            binary_result = await installer.download_binary()
+
+        if target_component in ("web_ui", "all"):
+            ui_result = await installer.download_web_ui()
+
+        all_success = binary_result.get("success") and ui_result.get("success")
+        any_success = binary_result.get("success") or ui_result.get("success")
+
+        return {
+            "job_id": job_id,
+            "status": "completed" if all_success else ("partial" if any_success else "failed"),
+            "service": target_service,
+            "binary_version": QDRANT_BINARY_VERSION if binary_result.get("success") else None,
+            "ui_version": QDRANT_UI_VERSION if ui_result.get("success") else None,
+            "binary_error": binary_result.get("error") if not binary_result.get("success") else None,
+            "ui_error": ui_result.get("error") if not ui_result.get("success") else None,
+        }
+
+    return {"job_id": job_id, "status": "started", "service": target_service}
 
 
 def _build_error_response(
@@ -257,10 +277,9 @@ async def download_action(
     x_idempotency_key: str | None = Header(default=None, alias="X-Idempotency-Key"),
 ) -> JSONResponse:
     """POST /api/v1/admin/download - Download/update services."""
-    # Get service from request
-    service = request.service if request else None
+    service = request.service if request else "qdrant"
+    target = request.target if request else "all"
 
-    # Validate idempotency key
     if _is_valid_idempotency_key(x_idempotency_key):
         _cleanup_expired_entries()
         cache_key = f"download:{x_idempotency_key}"
@@ -268,12 +287,13 @@ async def download_action(
             cached_content, _, _ = _idempotency_store[cache_key]
             return JSONResponse(content=cached_content)
 
-    # Start download
-    result = start_download(service)
+    result = await start_download(service=service, target=target)
 
-    response_content = {"data": result, "status": result.get("status", "success")}
+    response_content = {
+        "data": result,
+        "status": "success" if result.get("status") == "completed" else result.get("status", "success"),
+    }
 
-    # Store idempotency result
     if _is_valid_idempotency_key(x_idempotency_key):
         _idempotency_store[f"download:{x_idempotency_key}"] = (
             response_content,
@@ -356,21 +376,22 @@ async def cancel_action(
 @router.get("/models")
 async def get_models() -> JSONResponse:
     """GET /api/v1/admin/models - Return installed models list."""
-    from src.api.dependencies import get_model_manager
+    from src.api.dependencies import get_unified_registry
+    from src.shared import LLM_DIR
 
     try:
-        mm = get_model_manager()
-        models = await mm.list_installed_models()
+        reg = get_unified_registry()
+        reg.sync_llm_folder(LLM_DIR)
+        llms = reg.list_llms()
 
         model_list = []
-        for m in models:
-            for filename, f in m.files.items():
+        for repo_id, data in llms.items():
+            for filename, info in data.get("files", {}).items():
                 model_list.append(
                     {
-                        "repo_id": m.repo_id,
-                        "filename": filename,
-                        "size_mb": f.file_size / (1024 * 1024) if f.file_size else 0,
-                        "status": m.status.value,
+                        "repo_id": repo_id,
+                        "filename": info.get("filename", filename),
+                        "size_mb": (info.get("file_size", 0) or 0) / (1024 * 1024),
                     }
                 )
 
@@ -388,10 +409,13 @@ async def get_models() -> JSONResponse:
 @router.post("/models/delete")
 async def delete_model(request: dict) -> JSONResponse:
     """POST /api/v1/admin/models/delete - Delete a model."""
-    from src.api.dependencies import get_model_manager
-    from src.back.backend.huggingface.registry import ModelNotFoundError
+    from pathlib import Path
+
+    from src.api.dependencies import get_unified_registry
+    from src.back.models import ModelNotFoundError
 
     try:
+        reg = get_unified_registry()
         repo_id = request.get("repo_id")
         filename = request.get("filename")
 
@@ -401,8 +425,16 @@ async def delete_model(request: dict) -> JSONResponse:
                 content={"status": "error", "error": "repo_id and filename required"},
             )
 
-        mm = get_model_manager()
-        await mm.delete_model(repo_id, filename)
+        record = reg.get_llm(repo_id)
+        if not record:
+            raise ModelNotFoundError(f"Model {repo_id} not found")
+        if filename not in record.get("files", {}):
+            raise ModelNotFoundError(f"File {filename} not found in {repo_id}")
+        path = Path(record["files"][filename]["local_path"])
+        if path.exists():
+            path.unlink()
+        del record["files"][filename]
+        reg._save()
 
         return JSONResponse(
             content={"status": "success", "message": f"Deleted {repo_id}/{filename}"}

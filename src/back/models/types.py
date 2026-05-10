@@ -1,4 +1,4 @@
-"""Types for HuggingFace models."""
+"""Model management types."""
 
 from __future__ import annotations
 
@@ -6,14 +6,13 @@ from __future__ import annotations
 class HFRepo:
     """HuggingFace repository identifier."""
 
-    def __init__(self, owner: str, name: str, repo_type: str = "models") -> None:
-        """Initialize HFRepo.
+    VALID_REPO_TYPES = {"models", "datasets", "spaces"}
 
-        Args:
-            owner: Repository owner/organization
-            name: Repository name
-            repo_type: Repository type (models, datasets, spaces)
-        """
+    def __init__(self, owner: str, name: str, repo_type: str = "models") -> None:
+        if repo_type not in self.VALID_REPO_TYPES:
+            raise ValueError(
+                f"Invalid repo_type: {repo_type}. Must be one of {self.VALID_REPO_TYPES}"
+            )
         self.owner = owner
         self.name = name
         self.repo_type = repo_type
@@ -32,23 +31,16 @@ class HFRepo:
 
         Returns:
             HFRepo instance
+
+        Raises:
+            ValueError: If repo_id is not in owner/name format
         """
         parts = repo_id.split("/")
         if len(parts) != 2:
-            raise ValueError(f"Invalid repo_id: {repo_id}")
+            raise ValueError(
+                f"Invalid repo_id format: '{repo_id}'. Expected 'owner/name'."
+            )
         return cls(owner=parts[0], name=parts[1])
-
-    @classmethod
-    def from_id(cls, repo_id: str) -> HFRepo:
-        """Create HFRepo from full repository ID.
-
-        Args:
-            repo_id: Full repository ID
-
-        Returns:
-            HFRepo instance
-        """
-        return cls.from_string(repo_id)
 
     def __repr__(self) -> str:
         return f"HFRepo({self.owner}/{self.name})"
@@ -57,3 +49,6 @@ class HFRepo:
         if not isinstance(other, HFRepo):
             return False
         return self.full_id == other.full_id
+
+    def __hash__(self) -> int:
+        return hash(self.full_id)

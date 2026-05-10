@@ -6,10 +6,10 @@ import json
 import shutil
 from pathlib import Path
 
+from src.back.models.download import HFDownloadService
+from src.back.models.exceptions import DownloadError
+from src.back.models.types import HFRepo
 from src.shared import EMBEDDINGS_DIR
-
-from .download import HFDownloadService
-from .registry import ModelFile, ModelRecord
 
 
 class EmbeddingManager:
@@ -36,7 +36,7 @@ class EmbeddingManager:
 
     async def search_models(
         self, query: str = "sentence-transformers", limit: int = 10
-    ):
+    ) -> list[HFRepo]:
         """Search for embedding models."""
         return await self.download_service.list_models(query)
 
@@ -57,11 +57,16 @@ class EmbeddingManager:
         repo_id: str,
         filename: str | None = None,
         create_index: bool = True,
-    ) -> ModelRecord:
-        """Download an embedding model."""
-        from src.back.backend.huggingface.types import HFRepo
+    ) -> dict:
+        """Download an embedding model.
 
-        repo = HFRepo.from_string(repo_id)
+        Raises:
+            DownloadError: If repo_id format is invalid
+        """
+        try:
+            repo = HFRepo.from_string(repo_id)
+        except ValueError as e:
+            raise DownloadError(f"Invalid repo_id '{repo_id}': {e}") from e
         temp_dir = self.embeddings_dir / "temp" / repo.owner / repo.name
         temp_dir.mkdir(parents=True, exist_ok=True)
         downloaded_path = self.download_service.download_repo(repo, temp_dir)
@@ -89,17 +94,14 @@ class EmbeddingManager:
         if temp_parent.exists():
             shutil.rmtree(temp_parent)
 
-        record = ModelRecord(
-            repo_id=repo_id,
-            files={
-                dest.name: ModelFile(
-                    filename=dest.name,
-                    local_path=dest,
-                    file_size=dest.stat().st_size,
-                )
-            },
-            status="ready",
-        )
+        record = {
+            "repo_id": repo_id,
+            "local_path": str(dest),
+            "file_size": dest.stat().st_size,
+            "status": "ready",
+            "dimension": dimension,
+            "index_path": str(index_path) if index_path else None,
+        }
 
         registry = await self._load_registry()
         total_size = sum(f.stat().st_size for f in dest.rglob("*") if f.is_file())
@@ -130,7 +132,7 @@ class EmbeddingManager:
                 continue
             if model_dir.name.startswith("."):
                 continue
-            if model_dir.name in ("cache", "temp"):
+            if model_dir.name in ("cache", "temp", "embeddings_registry.json"):
                 continue
 
             for sub_dir in model_dir.iterdir():
@@ -138,7 +140,7 @@ class EmbeddingManager:
                     continue
                 if sub_dir.name.startswith("."):
                     continue
-                if sub_dir.name in ("cache", "temp"):
+                if sub_dir.name in ("cache", "temp", "embeddings_registry.json"):
                     continue
 
                 repo_id = f"{model_dir.name}/{sub_dir.name}"
@@ -146,18 +148,21 @@ class EmbeddingManager:
                     files = list(sub_dir.rglob("*"))
                     file_count = sum(1 for f in files if f.is_file())
                     if file_count > 0:
+                        total_size = sum(f.stat().st_size for f in files if f.is_file())
                         registry[repo_id] = {
                             "local_path": str(sub_dir),
                             "status": "ready",
+                            "file_size": total_size,
                         }
 
         await self._save_registry(registry)
 
     async def get_repo_files(self, repo_id: str) -> list[str]:
         """Get list of files in an embedding model repo."""
-        from src.back.backend.huggingface.types import HFRepo
-
-        repo = HFRepo.from_string(repo_id)
+        try:
+            repo = HFRepo.from_string(repo_id)
+        except ValueError as e:
+            raise DownloadError(f"Invalid repo_id '{repo_id}': {e}") from e
         api = self.download_service.get_model_info(repo)
         if api.siblings:
             return [f.rfilename for f in api.siblings]
@@ -178,8 +183,3 @@ class EmbeddingManager:
                 Path(index_path).unlink()
             del registry[repo_id]
             await self._save_registry(registry)
-
-
-def create_embedding_manager() -> EmbeddingManager:
-    """Create an EmbeddingManager instance."""
-    return EmbeddingManager()

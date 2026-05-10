@@ -13,7 +13,7 @@ from git.exc import InvalidGitRepositoryError
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_REPOS_DIR = Path("data/repos")
+DEFAULT_REPOS_DIR = Path("data/github")
 LOCKFILE = ".cloning"
 METADATA_FILE = "metadata.json"
 

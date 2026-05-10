@@ -68,8 +68,8 @@ function loadModels() {
             models.forEach(m => {
                 for (const [filename, f] of Object.entries(m.files)) {
                     html += `<tr>
-                        <td>${m.repo_id}/${filename}</td>
-                        <td>${Math.round(f.size / 1024 / 1024)}MB</td>
+                        <td>${f.filename || filename}</td>
+                        <td>${Math.round((f.file_size || f.size || 0) / 1024 / 1024)}MB</td>
                         <td><button class="btn btn-danger btn-sm" onclick="deleteModel('${m.repo_id}', '${filename}')">Delete</button></td>
                     </tr>`;
                 }

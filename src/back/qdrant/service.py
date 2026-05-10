@@ -6,13 +6,13 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from src.shared import QDRANT_BIN_PATH, QDRANT_STORAGE_DIR
-from src.shared.subprocess_manager import SubprocessManager
+from src.shared import QDRANT_BIN_PATH
 
 logger = logging.getLogger(__name__)
 
-QDRANT_BIN = Path(QDRANT_BIN_PATH)
-QDRANT_STORAGE_DIR = Path(QDRANT_STORAGE_DIR)
+QDRANT_BIN = QDRANT_BIN_PATH()
+
+_qdrant_service: QdrantBinaryService | None = None
 
 
 class QdrantBinaryService:
@@ -21,21 +21,27 @@ class QdrantBinaryService:
     def __init__(
         self,
         qdrant_bin: Path = QDRANT_BIN,
-        logs_dir: Path = Path("src/logs"),
-        pid_dir: Path = Path("src/data/pids"),
+        logs_dir: Path = Path("data/logs"),
+        pid_dir: Path = Path("data/pids"),
+        subprocess_manager=None,
     ) -> None:
         """Initialize QdrantBinaryService."""
         self.qdrant_bin = qdrant_bin
         self.logs_dir = logs_dir
         self.pid_dir = pid_dir
-        self._subprocess_manager = SubprocessManager(self.logs_dir, self.pid_dir)
+
+        if subprocess_manager is None:
+            from src.back.service_manager import get_subprocess_manager
+
+            subprocess_manager = get_subprocess_manager()
+
+        self._subprocess_manager = subprocess_manager
 
     async def start(
         self,
-        storage_path: str = str(QDRANT_STORAGE_DIR),
         config_path: str = "data/config/qdrant.yaml",
     ) -> dict[str, Any]:
-        """Start Qdrant server."""
+        """Start Qdrant server using config file."""
         qdrant_path = self.qdrant_bin
         if qdrant_path.is_dir():
             exe_in_dir = qdrant_path / "qdrant.exe"
@@ -55,13 +61,9 @@ class QdrantBinaryService:
         log_file = self.logs_dir / "qdrant.log"
         pid_file = self.pid_dir / "qdrant.exe.pid"
 
-        cmd = [
-            str(qdrant_path),
-            "--storage-path",
-            storage_path,
-            "--config-path",
-            config_path,
-        ]
+        cmd = [str(qdrant_path)]
+        if Path(config_path).exists():
+            cmd.extend(["--config-path", config_path])
 
         return await self._subprocess_manager.start_service(
             name="qdrant",
@@ -80,5 +82,8 @@ class QdrantBinaryService:
 
 
 def create_qdrant_service() -> QdrantBinaryService:
-    """Create a qdrant binary service manager."""
-    return QdrantBinaryService()
+    """Create or return cached qdrant service instance."""
+    global _qdrant_service
+    if _qdrant_service is None:
+        _qdrant_service = QdrantBinaryService()
+    return _qdrant_service

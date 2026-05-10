@@ -23,8 +23,6 @@ from src.shared.version_manager import (
 )
 
 logger = logging.getLogger(__name__)
-
-
 @dataclass
 class DownloadTask:
     """Represents an active download task."""
@@ -41,6 +39,8 @@ class DownloadTask:
     speed_bps: int = 0
     cancel_event: asyncio.Event = field(default_factory=asyncio.Event)
     progress_queue: asyncio.Queue | None = None
+    post_install_callback: Any | None = None
+
 
 
 class DownloadManager:
@@ -67,6 +67,7 @@ class DownloadManager:
         service: str,
         version: str,
         github_token: str | None = None,
+        post_install_callback: Any | None = None,
     ) -> dict[str, Any]:
         """Start a binary download.
 
@@ -74,10 +75,9 @@ class DownloadManager:
             service: Service name (llama.cpp, qdrant)
             version: Version tag or "latest"
             github_token: Optional GitHub token
-
-        Returns:
-            Dict with download_id, status, service, version, target_path
+            post_install_callback: Async callback to run after installation
         """
+
         if service not in ("llama.cpp", "qdrant"):
             raise DownloadError(f"Unsupported service: {service}")
 
@@ -136,6 +136,7 @@ class DownloadManager:
             total_bytes=asset.size,
             cancel_event=cancel_event,
             progress_queue=progress_queue,
+            post_install_callback=post_install_callback,
         )
 
         self.active_downloads[download_id] = download_task
@@ -195,11 +196,7 @@ class DownloadManager:
                                 task.status = "cancelled"
                                 self.temp_manager.cleanup(task.temp_path)
                                 if task.progress_queue:
-                                    await task.progress_queue.put(
-                                        {
-                                            "status": "cancelled",
-                                        }
-                                    )
+                                    await task.progress_queue.put({"status": "cancelled"})
                                 del self.active_downloads[download_id]
                                 return
 
@@ -243,6 +240,9 @@ class DownloadManager:
                         task.temp_path, task.target_path, task.service
                     )
 
+                    if task.post_install_callback:
+                        await task.post_install_callback(task.target_path)
+
                     if task.progress_queue:
                         await task.progress_queue.put(
                             {
@@ -252,6 +252,7 @@ class DownloadManager:
                         )
 
                     version_str = task.version.lstrip("v")
+
                     if task.service in ("llama", "llama.cpp"):
                         from src.shared import set_llamacpp_version
 

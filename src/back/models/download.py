@@ -1,4 +1,4 @@
-"""Download services for HuggingFace models."""
+"""Download service for HuggingFace models."""
 
 from __future__ import annotations
 
@@ -8,31 +8,8 @@ import os
 from pathlib import Path
 from typing import Any
 
-from src.back.backend.huggingface.types import HFRepo
-
-
-class DownloadError(Exception):
-    """Download operation error."""
-
-    pass
-
-
-class ChecksumMismatchError(DownloadError):
-    """Checksum verification failed."""
-
-    pass
-
-
-class DiskSpaceError(DownloadError):
-    """Insufficient disk space."""
-
-    pass
-
-
-class NetworkError(DownloadError):
-    """Network operation failed."""
-
-    pass
+from src.back.models.exceptions import DownloadError
+from src.back.models.types import HFRepo
 
 
 class HFDownloadService:
@@ -164,11 +141,6 @@ class HFDownloadService:
         api = HfApi(token=self.token)
         try:
             results = api.hf_hub_search(query, sort="downloads", direction=-1)
-            return [HFRepo.from_id(r.id) for r in results]
+            return [HFRepo.from_string(r.id) for r in results]
         except Exception as e:
             raise DownloadError(f"Failed to search models: {e}") from e
-
-
-def create_download_service() -> HFDownloadService:
-    """Create an HFDownloadService instance."""
-    return HFDownloadService()

@@ -20,6 +20,7 @@
             </select>
             <input type="number" id="log-lines" value="" min="1" max="500" class="form-control" placeholder="25">
             <button onclick="loadLogs()" class="btn btn-primary">Load Logs</button>
+            <button onclick="clearLogs()" class="btn btn-secondary">Clear</button>
         </div>
     </div>
     <div class="card-body">
@@ -44,6 +45,21 @@ async function loadLogs() {
             data.logs.map(l => l.text).join('\n') || 'No logs found';
     } catch (error) {
         console.error('Failed to load logs:', error);
+    }
+}
+
+async function clearLogs() {
+    const source = document.getElementById('log-source').value;
+    try {
+        const response = await fetch('/api/v1/logs?source=' + source, { method: 'DELETE' });
+        const data = await response.json();
+        if (data.success) {
+            document.getElementById('logs-output').textContent = '';
+        } else {
+            alert(data.message || 'Failed to clear logs');
+        }
+    } catch (error) {
+        console.error('Failed to clear logs:', error);
     }
 }
 

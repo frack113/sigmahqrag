@@ -1,8 +1,7 @@
 """Services layer for external integrations."""
 
-from src.back.backend.huggingface import EmbeddingManager
-from src.back.backend.huggingface.registry import ModelNotFoundError, ModelRegistry
 from src.back.llamacpp import LlamaService
+from src.back.models import EmbeddingManager, ModelNotFoundError
 from src.back.qdrant import QdrantService
 
 from .cache import ResponseCache
@@ -21,5 +20,4 @@ __all__ = [
     "SigmaValidator",
     "ChatService",
     "ModelNotFoundError",
-    "ModelRegistry",
 ]

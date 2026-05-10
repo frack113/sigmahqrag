@@ -17,8 +17,22 @@ EMBEDDINGS_DIR = MODELS_DIR / "embeddings"
 LOGS_DIR = BASE_DIR / "logs"
 PID_DIR = BASE_DIR / "pids"
 
-LLAMA_BIN_PATH = BIN_DIR / "llama-cpp"
-QDRANT_BIN_PATH = BIN_DIR / "qdrant"
+def get_llamacpp_bin_path() -> Path:
+    """Get Llama.cpp binary path from config or default."""
+    config = load_config()
+    llama_cfg = config.get("services", {}).get("llama", {})
+    if "binary_path" in llama_cfg:
+        return Path(llama_cfg["binary_path"])
+    return BIN_DIR / "llama-cpp"
+
+def get_qdrant_bin_path() -> Path:
+    """Get Qdrant binary path from config or default."""
+    config = load_config()
+    qdrant_cfg = config.get("services", {}).get("qdrant", {})
+    if "binary_path" in qdrant_cfg:
+        return Path(qdrant_cfg["binary_path"])
+    return BIN_DIR / "qdrant"
+
 QDRANT_STORAGE_DIR = BASE_DIR / "qdrant_storage"
 DATA_DIR = BASE_DIR
 
@@ -37,12 +51,16 @@ DEFAULT_CONFIG = {
         "llama": {
             "base_url": "http://127.0.0.1:8080",
             "model_name": None,
+            "binary_path": "data/bin/llamacpp",
         },
         "qdrant": {
             "host": "127.0.0.1",
             "port": 6333,
             "collection_name": "sigma_rules",
             "vector_size": 384,
+            "binary_path": "data/bin/qdrant",
+            "storage_path": "data/qdrant_storage/database",
+            "snapshots_path": "data/qdrant_storage/snapshots",
         },
     },
     "paths": {
@@ -77,7 +95,6 @@ def load_config() -> dict[str, Any]:
     Returns:
         Dict with configuration (merged with defaults)
     """
-    ensure_qdrant_config()
     config = DEFAULT_CONFIG.copy()
     toml_service = _get_toml_service()
     file_config = toml_service.load()
@@ -151,33 +168,8 @@ def _persist_config(config: dict[str, Any]) -> None:
     """Persist the updated configuration to the TOML file."""
     toml_service = _get_toml_service()
     toml_service.save(config)
+    load_config.cache_clear()
 
-
-def ensure_qdrant_config() -> None:
-    """Ensure qdrant.yaml exists and is updated based on sigmahqrag.toml."""
-    try:
-        # We use _get_toml_service().load() to avoid recursion with load_config()
-        toml_service = _get_toml_service()
-        file_config = toml_service.load() or {}
-
-        # Get qdrant config from loaded file, or use defaults if not present
-        qdrant_cfg = file_config.get("services", {}).get("qdrant", {})
-        if not qdrant_cfg and "services" in DEFAULT_CONFIG:
-            qdrant_cfg = DEFAULT_CONFIG["services"].get("qdrant", {})
-
-        host = qdrant_cfg.get("host", "127.0.0.1")
-        port = qdrant_cfg.get("port", 6333)
-
-        # Use absolute path for storage location to avoid ambiguity
-        storage_path = QDRANT_STORAGE_DIR.resolve().as_posix()
-
-        yaml_content = f'storage:\n  location: "{storage_path}"\nservice:\n  host: "{host}"\n  port: {port}\n'
-
-        config_path = Path("data/config/qdrant.yaml")
-        config_path.parent.mkdir(parents=True, exist_ok=True)
-        config_path.write_text(yaml_content)
-    except Exception as e:
-        logger.error(f"Failed to ensure qdrant.yaml: {e}")
 
 
 def get_llama_config() -> dict[str, Any]:

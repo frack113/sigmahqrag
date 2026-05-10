@@ -214,3 +214,41 @@ class SubprocessManager:
 
         except Exception as e:
             return f"Error reading log: {e}"
+
+    async def stop_all(self) -> dict[str, Any]:
+        """Stop all running services (called on app shutdown)."""
+        results = {}
+        service_names = list(self._processes.keys())
+
+        for name in service_names:
+            result = await self.stop_service(name)
+            results[name] = result
+
+        logger.info(f"Stopped all services: {list(service_names)}")
+        return results
+
+    def shutdown(self) -> None:
+        """Synchronous shutdown for all services (called atexit)."""
+        import signal
+
+        for name, proc_info in list(self._processes.items()):
+            try:
+                if proc_info.process and proc_info.process.poll() is None:
+                    proc_info.process.send_signal(
+                        signal.SIGTERM if os.name != "nt" else signal.CTRL_BREAK_EVENT
+                    )
+                    try:
+                        proc_info.process.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        proc_info.process.kill()
+
+                if proc_info.log_handle:
+                    try:
+                        proc_info.log_handle.close()
+                    except OSError:
+                        pass
+            except Exception as e:
+                logger.error(f"Error shutting down {name}: {e}")
+
+        self._processes.clear()
+        logger.info("All services shut down")

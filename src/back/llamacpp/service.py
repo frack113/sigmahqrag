@@ -7,13 +7,14 @@ from pathlib import Path
 from typing import Any
 
 from src.shared import LLAMA_BIN_PATH, LOGS_DIR, PID_DIR
-from src.shared.subprocess_manager import SubprocessManager
 
 logger = logging.getLogger(__name__)
 
-LLAMA_BIN = Path(LLAMA_BIN_PATH)
+LLAMA_BIN = Path(LLAMA_BIN_PATH())
 LOGS_DIR = Path(LOGS_DIR)
 PID_DIR = Path(PID_DIR)
+
+_llama_service: LlamaBinaryService | None = None
 
 
 class LlamaBinaryService:
@@ -24,12 +25,19 @@ class LlamaBinaryService:
         llama_bin: Path = LLAMA_BIN,
         logs_dir: Path = LOGS_DIR,
         pid_dir: Path = PID_DIR,
+        subprocess_manager=None,
     ) -> None:
         """Initialize LlamaBinaryService."""
         self.llama_bin = llama_bin
         self.logs_dir = logs_dir
         self.pid_dir = pid_dir
-        self._subprocess_manager = SubprocessManager(self.logs_dir, self.pid_dir)
+
+        if subprocess_manager is None:
+            from src.back.service_manager import get_subprocess_manager
+
+            subprocess_manager = get_subprocess_manager()
+
+        self._subprocess_manager = subprocess_manager
 
     async def start(
         self,
@@ -85,5 +93,8 @@ class LlamaBinaryService:
 
 
 def create_llama_service() -> LlamaBinaryService:
-    """Create a llama.cpp binary service manager."""
-    return LlamaBinaryService()
+    """Create or return cached llama service instance."""
+    global _llama_service
+    if _llama_service is None:
+        _llama_service = LlamaBinaryService()
+    return _llama_service

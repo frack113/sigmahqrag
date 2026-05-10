@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import pytest
 
-from src.back.backend.huggingface.download import HFDownloadService
-from src.back.backend.services.manager import (
+from src.back.llamacpp.vram import VRAMEstimator
+from src.back.models import (
+    HFDownloadService,
     LocalRegistry,
     ModelManager,
     ModelNotFoundError,
 )
-from src.back.llamacpp.vram import VRAMEstimator
 
 
 @pytest.fixture

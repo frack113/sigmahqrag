@@ -25,6 +25,12 @@ from src.api.v1.model import router as model_v1_router
 from src.api.v1.qdrant import router as qdrant_router
 from src.api.v1.search import router as search_v1_router
 from src.api.v1.system_prompt import router as prompts_v1_router
+from src.back.service_manager import get_subprocess_manager, shutdown_all_services
+
+
+def _get_subprocess_manager():
+    """Get or create the global subprocess manager."""
+    return get_subprocess_manager()
 
 
 @asynccontextmanager
@@ -32,6 +38,7 @@ async def lifespan(app: FastAPI) -> None:
     """Application lifespan handler."""
     _validate_services()
     yield
+    await shutdown_all_services()
 
 
 def _validate_services() -> None:

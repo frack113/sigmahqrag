@@ -100,3 +100,42 @@ async def get_logs(
 
         logger.error(f"Failed to read logs: {e}\n{traceback.format_exc()}")
         return JSONResponse(status_code=500, content={"error": str(e)})
+
+
+@router.delete("")
+async def clear_logs(
+    source: str = Query(
+        "", description="Log source to clear: system, llamacpp, qdrant"
+    ),
+) -> JSONResponse:
+    """Clear log file contents.
+
+    Args:
+        source: Log source (system, llamacpp, qdrant). Defaults to system.
+
+    Returns:
+        JSON with success status
+    """
+    from src.shared import load_config
+
+    if not source:
+        source = load_config().get("logging", {}).get("display_source", "system")
+
+    logs_dir = get_logs_dir()
+    log_filename = LOG_FILES.get(source, LOG_FILES["system"])
+    log_path = logs_dir / log_filename
+
+    try:
+        if log_path.exists():
+            with open(log_path, "w") as f:
+                f.write("")
+            logger.info(f"Cleared log file: {log_path}")
+            return JSONResponse(
+                content={"success": True, "message": f"Cleared {log_filename}"}
+            )
+        return JSONResponse(
+            content={"success": False, "message": "Log file does not exist"}
+        )
+    except Exception as e:
+        logger.error(f"Failed to clear logs: {e}")
+        return JSONResponse(status_code=500, content={"error": str(e)})
