@@ -2,7 +2,6 @@
 
 from functools import lru_cache
 
-from src.back.backend.github import RepositoryManager
 from src.back.backend.huggingface import EmbeddingManager
 from src.back.backend.services.manager import ModelManager
 
@@ -22,9 +21,3 @@ def get_model_manager() -> ModelManager:
     registry_path = MODELS_DIR / "registry.json"
     registry = LocalRegistry(registry_path)
     return ModelManager(registry=registry)
-
-
-@lru_cache
-def get_github_repo_manager() -> RepositoryManager:
-    """Get a singleton instance of the GitHub repository manager."""
-    return RepositoryManager(repos_dir="data/github")

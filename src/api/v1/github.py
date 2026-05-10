@@ -5,11 +5,17 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel, Field
 
-from src.api.dependencies import get_github_repo_manager
-from src.back.backend.github.repo import RepositoryManager
+from src.back.github.git import (
+    clone_repo,
+    delete_repo,
+    get_metadata,
+    list_repos,
+    save_metadata,
+    update_repo,
+)
 
 router = APIRouter(prefix="/api/v1/github", tags=["v1-github"])
 
@@ -41,30 +47,25 @@ class RepositoryStatus(BaseModel):
     branch: str | None = None
 
 
-def _run_clone_task(manager: RepositoryManager, url: str, org: str, name: str) -> None:
-    """Background task to clone repository."""
-    manager.clone(url=url, org=org, name=name)
-
-
-def _run_sync_task(
-    manager: RepositoryManager, org: str, name: str, branch: str
-) -> dict[str, Any]:
-    """Background task to sync repository."""
-    return manager.update(org=org, name=name, branch=branch)
+def _extract_org_name(url: str) -> tuple[str, str]:
+    """Extract org and name from URL."""
+    url = url.rstrip("/")
+    if url.endswith(".git"):
+        url = url[:-4]
+    parts = url.split("/")
+    if len(parts) < 2:
+        raise ValueError("Invalid URL format")
+    return parts[-2], parts[-1]
 
 
 @router.get("/repos", response_model=list[RepositoryStatus])
-async def list_repos(
-    manager: RepositoryManager = Depends(get_github_repo_manager),
-) -> list[RepositoryStatus]:
+async def list_repos_handler() -> list[RepositoryStatus]:
     """List all repositories."""
-    repos = manager.list_with_metadata()
+    repos = list_repos()
     result = []
     for repo in repos:
-        metadata = repo.get("metadata", {})
-        status_val = "synced"
-        if metadata.get("status"):
-            status_val = metadata["status"]
+        metadata = get_metadata(repo["org"], repo["name"]) or {}
+        status_val = metadata.get("status", "synced")
         result.append(
             RepositoryStatus(
                 org=repo["org"],
@@ -82,32 +83,21 @@ async def list_repos(
 async def add_repo(
     request: RepositoryAddRequest,
     background_tasks: BackgroundTasks = None,
-    manager: RepositoryManager = Depends(get_github_repo_manager),
 ) -> RepositoryResponse:
     """Add a new repository."""
-    url = request.url.rstrip("/")
-    if url.endswith(".git"):
-        url = url[:-4]
-    parts = url.split("/")
-    if len(parts) < 2:
-        return RepositoryResponse(
-            success=False,
-            error="Invalid URL format",
-        )
-    name = parts[-1]
-    org = parts[-2]
+    try:
+        org, name = _extract_org_name(request.url)
+    except ValueError:
+        return RepositoryResponse(success=False, error="Invalid URL format")
 
-    existing = manager.get_repo_path(org, name)
-    if existing:
-        return RepositoryResponse(
-            success=False,
-            error=f"Repository '{org}/{name}' already exists",
-        )
+    existing = list_repos()
+    if any(r["org"] == org and r["name"] == name for r in existing):
+        return RepositoryResponse(success=False, error=f"Repository '{org}/{name}' already exists")
 
     def clone_with_status() -> None:
-        result = manager.clone(url=request.url, org=org, name=name)
+        result = clone_repo(url=request.url, branch=request.branch)
         if result.get("success"):
-            manager.save_metadata(
+            save_metadata(
                 org,
                 name,
                 {
@@ -121,7 +111,7 @@ async def add_repo(
                 },
             )
         else:
-            manager.save_metadata(
+            save_metadata(
                 org,
                 name,
                 {
@@ -144,19 +134,13 @@ async def add_repo(
 
 
 @router.get("/repos/{org}/{name}", response_model=RepositoryStatus)
-async def get_repo(
-    org: str,
-    name: str,
-    manager: RepositoryManager = Depends(get_github_repo_manager),
-) -> RepositoryStatus:
+async def get_repo(org: str, name: str) -> RepositoryStatus:
     """Get repository details."""
-    repo_path = manager.get_repo_path(org, name)
-    if not repo_path:
-        raise HTTPException(
-            status_code=404, detail=f"Repository '{org}/{name}' not found"
-        )
+    repos = list_repos()
+    if not any(r["org"] == org and r["name"] == name for r in repos):
+        raise HTTPException(status_code=404, detail=f"Repository '{org}/{name}' not found")
 
-    metadata = manager.get_metadata(org, name) or {}
+    metadata = get_metadata(org, name) or {}
     return RepositoryStatus(
         org=org,
         name=name,
@@ -173,30 +157,21 @@ async def sync_repo(
     name: str,
     branch: str = "main",
     background_tasks: BackgroundTasks = None,
-    manager: RepositoryManager = Depends(get_github_repo_manager),
 ) -> RepositoryResponse:
     """Sync a repository."""
     if ".." in branch or branch.startswith("/") or branch.endswith("/"):
-        return RepositoryResponse(
-            success=False,
-            error="Invalid branch name",
-        )
+        return RepositoryResponse(success=False, error="Invalid branch name")
     if len(branch) > 255:
-        return RepositoryResponse(
-            success=False,
-            error="Branch name too long",
-        )
-    repo_path = manager.get_repo_path(org, name)
-    if not repo_path:
-        return RepositoryResponse(
-            success=False,
-            error=f"Repository '{org}/{name}' not found",
-        )
+        return RepositoryResponse(success=False, error="Branch name too long")
+
+    repos = list_repos()
+    if not any(r["org"] == org and r["name"] == name for r in repos):
+        return RepositoryResponse(success=False, error=f"Repository '{org}/{name}' not found")
 
     def sync_with_status() -> dict[str, Any]:
-        result = manager.update(org=org, name=name, branch=branch)
+        result = update_repo(org=org, name=name, branch=branch)
         if result.get("success"):
-            manager.save_metadata(
+            save_metadata(
                 org,
                 name,
                 {
@@ -216,40 +191,25 @@ async def sync_repo(
 
 
 @router.delete("/repos/{org}/{name}", response_model=RepositoryResponse)
-async def delete_repo(
+async def delete_repo_handler(
     org: str,
     name: str,
-    manager: RepositoryManager = Depends(get_github_repo_manager),
 ) -> RepositoryResponse:
     """Delete a repository."""
-    result = manager.delete(org, name)
+    result = delete_repo(org, name)
     if result.get("success"):
-        return RepositoryResponse(
-            success=True,
-            message=f"Repository '{org}/{name}' deleted",
-        )
-    return RepositoryResponse(
-        success=False,
-        error=result.get("error", "Delete failed"),
-    )
+        return RepositoryResponse(success=True, message=f"Repository '{org}/{name}' deleted")
+    return RepositoryResponse(success=False, error=result.get("error", "Delete failed"))
 
 
 @router.get("/repos/{org}/{name}/status", response_model=RepositoryStatus)
-async def get_repo_status(
-    org: str,
-    name: str,
-    manager: RepositoryManager = Depends(get_github_repo_manager),
-) -> RepositoryStatus:
+async def get_repo_status(org: str, name: str) -> RepositoryStatus:
     """Get repository status."""
-    repo_path = manager.get_repo_path(org, name)
-    if not repo_path:
-        return RepositoryStatus(
-            org=org,
-            name=name,
-            repo_status="error",
-        )
+    repos = list_repos()
+    if not any(r["org"] == org and r["name"] == name for r in repos):
+        return RepositoryStatus(org=org, name=name, repo_status="error")
 
-    metadata = manager.get_metadata(org, name) or {}
+    metadata = get_metadata(org, name) or {}
     return RepositoryStatus(
         org=org,
         name=name,
@@ -258,10 +218,3 @@ async def get_repo_status(
         url=metadata.get("url"),
         branch=metadata.get("branch"),
     )
-
-
-def get_github_repo_manager() -> RepositoryManager:
-    """Dependency to get repository manager."""
-    from src.api.dependencies import get_github_repo_manager as _get_manager
-
-    return _get_manager()
