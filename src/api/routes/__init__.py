@@ -1,10 +1,5 @@
 """API routes package."""
 
-from . import (  # noqa: F401
-    admin_github,
-    admin_prompts,
-    admin_service,
-    coverage,
-    explain,
-    search,
-)
+import src.api.routes.page_admin
+import src.api.routes.page_chat
+import src.api.routes.page_data

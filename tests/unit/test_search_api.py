@@ -66,7 +66,6 @@ class TestSearchAPI:
     async def test_search_timeout_raises_exception(self):
         """Test search timeout raises HTTPException."""
         from fastapi.exceptions import HTTPException
-
         from src.api.routes.search import search_rules
         from src.rag.search import SearchEngine
         from src.schemas.search import SearchRequest

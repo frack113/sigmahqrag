@@ -7,14 +7,20 @@
     <div class="card-header">
         <h3>System Logs</h3>
         <div class="logs-controls">
+            <select id="log-source">
+                <option value="system">System</option>
+                <option value="llamacpp">Llama.cpp</option>
+                <option value="qdrant">Qdrant</option>
+            </select>
             <select id="log-level">
                 <option value="">All Levels</option>
                 <option value="INFO">INFO</option>
                 <option value="WARNING">WARNING</option>
                 <option value="ERROR">ERROR</option>
             </select>
-            <input type="number" id="log-lines" value="100" min="10" max="500" class="form-control">
+            <input type="number" id="log-lines" value="" min="1" max="500" class="form-control" placeholder="25">
             <button onclick="loadLogs()" class="btn btn-primary">Load Logs</button>
+            <button onclick="clearLogs()" class="btn btn-secondary">Clear</button>
         </div>
     </div>
     <div class="card-body">
@@ -24,18 +30,36 @@
 
 <script>
 async function loadLogs() {
+    const source = document.getElementById('log-source').value;
     const level = document.getElementById('log-level').value;
     const lines = document.getElementById('log-lines').value;
-    const params = new URLSearchParams({lines});
+    const params = new URLSearchParams();
+    if (source) params.append('source', source);
     if (level) params.append('level', level);
+    if (lines) params.append('lines', lines);
 
     try {
-        const response = await fetch(`/api/v1/admin/logs?${params}`);
+        const response = await fetch(`/api/v1/logs?${params}`);
         const data = await response.json();
         document.getElementById('logs-output').textContent = 
             data.logs.map(l => l.text).join('\n') || 'No logs found';
     } catch (error) {
         console.error('Failed to load logs:', error);
+    }
+}
+
+async function clearLogs() {
+    const source = document.getElementById('log-source').value;
+    try {
+        const response = await fetch('/api/v1/logs?source=' + source, { method: 'DELETE' });
+        const data = await response.json();
+        if (data.success) {
+            document.getElementById('logs-output').textContent = '';
+        } else {
+            alert(data.message || 'Failed to clear logs');
+        }
+    } catch (error) {
+        console.error('Failed to clear logs:', error);
     }
 }
 

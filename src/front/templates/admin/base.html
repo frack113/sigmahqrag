@@ -1,51 +1,30 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Admin | SigmaHQ RAG{% endblock %}</title>
-    <link rel="stylesheet" href="/static/css/admin.css">
-</head>
-<body>
-    <div class="admin-layout">
-        <aside class="sidebar">
-            <div class="sidebar-header">
-                <h2>SigmaHQ RAG</h2>
-                <p>Admin Panel</p>
-            </div>
-            <nav class="sidebar-nav" id="sidebar-nav">
-                <a href="/admin" class="" id="nav-backend">
-                    <span class="status-dot" id="dot-backend"></span>
-                    Backend
-                </a>
-                <a href="/admin/models" class="" id="nav-models">
-                    <span class="status-dot" id="dot-models"></span>
-                    Models
-                </a>
+{# Admin section layout - extends shared layout #}
+{% extends "shared/layout.html" %}
 
-                <a href="/admin/logs" class="" id="nav-logs">
-                    <span class="status-dot" id="dot-logs"></span>
-                    Logs
-                </a>
-                <a href="/admin/prompts" class="" id="nav-prompts">
-                    <span class="status-dot" id="dot-prompts"></span>
-                    Prompts
-                </a>
-                <a href="/chat" class="nav-link">
-                    ← Back to Chat
-                </a>
-            </nav>
-        </aside>
+{% block title %}Admin - Sigmahqrag{% endblock %}
 
-        <main class="main-content">
-            <div id="global-status-bar" class="status-bar" style="display:none;"></div>
-            <header class="content-header">
-                <h1>{% block header %}Admin Dashboard{% endblock %}</h1>
-            </header>
-            {% block content %}{% endblock %}
-        </main>
-    </div>
-    <div class="toast-container" id="toast-container"></div>
-    <script src="/static/js/admin.js"></script>
-</body>
-</html>
+{% block styles %}
+{{ super() }}
+<link rel="stylesheet" href="{{ url_for('static', path='/css/data.css') }}">
+{% endblock %}
+
+{% block sidebar_title %}Admin{% endblock %}
+{% block sidebar_subtitle %}Panel{% endblock %}
+
+{% block sidebar_nav %}
+<a href="/admin" {% if request.url.path == '/admin' or request.url.path == '/admin/' %}class="active"{% endif %}>Overview</a>
+<a href="/admin/backend" {% if '/admin/backend' in request.url.path %}class="active"{% endif %}>Backend</a>
+<a href="/admin/models" {% if '/admin/models' in request.url.path %}class="active"{% endif %}>Models</a>
+<a href="/admin/system-prompts" {% if '/admin/system-prompts' in request.url.path %}class="active"{% endif %}>Prompts</a>
+<a href="/admin/logs" {% if '/admin/logs' in request.url.path %}class="active"{% endif %}>Logs</a>
+<div class="sidebar-footer">
+    <a href="/chat">← Chat</a>
+    <a href="/data">Data</a>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', path='/js/admin.js') }}"></script>
+{% endblock %}
+
+{% block content %}{% endblock %}

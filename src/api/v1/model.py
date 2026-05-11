@@ -7,8 +7,7 @@ import logging
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
-from src.core.backend.services.manager import ModelNotFoundError
-from src.core.types import HFRepo
+from src.back.models import HFRepo
 
 logger = logging.getLogger(__name__)
 
@@ -36,32 +35,33 @@ async def get_download_progress(repo_id: str) -> JSONResponse:
 @router.get("/llm/installed")
 async def list_installed_llm_models() -> JSONResponse:
     """List installed LLM models."""
-    from src.api.dependencies import get_model_manager
+    from src.api.dependencies import get_unified_registry
 
     try:
-        mm = get_model_manager()
-        await mm.registry.sync_with_folder()
-        models = await mm.list_installed_models()
-        return JSONResponse(
-            content={
-                "models": [
+        reg = get_unified_registry()
+        from src.shared import LLM_DIR
+
+        reg.sync_llm_folder(LLM_DIR)
+        llms = reg.list_llms()
+        models = []
+        for repo_id, data in llms.items():
+            files = []
+            for name, info in data.get("files", {}).items():
+                files.append(
                     {
-                        "repo_id": m.repo_id,
-                        "files": [
-                            {
-                                "filename": fn,
-                                "path": str(f.local_path),
-                                "size": f.file_size,
-                                "status": f.status if isinstance(f.status, str) else f.status.value,
-                            }
-                            for fn, f in m.files.items()
-                        ],
-                        "status": m.status if isinstance(m.status, str) else m.status.value,
+                        "filename": info.get("filename", name),
+                        "path": info.get("local_path", ""),
+                        "size": info.get("file_size", 0),
+                        "status": info.get("status", "ready"),
                     }
-                    for m in models
-                ]
-            }
-        )
+                )
+            models.append(
+                {
+                    "repo_id": repo_id,
+                    "files": files,
+                }
+            )
+        return JSONResponse(content={"models": models})
     except Exception as e:
         logger.error(f"Failed to list installed LLM models: {e}")
         return JSONResponse(status_code=500, content={"error": str(e)})
@@ -176,11 +176,23 @@ async def download_llm_model(
 @router.delete("/llm/{repo_id}/file/{filename}")
 async def delete_llm_model_file(repo_id: str, filename: str) -> JSONResponse:
     """Delete a LLM model file."""
-    from src.api.dependencies import get_model_manager
+    from pathlib import Path
+
+    from src.api.dependencies import get_unified_registry
+    from src.back.models.exceptions import ModelNotFoundError
 
     try:
-        mm = get_model_manager()
-        await mm.delete_model(repo_id, filename)
+        reg = get_unified_registry()
+        record = reg.get_llm(repo_id)
+        if not record:
+            raise ModelNotFoundError(f"Model {repo_id} not found")
+        if filename not in record.get("files", {}):
+            raise ModelNotFoundError(f"File {filename} not found in {repo_id}")
+        path = Path(record["files"][filename]["local_path"])
+        if path.exists():
+            path.unlink()
+        del record["files"][filename]
+        reg._save()
         return JSONResponse(
             content={"success": True, "repo_id": repo_id, "filename": filename}
         )
@@ -197,12 +209,15 @@ async def delete_llm_model_file(repo_id: str, filename: str) -> JSONResponse:
 @router.get("/embedding/installed")
 async def list_installed_embedding_models() -> JSONResponse:
     """List installed embedding models."""
-    from src.api.dependencies import get_embedding_manager
+    from src.api.dependencies import get_unified_registry
 
     try:
-        manager = get_embedding_manager()
-        models = await manager.list_installed()
-        return JSONResponse(content={"models": models})
+        reg = get_unified_registry()
+        from src.shared import EMBEDDINGS_DIR
+
+        reg.sync_embeddings_folder(EMBEDDINGS_DIR)
+        embeddings = reg.list_embeddings()
+        return JSONResponse(content={"models": embeddings})
     except Exception as e:
         logger.error(f"Failed to list installed embedding models: {e}")
         return JSONResponse(status_code=500, content={"error": str(e)})
@@ -211,7 +226,9 @@ async def list_installed_embedding_models() -> JSONResponse:
 @router.get("/embedding/progress/{repo_id}")
 async def get_embedding_progress(repo_id: str) -> JSONResponse:
     """Get embedding download progress."""
-    progress = _download_progress.get(f"emb_{repo_id}", {"progress": 0, "status": "idle"})
+    progress = _download_progress.get(
+        f"emb_{repo_id}", {"progress": 0, "status": "idle"}
+    )
     return JSONResponse(content=progress)
 
 
@@ -253,11 +270,25 @@ async def download_embedding_model(
 @router.delete("/embedding/{repo_id}")
 async def delete_embedding_model(repo_id: str) -> JSONResponse:
     """Delete an embedding model."""
-    from src.api.dependencies import get_embedding_manager
+    import shutil
+    from pathlib import Path
+
+    from src.api.dependencies import get_unified_registry
 
     try:
-        manager = get_embedding_manager()
-        await manager.delete_model(repo_id)
+        reg = get_unified_registry()
+        record = reg.get_embedding(repo_id)
+        if not record:
+            return JSONResponse(
+                status_code=404, content={"error": f"Model {repo_id} not found"}
+            )
+        path = Path(record.get("local_path", ""))
+        if path.exists():
+            if path.is_dir():
+                shutil.rmtree(path)
+            else:
+                path.unlink()
+        reg.remove_embedding(repo_id)
         return JSONResponse(content={"success": True, "repo_id": repo_id})
     except Exception as e:
         logger.error(f"Delete failed: {e}")

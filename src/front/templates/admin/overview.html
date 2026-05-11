@@ -1,0 +1,29 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Overview - Admin{% endblock %}
+
+{% block content %}
+<h1>Admin Overview</h1>
+<p>System status and quick actions.</p>
+
+<div class="admin-overview">
+    <div class="data-cards">
+        <a href="/admin/backend" class="data-card">
+            <h3>Backend</h3>
+            <p>System configuration and settings.</p>
+        </a>
+        <a href="/admin/models" class="data-card">
+            <h3>Models</h3>
+            <p>Manage installed models.</p>
+        </a>
+        <a href="/admin/system-prompts" class="data-card">
+            <h3>Prompts</h3>
+            <p>Manage AI prompts.</p>
+        </a>
+        <a href="/admin/logs" class="data-card">
+            <h3>Logs</h3>
+            <p>View system logs.</p>
+        </a>
+    </div>
+</div>
+{% endblock %}

@@ -7,9 +7,9 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
+from src.api.routes.admin_service import _get_status_display
 
 from src.core.health import ServiceHealth, ServiceStatus
-from src.api.routes.admin_service import _get_status_display
 
 
 @pytest.fixture

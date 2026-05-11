@@ -1,0 +1,53 @@
+{# Shared layout for all app pages #}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Sigmahqrag{% endblock %}</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', path='/favicon.ico') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/main.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/_shared-layout.css') }}">
+    {% block styles %}{% endblock %}
+</head>
+<body>
+    {# Global header #}
+    <header>
+        <h1>Sigmahqrag</h1>
+        <nav aria-label="Main navigation">
+            <ul>
+                <li><a href="/chat" {% if request.url.path == '/chat' or request.url.path == '/' %}class="active"{% endif %}>Chat</a></li>
+                <li><a href="/data" {% if '/data' in request.url.path %}class="active"{% endif %}>Data</a></li>
+                <li><a href="/admin" {% if '/admin' in request.url.path %}class="active"{% endif %}>Admin</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    {# Page-specific sidebar layout #}
+    <div class="app-layout">
+        {# Page sidebar (defaut: override in child templates) #}
+        <aside class="app-sidebar">
+            {% block sidebar %}
+            <div class="sidebar-header">
+                <h2>{% block sidebar_title %}Menu{% endblock %}</h2>
+                <p>{% block sidebar_subtitle %}{% endblock %}</p>
+            </div>
+            <nav class="sidebar-nav">
+                {% block sidebar_nav %}{% endblock %}
+            </nav>
+            {% endblock %}
+        </aside>
+
+        {# Main content #}
+        <main class="app-content">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+
+    <footer>
+        <p>&copy; 2026 Sigmahqrag - Local RAG for Sigma Rules</p>
+    </footer>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

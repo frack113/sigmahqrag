@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Sigmahqrag{% endblock %}</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', path='/favicon.ico') }}">
     <link rel="stylesheet" href="{{ url_for('static', path='/css/main.css') }}">
     {% block styles %}{% endblock %}
 </head>
@@ -13,6 +14,7 @@
         <nav aria-label="Main navigation">
             <ul>
                 <li><a href="/chat" {% if request.url.path == '/chat' or request.url.path == '/' %}class="active"{% endif %}>Chat</a></li>
+                <li><a href="/data" {% if '/data' in request.url.path %}class="active"{% endif %}>Data</a></li>
                 <li><a href="/admin" {% if '/admin' in request.url.path %}class="active"{% endif %}>Admin</a></li>
             </ul>
         </nav>

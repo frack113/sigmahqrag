@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 
 def test_llm_client_init():
     """Test LLM client can be instantiated."""

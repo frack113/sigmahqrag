@@ -10,7 +10,7 @@ from fastapi import APIRouter, Header
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from src.config import load_config
+from src.shared import load_config
 
 logger = logging.getLogger(__name__)
 
@@ -53,41 +53,52 @@ async def check_service_health() -> dict[str, Any]:
 
     from httpx import AsyncClient
 
+    from src.shared import get_llamacpp_version, get_qdrant_version, load_config
+
+    llama_version = get_llamacpp_version() or "Not installed"
+    qdrant_version = get_qdrant_version() or "Not installed"
+
+    config = load_config().get("services", {})
+    llama_port = config.get("llama", {}).get("port", 8080)
+    qdrant_port = config.get("qdrant", {}).get("port", 6333)
+
     result: dict[str, Any] = {
-        "llama_cpp": {"status": "unknown", "component": "llama.cpp", "port": 8080},
-        "qdrant": {"status": "unknown", "component": "qdrant", "port": 6333},
+        "llama_cpp": {
+            "status": "unknown",
+            "component": "llama.cpp",
+            "port": llama_port,
+            "version": llama_version,
+        },
+        "qdrant": {
+            "status": "unknown",
+            "component": "qdrant",
+            "port": qdrant_port,
+            "version": qdrant_version,
+        },
     }
 
     async with AsyncClient() as client:
-        # Parallel health checks to meet <500ms requirement (AC3)
-        import asyncio
-
-        llama_url = "http://localhost:8080/health"  # TODO Growth: from config
-        qdrant_url = "http://localhost:6333/health"  # TODO Growth: from config
 
         async def check_llama():
             try:
-                response = await client.get(llama_url, timeout=2.0)
+                response = await client.get(
+                    f"http://localhost:{llama_port}/health", timeout=2.0
+                )
                 if (
                     response.status_code == 200
                     and response.json().get("status") == "healthy"
                 ):
                     result["llama_cpp"]["status"] = "active"
-                else:
-                    result["llama_cpp"]["status"] = "inactive"
             except Exception:
                 result["llama_cpp"]["status"] = "inactive"
 
         async def check_qdrant():
             try:
-                response = await client.get(qdrant_url, timeout=2.0)
-                if (
-                    response.status_code == 200
-                    and response.json().get("status") == "healthy"
-                ):
+                response = await client.get(
+                    f"http://localhost:{qdrant_port}/readyz", timeout=2.0
+                )
+                if response.status_code == 200:
                     result["qdrant"]["status"] = "active"
-                else:
-                    result["qdrant"]["status"] = "inactive"
             except Exception:
                 result["qdrant"]["status"] = "inactive"
 
@@ -96,11 +107,99 @@ async def check_service_health() -> dict[str, Any]:
     return result
 
 
-class DownloadRequest(BaseModel):
-    """Request model for download action (Patch 13: Pydantic model)."""
+@router.get("/backend")
+async def get_backend() -> JSONResponse:
+    """GET /api/v1/admin/backend - Return backend status and config."""
+    try:
+        health = await check_service_health()
+        config = load_config()
+        data = {
+            "services": health,
+            "config": config,
+        }
+        return JSONResponse(content={"data": data, "status": "success"})
+    except Exception as e:
+        logger.error(f"Backend status error: {e}")
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
-    repo_url: str | None = None
-    target_dir: str | None = None
+
+@router.post("/backend")
+async def post_backend(request: dict) -> JSONResponse:
+    """POST /api/v1/admin/backend - Start/stop services."""
+    try:
+        action = request.get("action")
+        service = request.get("service")
+
+        if action == "start":
+            if service == "llama":
+                from pathlib import Path
+
+                from src.shared import LLM_DIR
+
+                # Find any available model
+                models = list(Path(LLM_DIR).rglob("*.gguf")) if LLM_DIR.exists() else []
+                model_path = str(models[0]) if models else None
+
+                if not model_path:
+                    return JSONResponse(
+                        content={
+                            "data": {
+                                "success": False,
+                                "error": "No model found in models/llm",
+                            },
+                            "status": "error",
+                        }
+                    )
+
+                from src.back.llamacpp.service import create_llama_service
+
+                service_manager = create_llama_service()
+                result = await service_manager.start(
+                    model_path=model_path, port=8080, context_size=4096
+                )
+
+            elif service == "qdrant":
+                from src.back.qdrant.service import create_qdrant_service
+
+                service_manager = create_qdrant_service()
+                result = await service_manager.start()
+            else:
+                result = {"success": False, "error": f"Unknown service: {service}"}
+
+        elif action == "stop":
+            if service == "llama":
+                from src.back.llamacpp.service import create_llama_service
+
+                service_manager = create_llama_service()
+                result = await service_manager.stop()
+            elif service == "qdrant":
+                from src.back.qdrant.service import create_qdrant_service
+
+                service_manager = create_qdrant_service()
+                result = await service_manager.stop()
+            else:
+                result = {"success": False, "error": f"Unknown service: {service}"}
+
+        else:
+            result = {"success": False, "error": f"Unknown action: {action}"}
+
+        return JSONResponse(
+            content={
+                "data": result,
+                "status": "success" if result.get("success") else "error",
+            }
+        )
+    except Exception as e:
+        logger.error(f"Backend action error: {e}")
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+
+class DownloadRequest(BaseModel):
+    """Request model for download action."""
+
+    action: str | None = "install"
+    service: str | None = "qdrant"
+    target: str | None = None
 
 
 class CancelRequest(BaseModel):
@@ -116,11 +215,55 @@ class JobResponse(BaseModel):
     status: str
 
 
-def start_download() -> dict[str, Any]:
-    """Start download action and return job info (Patch 20: remove unnecessary async)."""
+async def start_download(service: str = None, target: str = None) -> dict[str, Any]:
+    """Start download action and return job info."""
     import uuid
 
-    return {"job_id": f"job-{uuid.uuid4().hex[:8]}", "status": "started"}
+    from src.back.qdrant.downloader import (
+        QDRANT_BINARY_VERSION,
+        QDRANT_UI_VERSION,
+        create_qdrant_installer,
+    )
+
+    target_service = service or "qdrant"
+    target_component = target or "all"
+
+    job_id = f"job-{uuid.uuid4().hex[:8]}"
+
+    if target_service == "qdrant":
+        installer = create_qdrant_installer()
+
+        binary_result = {"success": False, "error": "skipped (binary running)"}
+        ui_result = {"success": False, "error": "skipped"}
+
+        if target_component in ("binary", "all"):
+            binary_result = await installer.download_binary()
+
+        if target_component in ("web_ui", "all"):
+            ui_result = await installer.download_web_ui()
+
+        all_success = binary_result.get("success") and ui_result.get("success")
+        any_success = binary_result.get("success") or ui_result.get("success")
+
+        return {
+            "job_id": job_id,
+            "status": (
+                "completed" if all_success else ("partial" if any_success else "failed")
+            ),
+            "service": target_service,
+            "binary_version": (
+                QDRANT_BINARY_VERSION if binary_result.get("success") else None
+            ),
+            "ui_version": QDRANT_UI_VERSION if ui_result.get("success") else None,
+            "binary_error": (
+                binary_result.get("error") if not binary_result.get("success") else None
+            ),
+            "ui_error": (
+                ui_result.get("error") if not ui_result.get("success") else None
+            ),
+        }
+
+    return {"job_id": job_id, "status": "started", "service": target_service}
 
 
 def _build_error_response(
@@ -145,61 +288,28 @@ async def download_action(
     request: DownloadRequest | None = None,
     x_idempotency_key: str | None = Header(default=None, alias="X-Idempotency-Key"),
 ) -> JSONResponse:
-    """POST /api/v1/admin/download - Action-based endpoint (FR16, FR20, NFR20).
+    """POST /api/v1/admin/download - Download/update services."""
+    service = request.service if request else "qdrant"
+    target = request.target if request else "all"
 
-    Supports idempotency via X-Idempotency-Key header.
-    Returns 503 if llama.cpp or Qdrant is down (FR17, NFR9, NFR10).
-    """
-    # Patch 11: Validate idempotency key
     if _is_valid_idempotency_key(x_idempotency_key):
         _cleanup_expired_entries()
-        # Patch 10: Namespace per endpoint
         cache_key = f"download:{x_idempotency_key}"
         if cache_key in _idempotency_store:
             cached_content, _, _ = _idempotency_store[cache_key]
             return JSONResponse(content=cached_content)
 
-    # Health check (fail-fast pattern)
-    health = await check_service_health()
+    result = await start_download(service=service, target=target)
 
-    if health["llama_cpp"]["status"] != "active":
-        response = _build_error_response(
-            status_code=503,
-            error_type="service_unavailable",
-            message="llama.cpp is not responding on port 8080",
-            component="llama.cpp",
-        )
-        # Patch 4: Cache error responses too
-        if _is_valid_idempotency_key(x_idempotency_key):
-            _idempotency_store[f"download:{x_idempotency_key}"] = (
-                response.content,
-                time.time(),
-                "download",
-            )
-        return response
+    response_content = {
+        "data": result,
+        "status": (
+            "success"
+            if result.get("status") == "completed"
+            else result.get("status", "success")
+        ),
+    }
 
-    if health["qdrant"]["status"] != "active":
-        response = _build_error_response(
-            status_code=503,
-            error_type="service_unavailable",
-            message="Qdrant is not responding on port 6333",
-            component="qdrant",
-        )
-        # Patch 4: Cache error responses too
-        if _is_valid_idempotency_key(x_idempotency_key):
-            _idempotency_store[f"download:{x_idempotency_key}"] = (
-                response.content,
-                time.time(),
-                "download",
-            )
-        return response
-
-    # Process download action
-    result = await start_download()
-
-    response_content = {"data": result, "status": "success"}
-
-    # Patch 2,5: Store idempotency result with timestamp
     if _is_valid_idempotency_key(x_idempotency_key):
         _idempotency_store[f"download:{x_idempotency_key}"] = (
             response_content,
@@ -282,21 +392,22 @@ async def cancel_action(
 @router.get("/models")
 async def get_models() -> JSONResponse:
     """GET /api/v1/admin/models - Return installed models list."""
-    from src.api.dependencies import get_model_manager
+    from src.api.dependencies import get_unified_registry
+    from src.shared import LLM_DIR
 
     try:
-        mm = get_model_manager()
-        models = await mm.list_installed_models()
+        reg = get_unified_registry()
+        reg.sync_llm_folder(LLM_DIR)
+        llms = reg.list_llms()
 
         model_list = []
-        for m in models:
-            for filename, f in m.files.items():
+        for repo_id, data in llms.items():
+            for filename, info in data.get("files", {}).items():
                 model_list.append(
                     {
-                        "repo_id": m.repo_id,
-                        "filename": filename,
-                        "size_mb": f.file_size / (1024 * 1024) if f.file_size else 0,
-                        "status": m.status.value,
+                        "repo_id": repo_id,
+                        "filename": info.get("filename", filename),
+                        "size_mb": (info.get("file_size", 0) or 0) / (1024 * 1024),
                     }
                 )
 
@@ -314,10 +425,13 @@ async def get_models() -> JSONResponse:
 @router.post("/models/delete")
 async def delete_model(request: dict) -> JSONResponse:
     """POST /api/v1/admin/models/delete - Delete a model."""
-    from src.api.dependencies import get_model_manager
-    from src.core.backend.services.manager import ModelNotFoundError
+    from pathlib import Path
+
+    from src.api.dependencies import get_unified_registry
+    from src.back.models import ModelNotFoundError
 
     try:
+        reg = get_unified_registry()
         repo_id = request.get("repo_id")
         filename = request.get("filename")
 
@@ -327,8 +441,16 @@ async def delete_model(request: dict) -> JSONResponse:
                 content={"status": "error", "error": "repo_id and filename required"},
             )
 
-        mm = get_model_manager()
-        await mm.delete_model(repo_id, filename)
+        record = reg.get_llm(repo_id)
+        if not record:
+            raise ModelNotFoundError(f"Model {repo_id} not found")
+        if filename not in record.get("files", {}):
+            raise ModelNotFoundError(f"File {filename} not found in {repo_id}")
+        path = Path(record["files"][filename]["local_path"])
+        if path.exists():
+            path.unlink()
+        del record["files"][filename]
+        reg._save()
 
         return JSONResponse(
             content={"status": "success", "message": f"Deleted {repo_id}/{filename}"}

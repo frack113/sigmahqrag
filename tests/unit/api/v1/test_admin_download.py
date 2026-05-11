@@ -28,29 +28,33 @@ def client(app: FastAPI) -> TestClient:
 class TestPostAdminDownload:
     """Test POST /api/v1/admin/download endpoint."""
 
+    @patch("src.api.v1.qdrant.create_download_manager")
     @patch("src.api.v1.admin.check_service_health", new_callable=AsyncMock)
-    @patch("src.api.v1.admin.start_download", new_callable=AsyncMock)
-    def test_download_returns_200_with_job_id(
-        self, mock_start: AsyncMock, mock_health: AsyncMock, client: TestClient
+    def test_qdrant_download_returns_200_with_job_id(
+        self, mock_health: AsyncMock, mock_dm: AsyncMock, client: TestClient
     ) -> None:
-        """Given frontend needs to download repos, when POST /api/v1/admin/download called, then returns 200 with job_id (FR16)."""
-        mock_start.return_value = {"job_id": "job-123", "status": "started"}
+        """Given frontend needs to download repos, when POST /api/v1/qdrant called, then returns 200 with job_id (FR16)."""
         mock_health.return_value = {
             "llama_cpp": {"status": "active", "component": "llama.cpp"},
             "qdrant": {"status": "active", "component": "qdrant"},
         }
 
+        # Mocking the download manager to return a dummy stream
+        mock_manager = AsyncMock()
+        mock_dm.return_value = mock_manager
+
+        payload = {"action": "download_update", "payload": {"version": "latest"}}
+
         response = client.post(
-            "/api/v1/admin/download",
-            json={},
+            "/api/v1/qdrant",
+            json=payload,
             headers={"X-Idempotency-Key": "key-1"},
         )
 
         assert response.status_code == 200
         data = response.json()
-        assert "data" in data
-        assert "job_id" in data["data"]
-        assert data["data"]["status"] == "started"
+        assert "success" in data["status"]
+        assert "Download initiated" in data["message"]
 
     @patch("src.api.v1.admin.check_service_health", new_callable=AsyncMock)
     @patch("src.api.v1.admin.start_download", new_callable=AsyncMock)

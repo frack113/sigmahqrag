@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
 from src.core.services.rag_pipeline import RAGPipeline
 
 

@@ -193,7 +193,7 @@ function updateLlama() {
 }
 
 function startLlama() {
-    fetch('/admin/services/?action=start&service=llama', {
+    fetch('/api/v1/llamacpp/start', {
         method: 'POST'
     })
     .then(r => r.json())
@@ -205,7 +205,7 @@ function startLlama() {
 }
 
 function stopLlama() {
-    fetch('/admin/services/?action=stop&service=llama', {
+    fetch('/api/v1/llamacpp/stop', {
         method: 'POST'
     })
     .then(r => r.json())

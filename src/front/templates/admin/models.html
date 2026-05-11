@@ -68,8 +68,8 @@ function loadModels() {
             models.forEach(m => {
                 for (const [filename, f] of Object.entries(m.files)) {
                     html += `<tr>
-                        <td>${m.repo_id}/${filename}</td>
-                        <td>${Math.round(f.size / 1024 / 1024)}MB</td>
+                        <td>${f.filename || filename}</td>
+                        <td>${Math.round((f.file_size || f.size || 0) / 1024 / 1024)}MB</td>
                         <td><button class="btn btn-danger btn-sm" onclick="deleteModel('${m.repo_id}', '${filename}')">Delete</button></td>
                     </tr>`;
                 }
@@ -85,7 +85,8 @@ function loadModels() {
     fetch('/api/v1/model/embedding/installed')
         .then(r => r.json())
         .then(data => {
-            const models = data.models || [];
+            const modelsObj = data.models || {};
+            const models = Array.isArray(modelsObj) ? modelsObj : Object.entries(modelsObj).map(([repo_id, info]) => ({repo_id, ...info}));
             if (models.length === 0) {
                 document.getElementById('embedding-models').innerHTML = '<p>No embedding models installed.</p>';
                 return;
@@ -101,6 +102,7 @@ function loadModels() {
             document.getElementById('embedding-models').innerHTML = html;
         })
         .catch(err => {
+            console.error('Embeddings load error:', err);
             document.getElementById('embedding-models').innerHTML = '<p class="error">Failed to load embeddings</p>';
         });
 }
@@ -180,7 +182,13 @@ function downloadModel() {
     // Start polling for progress
     const progressInterval = setInterval(() => {
         fetch(`${basePath}/progress/${encodeURIComponent(repoId)}`)
-            .then(r => r.json())
+            .then(r => {
+                if (!r.ok) {
+                    console.error('Progress endpoint error:', r.status);
+                    return {progress: 0, status: 'error'};
+                }
+                return r.json();
+            })
             .then(data => {
                 const progress = data.progress || 0;
                 document.getElementById('download-progress').value = progress;
@@ -191,21 +199,14 @@ function downloadModel() {
                     setTimeout(loadModels, 2000);
                 }
             })
-            .catch(() => {});
+            .catch(err => console.error('Progress poll error:', err));
     }, 2000);
 
     fetch(url, { method: 'POST' })
     .then(r => r.json())
     .then(data => {
-        clearInterval(progressInterval);
-        document.getElementById('download-progress').value = 100;
-        if (data.success) {
-            document.getElementById('progress-text').textContent = 'Download complete!';
-            setTimeout(() => {
-                document.getElementById('progress-container').style.display = 'none';
-            }, 3000);
-            setTimeout(loadModels, 2000);
-        } else {
+        if (!data.success) {
+            clearInterval(progressInterval);
             document.getElementById('progress-text').textContent = 'Download failed: ' + data.error;
         }
     })

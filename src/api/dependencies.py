@@ -2,28 +2,17 @@
 
 from functools import lru_cache
 
-from src.core.backend.github import RepositoryManager
-from src.core.backend.huggingface import EmbeddingManager
-from src.core.backend.services.manager import ModelManager
+from src.back.models import EmbeddingManager
+from src.back.models.registry import UnifiedRegistry
 
 
 @lru_cache
 def get_embedding_manager() -> EmbeddingManager:
-    """Get a singleton instance of the embedding manager."""
     return EmbeddingManager()
 
 
 @lru_cache
-def get_model_manager() -> ModelManager:
-    """Get a singleton instance of the model manager."""
-    from src.config import MODELS_DIR
-    from src.core.backend.services.registry import LocalRegistry
-    registry_path = MODELS_DIR / "registry.json"
-    registry = LocalRegistry(registry_path)
-    return ModelManager(registry=registry)
+def get_unified_registry() -> UnifiedRegistry:
+    from pathlib import Path
 
-
-@lru_cache
-def get_github_repo_manager() -> RepositoryManager:
-    """Get a singleton instance of the GitHub repository manager."""
-    return RepositoryManager(repos_dir="data/github")
+    return UnifiedRegistry(Path("data/models/registry.json"))

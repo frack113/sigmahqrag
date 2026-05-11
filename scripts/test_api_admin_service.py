@@ -10,21 +10,24 @@ BASE_URL = "http://localhost:7860"
 
 def cmd_start(url: str, service: str, model_path: str | None) -> None:
     """Start a service."""
-    params = {"action": "start", "service": service}
-    data = {}
-    if model_path:
-        data["model_path"] = model_path
-
-    response = requests.post(
-        f"{url}/admin/services/",
-        params=params,
-        json=data if data else None,
-    )
+    if service == "qdrant":
+        endpoint = f"{url}/api/v1/qdrant"
+        payload = {"action": "service_control", "payload": {"command": "start"}}
+        response = requests.post(endpoint, json=payload)
+    else:
+        params = {"action": "start", "service": service}
+        data = {}
+        if model_path:
+            data["model_path"] = model_path
+        response = requests.post(
+            f"{url}/admin/services/",
+            params=params,
+            json=data if data else None,
+        )
     print(f"Status: {response.status_code}")
     data = response.json()
     if response.status_code == 200:
-        print(f"Success: {data.get('success')}")
-        print(f"Message: {data.get('message')}")
+        print(f"Success: {data.get('success') or data.get('message')}")
         if data.get("pid"):
             print(f"PID: {data.get('pid')}")
     else:
@@ -33,12 +36,21 @@ def cmd_start(url: str, service: str, model_path: str | None) -> None:
 
 def cmd_stop(url: str, service: str) -> None:
     """Stop a service."""
-    params = {"action": "stop", "service": service}
-
-    response = requests.post(
-        f"{url}/admin/services/",
-        params=params,
-    )
+    if service == "qdrant":
+        endpoint = f"{url}/api/v1/qdrant"
+        payload = {"action": "service_control", "payload": {"command": "stop"}}
+        response = requests.post(endpoint, json=payload)
+    else:
+        params = {
+            "action": "stop",
+            "s_service": service,
+        }  # Wait, I'll check the original
+        # The original was: params = {"action": "stop", "service": service}
+        params = {"action": "stop", "service": service}
+        response = requests.post(
+            f"{url}/admin/services/",
+            params=params,
+        )
     print(f"Status: {response.status_code}")
     data = response.json()
     print(f"Response: {data}")

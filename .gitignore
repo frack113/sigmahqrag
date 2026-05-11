@@ -50,4 +50,8 @@ logs/
 *.log
 *.tmp
 
+# Some bug I don't understand causes this file to be created at startup, we can ignore it
 workflow.md
+
+# qdrant created the file at startup, we can ignore it
+.qdrant-initialized

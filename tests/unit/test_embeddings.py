@@ -1,7 +1,5 @@
 """Tests for embeddings service."""
 
-import pytest
-
 
 class TestGetEmbeddingModel:
     """Test getting embedding model."""
