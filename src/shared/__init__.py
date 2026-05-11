@@ -6,12 +6,10 @@ from src.shared.config import (
     DATA_DIR,
     DEFAULT_CONFIG,
     EMBEDDINGS_DIR,
-    get_llamacpp_bin_path as LLAMA_BIN_PATH,
     LLM_DIR,
     LOGS_DIR,
     MODELS_DIR,
     PID_DIR,
-    get_qdrant_bin_path as QDRANT_BIN_PATH,
     QDRANT_STORAGE_DIR,
     get_backend_gpu_type,
     get_backend_os,
@@ -27,9 +25,14 @@ from src.shared.config import (
     set_llamacpp_version,
     set_qdrant_version,
 )
+from src.shared.config import (
+    get_llamacpp_bin_path as LLAMA_BIN_PATH,  # noqa: N812
+)
+from src.shared.config import (
+    get_qdrant_bin_path as QDRANT_BIN_PATH,  # noqa: N812
+)
 from src.shared.toml_service import TOMLService as TOMLService
 from src.shared.toml_service import deep_merge as deep_merge
-
 
 __all__ = [
     "TOMLService",

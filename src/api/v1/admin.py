@@ -81,7 +81,9 @@ async def check_service_health() -> dict[str, Any]:
 
         async def check_llama():
             try:
-                response = await client.get(f"http://localhost:{llama_port}/health", timeout=2.0)
+                response = await client.get(
+                    f"http://localhost:{llama_port}/health", timeout=2.0
+                )
                 if (
                     response.status_code == 200
                     and response.json().get("status") == "healthy"
@@ -92,7 +94,9 @@ async def check_service_health() -> dict[str, Any]:
 
         async def check_qdrant():
             try:
-                response = await client.get(f"http://localhost:{qdrant_port}/readyz", timeout=2.0)
+                response = await client.get(
+                    f"http://localhost:{qdrant_port}/readyz", timeout=2.0
+                )
                 if response.status_code == 200:
                     result["qdrant"]["status"] = "active"
             except Exception:
@@ -243,12 +247,20 @@ async def start_download(service: str = None, target: str = None) -> dict[str, A
 
         return {
             "job_id": job_id,
-            "status": "completed" if all_success else ("partial" if any_success else "failed"),
+            "status": (
+                "completed" if all_success else ("partial" if any_success else "failed")
+            ),
             "service": target_service,
-            "binary_version": QDRANT_BINARY_VERSION if binary_result.get("success") else None,
+            "binary_version": (
+                QDRANT_BINARY_VERSION if binary_result.get("success") else None
+            ),
             "ui_version": QDRANT_UI_VERSION if ui_result.get("success") else None,
-            "binary_error": binary_result.get("error") if not binary_result.get("success") else None,
-            "ui_error": ui_result.get("error") if not ui_result.get("success") else None,
+            "binary_error": (
+                binary_result.get("error") if not binary_result.get("success") else None
+            ),
+            "ui_error": (
+                ui_result.get("error") if not ui_result.get("success") else None
+            ),
         }
 
     return {"job_id": job_id, "status": "started", "service": target_service}
@@ -291,7 +303,11 @@ async def download_action(
 
     response_content = {
         "data": result,
-        "status": "success" if result.get("status") == "completed" else result.get("status", "success"),
+        "status": (
+            "success"
+            if result.get("status") == "completed"
+            else result.get("status", "success")
+        ),
     }
 
     if _is_valid_idempotency_key(x_idempotency_key):

@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import logging
 import os
+import signal
 import subprocess
+from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -20,6 +22,7 @@ class ServiceProcess:
     process: subprocess.Popen[str] | None = None
     pid: int | None = None
     log_file: Path | None = None
+    pid_file: Path | None = None
     log_handle: Any = None
     is_running: bool = False
 
@@ -76,6 +79,72 @@ class SubprocessManager:
         except (OSError, ProcessLookupError):
             return False
 
+    def is_healthy(self, name: str) -> bool:
+        """Check if a service process is healthy (running).
+
+        Args:
+            name: Service name
+
+        Returns:
+            True if service is running
+        """
+        if name not in self._processes:
+            return False
+
+        proc_info = self._processes[name]
+        if not proc_info.is_running or proc_info.pid is None:
+            return False
+
+        return self._is_process_running(proc_info.pid)
+
+    async def get_status(self, name: str) -> dict[str, Any]:
+        """Get detailed status of a service.
+
+        Args:
+            name: Service name
+
+        Returns:
+            Dict with service status
+        """
+        is_healthy = self.is_healthy(name)
+        proc_info = self._processes.get(name)
+
+        return {
+            "name": name,
+            "running": is_healthy,
+            "pid": proc_info.pid if proc_info else None,
+            "log_file": (
+                str(proc_info.log_file) if proc_info and proc_info.log_file else None
+            ),
+        }
+
+    async def restart_service(
+        self,
+        name: str,
+        cmd: list[str],
+        log_file: Path,
+        pid_file: Path,
+    ) -> dict[str, Any]:
+        """Restart a crashed service.
+
+        Args:
+            name: Service name
+            cmd: Command to run
+            log_file: Path to log file
+            pid_file: Path to PID file
+
+        Returns:
+            Dict with restart status
+        """
+        if name in self._processes:
+            logger.warning(
+                f"Service {name} is still tracked as running, stopping first."
+            )
+            await self.stop_service(name)
+
+        pid_file.unlink(missing_ok=True)
+        return await self.start_service(name, cmd, log_file, pid_file)
+
     async def start_service(
         self,
         name: str,
@@ -125,6 +194,7 @@ class SubprocessManager:
                 process=process,
                 pid=process.pid,
                 log_file=log_file,
+                pid_file=pid_file,
                 log_handle=log_handle,
                 is_running=True,
             )
@@ -185,6 +255,11 @@ class SubprocessManager:
 
         except Exception as e:
             logger.error(f"Failed to stop {name}: {e}")
+            try:
+                if process_info.pid_file:
+                    process_info.pid_file.unlink(missing_ok=True)
+            except OSError:
+                pass
             return {"success": False, "error": str(e)}
 
     def get_logs(self, name: str, lines: int = 50) -> str:
@@ -208,8 +283,7 @@ class SubprocessManager:
 
         try:
             with open(log_file, encoding="utf-8") as f:
-                all_lines = f.readlines()
-                recent = all_lines[-lines:]
+                recent = deque(f, maxlen=lines)
                 return "".join(recent)
 
         except Exception as e:
@@ -229,8 +303,6 @@ class SubprocessManager:
 
     def shutdown(self) -> None:
         """Synchronous shutdown for all services (called atexit)."""
-        import signal
-
         for name, proc_info in list(self._processes.items()):
             try:
                 if proc_info.process and proc_info.process.poll() is None:
@@ -245,6 +317,12 @@ class SubprocessManager:
                 if proc_info.log_handle:
                     try:
                         proc_info.log_handle.close()
+                    except OSError:
+                        pass
+
+                if proc_info.pid_file:
+                    try:
+                        proc_info.pid_file.unlink(missing_ok=True)
                     except OSError:
                         pass
             except Exception as e:

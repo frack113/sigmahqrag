@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
+import yaml
 from jinja2 import Environment, FileSystemLoader
 
 from src.back.llamacpp import LlamaService
@@ -55,8 +57,9 @@ class RAGPipeline:
             return cached
 
         template = self.env.get_template("explain_rule.j2")
+        rule_yaml = await self._format_rule_yaml(rule_data)
         prompt = template.render(
-            uploaded_rule=self._format_rule_yaml(rule_data),
+            uploaded_rule=rule_yaml,
             related_rules=related_text,
         )
 
@@ -136,8 +139,9 @@ class RAGPipeline:
             return cached
 
         template = self.env.get_template("coverage_analysis.j2")
+        rule_yaml = await self._format_rule_yaml(rule_data)
         prompt = template.render(
-            uploaded_rule=self._format_rule_yaml(rule_data),
+            uploaded_rule=rule_yaml,
             related_rules=related_text,
         )
 
@@ -169,11 +173,12 @@ class RAGPipeline:
 
         return "\n\n".join(lines)
 
-    def _format_rule_yaml(self, rule: dict[str, Any]) -> str:
+    async def _format_rule_yaml(self, rule: dict[str, Any]) -> str:
         """Format rule data as readable YAML-like text."""
-        import yaml
-
-        return yaml.dump(rule, default_flow_style=False, allow_unicode=True)
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            None, lambda: yaml.dump(rule, default_flow_style=False, allow_unicode=True)
+        )
 
     def _fallback_explanation(self, rule_data: dict[str, Any]) -> str:
         """Fallback explanation without LLM."""

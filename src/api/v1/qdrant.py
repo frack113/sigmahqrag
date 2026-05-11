@@ -125,11 +125,12 @@ async def qdrant_action(request: QdrantActionRequest) -> QdrantActionResponse:
                     from src.shared import QDRANT_STORAGE_DIR
 
                     storage_path = QDRANT_STORAGE_DIR.resolve().as_posix()
-                    snapshots_path = (QDRANT_STORAGE_DIR / "snapshots").resolve().as_posix()
+                    snapshots_path = (
+                        (QDRANT_STORAGE_DIR / "snapshots").resolve().as_posix()
+                    )
 
                     rendered = template.render(
-                        storage_path=storage_path,
-                        snapshots_path=snapshots_path
+                        storage_path=storage_path, snapshots_path=snapshots_path
                     )
 
                     config_dir = target_path / "config"
@@ -148,7 +149,7 @@ async def qdrant_action(request: QdrantActionRequest) -> QdrantActionResponse:
             download_id = await manager.start_download(
                 service="qdrant",
                 version=payload.version,
-                post_install_callback=post_install_call
+                post_install_callback=post_install_call,
             )
 
             return QdrantActionResponse(
@@ -159,14 +160,11 @@ async def qdrant_action(request: QdrantActionRequest) -> QdrantActionResponse:
             )
 
         elif action == "service_control":
-            service_manager = create_qradant_service() # Wait, typo in service name?
-            # Let me check the original code:
-            # service_manager = create_qdrant_service()
-            # I'll use the correct one.
             service_manager = create_qdrant_service()
             command = payload.command
             if command == "start":
                 from src.shared import QDRANT_STORAGE_DIR
+
                 result = await service_manager.start(
                     storage_path=str(QDRANT_STORAGE_DIR)
                 )
@@ -247,7 +245,9 @@ async def qdrant_action(request: QdrantActionRequest) -> QdrantActionResponse:
                 if not success:
                     raise ValueError("Failed to delete data")
                 return QdrantActionResponse(
-                    status="success", action=action, message="Data deleted",
+                    status="success",
+                    action=action,
+                    message="Data deleted",
                 )
             else:
                 raise ValueError(f"Unknown operation: {op}")

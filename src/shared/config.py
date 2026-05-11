@@ -17,6 +17,7 @@ EMBEDDINGS_DIR = MODELS_DIR / "embeddings"
 LOGS_DIR = BASE_DIR / "logs"
 PID_DIR = BASE_DIR / "pids"
 
+
 def get_llamacpp_bin_path() -> Path:
     """Get Llama.cpp binary path from config or default."""
     config = load_config()
@@ -25,6 +26,7 @@ def get_llamacpp_bin_path() -> Path:
         return Path(llama_cfg["binary_path"])
     return BIN_DIR / "llama-cpp"
 
+
 def get_qdrant_bin_path() -> Path:
     """Get Qdrant binary path from config or default."""
     config = load_config()
@@ -32,6 +34,7 @@ def get_qdrant_bin_path() -> Path:
     if "binary_path" in qdrant_cfg:
         return Path(qdrant_cfg["binary_path"])
     return BIN_DIR / "qdrant"
+
 
 QDRANT_STORAGE_DIR = BASE_DIR / "qdrant_storage"
 DATA_DIR = BASE_DIR
@@ -169,7 +172,6 @@ def _persist_config(config: dict[str, Any]) -> None:
     toml_service = _get_toml_service()
     toml_service.save(config)
     load_config.cache_clear()
-
 
 
 def get_llama_config() -> dict[str, Any]:

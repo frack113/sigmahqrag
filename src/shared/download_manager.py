@@ -23,6 +23,8 @@ from src.shared.version_manager import (
 )
 
 logger = logging.getLogger(__name__)
+
+
 @dataclass
 class DownloadTask:
     """Represents an active download task."""
@@ -40,7 +42,6 @@ class DownloadTask:
     cancel_event: asyncio.Event = field(default_factory=asyncio.Event)
     progress_queue: asyncio.Queue | None = None
     post_install_callback: Any | None = None
-
 
 
 class DownloadManager:
@@ -196,7 +197,9 @@ class DownloadManager:
                                 task.status = "cancelled"
                                 self.temp_manager.cleanup(task.temp_path)
                                 if task.progress_queue:
-                                    await task.progress_queue.put({"status": "cancelled"})
+                                    await task.progress_queue.put(
+                                        {"status": "cancelled"}
+                                    )
                                 del self.active_downloads[download_id]
                                 return
 

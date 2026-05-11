@@ -115,12 +115,15 @@ class SearchEngine:
         self.top_k = top_k
         self.similarity_threshold = similarity_threshold
 
-    async def search(self, query: str) -> list[dict[str, Any]]:
+    async def search(
+        self, query: str, top_k: int | None = None
+    ) -> list[dict[str, Any]]:
         """Search for relevant documents."""
+        limit = top_k if top_k is not None else self.top_k
         return await search(
             query=query,
             collection_name=self.collection_name,
-            top_k=self.top_k,
+            top_k=limit,
             similarity_threshold=self.similarity_threshold,
         )
 
