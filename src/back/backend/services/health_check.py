@@ -6,7 +6,7 @@ import logging
 import time
 from typing import Any
 
-from src.shared import load_config
+from src.shared import get_config
 
 logger = logging.getLogger(__name__)
 
@@ -27,38 +27,23 @@ class HealthCheckService:
         Returns:
             Dict with status for each component
         """
-        config = load_config()
         results = {
-            "llamacpp": await self._check_llamacpp(config),
-            "qdrant": await self._check_qdrant(config),
+            "llamacpp": await self._check_llamacpp(),
+            "qdrant": await self._check_qdrant(),
             "timestamp": time.time(),
         }
         return results
 
-    async def _check_llamacpp(self, config: dict) -> dict[str, Any]:
-        """Check llama.cpp service health."""
-        cached = self._get_cached("llamacpp")
-        if cached:
-            return cached
-
-        from src.back.llamacpp.health import check_health
-
-        start = time.time()
-        result = await check_health(port=8080)
-        result["response_time"] = round(time.time() - start, 3)
-        self._set_cached("llamacpp", result)
-        return result
-
-    async def _check_qdrant(self, config: dict) -> dict[str, Any]:
+    async def _check_qdrant(self) -> dict[str, Any]:
         """Check Qdrant health."""
         cached = self._get_cached("qdrant")
         if cached:
             return cached
 
-        qdrant_config = config.get("services", {}).get("qdrant", {})
-        host = qdrant_config.get("host", "localhost")
-        port = qdrant_config.get("port", 6333)
-        collection = qdrant_config.get("collection_name", "sigma_rules")
+        config = get_config()
+        host = config.qdrant_host
+        port = config.qdrant_port
+        collection = config.qdrant_collection_name
 
         from src.back.qdrant.health import check_health
 

@@ -2,17 +2,11 @@
 
 from __future__ import annotations
 
-import logging
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from src.shared import LLAMA_BIN_PATH, LOGS_DIR, PID_DIR
-
-logger = logging.getLogger(__name__)
-
-LLAMA_BIN = Path(LLAMA_BIN_PATH())
-LOGS_DIR = Path(LOGS_DIR)
-PID_DIR = Path(PID_DIR)
+if TYPE_CHECKING:
+    from src.shared import Config
 
 _llama_service: LlamaBinaryService | None = None
 
@@ -22,15 +16,18 @@ class LlamaBinaryService:
 
     def __init__(
         self,
-        llama_bin: Path = LLAMA_BIN,
-        logs_dir: Path = LOGS_DIR,
-        pid_dir: Path = PID_DIR,
+        config: Config | None = None,
         subprocess_manager=None,
     ) -> None:
         """Initialize LlamaBinaryService."""
-        self.llama_bin = llama_bin
-        self.logs_dir = logs_dir
-        self.pid_dir = pid_dir
+        from src.shared import get_config
+
+        self._config = config or get_config()
+        self.llama_bin = Path(self._config.llama_binary_path).resolve()
+        self.logs_dir = Path(self._config.paths_logs_dir).resolve()
+        self.pid_dir = Path(
+            self._config.paths_logs_dir.replace("logs", "pids")
+        ).resolve()
 
         if subprocess_manager is None:
             from src.back.service_manager import get_subprocess_manager
@@ -81,6 +78,7 @@ class LlamaBinaryService:
             cmd=cmd,
             log_file=log_file,
             pid_file=pid_file,
+            cwd=self.llama_bin,
         )
 
     async def stop(self) -> dict[str, Any]:

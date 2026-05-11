@@ -6,7 +6,6 @@ import logging
 from collections.abc import AsyncGenerator
 from pathlib import Path
 
-import jinja2
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse, StreamingResponse
 
@@ -56,9 +55,9 @@ async def qdrant_status():
     """Get status and version for qdrant service."""
     try:
         is_healthy = await check_health()
-        from src.back import get_qdrant_version
+        from src.shared import get_config
 
-        version = get_qdrant_version()
+        version = get_config().qdrant_version
 
         manager = create_download_manager()
         downloads = {
@@ -99,52 +98,30 @@ async def qdrant_action(request: QdrantActionRequest) -> QdrantActionResponse:
     action = request.action
     payload = request.payload
 
-    # Configuration for Qdrant connection
-    from src.shared import get_qdrant_config
+    from src.shared import get_config
 
-    config = get_qdrant_config()
-    host = config.get("host", "127.0.0.1")
-    try:
-        port = int(config.get("port", 6333))
-    except (ValueError, TypeError):
-        port = 6333
+    config = get_config()
+    host = config.qdrant_host
+    port = config.qdrant_port
 
     try:
         if action == "download_update":
             manager = create_download_manager()
 
             async def post_install_call(target_path: Path):
-                template_path = Path("templates/config.yaml.j2")
-                if not template_path.exists():
-                    logger.error(f"Template not found: {template_path}")
-                    return
-
+                logger.info(f"post_install_call triggered: {target_path}")
                 try:
-                    template = jinja2.Template(template_path.read_text())
+                    from src.shared.config import Config
 
-                    from src.shared import QDRANT_STORAGE_DIR
-
-                    storage_path = QDRANT_STORAGE_DIR.resolve().as_posix()
-                    snapshots_path = (
-                        (QDRANT_STORAGE_DIR / "snapshots").resolve().as_posix()
+                    Config.ensure_qdrant_config()
+                    logger.info(
+                        "Qdrant config generated via Config.ensure_qdrant_config()"
                     )
-
-                    rendered = template.render(
-                        storage_path=storage_path, snapshots_path=snapshots_path
-                    )
-
-                    config_dir = target_path / "config"
-                    config_dir.mkdir(parents=True, exist_ok=True)
-                    config_file = config_dir / "api/v1/qdrant/config.yaml"
-                    # Wait, I should check where the config file should be written.
-                    # Looking at the original code:
-                    # config_file = config_dir / "config.yaml"
-                    # Let me fix that.
-                    config_file = config_dir / "config.yaml"
-                    config_file.write_text(rendered)
-                    logger.info(f"Qdrant config generated at: {config_file}")
                 except Exception as e:
+                    import traceback
+
                     logger.error(f"Failed to generate Qdrant config: {e}")
+                    logger.error(traceback.format_exc())
 
             download_id = await manager.start_download(
                 service="qdrant",
@@ -199,9 +176,7 @@ async def qdrant_action(request: QdrantActionRequest) -> QdrantActionResponse:
                 data = await list_collections(host, port)
                 return QdrantActionResponse(status="success", action=action, data=data)
             elif op == "create":
-                v_size = (
-                    payload.config.get("vector_size", 384) if payload.config else 384
-                )
+                v_size = payload.config.vector_size if payload.config else 384
                 await create_collection(host, port, name, v_size)
                 return QdrantActionResponse(
                     status="success",

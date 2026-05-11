@@ -10,7 +10,7 @@ from fastapi import APIRouter, Header
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from src.shared import load_config
+from src.shared import get_config
 
 logger = logging.getLogger(__name__)
 
@@ -53,14 +53,14 @@ async def check_service_health() -> dict[str, Any]:
 
     from httpx import AsyncClient
 
-    from src.shared import get_llamacpp_version, get_qdrant_version, load_config
+    from src.shared import get_config
 
-    llama_version = get_llamacpp_version() or "Not installed"
-    qdrant_version = get_qdrant_version() or "Not installed"
+    config = get_config()
+    llama_version = config.llamacpp_version or "Not installed"
+    qdrant_version = config.qdrant_version or "Not installed"
 
-    config = load_config().get("services", {})
-    llama_port = config.get("llama", {}).get("port", 8080)
-    qdrant_port = config.get("qdrant", {}).get("port", 6333)
+    llama_port = 8080
+    qdrant_port = config.qdrant_port
 
     result: dict[str, Any] = {
         "llama_cpp": {
@@ -112,10 +112,10 @@ async def get_backend() -> JSONResponse:
     """GET /api/v1/admin/backend - Return backend status and config."""
     try:
         health = await check_service_health()
-        config = load_config()
+        config = get_config()
         data = {
             "services": health,
-            "config": config,
+            "config": config.to_dict(),
         }
         return JSONResponse(content={"data": data, "status": "success"})
     except Exception as e:
@@ -238,9 +238,21 @@ async def start_download(service: str = None, target: str = None) -> dict[str, A
 
         if target_component in ("binary", "all"):
             binary_result = await installer.download_binary()
+            if binary_result.get("success"):
+                from src.shared import get_config
+
+                config = get_config()
+                config.qdrant_version = QDRANT_BINARY_VERSION
+                config.save()
 
         if target_component in ("web_ui", "all"):
             ui_result = await installer.download_web_ui()
+            if ui_result.get("success"):
+                from src.shared import get_config
+
+                config = get_config()
+                config.qdrant_webui_version = QDRANT_UI_VERSION
+                config.save()
 
         all_success = binary_result.get("success") and ui_result.get("success")
         any_success = binary_result.get("success") or ui_result.get("success")
@@ -468,11 +480,11 @@ async def delete_model(request: dict) -> JSONResponse:
 
 
 @router.get("/config")
-async def get_config() -> JSONResponse:
+async def admin_get_config() -> JSONResponse:
     """GET /api/v1/admin/config - Return app config."""
     try:
-        config = load_config()
-        return JSONResponse(content={"status": "success", "data": config})
+        config = get_config()
+        return JSONResponse(content={"status": "success", "data": config.to_dict()})
     except Exception as e:
         logger.error(f"Failed to load config: {e}")
         return JSONResponse(

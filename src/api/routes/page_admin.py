@@ -9,7 +9,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from src.back.backend.services.health_check import HealthCheckService
-from src.shared import load_config
+from src.shared import get_config
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,9 @@ async def admin_overview(request: Request) -> HTMLResponse:
 async def admin_backend(request: Request) -> HTMLResponse:
     """Serve admin backend page."""
     return templates.TemplateResponse(
-        request=request, name="admin/backend.html", context={"config": load_config()}
+        request=request,
+        name="admin/backend.html",
+        context={"config": get_config().to_dict()},
     )
 
 
@@ -62,7 +64,9 @@ async def admin_logs(request: Request) -> HTMLResponse:
 async def admin_llama(request: Request) -> HTMLResponse:
     """Serve llama.cpp management page."""
     return templates.TemplateResponse(
-        request=request, name="admin/llama.html", context={"config": load_config()}
+        request=request,
+        name="admin/llama.html",
+        context={"config": get_config().to_dict()},
     )
 
 

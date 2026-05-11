@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 _subprocess_manager = None
 
 
@@ -11,11 +9,15 @@ def get_subprocess_manager():
     """Get or create the global subprocess manager."""
     global _subprocess_manager
     if _subprocess_manager is None:
+        from pathlib import Path
+
+        from src.shared import get_config
         from src.shared.subprocess_manager import SubprocessManager
 
+        config = get_config()
         _subprocess_manager = SubprocessManager(
-            logs_dir=Path("data/logs"),
-            pid_dir=Path("data/pids"),
+            logs_dir=Path(config.paths_logs_dir).resolve(),
+            pid_dir=Path(config.paths_logs_dir.replace("logs", "pids")).resolve(),
         )
     return _subprocess_manager
 

@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -28,6 +30,24 @@ from src.api.v1.system_prompt import router as prompts_v1_router
 from src.back.service_manager import get_subprocess_manager, shutdown_all_services
 
 
+def _setup_logging() -> None:
+    """Setup logging to file."""
+    log_file = Path("data/logs/sigmahqrag.log")
+    log_file.parent.mkdir(parents=True, exist_ok=True)
+
+    handler = logging.FileHandler(log_file, encoding="utf-8")
+    handler.setLevel(logging.INFO)
+
+    formatter = logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    )
+    handler.setFormatter(formatter)
+
+    root_logger = logging.getLogger()
+    root_logger.addHandler(handler)
+    root_logger.setLevel(logging.INFO)
+
+
 def _get_subprocess_manager():
     """Get or create the global subprocess manager."""
     return get_subprocess_manager()
@@ -36,6 +56,10 @@ def _get_subprocess_manager():
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> None:
     """Application lifespan handler."""
+    _setup_logging()
+    from src.shared import Config
+
+    Config.init_app()
     _validate_services()
     yield
     await shutdown_all_services()
@@ -43,12 +67,12 @@ async def lifespan(app: FastAPI) -> None:
 
 def _validate_services() -> None:
     """Validate required services are configured."""
-    from src.shared import load_config
+    from src.shared import get_config
 
-    config = load_config()
-    if not config.get("services", {}).get("llama", {}).get("base_url"):
+    config = get_config()
+    if not config.llama_base_url:
         raise ValueError("LLM service not configured")
-    if not config.get("services", {}).get("qdrant", {}).get("collection_name"):
+    if not config.qdrant_collection_name:
         raise ValueError("Qdrant service not configured")
 
 
