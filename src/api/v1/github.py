@@ -12,8 +12,11 @@ from src.back.github.git import (
     clone_repo,
     delete_repo,
     get_metadata,
+    get_selected_dirs,
+    list_directory_tree,
     list_repos,
     save_metadata,
+    save_selected_dirs,
     update_repo,
 )
 
@@ -225,4 +228,87 @@ async def get_repo_status(org: str, name: str) -> RepositoryStatus:
         last_synced=metadata.get("last_synced"),
         url=metadata.get("url"),
         branch=metadata.get("branch"),
+    )
+
+
+class DirectoryTreeResponse(BaseModel):
+    """Response for directory tree listing."""
+
+    success: bool
+    tree: list[dict[str, Any]] = Field(default_factory=list)
+    error: str | None = None
+
+
+class SelectDirsRequest(BaseModel):
+    """Request to save selected directories."""
+
+    selected: list[str] = Field(default_factory=list, description="List of folder paths")
+
+
+class SelectDirsResponse(BaseModel):
+    """Response for saving selected directories."""
+
+    success: bool
+    message: str | None = None
+    error: str | None = None
+
+
+@router.get("/repos/{org}/{name}/tree", response_model=DirectoryTreeResponse)
+async def get_repo_tree(
+    org: str,
+    name: str,
+    max_depth: int = 5,
+) -> DirectoryTreeResponse:
+    """Get directory tree for a repository."""
+    repos = list_repos()
+    repo_exists = any(r["org"] == org and r["name"] == name for r in repos)
+
+    if not repo_exists:
+        return DirectoryTreeResponse(
+            success=False, error=f"Repository '{org}/{name}' not found or not cloned yet"
+        )
+
+    tree = list_directory_tree(org, name, max_depth=max_depth)
+    selected = get_selected_dirs(org, name)
+
+    for node in tree:
+        _mark_selected(node, selected)
+
+    return DirectoryTreeResponse(
+        success=True,
+        tree=tree,
+    )
+
+
+def _mark_selected(node: dict[str, Any], selected: list[str]) -> None:
+    """Mark nodes as selected based on their path."""
+    if node["path"] in selected:
+        node["selected"] = True
+    if "children" in node:
+        for child in node["children"]:
+            _mark_selected(child, selected)
+
+
+@router.post("/repos/{org}/{name}/select-dirs", response_model=SelectDirsResponse)
+async def select_dirs(
+    org: str,
+    name: str,
+    request: SelectDirsRequest,
+) -> SelectDirsResponse:
+    """Save selected directories for a repository."""
+    repos = list_repos()
+    if not any(r["org"] == org and r["name"] == name for r in repos):
+        return SelectDirsResponse(
+            success=False, error=f"Repository '{org}/{name}' not found"
+        )
+
+    result = save_selected_dirs(org, name, request.selected)
+    if result.get("success"):
+        return SelectDirsResponse(
+            success=True,
+            message=f"Saved {len(request.selected)} selected directories for {org}/{name}",
+        )
+    return SelectDirsResponse(
+        success=False,
+        error=result.get("error", "Failed to save selections"),
     )
