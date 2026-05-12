@@ -11,8 +11,10 @@ from pydantic import BaseModel, Field
 from src.back.github.git import (
     clone_repo,
     delete_repo,
+    get_last_commit_date,
     get_metadata,
     get_selected_dirs,
+    is_repo_outdated,
     list_directory_tree,
     list_repos,
     save_metadata,
@@ -44,10 +46,13 @@ class RepositoryStatus(BaseModel):
 
     org: str
     name: str
-    repo_status: str = Field(..., description="synced|outdated|error|cloning|syncing")
     last_synced: datetime | None = None
     url: str | None = None
     branch: str | None = None
+    last_commit: str | None = None
+    sync_class: str = Field(
+        default="btn-success", description="btn-success|btn-warning|btn-unknown"
+    )
 
 
 def _extract_org_name(url: str) -> tuple[str, str]:
@@ -68,15 +73,26 @@ async def list_repos_handler() -> list[RepositoryStatus]:
     result = []
     for repo in repos:
         metadata = get_metadata(repo["org"], repo["name"]) or {}
-        status_val = metadata.get("status", "synced")
+        stored_status = metadata.get("status", "synced")
+
+        if stored_status == "cloning" or stored_status == "syncing":
+            sync_class = "btn-warning"
+        elif stored_status == "error":
+            sync_class = "btn-unknown"
+        else:
+            is_outdated = is_repo_outdated(repo["org"], repo["name"])
+            sync_class = "btn-danger" if is_outdated else "btn-success"
+
+        last_commit = get_last_commit_date(repo["org"], repo["name"])
         result.append(
             RepositoryStatus(
                 org=repo["org"],
                 name=repo["name"],
-                repo_status=status_val,
                 last_synced=metadata.get("last_synced"),
                 url=metadata.get("url"),
                 branch=metadata.get("branch"),
+                last_commit=last_commit,
+                sync_class=sync_class,
             )
         )
     return result
@@ -115,6 +131,7 @@ async def add_repo(
                     "created_at": datetime.now().isoformat(),
                 },
             )
+            save_selected_dirs(org, name, [])
         else:
             save_metadata(
                 org,
@@ -242,7 +259,9 @@ class DirectoryTreeResponse(BaseModel):
 class SelectDirsRequest(BaseModel):
     """Request to save selected directories."""
 
-    selected: list[str] = Field(default_factory=list, description="List of folder paths")
+    selected: list[str] = Field(
+        default_factory=list, description="List of folder paths"
+    )
 
 
 class SelectDirsResponse(BaseModel):
@@ -265,7 +284,8 @@ async def get_repo_tree(
 
     if not repo_exists:
         return DirectoryTreeResponse(
-            success=False, error=f"Repository '{org}/{name}' not found or not cloned yet"
+            success=False,
+            error=f"Repository '{org}/{name}' not found or not cloned yet",
         )
 
     tree = list_directory_tree(org, name, max_depth=max_depth)

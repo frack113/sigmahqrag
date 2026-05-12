@@ -179,6 +179,7 @@ def delete_repo(
     """Delete a local repository."""
     repos_dir = Path(repos_dir).resolve()
     repo_path = _get_repo_path(repos_dir, org, name)
+    selection_path = _get_selection_file_path(repos_dir, org, name)
 
     if not repo_path.exists():
         return {"success": False, "error": f"Repository '{org}/{name}' not found"}
@@ -190,6 +191,10 @@ def delete_repo(
         org_path = repos_dir / org
         if org_path.exists() and not any(org_path.iterdir()):
             org_path.rmdir()
+
+        if selection_path.exists():
+            selection_path.unlink()
+            logger.info(f"Deleted selection file for {org}/{name}")
 
         return {"success": True}
     except Exception as e:
@@ -292,10 +297,13 @@ def list_directory_tree(
         try:
             for entry in sorted(path.iterdir()):
                 if entry.is_dir():
-                    if entry.name.startswith('.') or entry.name.startswith('__'):
+                    if entry.name.startswith(".") or entry.name.startswith("__"):
                         continue
                     children = _walk_dir(entry, current_depth + 1)
-                    node = {"name": entry.name, "path": str(entry.relative_to(repo_path))}
+                    node = {
+                        "name": entry.name,
+                        "path": entry.relative_to(repo_path).as_posix(),
+                    }
                     if children:
                         node["children"] = children
                     results.append(node)
@@ -366,3 +374,43 @@ def get_selected_dirs(
     except (json.JSONDecodeError, OSError) as e:
         logger.error(f"Failed to read selection for {org}/{name}: {e}")
         return []
+
+
+def get_last_commit_date(
+    org: str, name: str, repos_dir: Path = DEFAULT_REPOS_DIR
+) -> str | None:
+    """Get the date of the last commit in the repository."""
+    repos_dir = Path(repos_dir).resolve()
+    repo_path = _get_repo_path(repos_dir, org, name)
+
+    repo = _get_or_create_repo(repo_path)
+    if repo is None:
+        return None
+
+    try:
+        commit = repo.head.commit
+        return commit.committed_datetime.isoformat()
+    except Exception:
+        return None
+
+
+def is_repo_outdated(org: str, name: str, repos_dir: Path = DEFAULT_REPOS_DIR) -> bool:
+    """Check if local repo is behind remote by comparing commit hashes."""
+    repos_dir = Path(repos_dir).resolve()
+    repo_path = _get_repo_path(repos_dir, org, name)
+
+    repo = _get_or_create_repo(repo_path)
+    if repo is None:
+        return False
+
+    try:
+        local_commit = repo.head.commit.hexsha
+        origin = repo.remotes.origin
+        origin.fetch()
+        for ref in origin.refs:
+            if ref.remote_head == repo.active_branch.name:
+                remote_commit = ref.commit.hexsha
+                return local_commit != remote_commit
+        return False
+    except Exception:
+        return False

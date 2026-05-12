@@ -9,7 +9,7 @@
 <div class="github-container">
     <div class="github-actions">
         <button id="add-repo-btn" class="btn btn-primary">Add Repository</button>
-        <button id="refresh-btn" class="btn" onclick="loadRepos()">Refresh</button>
+        <button id="refresh-btn" class="btn" onclick="loadRepos()">Refresh list</button>
     </div>
 
     <div id="repos-list" class="repos-grid"></div>
@@ -66,6 +66,16 @@
 const API_BASE = '/api/v1/github';
 let currentRepo = null;
 
+function formatDate(isoString) {
+    if (!isoString) return 'Unknown';
+    try {
+        const date = new Date(isoString);
+        return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+    } catch (e) {
+        return 'Unknown';
+    }
+}
+
 async function loadRepos() {
     try {
         const response = await fetch(API_BASE + '/repos');
@@ -87,9 +97,9 @@ async function loadRepos() {
         container.innerHTML = repos.map(repo => `
             <div class="repo-card">
                 <h3>${repo.org}/${repo.name}</h3>
-                <p>${repo.description || 'No description'}</p>
+                <p>Last commit: ${formatDate(repo.last_commit)}</p>
                 <div class="repo-actions">
-                    <span class="repo-status">${repo.repo_status}</span>
+                    <button onclick="syncRepo('${repo.org}', '${repo.name}')" class="btn btn-sm ${repo.sync_class || 'btn-unknown'}">Sync</button>
                     <button onclick="openRepoDetail('${repo.org}', '${repo.name}')" class="btn btn-sm">Browse</button>
                     <button onclick="deleteRepo('${repo.org}', '${repo.name}')" class="btn btn-danger btn-sm">Delete</button>
                 </div>
@@ -150,7 +160,7 @@ function renderTreeNodes(nodes) {
         return '<li class="tree-node">' +
             '<div class="tree-item">' +
                 (hasChildren ? '<button class="tree-toggle" onclick="toggleNode(this)">&#9658;</button>' : '<span class="tree-spacer"></span>') +
-                '<input type="checkbox" class="folder-checkbox" value="' + node.path + '" ' + isSelected + ' onchange="updateSelectedCount()">' +
+                '<input type="checkbox" class="folder-checkbox" value="' + node.path + '" ' + isSelected + ' onchange="onSelectionChange()">' +
                 '<span class="folder-icon">&#128193;</span>' +
                 '<span class="folder-name">' + node.name + '</span>' +
             '</div>' +
@@ -177,6 +187,28 @@ function expandAll() {
 function collapseAll() {
     document.querySelectorAll('.tree-children').forEach(el => el.style.display = 'none');
     document.querySelectorAll('.tree-toggle').forEach(el => el.innerHTML = '&#9658;');
+}
+
+function onSelectionChange() {
+    if (!currentRepo) return;
+    
+    const selected = Array.from(document.querySelectorAll('.folder-checkbox:checked'))
+        .map(cb => cb.value);
+    
+    updateSelectedCount();
+    
+    fetch(API_BASE + '/repos/' + currentRepo.org + '/' + currentRepo.name + '/select-dirs', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ selected: selected })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            console.log('Selection saved automatically');
+        }
+    })
+    .catch(err => console.error('Failed to save selection:', err));
 }
 
 function updateSelectedCount() {
@@ -220,6 +252,25 @@ document.getElementById('add-repo-btn').onclick = () => {
 function closeModal() {
     document.getElementById('add-repo-modal').style.display = 'none';
     document.getElementById('add-repo-form').reset();
+}
+
+async function syncRepo(org, name) {
+    if (!confirm('Sync repository ' + org + '/' + name + '?')) return;
+    try {
+        const response = await fetch(API_BASE + '/repos/' + org + '/' + name + '/sync', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'}
+        });
+        const result = await response.json();
+        if (result.success) {
+            alert('Syncing repository...');
+            loadRepos();
+        } else {
+            alert(result.error || 'Failed to sync');
+        }
+    } catch (error) {
+        alert('Failed to sync repository');
+    }
 }
 
 async function deleteRepo(org, name) {
@@ -370,6 +421,46 @@ loadRepos();
     color: #666;
     padding: 20px;
     text-align: center;
+}
+.repo-status {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    margin-right: 8px;
+}
+.repo-status.synced {
+    background: #d4edda;
+    color: #155724;
+}
+.repo-status.outdated {
+    background: #fff3cd;
+    color: #856404;
+}
+.repo-status.error, .repo-status.cloning, .repo-status.syncing {
+    background: #f8d7da;
+    color: #721c24;
+}
+.btn-success {
+    background: #27ae60;
+    color: white;
+    border: none;
+}
+.btn-danger {
+    background: #e74c3c;
+    color: white;
+    border: none;
+}
+.btn-warning {
+    background: #f39c12;
+    color: white;
+    border: none;
+}
+.btn-unknown {
+    background: #333;
+    color: white;
+    border: none;
 }
 </style>
 {% endblock %}
