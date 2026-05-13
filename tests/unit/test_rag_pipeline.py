@@ -3,6 +3,7 @@
 import pytest
 from src.back.rag.pipeline import RAGPipeline
 
+
 @pytest.mark.asyncio
 async def test_rag_pipeline_init() -> None:
     """Test RAG pipeline initialization."""
@@ -33,5 +34,5 @@ async def test_rag_pipeline_index() -> None:
     await pipeline.index(
         embeddings=[[0.1, 0.2, 0.3]],
         documents=["test document"],
-        metadata=[{"id": "1"}]
+        metadata=[{"id": "1"}],
     )
