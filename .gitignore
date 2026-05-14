@@ -45,8 +45,8 @@ venv.bak/
 .ruff.toml
 
 _bmad-output/
-data/
-logs/
+/data/
+/logs/
 *.log
 *.tmp
 

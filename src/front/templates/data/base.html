@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block styles %}
+<link rel="stylesheet" href="{{ url_for('static', path='/css/data.css') }}">
+{% endblock %}
+
+{% block content %}
+<section class="data-container">
+    <nav class="data-subnav" aria-label="Data subnav">
+        <ul>
+            <li><a href="/data" {% if request.url.path == '/data' %}class="active"{% endif %}>Overview</a></li>
+            <li><a href="/data/github" {% if '/data/github' in request.url.path %}class="active"{% endif %}>GitHub</a></li>
+        </ul>
+    </nav>
+    {% block page_content %}{% endblock %}
+</section>
+{% endblock %}

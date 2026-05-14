@@ -49,15 +49,25 @@ class LlamaBinaryService:
                 "error": f"llama.cpp directory not found: {self.llama_bin}",
             }
 
-        llama_exe = None
-        for exe in self.llama_bin.glob("*.exe"):
-            llama_exe = exe
-            break
+        preferred = self.llama_bin / "llama-server.exe"
+        if preferred.exists():
+            llama_exe = preferred
+        else:
+            llama_exe = None
+            for exe in self.llama_bin.glob("llama-server*"):
+                llama_exe = exe
+                break
 
         if not llama_exe:
             return {
                 "success": False,
-                "error": f"llama.cpp executable not found in {self.llama_bin}",
+                "error": (
+                    f"llama-server executable not found in {self.llama_bin}. "
+                    "Expected llama-server.exe (the OpenAI-compatible HTTP "
+                    "server), not llama-cli / llama-batched-bench / etc. — "
+                    "first-alphabetical exe selection used to spawn the "
+                    "wrong binary and produced 'invalid argument: --port'."
+                ),
             }
 
         log_file = self.logs_dir / "llama.cpp.log"

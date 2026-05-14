@@ -1,0 +1,16 @@
+{% extends "data/base.html" %}
+
+{% block title %}Data Sources - Sigmahqrag{% endblock %}
+
+{% block page_content %}
+<h1>Data Sources</h1>
+<p>Manage Sigma rule corpora indexed for retrieval.</p>
+
+<div class="data-overview">
+    <article class="data-card">
+        <h2><a href="/data/github">GitHub Repositories</a></h2>
+        <p>Clone Sigma rule repositories from GitHub (e.g. SigmaHQ/sigma) and choose which directories to index.</p>
+        <a class="btn btn-primary" href="/data/github">Open</a>
+    </article>
+</div>
+{% endblock %}
