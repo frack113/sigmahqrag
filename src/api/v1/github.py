@@ -180,10 +180,14 @@ async def get_repo(org: str, name: str) -> RepositoryStatus:
 async def sync_repo(
     org: str,
     name: str,
-    branch: str = "main",
+    branch: str | None = None,
     background_tasks: BackgroundTasks = None,
 ) -> RepositoryResponse:
     """Sync a repository."""
+    metadata = get_metadata(org, name)
+    if branch is None:
+        branch = (metadata or {}).get("branch", "main")
+
     if ".." in branch or branch.startswith("/") or branch.endswith("/"):
         return RepositoryResponse(success=False, error="Invalid branch name")
     if len(branch) > 255:

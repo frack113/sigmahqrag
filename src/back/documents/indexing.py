@@ -139,7 +139,7 @@ async def _generate_embeddings(nodes: list[TextNode]) -> list[list[float]]:
     Returns:
         List of embedding vectors
     """
-    from src.rag.embeddings import get_embedding_model
+    from src.back.rag.embeddings import get_embedding_model
 
     embed_model = get_embedding_model()
     texts = [node.text for node in nodes]
