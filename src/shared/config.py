@@ -276,5 +276,5 @@ _config: Config | None = None
 def get_config() -> Config:
     global _config
     if _config is None:
-        _config = Config()
+        _config = Config.init_app()
     return _config

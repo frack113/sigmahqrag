@@ -1,12 +1,12 @@
 """Main application entry point."""
 
-from __future__ import annotations
-
 import logging
 from contextlib import asynccontextmanager
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from src.api.routes.page_admin import router as admin_pages_router
@@ -29,15 +29,20 @@ from src.api.v1.qdrant import router as qdrant_router
 from src.api.v1.search import router as search_v1_router
 from src.api.v1.system_prompt import router as prompts_v1_router
 from src.back.qdrant.auto_start import start_qdrant, stop_qdrant
-from src.back.service_manager import get_subprocess_manager, shutdown_all_services
+from src.back.service_manager import shutdown_all_services
+from src.shared.exceptions import SigmaError
+
+logger = logging.getLogger(__name__)
 
 
 def _setup_logging() -> None:
-    """Setup logging to file."""
+    """Setup logging to file with rotation."""
     log_file = Path("data/logs/sigmahqrag.log")
     log_file.parent.mkdir(parents=True, exist_ok=True)
 
-    handler = logging.FileHandler(log_file, encoding="utf-8")
+    handler = RotatingFileHandler(
+        log_file, maxBytes=10 * 1024 * 1024, backupCount=5, encoding="utf-8"
+    )
     handler.setLevel(logging.INFO)
 
     formatter = logging.Formatter(
@@ -48,11 +53,6 @@ def _setup_logging() -> None:
     root_logger = logging.getLogger()
     root_logger.addHandler(handler)
     root_logger.setLevel(logging.INFO)
-
-
-def _get_subprocess_manager():
-    """Get or create the global subprocess manager."""
-    return get_subprocess_manager()
 
 
 @asynccontextmanager
@@ -75,9 +75,11 @@ def _validate_services() -> None:
 
     config = get_config()
     if not config.llama_base_url:
-        raise ValueError("LLM service not configured")
+        logger.critical("LLM service not configured")
+        raise SystemExit(1)
     if not config.qdrant_collection_name:
-        raise ValueError("Qdrant service not configured")
+        logger.critical("Qdrant service not configured")
+        raise SystemExit(1)
 
 
 def create_app() -> FastAPI:
@@ -88,7 +90,8 @@ def create_app() -> FastAPI:
         description="Local RAG system for Sigma rules",
     )
 
-    app.mount("/static", StaticFiles(directory="src/front/static"), name="static")
+    static_dir = str(Path(__file__).parent / "front" / "static")
+    app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
     app.include_router(admin_pages_router)
     app.include_router(admin_v1_router)
@@ -109,6 +112,15 @@ def create_app() -> FastAPI:
     app.include_router(embeddings_v1_router)
     app.include_router(feedback_v1_router)
     app.include_router(prompts_v1_router)
+
+    @app.exception_handler(SigmaError)
+    async def sigma_error_handler(request: Request, exc: SigmaError) -> JSONResponse:
+        """Global handler for SigmaError exceptions."""
+        logger.error(f"SigmaError ({exc.code}): {exc.message}")
+        return JSONResponse(
+            status_code=exc.http_status,
+            content=exc.to_dict(),
+        )
 
     return app
 
