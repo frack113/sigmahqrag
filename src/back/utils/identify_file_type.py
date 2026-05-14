@@ -32,6 +32,11 @@ class FileType(Enum):
     UNKNOWN = "unknown"
 
 
+SUPPORTED_DOC_EXTENSION_MAP: dict[str, FileType] = {
+    ".md": FileType.MARKDOWN,
+    ".markdown": FileType.MARKDOWN,
+}
+
 PUREMAGIC_TYPE_MAP: dict[str, FileType] = {
     ".pdf": FileType.PDF,
     ".png": FileType.IMAGE,

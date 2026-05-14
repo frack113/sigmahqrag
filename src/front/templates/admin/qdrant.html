@@ -25,9 +25,9 @@
         <p>Loading...</p>
     </div>
     <div style="margin-top: 15px;">
-        <button class="btn btn-primary" onclick="downloadQdrant()">Download / Update</button>
-        <button class="btn btn-success" onclick="startQdrant()">Start</button>
-        <button class="btn btn-danger" onclick="stopQdrant()">Stop</button>
+        <button id="qdrant-download-btn" class="btn btn-primary" onclick="downloadQdrant()">Download / Update</button>
+        <button id="qdrant-start-btn" class="btn btn-success" onclick="startQdrant()">Start</button>
+        <button id="qdrant-stop-btn" class="btn btn-danger" onclick="stopQdrant()">Stop</button>
     </div>
     <div id="download-status" class="status-message"></div>
 </div>
@@ -46,7 +46,15 @@ function loadQdrantInfo() {
         if (v1Status.message) {
             html += '<p><strong>Message:</strong> ' + v1Status.message + '</p>';
         }
+        if (v1Status.mode) {
+            html += '<p><strong>Mode:</strong> ' + v1Status.mode + '</p>';
+        }
         document.getElementById('qdrant-info').innerHTML = html;
+
+        const isExternal = v1Status.mode === 'external';
+        document.getElementById('qdrant-start-btn').disabled = isExternal;
+        document.getElementById('qdrant-stop-btn').disabled = isExternal;
+        document.getElementById('qdrant-download-btn').disabled = isExternal;
     })
     .catch(err => {
         document.getElementById('qdrant-info').innerHTML = '<p class="error">Failed to load info: ' + err + '</p>';

@@ -57,9 +57,9 @@
         <p>Loading...</p>
     </div>
     <div style="margin-top: 15px;">
-        <button class="btn btn-success" onclick="startService('qdrant')">Start</button>
-        <button class="btn btn-danger" onclick="stopService('qdrant')">Stop</button>
-        <button class="btn btn-primary" onclick="downloadQdrant()">Download / Update</button>
+        <button id="qdrant-start-btn" class="btn btn-success" onclick="startService('qdrant')">Start</button>
+        <button id="qdrant-stop-btn" class="btn btn-danger" onclick="stopService('qdrant')">Stop</button>
+        <button id="qdrant-download-btn" class="btn btn-primary" onclick="downloadQdrant()">Download / Update</button>
         <button class="btn btn-secondary" onclick="openQdrantUI()">Open Web UI</button>
     </div>
     <div id="qdrant-download-status" class="status-message"></div>
@@ -181,6 +181,12 @@ function loadStatus() {
                     <span>v0.2.11</span>
                 </div>
             `;
+
+            // Apply managed vs external mode
+            const isExternal = data.mode === 'external';
+            document.getElementById('qdrant-start-btn').disabled = isExternal;
+            document.getElementById('qdrant-stop-btn').disabled = isExternal;
+            document.getElementById('qdrant-download-btn').disabled = isExternal;
 
             // Load config
             const backend = config.backend || {};

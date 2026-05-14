@@ -57,7 +57,8 @@ async def qdrant_status():
         is_healthy = await check_health()
         from src.shared import get_config
 
-        version = get_config().qdrant_version
+        config = get_config()
+        version = config.qdrant_version
 
         manager = create_download_manager()
         downloads = {
@@ -72,6 +73,7 @@ async def qdrant_status():
                 "healthy": is_healthy,
                 "current_version": version or "unknown",
                 "downloads": downloads,
+                "mode": config.qdrant_mode,
             }
         )
     except Exception as e:

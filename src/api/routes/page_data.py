@@ -7,7 +7,11 @@ from fastapi.templating import Jinja2Templates
 
 from src.back.embedding_config import EmbeddingTypeConfig
 from src.back.models import EmbeddingManager
-from src.back.utils.identify_file_type import PUREMAGIC_TYPE_MAP, FileType
+from src.back.utils.identify_file_type import (
+    PUREMAGIC_TYPE_MAP,
+    SUPPORTED_DOC_EXTENSION_MAP,
+    FileType,
+)
 
 router = APIRouter(prefix="", tags=["pages"])
 templates = Jinja2Templates(directory="src/front/templates")
@@ -62,8 +66,8 @@ async def data_embedding_page(request: Request):
     config = config_mgr.load()
     safe_config = {k: v for k, v in config.items() if isinstance(v, dict)}
 
-    # Supported document types (extend this list as more types are supported)
-    supported_doc_types = {FileType.MARKDOWN.value}
+    # Supported document types derived from shared extension map
+    supported_doc_types = {ft.value for ft in SUPPORTED_DOC_EXTENSION_MAP.values()}
     all_types = _serialize_file_types()
     file_types = [ft for ft in all_types if ft["value"] in supported_doc_types]
 

@@ -28,6 +28,7 @@ from src.api.v1.model import router as model_v1_router
 from src.api.v1.qdrant import router as qdrant_router
 from src.api.v1.search import router as search_v1_router
 from src.api.v1.system_prompt import router as prompts_v1_router
+from src.back.qdrant.auto_start import start_qdrant, stop_qdrant
 from src.back.service_manager import get_subprocess_manager, shutdown_all_services
 
 
@@ -62,8 +63,10 @@ async def lifespan(app: FastAPI) -> None:
 
     Config.init_app()
     _validate_services()
+    await start_qdrant()
     yield
     await shutdown_all_services()
+    await stop_qdrant()
 
 
 def _validate_services() -> None:

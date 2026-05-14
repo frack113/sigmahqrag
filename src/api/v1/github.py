@@ -8,6 +8,7 @@ from typing import Any
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel, Field
 
+from src.back.documents.sigma_ref_downloader import download_references
 from src.back.github.git import (
     clone_repo,
     delete_repo,
@@ -245,6 +246,46 @@ async def get_repo_status(org: str, name: str) -> RepositoryStatus:
         last_synced=metadata.get("last_synced"),
         url=metadata.get("url"),
         branch=metadata.get("branch"),
+    )
+
+
+class DownloadRefRequest(BaseModel):
+    """Request to download Sigma rule references."""
+
+    rules_dir: str | None = Field(
+        default=None, description="Path to Sigma rules directory"
+    )
+    output_dir: str | None = Field(
+        default=None, description="Path to output directory for references"
+    )
+
+
+class DownloadRefResponse(BaseModel):
+    """Response for download-ref operation."""
+
+    success: bool
+    message: str | None = None
+    summary: dict[str, Any] | None = None
+    error: str | None = None
+
+
+@router.post("/download-ref", response_model=DownloadRefResponse)
+async def download_ref_handler(
+    background_tasks: BackgroundTasks,
+    request: DownloadRefRequest | None = None,
+) -> DownloadRefResponse:
+    """Download Sigma rule references for all managed repositories."""
+    if request is None:
+        request = DownloadRefRequest()
+
+    rules_dir = request.rules_dir or "data/github/sigmahq/sigma/rules"
+    output_dir = request.output_dir or "data/documents/sigmaref"
+
+    background_tasks.add_task(download_references, rules_dir, output_dir)
+
+    return DownloadRefResponse(
+        success=True,
+        message="Reference download started in background",
     )
 
 

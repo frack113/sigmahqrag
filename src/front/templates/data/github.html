@@ -10,6 +10,7 @@
     <div class="github-actions">
         <button id="add-repo-btn" class="btn btn-primary">Add Repository</button>
         <button id="refresh-btn" class="btn" onclick="loadRepos()">Refresh list</button>
+        <button id="download-ref-btn" class="btn btn-secondary" onclick="downloadRefs()">Download ref</button>
     </div>
 
     <div id="repos-list" class="repos-grid"></div>
@@ -290,6 +291,26 @@ async function deleteRepo(org, name) {
         }
     } catch (error) {
         alert('Failed to delete repository');
+    }
+}
+
+async function downloadRefs() {
+    const btn = document.getElementById('download-ref-btn');
+    btn.disabled = true;
+    btn.textContent = 'Starting...';
+    try {
+        const response = await fetch(API_BASE + '/download-ref', { method: 'POST' });
+        const result = await response.json();
+        if (result.success) {
+            alert(result.message || 'Download started in background');
+        } else {
+            alert(result.error || 'Download failed');
+        }
+    } catch (error) {
+        alert('Failed to download references');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Download ref';
     }
 }
 

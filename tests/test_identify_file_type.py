@@ -4,6 +4,7 @@ import pytest
 
 from src.back.utils.identify_file_type import (
     DETECTION_REGISTRY,
+    SUPPORTED_DOC_EXTENSION_MAP,
     FileType,
     identify,
 )
@@ -211,6 +212,21 @@ class TestEdgeCases:
         f = tmp_path / "doc.md"
         f.write_text("hello", encoding="utf-8")
         assert identify(f) == FileType.MARKDOWN
+
+
+class TestSupportedDocExtensionMap:
+    def test_contains_markdown(self) -> None:
+        assert SUPPORTED_DOC_EXTENSION_MAP[".md"] == FileType.MARKDOWN
+
+    def test_contains_markdown_alt(self) -> None:
+        assert SUPPORTED_DOC_EXTENSION_MAP[".markdown"] == FileType.MARKDOWN
+
+    def test_only_markdown_types(self) -> None:
+        assert set(SUPPORTED_DOC_EXTENSION_MAP.values()) == {FileType.MARKDOWN}
+
+    def test_values_are_filetype(self) -> None:
+        for ft in SUPPORTED_DOC_EXTENSION_MAP.values():
+            assert isinstance(ft, FileType)
 
 
 class TestRegistry:
