@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -49,13 +50,24 @@ class LlamaBinaryService:
                 "error": f"llama.cpp directory not found: {self.llama_bin}",
             }
 
-        preferred = self.llama_bin / "llama-server.exe"
-        if preferred.exists():
-            llama_exe = preferred
+        # llama.cpp upstream ships per-OS prebuilt server binaries:
+        #   Windows : llama-server.exe
+        #   Linux   : llama-server
+        #   macOS   : llama-server
+        # On Windows prefer .exe, on other platforms prefer the bare name.
+        # The previous code globbed `*.exe` and took the first alphabetical
+        # match, which spawned `llama-batched-bench.exe` and crashed with
+        # "invalid argument: --port"; on Linux/macOS it found nothing at all.
+        if sys.platform == "win32":
+            candidates = ("llama-server.exe", "llama-server")
         else:
-            llama_exe = None
-            for exe in self.llama_bin.glob("llama-server*"):
-                llama_exe = exe
+            candidates = ("llama-server", "llama-server.exe")
+
+        llama_exe: Path | None = None
+        for name in candidates:
+            candidate = self.llama_bin / name
+            if candidate.is_file():
+                llama_exe = candidate
                 break
 
         if not llama_exe:
@@ -63,10 +75,9 @@ class LlamaBinaryService:
                 "success": False,
                 "error": (
                     f"llama-server executable not found in {self.llama_bin}. "
-                    "Expected llama-server.exe (the OpenAI-compatible HTTP "
-                    "server), not llama-cli / llama-batched-bench / etc. — "
-                    "first-alphabetical exe selection used to spawn the "
-                    "wrong binary and produced 'invalid argument: --port'."
+                    "Expected the llama.cpp HTTP server binary "
+                    "(llama-server / llama-server.exe), not llama-cli / "
+                    "llama-batched-bench / etc."
                 ),
             }
 
