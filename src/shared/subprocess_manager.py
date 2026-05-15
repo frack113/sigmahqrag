@@ -124,6 +124,7 @@ class SubprocessManager:
         cmd: list[str],
         log_file: Path,
         pid_file: Path,
+        cwd: Path | None = None,
     ) -> dict[str, Any]:
         """Restart a crashed service.
 
@@ -132,6 +133,7 @@ class SubprocessManager:
             cmd: Command to run
             log_file: Path to log file
             pid_file: Path to PID file
+            cwd: Working directory for subprocess
 
         Returns:
             Dict with restart status
@@ -143,7 +145,7 @@ class SubprocessManager:
             await self.stop_service(name)
 
         pid_file.unlink(missing_ok=True)
-        return await self.start_service(name, cmd, log_file, pid_file)
+        return await self.start_service(name, cmd, log_file, pid_file, cwd)
 
     async def start_service(
         self,
@@ -151,6 +153,7 @@ class SubprocessManager:
         cmd: list[str],
         log_file: Path,
         pid_file: Path,
+        cwd: Path | None = None,
     ) -> dict[str, Any]:
         """Start a service process.
 
@@ -159,6 +162,7 @@ class SubprocessManager:
             cmd: Command to run
             log_file: Path to log file
             pid_file: Path to PID file
+            cwd: Working directory for subprocess
 
         Returns:
             Dict with start status
@@ -177,6 +181,7 @@ class SubprocessManager:
                 cmd,
                 stdout=log_handle,
                 stderr=subprocess.STDOUT,
+                cwd=str(cwd) if cwd else None,
             )
 
             if process.pid is None:

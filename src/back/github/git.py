@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import shutil
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -178,6 +179,7 @@ def delete_repo(
     """Delete a local repository."""
     repos_dir = Path(repos_dir).resolve()
     repo_path = _get_repo_path(repos_dir, org, name)
+    selection_path = _get_selection_file_path(repos_dir, org, name)
 
     if not repo_path.exists():
         return {"success": False, "error": f"Repository '{org}/{name}' not found"}
@@ -189,6 +191,10 @@ def delete_repo(
         org_path = repos_dir / org
         if org_path.exists() and not any(org_path.iterdir()):
             org_path.rmdir()
+
+        if selection_path.exists():
+            selection_path.unlink()
+            logger.info(f"Deleted selection file for {org}/{name}")
 
         return {"success": True}
     except Exception as e:
@@ -256,3 +262,155 @@ def get_metadata(
     except json.JSONDecodeError as e:
         logger.error(f"Failed to parse metadata for '{org}/{name}': {e}")
         return None
+
+
+def _get_selection_file_path(repos_dir: Path, org: str, name: str) -> Path:
+    """Get path for selected directories file (outside repo dir)."""
+    repos_dir = Path(repos_dir).resolve()
+    return repos_dir / f"{org}_{name}_selected_dirs.json"
+
+
+def list_directory_tree(
+    org: str, name: str, repos_dir: Path = DEFAULT_REPOS_DIR, max_depth: int = 5
+) -> list[dict[str, Any]]:
+    """List directory tree for a repository.
+
+    Args:
+        org: Organization/user
+        name: Repository name
+        repos_dir: Base directory for cloned repos
+        max_depth: Maximum depth to traverse
+
+    Returns:
+        List of folder nodes with 'path', 'name', and optional 'children'
+    """
+    repos_dir = Path(repos_dir).resolve()
+    repo_path = _get_repo_path(repos_dir, org, name)
+
+    if not repo_path.exists() or not _is_valid_repo(repo_path):
+        return []
+
+    def _walk_dir(path: Path, current_depth: int) -> list[dict[str, Any]]:
+        if current_depth > max_depth:
+            return []
+        results = []
+        try:
+            for entry in sorted(path.iterdir()):
+                if entry.is_dir():
+                    if entry.name.startswith(".") or entry.name.startswith("__"):
+                        continue
+                    children = _walk_dir(entry, current_depth + 1)
+                    node = {
+                        "name": entry.name,
+                        "path": entry.relative_to(repo_path).as_posix(),
+                    }
+                    if children:
+                        node["children"] = children
+                    results.append(node)
+        except PermissionError:
+            pass
+        return results
+
+    return _walk_dir(repo_path, 1)
+
+
+def save_selected_dirs(
+    org: str, name: str, selected: list[str], repos_dir: Path = DEFAULT_REPOS_DIR
+) -> dict[str, Any]:
+    """Save selected directories for a repository.
+
+    Args:
+        org: Organization/user
+        name: Repository name
+        selected: List of relative folder paths
+        repos_dir: Base directory for cloned repos
+
+    Returns:
+        Result dict with success status
+    """
+    repos_dir = Path(repos_dir).resolve()
+    selection_path = _get_selection_file_path(repos_dir, org, name)
+
+    data = {
+        "repo_key": f"{org}/{name}",
+        "selected": selected,
+        "updated": datetime.now().isoformat(),
+    }
+
+    try:
+        repos_dir.mkdir(parents=True, exist_ok=True)
+        with open(selection_path, "w") as f:
+            json.dump(data, f, indent=2)
+        logger.info(f"Saved selection for {org}/{name}: {selected}")
+        return {"success": True}
+    except Exception as e:
+        logger.error(f"Failed to save selection for {org}/{name}: {e}")
+        return {"success": False, "error": str(e)}
+
+
+def get_selected_dirs(
+    org: str, name: str, repos_dir: Path = DEFAULT_REPOS_DIR
+) -> list[str]:
+    """Get selected directories for a repository.
+
+    Args:
+        org: Organization/user
+        name: Repository name
+        repos_dir: Base directory for cloned repos
+
+    Returns:
+        List of selected folder paths, empty if not found
+    """
+    repos_dir = Path(repos_dir).resolve()
+    selection_path = _get_selection_file_path(repos_dir, org, name)
+
+    if not selection_path.exists():
+        return []
+
+    try:
+        with open(selection_path) as f:
+            data = json.load(f)
+        return data.get("selected", [])
+    except (json.JSONDecodeError, OSError) as e:
+        logger.error(f"Failed to read selection for {org}/{name}: {e}")
+        return []
+
+
+def get_last_commit_date(
+    org: str, name: str, repos_dir: Path = DEFAULT_REPOS_DIR
+) -> str | None:
+    """Get the date of the last commit in the repository."""
+    repos_dir = Path(repos_dir).resolve()
+    repo_path = _get_repo_path(repos_dir, org, name)
+
+    repo = _get_or_create_repo(repo_path)
+    if repo is None:
+        return None
+
+    try:
+        commit = repo.head.commit
+        return commit.committed_datetime.isoformat()
+    except Exception:
+        return None
+
+
+def is_repo_outdated(org: str, name: str, repos_dir: Path = DEFAULT_REPOS_DIR) -> bool:
+    """Check if local repo is behind remote by comparing commit hashes."""
+    repos_dir = Path(repos_dir).resolve()
+    repo_path = _get_repo_path(repos_dir, org, name)
+
+    repo = _get_or_create_repo(repo_path)
+    if repo is None:
+        return False
+
+    try:
+        local_commit = repo.head.commit.hexsha
+        origin = repo.remotes.origin
+        origin.fetch()
+        for ref in origin.refs:
+            if ref.remote_head == repo.active_branch.name:
+                remote_commit = ref.commit.hexsha
+                return local_commit != remote_commit
+        return False
+    except Exception:
+        return False

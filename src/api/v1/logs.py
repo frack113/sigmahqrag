@@ -55,16 +55,15 @@ async def get_logs(
     Returns:
         JSON with log entries
     """
-    from src.shared import load_config
 
     if not source:
-        source = load_config().get("logging", {}).get("display_source", "system")
+        source = "system"
 
     if not lines:
-        lines = load_config().get("logging", {}).get("display_nb_line", 25)
+        lines = 25
 
     if not level:
-        level = load_config().get("logging", {}).get("display_level", "")
+        level = ""
 
     logs_dir = get_logs_dir()
     log_filename = LOG_FILES.get(source, LOG_FILES["system"])
@@ -116,10 +115,9 @@ async def clear_logs(
     Returns:
         JSON with success status
     """
-    from src.shared import load_config
 
     if not source:
-        source = load_config().get("logging", {}).get("display_source", "system")
+        source = "system"
 
     logs_dir = get_logs_dir()
     log_filename = LOG_FILES.get(source, LOG_FILES["system"])

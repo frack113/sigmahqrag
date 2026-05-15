@@ -49,6 +49,12 @@ class VectorSearchPayload(BaseModel):
     collection_name: str
 
 
+class EmbedSigmaRefPayload(BaseModel):
+    action: Literal["embed_sigmaref"] = "embed_sigmaref"
+    registry_path: str = "data/documents/sigmaref/registry.json"
+    collection_name: str = "sigma_rules"
+
+
 class QdrantActionRequest(BaseModel):
     action: Literal[
         "download_update",
@@ -58,6 +64,7 @@ class QdrantActionRequest(BaseModel):
         "vector_search",
         "progress",
         "cancel",
+        "embed_sigmaref",
     ]
     payload: (
         DownloadUpdatePayload
@@ -67,6 +74,7 @@ class QdrantActionRequest(BaseModel):
         | CollectionManagementPayload
         | DataManagementPayload
         | VectorSearchPayload
+        | EmbedSigmaRefPayload
     ) = Field(..., discriminator="action")
 
 

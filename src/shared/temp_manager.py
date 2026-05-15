@@ -80,5 +80,7 @@ def create_temp_manager() -> TempManager:
     """Create a singleton temp manager instance."""
     global _temp_manager
     if _temp_manager is None:
-        _temp_manager = TempManager()
+        from src.shared.config import TEMP_DIR
+
+        _temp_manager = TempManager(temp_dir=TEMP_DIR)
     return _temp_manager

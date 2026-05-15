@@ -3,10 +3,10 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import uuid
 from collections.abc import AsyncGenerator
 from pathlib import Path
 
-import jinja2
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse, StreamingResponse
 
@@ -20,14 +20,148 @@ from src.back.qdrant import (
 from src.back.qdrant.service import create_qdrant_service
 from src.back.qdrant.storage import delete_point, store_embeddings
 from src.back.qdrant.storage import search as qdrant_search
+from src.back.utils.file_utils import load_registry_files
 from src.shared.download_manager import create_download_manager
-from src.shared.schemas import QdrantActionRequest, QdrantActionResponse
+from src.shared.schemas.qdrant import EmbedSigmaRefPayload, QdrantActionRequest, QdrantActionResponse
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/qdrant", tags=["v1-qdrant"])
 
 SERVICE_NAME = "qdrant"
+
+# In-memory store for embed_sigmaref task progress
+_embed_tasks: dict[str, dict] = {}
+_embed_progress_queues: dict[str, asyncio.Queue] = {}
+
+
+async def _embed_progress_generator(task_id: str) -> AsyncGenerator[str, None]:
+    """Generate SSE progress updates for embed_sigmaref tasks."""
+    queue = _embed_progress_queues.get(task_id)
+
+    if not queue:
+        yield f"data: {json.dumps({'status': 'not_found'})}\n\n"
+        return
+
+    while True:
+        try:
+            data = await asyncio.wait_for(queue.get(), timeout=30.0)
+            yield f"data: {json.dumps(data)}\n\n"
+
+            if data.get("status") in ("completed", "failed"):
+                break
+        except TimeoutError:
+            yield f"data: {json.dumps({'status': 'timeout'})}\n\n"
+            break
+
+
+async def _run_embed_sigmaref(
+    task_id: str,
+    registry_path: Path,
+    collection_name: str,
+    progress_queue: asyncio.Queue,
+) -> None:
+    """Background task to embed all files from the SigmaRef registry."""
+    _embed_tasks[task_id]["status"] = "running"
+
+    try:
+        registry_entries = load_registry_files(registry_path)
+        if not registry_entries:
+            await progress_queue.put({
+                "status": "completed",
+                "task_id": task_id,
+                "message": "No files found in registry",
+                "total": 0,
+                "processed": 0,
+            })
+            _embed_tasks[task_id]["status"] = "completed"
+            return
+
+        total = len(registry_entries)
+        await progress_queue.put({
+            "status": "processing",
+            "task_id": task_id,
+            "total": total,
+            "processed": 0,
+            "current_file": "",
+        })
+
+        from src.back.rag.ingestion import IngestionPipelineBuilder
+        from llama_index.core.schema import Document
+
+        builder = IngestionPipelineBuilder(collection_name=collection_name)
+        base_dir = registry_path.parent
+
+        for idx, entry in enumerate(registry_entries):
+            file_hash = entry.get("hash", entry.get("id", ""))
+            file_name = entry.get("file_name", "")
+            relative_path = entry.get("path", entry.get("file_path", file_hash))
+            file_path = base_dir / file_hash if not (base_dir / relative_path).exists() else base_dir / relative_path
+
+            await progress_queue.put({
+                "status": "processing",
+                "task_id": task_id,
+                "total": total,
+                "processed": idx,
+                "current_file": file_name or file_hash,
+            })
+
+            # Read the document
+            doc_text = ""
+            try:
+                doc_text = file_path.read_text(encoding="utf-8")
+            except FileNotFoundError:
+                logger.warning(f"File not found: {file_path}, skipping")
+                _embed_tasks[task_id].setdefault("skipped", []).append(file_name or file_hash)
+                continue
+            except Exception as e:
+                logger.warning(f"Error reading {file_path}: {e}")
+                _embed_tasks[task_id].setdefault("errors", []).append({"file": file_name or file_hash, "error": str(e)})
+                continue
+
+            # Create metadata from registry entry
+            metadata = dict(entry)
+            metadata.pop("hash", None)
+            metadata["source"] = "sigmaref"
+            metadata["collection"] = collection_name
+
+            doc = Document(text=doc_text, metadata=metadata)
+            try:
+                builder.run(documents=[doc])
+            except Exception as e:
+                logger.error(f"Error embedding {file_name or file_hash}: {e}")
+                _embed_tasks[task_id].setdefault("errors", []).append({"file": file_name or file_hash, "error": str(e)})
+
+            # Small yield to prevent blocking
+            await asyncio.sleep(0)
+
+        processed = len(registry_entries) - len(_embed_tasks[task_id].get("errors", [])) - len(_embed_tasks[task_id].get("skipped", []))
+        await progress_queue.put({
+            "status": "completed",
+            "task_id": task_id,
+            "total": total,
+            "processed": processed,
+            "errors": len(_embed_tasks[task_id].get("errors", [])),
+            "skipped": len(_embed_tasks[task_id].get("skipped", [])),
+            "message": f"Processed {processed}/{total} files",
+        })
+        _embed_tasks[task_id]["status"] = "completed"
+
+    except Exception as e:
+        logger.error(f"Embed SigmaRef task {task_id} failed: {e}")
+        _embed_tasks[task_id]["status"] = "failed"
+        await progress_queue.put({
+            "status": "failed",
+            "task_id": task_id,
+            "error": str(e),
+        })
+    finally:
+        # Clean up after a delay
+        async def _cleanup():
+            await asyncio.sleep(300)
+            _embed_tasks.pop(task_id, None)
+            _embed_progress_queues.pop(task_id, None)
+        asyncio.create_task(_cleanup())
 
 
 async def _progress_generator(download_id: str) -> AsyncGenerator[str, None]:
@@ -56,9 +190,10 @@ async def qdrant_status():
     """Get status and version for qdrant service."""
     try:
         is_healthy = await check_health()
-        from src.back import get_qdrant_version
+        from src.shared import get_config
 
-        version = get_qdrant_version()
+        config = get_config()
+        version = config.qdrant_version
 
         manager = create_download_manager()
         downloads = {
@@ -73,6 +208,7 @@ async def qdrant_status():
                 "healthy": is_healthy,
                 "current_version": version or "unknown",
                 "downloads": downloads,
+                "mode": config.qdrant_mode,
             }
         )
     except Exception as e:
@@ -93,58 +229,58 @@ async def qdrant_progress(download_id: str):
         return JSONResponse(status_code=500, content={"error": str(e)})
 
 
+@router.get("/embed/{task_id}")
+async def embed_progress(task_id: str):
+    """Get the status of an embed_sigmaref task."""
+    task = _embed_tasks.get(task_id)
+    if not task:
+        return JSONResponse(status_code=404, content={"status": "not_found", "message": "Task not found"})
+    return JSONResponse(content={"status": task.get("status", "unknown"), "task_id": task_id, "details": task})
+
+
+@router.get("/embed/{task_id}/stream")
+async def embed_progress_stream(task_id: str):
+    """Stream SSE progress for an embed_sigmaref task."""
+    try:
+        return StreamingResponse(
+            _embed_progress_generator(task_id),
+            media_type="text/event-stream",
+        )
+    except Exception as e:
+        logger.error(f"embed progress error: {e}")
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+
 @router.post("")
 async def qdrant_action(request: QdrantActionRequest) -> QdrantActionResponse:
     """Unified endpoint for all Qdrant actions."""
     action = request.action
     payload = request.payload
 
-    # Configuration for Qdrant connection
-    from src.shared import get_qdrant_config
+    from src.shared import get_config
 
-    config = get_qdrant_config()
-    host = config.get("host", "127.0.0.1")
-    try:
-        port = int(config.get("port", 6333))
-    except (ValueError, TypeError):
-        port = 6333
+    config = get_config()
+    host = config.qdrant_host
+    port = config.qdrant_port
 
     try:
         if action == "download_update":
             manager = create_download_manager()
 
             async def post_install_call(target_path: Path):
-                template_path = Path("templates/config.yaml.j2")
-                if not template_path.exists():
-                    logger.error(f"Template not found: {template_path}")
-                    return
-
+                logger.info(f"post_install_call triggered: {target_path}")
                 try:
-                    template = jinja2.Template(template_path.read_text())
+                    from src.shared.config import Config
 
-                    from src.shared import QDRANT_STORAGE_DIR
-
-                    storage_path = QDRANT_STORAGE_DIR.resolve().as_posix()
-                    snapshots_path = (
-                        (QDRANT_STORAGE_DIR / "snapshots").resolve().as_posix()
+                    Config.ensure_qdrant_config()
+                    logger.info(
+                        "Qdrant config generated via Config.ensure_qdrant_config()"
                     )
-
-                    rendered = template.render(
-                        storage_path=storage_path, snapshots_path=snapshots_path
-                    )
-
-                    config_dir = target_path / "config"
-                    config_dir.mkdir(parents=True, exist_ok=True)
-                    config_file = config_dir / "api/v1/qdrant/config.yaml"
-                    # Wait, I should check where the config file should be written.
-                    # Looking at the original code:
-                    # config_file = config_dir / "config.yaml"
-                    # Let me fix that.
-                    config_file = config_dir / "config.yaml"
-                    config_file.write_text(rendered)
-                    logger.info(f"Qdrant config generated at: {config_file}")
                 except Exception as e:
+                    import traceback
+
                     logger.error(f"Failed to generate Qdrant config: {e}")
+                    logger.error(traceback.format_exc())
 
             download_id = await manager.start_download(
                 service="qdrant",
@@ -199,9 +335,7 @@ async def qdrant_action(request: QdrantActionRequest) -> QdrantActionResponse:
                 data = await list_collections(host, port)
                 return QdrantActionResponse(status="success", action=action, data=data)
             elif op == "create":
-                v_size = (
-                    payload.config.get("vector_size", 384) if payload.config else 384
-                )
+                v_size = payload.config.vector_size if payload.config else 384
                 await create_collection(host, port, name, v_size)
                 return QdrantActionResponse(
                     status="success",
@@ -259,6 +393,73 @@ async def qdrant_action(request: QdrantActionRequest) -> QdrantActionResponse:
                 top_k=payload.top_k,
             )
             return QdrantActionResponse(status="success", action=action, data=results)
+
+        elif action == "embed_sigmaref":
+            registry_path = Path(payload.registry_path)
+            if not registry_path.exists():
+                return QdrantActionResponse(
+                    status="error",
+                    action=action,
+                    error_code="REGISTRY_MISSING",
+                    message="Registry file not found",
+                )
+
+            # Check if a task is already running
+            existing_running = [tid for tid, t in _embed_tasks.items() if t.get("status") in ("running", "pending")]
+            if existing_running:
+                return QdrantActionResponse(
+                    status="error",
+                    action=action,
+                    error_code="ALREADY_RUNNING",
+                    message="Task already in progress",
+                )
+
+            # Check Qdrant health
+            try:
+                from src.back.qdrant import check_health as qdrant_health
+
+                if not await qdrant_health():
+                    return QdrantActionResponse(
+                        status="error",
+                        action=action,
+                        error_code="QDRANT_DOWN",
+                        message="Qdrant is unreachable",
+                    )
+            except Exception:
+                return QdrantActionResponse(
+                    status="error",
+                    action=action,
+                    error_code="QDRANT_DOWN",
+                    message="Qdrant is unreachable",
+                )
+
+            task_id = str(uuid.uuid4())
+            progress_queue = asyncio.Queue()
+            _embed_tasks[task_id] = {
+                "id": task_id,
+                "status": "pending",
+                "action": action,
+                "collection_name": payload.collection_name,
+                "registry_path": str(payload.registry_path),
+            }
+            _embed_progress_queues[task_id] = progress_queue
+
+            # Launch the background task
+            asyncio.create_task(
+                _run_embed_sigmaref(
+                    task_id=task_id,
+                    registry_path=registry_path,
+                    collection_name=payload.collection_name,
+                    progress_queue=progress_queue,
+                )
+            )
+
+            return QdrantActionResponse(
+                status="success",
+                action=action,
+                data={"task_id": task_id},
+                message="SigmaRef embedding started",
+            )
 
         else:
             return QdrantActionResponse(

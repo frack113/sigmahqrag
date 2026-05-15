@@ -129,15 +129,12 @@ class VersionManager:
             "windows", "linux", "macos", or None if not specified
         """
         try:
-            from src.shared import get_backend_os, load_config
+            from src.shared import get_config
 
-            config = load_config()
-            print(f"DEBUG: Full config: {config}")
-            os_val = config.get("backend", {}).get("os")
-            print(f"DEBUG: OS from backend config: {os_val}")
+            config = get_config()
+            os_val = config.os
             if not os_val:
-                os_val = get_backend_os()
-                print(f"DEBUG: OS from get_backend_os: {os_val}")
+                os_val = "windows"
             logger.info(f"OS from config: {os_val}")
             return os_val
         except Exception as e:
@@ -154,9 +151,9 @@ class VersionManager:
             "hip", "cuda", "cpu", or None if not specified
         """
         try:
-            from src.shared import get_backend_gpu_type
+            from src.shared import get_config
 
-            return get_backend_gpu_type()
+            return get_config().gpu_type
         except Exception as e:
             logger.debug(f"Could not read GPU preference from config: {e}")
         return None
@@ -351,12 +348,13 @@ async def get_current_version(service: str) -> str | None:
     Returns:
         Version string or None
     """
-    from src.shared import get_llamacpp_version, get_qdrant_version
+    from src.shared import get_config
 
+    config = get_config()
     if service in ("llama", "llama.cpp"):
-        return get_llamacpp_version()
+        return config.llamacpp_version
     elif service in ("qdrant", "qdrant_db"):
-        return get_qdrant_version()
+        return config.qdrant_version
     return None
 
 

@@ -3,27 +3,18 @@
 from __future__ import annotations
 
 import logging
-import os
 from typing import Any
 
 from llama_index.core.schema import TextNode
 
 from src.back.documents.models import SigmaRule
 from src.back.qdrant import QdrantService
+from src.shared import get_config
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_COLLECTION = "sigma_rules"
 EMBEDDING_DIM = 384
-
-
-def get_config() -> dict[str, str]:
-    """Get configuration from environment variables."""
-    return {
-        "qdrant_url": os.environ.get("QDRANT_URL", "127.0.0.1:6333"),
-        "qdrant_collection": os.environ.get("QDRANT_COLLECTION", DEFAULT_COLLECTION),
-        "embed_model": os.environ.get("EMBED_MODEL", "default"),
-    }
 
 
 async def index_sigma_rules(
@@ -40,16 +31,13 @@ async def index_sigma_rules(
         Dict with indexing results
     """
     config = get_config()
-    collection = collection_name or config["qdrant_collection"]
-
-    host, port_str = config["qdrant_url"].split(":")
-    port = int(port_str)
+    collection = collection_name or config.qdrant_collection_name
 
     service = QdrantService(
         collection_name=collection,
         vector_size=EMBEDDING_DIM,
-        host=host,
-        port=port,
+        host=config.qdrant_host,
+        port=config.qdrant_port,
     )
 
     try:
@@ -151,7 +139,7 @@ async def _generate_embeddings(nodes: list[TextNode]) -> list[list[float]]:
     Returns:
         List of embedding vectors
     """
-    from src.rag.embeddings import get_embedding_model
+    from src.back.rag.embeddings import get_embedding_model
 
     embed_model = get_embedding_model()
     texts = [node.text for node in nodes]
@@ -175,14 +163,12 @@ async def check_duplicate(rule_id: str, collection: str) -> bool:
         True if duplicate exists
     """
     config = get_config()
-    host, port_str = config["qdrant_url"].split(":")
-    port = int(port_str)
 
     service = QdrantService(
         collection_name=collection,
         vector_size=EMBEDDING_DIM,
-        host=host,
-        port=port,
+        host=config.qdrant_host,
+        port=config.qdrant_port,
     )
 
     try:

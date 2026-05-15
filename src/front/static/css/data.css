@@ -352,3 +352,153 @@
     background: #27ae60;
     color: #ffffff;
 }
+
+/* Embedding Config Page */
+.embedding-config {
+    padding: 16px 0;
+}
+
+.type-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.type-card {
+    background: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    padding: 20px;
+    transition: box-shadow 0.2s;
+}
+
+.type-card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.type-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.type-name {
+    font-weight: 600;
+    font-size: 16px;
+    color: #1a1a1a;
+    min-width: 120px;
+}
+
+.type-extensions {
+    font-size: 13px;
+    color: #7f8c8d;
+    font-family: monospace;
+}
+
+.status-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+    margin-left: auto;
+}
+
+.status-badge.supported {
+    background: #27ae60;
+    color: #ffffff;
+}
+
+.status-badge.unsupported {
+    background: #bdc3c7;
+    color: #ffffff;
+}
+
+.type-body label {
+    display: block;
+    font-size: 13px;
+    color: #666;
+    margin-bottom: 6px;
+}
+
+.model-input-group {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.model-input {
+    flex: 1;
+    padding: 10px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    font-family: monospace;
+    color: #1a1a1a;
+    background: #fff;
+    max-width: 400px;
+}
+
+.model-input:focus {
+    outline: none;
+    border-color: #3498db;
+    box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+}
+
+.save-btn {
+    padding: 10px 20px;
+    white-space: nowrap;
+}
+
+/* Advanced Parameters */
+.advanced-params {
+    margin-top: 12px;
+    border-top: 1px solid #eee;
+    padding-top: 10px;
+}
+
+.advanced-params summary {
+    font-size: 13px;
+    color: #7f8c8d;
+    cursor: pointer;
+    user-select: none;
+}
+
+.advanced-params summary:hover {
+    color: #3498db;
+}
+
+.advanced-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 12px;
+    margin-top: 10px;
+}
+
+.param-field label {
+    display: block;
+    font-size: 12px;
+    color: #666;
+    margin-bottom: 4px;
+}
+
+.param-field input,
+.param-field select {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 13px;
+    font-family: monospace;
+    color: #1a1a1a;
+    background: #fff;
+    box-sizing: border-box;
+}
+
+.param-field input:focus,
+.param-field select:focus {
+    outline: none;
+    border-color: #3498db;
+    box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+}

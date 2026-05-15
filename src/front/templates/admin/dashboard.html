@@ -54,7 +54,7 @@ function loadStatus() {
                     <span class="status-text">${qdrant.status || 'unknown'}</span>
                     ${qdrantInfo.current_version ? `<span class="version">v${qdrantInfo.current_version}</span>` : ''}
                 </div>
-                <div class="service-actions">
+                <div class="service-actions" id="qdrant-actions">
                     <button class="btn btn-sm btn-success" onclick="startService('qdrant')">Start</button>
                     <button class="btn btn-sm btn-danger" onclick="stopService('qdrant')">Stop</button>
                     <button class="btn btn-sm" onclick="showLogs('qdrant')">Logs</button>
@@ -62,6 +62,15 @@ function loadStatus() {
             </div>
         `;
         document.getElementById('status-cards').innerHTML = html;
+        
+        // Disable Qdrant management buttons in external mode
+        const isExternal = qdrantInfo.mode === 'external';
+        if (isExternal) {
+            const qdrantActions = document.getElementById('qdrant-actions');
+            if (qdrantActions) {
+                qdrantActions.querySelectorAll('button').forEach(b => b.disabled = true);
+            }
+        }
         
         // Update banner
         let bannerHtml = '';

@@ -90,13 +90,13 @@ class DownloadManager:
             version_to_check = version.lstrip("v")
 
         if service in ("llama", "llama.cpp"):
-            from src.shared import get_llamacpp_version
+            from src.shared import get_config
 
-            current_version = get_llamacpp_version()
+            current_version = get_config().llamacpp_version
         elif service in ("qdrant", "qdrant_db"):
-            from src.shared import get_qdrant_version
+            from src.shared import get_config
 
-            current_version = get_qdrant_version()
+            current_version = get_config().qdrant_version
         else:
             current_version = None
 
@@ -257,13 +257,17 @@ class DownloadManager:
                     version_str = task.version.lstrip("v")
 
                     if task.service in ("llama", "llama.cpp"):
-                        from src.shared import set_llamacpp_version
+                        from src.shared import get_config
 
-                        set_llamacpp_version(version_str)
+                        config = get_config()
+                        config.llamacpp_version = version_str
+                        config.save()
                     elif task.service in ("qdrant", "qdrant_db"):
-                        from src.shared import set_qdrant_version
+                        from src.shared import get_config
 
-                        set_qdrant_version(version_str)
+                        config = get_config()
+                        config.qdrant_version = version_str
+                        config.save()
 
                     logger.info(f"Download {download_id} completed: {task.target_path}")
 

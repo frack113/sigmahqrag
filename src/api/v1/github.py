@@ -8,12 +8,18 @@ from typing import Any
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel, Field
 
+from src.back.documents.sigma_ref_downloader import download_references
 from src.back.github.git import (
     clone_repo,
     delete_repo,
+    get_last_commit_date,
     get_metadata,
+    get_selected_dirs,
+    is_repo_outdated,
+    list_directory_tree,
     list_repos,
     save_metadata,
+    save_selected_dirs,
     update_repo,
 )
 
@@ -41,10 +47,13 @@ class RepositoryStatus(BaseModel):
 
     org: str
     name: str
-    repo_status: str = Field(..., description="synced|outdated|error|cloning|syncing")
     last_synced: datetime | None = None
     url: str | None = None
     branch: str | None = None
+    last_commit: str | None = None
+    sync_class: str = Field(
+        default="btn-success", description="btn-success|btn-warning|btn-unknown"
+    )
 
 
 def _extract_org_name(url: str) -> tuple[str, str]:
@@ -65,15 +74,26 @@ async def list_repos_handler() -> list[RepositoryStatus]:
     result = []
     for repo in repos:
         metadata = get_metadata(repo["org"], repo["name"]) or {}
-        status_val = metadata.get("status", "synced")
+        stored_status = metadata.get("status", "synced")
+
+        if stored_status == "cloning" or stored_status == "syncing":
+            sync_class = "btn-warning"
+        elif stored_status == "error":
+            sync_class = "btn-unknown"
+        else:
+            is_outdated = is_repo_outdated(repo["org"], repo["name"])
+            sync_class = "btn-danger" if is_outdated else "btn-success"
+
+        last_commit = get_last_commit_date(repo["org"], repo["name"])
         result.append(
             RepositoryStatus(
                 org=repo["org"],
                 name=repo["name"],
-                repo_status=status_val,
                 last_synced=metadata.get("last_synced"),
                 url=metadata.get("url"),
                 branch=metadata.get("branch"),
+                last_commit=last_commit,
+                sync_class=sync_class,
             )
         )
     return result
@@ -112,6 +132,7 @@ async def add_repo(
                     "created_at": datetime.now().isoformat(),
                 },
             )
+            save_selected_dirs(org, name, [])
         else:
             save_metadata(
                 org,
@@ -159,10 +180,14 @@ async def get_repo(org: str, name: str) -> RepositoryStatus:
 async def sync_repo(
     org: str,
     name: str,
-    branch: str = "main",
+    branch: str | None = None,
     background_tasks: BackgroundTasks = None,
 ) -> RepositoryResponse:
     """Sync a repository."""
+    metadata = get_metadata(org, name)
+    if branch is None:
+        branch = (metadata or {}).get("branch", "main")
+
     if ".." in branch or branch.startswith("/") or branch.endswith("/"):
         return RepositoryResponse(success=False, error="Invalid branch name")
     if len(branch) > 255:
@@ -225,4 +250,130 @@ async def get_repo_status(org: str, name: str) -> RepositoryStatus:
         last_synced=metadata.get("last_synced"),
         url=metadata.get("url"),
         branch=metadata.get("branch"),
+    )
+
+
+class DownloadRefRequest(BaseModel):
+    """Request to download Sigma rule references."""
+
+    rules_dir: str | None = Field(
+        default=None, description="Path to Sigma rules directory"
+    )
+    output_dir: str | None = Field(
+        default=None, description="Path to output directory for references"
+    )
+
+
+class DownloadRefResponse(BaseModel):
+    """Response for download-ref operation."""
+
+    success: bool
+    message: str | None = None
+    summary: dict[str, Any] | None = None
+    error: str | None = None
+
+
+@router.post("/download-ref", response_model=DownloadRefResponse)
+async def download_ref_handler(
+    background_tasks: BackgroundTasks,
+    request: DownloadRefRequest | None = None,
+) -> DownloadRefResponse:
+    """Download Sigma rule references for all managed repositories."""
+    if request is None:
+        request = DownloadRefRequest()
+
+    rules_dir = request.rules_dir or "data/github/sigmahq/sigma/rules"
+    output_dir = request.output_dir or "data/documents/sigmaref"
+
+    background_tasks.add_task(download_references, rules_dir, output_dir)
+
+    return DownloadRefResponse(
+        success=True,
+        message="Reference download started in background",
+    )
+
+
+class DirectoryTreeResponse(BaseModel):
+    """Response for directory tree listing."""
+
+    success: bool
+    tree: list[dict[str, Any]] = Field(default_factory=list)
+    error: str | None = None
+
+
+class SelectDirsRequest(BaseModel):
+    """Request to save selected directories."""
+
+    selected: list[str] = Field(
+        default_factory=list, description="List of folder paths"
+    )
+
+
+class SelectDirsResponse(BaseModel):
+    """Response for saving selected directories."""
+
+    success: bool
+    message: str | None = None
+    error: str | None = None
+
+
+@router.get("/repos/{org}/{name}/tree", response_model=DirectoryTreeResponse)
+async def get_repo_tree(
+    org: str,
+    name: str,
+    max_depth: int = 5,
+) -> DirectoryTreeResponse:
+    """Get directory tree for a repository."""
+    repos = list_repos()
+    repo_exists = any(r["org"] == org and r["name"] == name for r in repos)
+
+    if not repo_exists:
+        return DirectoryTreeResponse(
+            success=False,
+            error=f"Repository '{org}/{name}' not found or not cloned yet",
+        )
+
+    tree = list_directory_tree(org, name, max_depth=max_depth)
+    selected = get_selected_dirs(org, name)
+
+    for node in tree:
+        _mark_selected(node, selected)
+
+    return DirectoryTreeResponse(
+        success=True,
+        tree=tree,
+    )
+
+
+def _mark_selected(node: dict[str, Any], selected: list[str]) -> None:
+    """Mark nodes as selected based on their path."""
+    if node["path"] in selected:
+        node["selected"] = True
+    if "children" in node:
+        for child in node["children"]:
+            _mark_selected(child, selected)
+
+
+@router.post("/repos/{org}/{name}/select-dirs", response_model=SelectDirsResponse)
+async def select_dirs(
+    org: str,
+    name: str,
+    request: SelectDirsRequest,
+) -> SelectDirsResponse:
+    """Save selected directories for a repository."""
+    repos = list_repos()
+    if not any(r["org"] == org and r["name"] == name for r in repos):
+        return SelectDirsResponse(
+            success=False, error=f"Repository '{org}/{name}' not found"
+        )
+
+    result = save_selected_dirs(org, name, request.selected)
+    if result.get("success"):
+        return SelectDirsResponse(
+            success=True,
+            message=f"Saved {len(request.selected)} selected directories for {org}/{name}",
+        )
+    return SelectDirsResponse(
+        success=False,
+        error=result.get("error", "Failed to save selections"),
     )

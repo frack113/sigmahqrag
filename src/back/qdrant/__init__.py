@@ -8,8 +8,6 @@ from typing import Any
 import qdrant_client
 from llama_index.vector_stores.qdrant import QdrantVectorStore
 
-from src.shared import get_qdrant_version, set_qdrant_version
-
 from .collections import (
     create_collection,
     delete_collection,
@@ -24,12 +22,27 @@ logger = logging.getLogger(__name__)
 
 def get_version() -> str | None:
     """Get current qdrant version."""
-    return get_qdrant_version()
+    from src.shared import get_config
+
+    return get_config().qdrant_version
 
 
 def set_version(version: str) -> None:
     """Set qdrant version."""
-    set_qdrant_version(version)
+    from src.shared import get_config
+
+    config = get_config()
+    config.qdrant_version = version
+    config.save()
+
+
+def set_webui_version(version: str) -> None:
+    """Set qdrant webui version."""
+    from src.shared import get_config
+
+    config = get_config()
+    config.qdrant_webui_version = version
+    config.save()
 
 
 class QdrantVectorService:
@@ -43,17 +56,15 @@ class QdrantVectorService:
         port: int | None = None,
     ) -> None:
         """Initialize QdrantVectorService."""
-        from src.shared import get_qdrant_config
+        from src.shared import get_config
 
-        config = get_qdrant_config()
-        self.collection_name = collection_name or config.get(
-            "collection_name", "sigma_rules"
-        )
+        config = get_config()
+        self.collection_name = collection_name or config.qdrant_collection_name
         self.vector_size = (
-            vector_size if vector_size is not None else config.get("vector_size", 384)
+            vector_size if vector_size is not None else config.qdrant_vector_size
         )
-        self.host = host or config.get("host", "127.0.0.1")
-        self.port = port if port is not None else config.get("port", 6333)
+        self.host = host or config.qdrant_host
+        self.port = port if port is not None else config.qdrant_port
         self._client: object | None = None
         self._vector_store: object | None = None
 

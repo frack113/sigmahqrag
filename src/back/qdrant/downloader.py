@@ -19,8 +19,8 @@ QDRANT_DOWNLOAD_BASE = (
 QDRANT_UI_DOWNLOAD_URL = f"https://github.com/qdrant/qdrant-web-ui/releases/download/{QDRANT_UI_VERSION}/dist-qdrant.zip"
 
 QDRANT_BIN_DIR = Path("data/bin/qdrant")
-QDRANT_STATIC_DIR = Path("src/front/static")
-QDRANT_UI_DEST = Path("src/front/static/dist")
+QDRANT_STATIC_DIR = Path("data/bin/qdrant/static")
+QDRANT_UI_DEST = Path("data/bin/qdrant/static")
 
 
 class QdrantInstallerService:

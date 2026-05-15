@@ -2,15 +2,11 @@
 
 from __future__ import annotations
 
-import logging
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from src.shared import QDRANT_BIN_PATH
-
-logger = logging.getLogger(__name__)
-
-QDRANT_BIN = QDRANT_BIN_PATH()
+if TYPE_CHECKING:
+    from src.shared import Config
 
 _qdrant_service: QdrantBinaryService | None = None
 
@@ -20,15 +16,18 @@ class QdrantBinaryService:
 
     def __init__(
         self,
-        qdrant_bin: Path = QDRANT_BIN,
-        logs_dir: Path = Path("data/logs"),
-        pid_dir: Path = Path("data/pids"),
+        config: Config | None = None,
         subprocess_manager=None,
     ) -> None:
         """Initialize QdrantBinaryService."""
-        self.qdrant_bin = qdrant_bin
-        self.logs_dir = logs_dir
-        self.pid_dir = pid_dir
+        from src.shared import get_config
+
+        self._config = config or get_config()
+        self.qdrant_bin = Path(self._config.qdrant_binary_path).resolve()
+        self.logs_dir = Path(self._config.paths_logs_dir).resolve()
+        self.pid_dir = Path(
+            self._config.paths_logs_dir.replace("logs", "pids")
+        ).resolve()
 
         if subprocess_manager is None:
             from src.back.service_manager import get_subprocess_manager
@@ -39,7 +38,7 @@ class QdrantBinaryService:
 
     async def start(
         self,
-        config_path: str = "data/config/qdrant.yaml",
+        config_path: str | None = None,
     ) -> dict[str, Any]:
         """Start Qdrant server using config file."""
         qdrant_path = self.qdrant_bin
@@ -58,6 +57,9 @@ class QdrantBinaryService:
                 "error": f"Qdrant binary not found: {qdrant_path}",
             }
 
+        if config_path is None:
+            config_path = str(qdrant_path.parent / "config" / "config.yaml")
+
         log_file = self.logs_dir / "qdrant.log"
         pid_file = self.pid_dir / "qdrant.exe.pid"
 
@@ -70,6 +72,7 @@ class QdrantBinaryService:
             cmd=cmd,
             log_file=log_file,
             pid_file=pid_file,
+            cwd=self.qdrant_bin,
         )
 
     async def stop(self) -> dict[str, Any]:

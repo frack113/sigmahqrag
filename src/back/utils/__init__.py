@@ -1,5 +1,3 @@
-"""Utility functions for sigmahqrag."""
+from src.back.utils.identify_file_type import FileType, identify
 
-from .download import download_file
-
-__all__ = ["download_file"]
+__all__ = ["FileType", "identify"]

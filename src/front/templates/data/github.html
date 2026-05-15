@@ -1,0 +1,487 @@
+{% extends "data/base.html" %}
+
+{% block title %}GitHub - Data Sources{% endblock %}
+
+{% block page_content %}
+<h1>GitHub Repositories</h1>
+<p>Manage GitHub repositories for Sigma rule indexing.</p>
+
+<div class="github-container">
+    <div class="github-actions">
+        <button id="add-repo-btn" class="btn btn-primary">Add Repository</button>
+        <button id="refresh-btn" class="btn" onclick="loadRepos()">Refresh list</button>
+        <button id="download-ref-btn" class="btn btn-secondary" onclick="downloadRefs()">Download ref</button>
+    </div>
+
+    <div id="repos-list" class="repos-grid"></div>
+
+    <div id="select-repo-prompt" class="select-repo-prompt" style="display: none;">
+        <p>Click "Browse" on a repository to view and select directories for indexing.</p>
+    </div>
+</div>
+
+<div id="repo-detail" class="repo-detail-section" style="display: none;">
+    <div class="repo-detail-header">
+        <h2 id="selected-repo-name">Repository</h2>
+        <button id="close-detail-btn" class="btn" onclick="closeRepoDetail()">Close</button>
+    </div>
+
+    <div class="directory-browser">
+        <div class="directory-header">
+            <h3>Select Directories to Index</h3>
+            <div class="directory-actions">
+                <button id="expand-all-btn" class="btn btn-sm" onclick="expandAll()">Expand All</button>
+                <button id="collapse-all-btn" class="btn btn-sm" onclick="collapseAll()">Collapse All</button>
+                <button id="scan-selected-btn" class="btn btn-primary" onclick="saveSelectedDirs()">Scan Selected</button>
+            </div>
+        </div>
+        <div id="directory-tree" class="directory-tree"></div>
+        <div id="selected-count" class="selected-count"></div>
+    </div>
+</div>
+
+<div id="add-repo-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <h2>Add GitHub Repository</h2>
+        <form id="add-repo-form">
+            <div class="form-group">
+                <label for="repo-url">Repository (owner/repo)</label>
+                <input type="text" id="repo-url" name="url" placeholder="SigmaHQ/sigma" required>
+            </div>
+            <div class="form-group">
+                <label for="repo-branch">Branch</label>
+                <input type="text" id="repo-branch" name="branch" placeholder="main" value="main">
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Add</button>
+                <button type="button" class="btn" onclick="closeModal()">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const API_BASE = '/api/v1/github';
+let currentRepo = null;
+
+function formatDate(isoString) {
+    if (!isoString) return 'Unknown';
+    try {
+        const date = new Date(isoString);
+        return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+    } catch (e) {
+        return 'Unknown';
+    }
+}
+
+async function loadRepos() {
+    try {
+        const response = await fetch(API_BASE + '/repos');
+        if (!response.ok) throw new Error('API error');
+        const data = await response.json();
+        const repos = Array.isArray(data) ? data : (data.repos || []);
+        const container = document.getElementById('repos-list');
+        const prompt = document.getElementById('select-repo-prompt');
+        if (!container) return;
+        
+        if (repos.length === 0) {
+            container.innerHTML = '<p>No repositories managed</p>';
+            prompt.style.display = 'none';
+            return;
+        }
+        
+        prompt.style.display = 'block';
+        
+        container.innerHTML = repos.map(repo => `
+            <div class="repo-card">
+                <h3>${repo.org}/${repo.name}</h3>
+                <p>Last commit: ${formatDate(repo.last_commit)}</p>
+                <div class="repo-actions">
+                    <button onclick="syncRepo('${repo.org}', '${repo.name}')" class="btn btn-sm ${repo.sync_class || 'btn-unknown'}">Sync</button>
+                    <button onclick="openRepoDetail('${repo.org}', '${repo.name}')" class="btn btn-sm">Browse</button>
+                    <button onclick="deleteRepo('${repo.org}', '${repo.name}')" class="btn btn-danger btn-sm">Delete</button>
+                </div>
+            </div>
+        `).join('');
+    } catch (error) {
+        console.error('Failed to load repos:', error);
+        const container = document.getElementById('repos-list');
+        if (container) container.innerHTML = '<p>Error loading repositories</p>';
+    }
+}
+
+async function openRepoDetail(org, name) {
+    currentRepo = { org, name };
+    document.getElementById('selected-repo-name').textContent = org + '/' + name;
+    document.getElementById('repo-detail').style.display = 'block';
+    document.getElementById('selected-count').textContent = '';
+    await loadDirectoryTree(org, name);
+}
+
+function closeRepoDetail() {
+    document.getElementById('repo-detail').style.display = 'none';
+    currentRepo = null;
+    document.getElementById('directory-tree').innerHTML = '';
+}
+
+async function loadDirectoryTree(org, name) {
+    const container = document.getElementById('directory-tree');
+    container.innerHTML = '<p>Loading directory structure...</p>';
+    
+    try {
+        const response = await fetch(API_BASE + '/repos/' + org + '/' + name + '/tree');
+        if (!response.ok) throw new Error('API error');
+        const data = await response.json();
+        
+        if (!data.success) {
+            container.innerHTML = '<p class="info-message">Repository not cloned yet.</p>';
+            return;
+        }
+        
+        if (data.tree.length === 0) {
+            container.innerHTML = '<p class="info-message">No directories found in this repository.</p>';
+            return;
+        }
+        
+        container.innerHTML = '<ul class="tree-root">' + renderTreeNodes(data.tree) + '</ul>';
+    } catch (error) {
+        console.error('Failed to load directory tree:', error);
+        container.innerHTML = '<p>Error loading directory structure</p>';
+    }
+}
+
+function renderTreeNodes(nodes) {
+    return nodes.map(node => {
+        const hasChildren = node.children && node.children.length > 0;
+        const isSelected = node.selected ? 'checked' : '';
+        const childrenHtml = hasChildren ? '<ul class="tree-children" style="display:none;">' + renderTreeNodes(node.children) + '</ul>' : '';
+        return '<li class="tree-node">' +
+            '<div class="tree-item">' +
+                (hasChildren ? '<button class="tree-toggle" onclick="toggleNode(this)">&#9658;</button>' : '<span class="tree-spacer"></span>') +
+                '<input type="checkbox" class="folder-checkbox" value="' + node.path + '" ' + isSelected + ' onchange="onSelectionChange()">' +
+                '<span class="folder-icon">&#128193;</span>' +
+                '<span class="folder-name">' + node.name + '</span>' +
+            '</div>' +
+            childrenHtml +
+        '</li>';
+    }).join('');
+}
+
+function toggleNode(button) {
+    const li = button.closest('.tree-node');
+    const children = li.querySelector('.tree-children');
+    if (children) {
+        const isExpanded = children.style.display !== 'none';
+        children.style.display = isExpanded ? 'none' : 'block';
+        button.innerHTML = isExpanded ? '&#9658;' : '&#9660;';
+    }
+}
+
+function expandAll() {
+    document.querySelectorAll('.tree-children').forEach(el => el.style.display = 'block');
+    document.querySelectorAll('.tree-toggle').forEach(el => el.innerHTML = '&#9660;');
+}
+
+function collapseAll() {
+    document.querySelectorAll('.tree-children').forEach(el => el.style.display = 'none');
+    document.querySelectorAll('.tree-toggle').forEach(el => el.innerHTML = '&#9658;');
+}
+
+function onSelectionChange() {
+    if (!currentRepo) return;
+    
+    const selected = Array.from(document.querySelectorAll('.folder-checkbox:checked'))
+        .map(cb => cb.value);
+    
+    updateSelectedCount();
+    
+    fetch(API_BASE + '/repos/' + currentRepo.org + '/' + currentRepo.name + '/select-dirs', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ selected: selected })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            console.log('Selection saved automatically');
+        }
+    })
+    .catch(err => console.error('Failed to save selection:', err));
+}
+
+function updateSelectedCount() {
+    const checked = document.querySelectorAll('.folder-checkbox:checked').length;
+    document.getElementById('selected-count').textContent = checked > 0 ? 
+        checked + ' folder(s) selected' : '';
+}
+
+async function saveSelectedDirs() {
+    if (!currentRepo) return;
+    
+    const selected = Array.from(document.querySelectorAll('.folder-checkbox:checked'))
+        .map(cb => cb.value);
+    
+    if (selected.length === 0) {
+        alert('Please select at least one directory');
+        return;
+    }
+    
+    try {
+        const response = await fetch(API_BASE + '/repos/' + currentRepo.org + '/' + currentRepo.name + '/select-dirs', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ selected: selected })
+        });
+        const result = await response.json();
+        if (result.success) {
+            alert('Saved ' + selected.length + ' directory selection(s)');
+        } else {
+            alert(result.error || 'Failed to save selections');
+        }
+    } catch (error) {
+        alert('Failed to save selections');
+    }
+}
+
+document.getElementById('add-repo-btn').onclick = () => {
+    document.getElementById('add-repo-modal').style.display = 'block';
+};
+
+function closeModal() {
+    document.getElementById('add-repo-modal').style.display = 'none';
+    document.getElementById('add-repo-form').reset();
+}
+
+async function syncRepo(org, name) {
+    if (!confirm('Sync repository ' + org + '/' + name + '?')) return;
+    try {
+        const response = await fetch(API_BASE + '/repos/' + org + '/' + name + '/sync', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'}
+        });
+        const result = await response.json();
+        if (result.success) {
+            alert('Syncing repository...');
+            loadRepos();
+        } else {
+            alert(result.error || 'Failed to sync');
+        }
+    } catch (error) {
+        alert('Failed to sync repository');
+    }
+}
+
+async function deleteRepo(org, name) {
+    if (!confirm('Delete repository ' + org + '/' + name + '?')) return;
+    try {
+        const response = await fetch(API_BASE + '/repos/' + org + '/' + name, {
+            method: 'DELETE'
+        });
+        const result = await response.json();
+        if (result.success) {
+            if (currentRepo && currentRepo.org === org && currentRepo.name === name) {
+                closeRepoDetail();
+            }
+            loadRepos();
+        } else {
+            alert(result.error || 'Failed to delete');
+        }
+    } catch (error) {
+        alert('Failed to delete repository');
+    }
+}
+
+async function downloadRefs() {
+    const btn = document.getElementById('download-ref-btn');
+    btn.disabled = true;
+    btn.textContent = 'Starting...';
+    try {
+        const response = await fetch(API_BASE + '/download-ref', { method: 'POST' });
+        const result = await response.json();
+        if (result.success) {
+            alert(result.message || 'Download started in background');
+        } else {
+            alert(result.error || 'Download failed');
+        }
+    } catch (error) {
+        alert('Failed to download references');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Download ref';
+    }
+}
+
+document.getElementById('add-repo-form').onsubmit = async (e) => {
+    e.preventDefault();
+    const url = document.getElementById('repo-url').value.trim();
+    const branch = document.getElementById('repo-branch').value.trim() || 'main';
+    
+    if (!url) {
+        alert('Please enter a repository');
+        return;
+    }
+    
+    let repoUrl = url;
+    if (!url.startsWith('http') && !url.endsWith('.git')) {
+        repoUrl = 'https://github.com/' + url + '.git';
+    } else if (!url.endsWith('.git')) {
+        repoUrl = url + '.git';
+    }
+    
+    try {
+        const response = await fetch(API_BASE + '/repos', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({url: repoUrl, branch: branch})
+        });
+        const result = await response.json();
+        if (result.success) {
+            closeModal();
+            loadRepos();
+        } else {
+            alert(result.error || 'Failed to add repository');
+        }
+    } catch (error) {
+        alert('Failed to add repository');
+    }
+};
+
+loadRepos();
+</script>
+{% endblock %}
+
+{% block styles %}
+{{ super() }}
+<style>
+.repo-detail-section {
+    margin-top: 20px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+.repo-detail-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+.directory-browser {
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 15px;
+}
+.directory-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #eee;
+}
+.directory-actions {
+    display: flex;
+    gap: 10px;
+}
+.directory-tree {
+    max-height: 400px;
+    overflow-y: auto;
+}
+.tree-root, .tree-children {
+    list-style: none;
+    padding-left: 20px;
+    margin: 0;
+}
+.tree-node {
+    margin: 5px 0;
+}
+.tree-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+.tree-toggle {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    width: 20px;
+    color: #666;
+}
+.tree-spacer {
+    width: 20px;
+}
+.folder-checkbox {
+    margin-right: 5px;
+}
+.folder-icon {
+    margin-right: 5px;
+}
+.folder-name {
+    cursor: pointer;
+}
+.selected-count {
+    margin-top: 10px;
+    padding: 10px;
+    background: #e8f4f8;
+    border-radius: 4px;
+    font-weight: 500;
+}
+.select-repo-prompt {
+    padding: 20px;
+    text-align: center;
+    color: #666;
+    background: #f8f9fa;
+    border-radius: 4px;
+    margin-top: 10px;
+}
+.info-message {
+    color: #666;
+    padding: 20px;
+    text-align: center;
+}
+.repo-status {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    margin-right: 8px;
+}
+.repo-status.synced {
+    background: #d4edda;
+    color: #155724;
+}
+.repo-status.outdated {
+    background: #fff3cd;
+    color: #856404;
+}
+.repo-status.error, .repo-status.cloning, .repo-status.syncing {
+    background: #f8d7da;
+    color: #721c24;
+}
+.btn-success {
+    background: #27ae60;
+    color: white;
+    border: none;
+}
+.btn-danger {
+    background: #e74c3c;
+    color: white;
+    border: none;
+}
+.btn-warning {
+    background: #f39c12;
+    color: white;
+    border: none;
+}
+.btn-unknown {
+    background: #333;
+    color: white;
+    border: none;
+}
+</style>
+{% endblock %}
