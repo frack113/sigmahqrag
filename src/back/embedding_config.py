@@ -3,51 +3,48 @@
 from __future__ import annotations
 
 import logging
-from pathlib import Path
-from tomllib import TOMLDecodeError
 
-from src.shared.toml_service import TOMLService, deep_merge
+from src.back.database import DatabaseService
 
 logger = logging.getLogger(__name__)
 
-CONFIG_FILE = Path("data/embedding.toml")
-
 
 class EmbeddingTypeConfig:
-    """Manages the embedding.toml config file for type-to-model mapping."""
-
-    def __init__(self) -> None:
-        self._toml = TOMLService(CONFIG_FILE)
+    """Manages the embedding config via DuckDB for type-to-model mapping."""
 
     def load(self) -> dict:
-        """Load the current config. Returns {} if missing or corrupted."""
-        try:
-            return self._toml.load(use_cache=False)
-        except TOMLDecodeError:
-            logger.warning("Failed to parse embedding config, returning empty")
+        """Load the current config. Returns {} if missing."""
+        db = DatabaseService.get_instance()
+        if db is None:
             return {}
+        return db.get_embedding_config()
 
     def save(self, data: dict) -> bool:
-        """Save config dict to file."""
-        return self._toml.save(data)
+        """Save config dict to DuckDB."""
+        db = DatabaseService.get_instance()
+        if db is None:
+            return False
+        try:
+            for doc_type, cfg in data.items():
+                if isinstance(cfg, dict):
+                    db.set_embedding_config(doc_type, cfg)
+            return True
+        except Exception as e:
+            logger.error(f"Failed to save embedding config: {e}")
+            return False
 
     def update_type(self, type_key: str, body: dict) -> dict | None:
-        """Update or remove a type configuration.
-
-        Deep-merges body under type_key. If model is empty string,
-        removes the type_key section entirely.
-        Returns the updated full config, or None on failure.
-        """
-        config = self.load()
+        db = DatabaseService.get_instance()
+        if db is None:
+            return None
         model = (body.get("model") or "").strip()
         if not model:
-            config.pop(type_key, None)
+            db.delete_embedding_config(type_key)
         else:
+            config = self.load()
             existing = config.get(type_key)
             if not isinstance(existing, dict):
                 existing = {}
-            config[type_key] = existing
-            deep_merge(config[type_key], body)
-        if self.save(config):
-            return config
-        return None
+            existing.update(body)
+            db.set_embedding_config(type_key, existing)
+        return self.load()

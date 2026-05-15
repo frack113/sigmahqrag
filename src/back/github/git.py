@@ -2,21 +2,20 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import shutil
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from git import Repo
 from git.exc import InvalidGitRepositoryError
 
+from src.back.database import DatabaseService
+
 logger = logging.getLogger(__name__)
 
 DEFAULT_REPOS_DIR = Path("data/github")
 LOCKFILE = ".cloning"
-METADATA_FILE = "metadata.json"
 
 
 def _get_repo_path(repos_dir: Path, org: str, name: str) -> Path:
@@ -84,9 +83,7 @@ def clone_repo(
     # Extract org/name from URL using gitpython's remote
     if org is None or name is None:
         try:
-            temp_clone = Repo.clone_from(
-                url, temp_dir / "__extract__", depth=1
-            )
+            temp_clone = Repo.clone_from(url, temp_dir / "__extract__", depth=1)
             remote_url = temp_clone.remote().url
             # git@github.com:org/name.git or https://github.com/org/name.git
             parts = remote_url.rstrip("/").replace(".git", "").split("/")
@@ -186,7 +183,7 @@ def delete_repo(
     """Delete a local repository."""
     repos_dir = Path(repos_dir).resolve()
     repo_path = _get_repo_path(repos_dir, org, name)
-    selection_path = _get_selection_file_path(repos_dir, org, name)
+    repo_key = _get_repo_key(org, name)
 
     if not repo_path.exists():
         return {"success": False, "error": f"Repository '{org}/{name}' not found"}
@@ -199,9 +196,10 @@ def delete_repo(
         if org_path.exists() and not any(org_path.iterdir()):
             org_path.rmdir()
 
-        if selection_path.exists():
-            selection_path.unlink()
-            logger.info(f"Deleted selection file for {org}/{name}")
+        db = DatabaseService.get_instance()
+        if db:
+            db.delete_git_metadata(repo_key)
+            db.delete_selected_dirs(repo_key)
 
         return {"success": True}
     except Exception as e:
@@ -240,41 +238,28 @@ def list_repos(repos_dir: Path = DEFAULT_REPOS_DIR) -> list[dict[str, Any]]:
 def save_metadata(
     org: str, name: str, metadata: dict[str, Any], repos_dir: Path = DEFAULT_REPOS_DIR
 ) -> None:
-    """Save metadata for a repository."""
-    repos_dir = Path(repos_dir).resolve()
-    repo_path = _get_repo_path(repos_dir, org, name)
-    if not repo_path.exists():
-        logger.error(f"Repository '{org}/{name}' not found, cannot save metadata")
+    """Save metadata for a repository to DuckDB."""
+    db = DatabaseService.get_instance()
+    if db is None:
+        logger.error("DatabaseService not available, cannot save metadata")
         return
-    metadata_path = repo_path / METADATA_FILE
-    try:
-        with open(metadata_path, "w") as f:
-            json.dump(metadata, f, indent=2)
-    except TypeError as e:
-        logger.error(f"Failed to serialize metadata for '{org}/{name}': {e}")
+    repo_key = f"{org}/{name}"
+    db.set_git_metadata(repo_key, metadata)
 
 
 def get_metadata(
     org: str, name: str, repos_dir: Path = DEFAULT_REPOS_DIR
 ) -> dict[str, Any] | None:
-    """Get metadata for a repository."""
-    repos_dir = Path(repos_dir).resolve()
-    repo_path = _get_repo_path(repos_dir, org, name)
-    metadata_path = repo_path / METADATA_FILE
-    if not metadata_path.exists():
+    """Get metadata for a repository from DuckDB."""
+    db = DatabaseService.get_instance()
+    if db is None:
         return None
-    try:
-        with open(metadata_path) as f:
-            return json.load(f)
-    except json.JSONDecodeError as e:
-        logger.error(f"Failed to parse metadata for '{org}/{name}': {e}")
-        return None
+    repo_key = f"{org}/{name}"
+    return db.get_git_metadata(repo_key)
 
 
-def _get_selection_file_path(repos_dir: Path, org: str, name: str) -> Path:
-    """Get path for selected directories file (outside repo dir)."""
-    repos_dir = Path(repos_dir).resolve()
-    return repos_dir / f"{org}_{name}_selected_dirs.json"
+def _get_repo_key(org: str, name: str) -> str:
+    return f"{org}/{name}"
 
 
 def list_directory_tree(
@@ -324,7 +309,7 @@ def list_directory_tree(
 def save_selected_dirs(
     org: str, name: str, selected: list[str], repos_dir: Path = DEFAULT_REPOS_DIR
 ) -> dict[str, Any]:
-    """Save selected directories for a repository.
+    """Save selected directories for a repository to DuckDB.
 
     Args:
         org: Organization/user
@@ -335,19 +320,12 @@ def save_selected_dirs(
     Returns:
         Result dict with success status
     """
-    repos_dir = Path(repos_dir).resolve()
-    selection_path = _get_selection_file_path(repos_dir, org, name)
-
-    data = {
-        "repo_key": f"{org}/{name}",
-        "selected": selected,
-        "updated": datetime.now().isoformat(),
-    }
-
+    db = DatabaseService.get_instance()
+    if db is None:
+        return {"success": False, "error": "DatabaseService not available"}
+    repo_key = _get_repo_key(org, name)
     try:
-        repos_dir.mkdir(parents=True, exist_ok=True)
-        with open(selection_path, "w") as f:
-            json.dump(data, f, indent=2)
+        db.set_selected_dirs(repo_key, selected)
         logger.info(f"Saved selection for {org}/{name}: {selected}")
         return {"success": True}
     except Exception as e:
@@ -358,7 +336,7 @@ def save_selected_dirs(
 def get_selected_dirs(
     org: str, name: str, repos_dir: Path = DEFAULT_REPOS_DIR
 ) -> list[str]:
-    """Get selected directories for a repository.
+    """Get selected directories for a repository from DuckDB.
 
     Args:
         org: Organization/user
@@ -368,17 +346,13 @@ def get_selected_dirs(
     Returns:
         List of selected folder paths, empty if not found
     """
-    repos_dir = Path(repos_dir).resolve()
-    selection_path = _get_selection_file_path(repos_dir, org, name)
-
-    if not selection_path.exists():
+    db = DatabaseService.get_instance()
+    if db is None:
         return []
-
+    repo_key = _get_repo_key(org, name)
     try:
-        with open(selection_path) as f:
-            data = json.load(f)
-        return data.get("selected", [])
-    except (json.JSONDecodeError, OSError) as e:
+        return db.get_selected_dirs(repo_key)
+    except Exception as e:
         logger.error(f"Failed to read selection for {org}/{name}: {e}")
         return []
 

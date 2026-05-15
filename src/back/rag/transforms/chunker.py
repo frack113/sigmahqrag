@@ -30,12 +30,8 @@ class Chunker:
         metadata = document.get("metadata") or {}
         doc = Document(text=text, metadata=metadata)
         nodes = self._splitter([doc])
-        return [
-            {"text": n.text, "metadata": n.metadata} for n in nodes
-        ]
+        return [{"text": n.text, "metadata": n.metadata} for n in nodes]
 
     def chunk_documents(self, documents: list[Document]) -> list[dict[str, Any]]:
         nodes = self._splitter(documents)
-        return [
-            {"text": n.text, "metadata": n.metadata} for n in nodes
-        ]
+        return [{"text": n.text, "metadata": n.metadata} for n in nodes]

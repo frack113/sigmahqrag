@@ -290,6 +290,7 @@ async def delete_embedding_model(repo_id: str) -> JSONResponse:
         logger.error(f"Delete failed: {e}")
         return JSONResponse(status_code=500, content={"error": str(e)})
 
+
 @router.get("/embeddings/search")
 async def search_embedding_models(
     query: str,
@@ -304,10 +305,12 @@ async def search_embedding_models(
         logger.error(f"Search failed: {e}")
         return JSONResponse(status_code=500, content={"error": str(e)})
 
+
 # ============= Embedding Config =============
 _config_manager = EmbeddingTypeConfig()
 MODEL_ID_RE = re.compile(r"^[\w.-]+/[\w.-]+$")
 VALID_TYPE_KEYS = {ft.value for ft in FileType}
+
 
 @router.get("/embeddings/config")
 async def get_embedding_config() -> JSONResponse:
@@ -347,6 +350,7 @@ async def update_type_config(type_key: str, body: dict) -> JSONResponse:
     if config is None:
         return JSONResponse(status_code=500, content={"error": "Failed to save config"})
     return JSONResponse(content=json.loads(json.dumps(config, default=str)))
+
 
 @router.get("/embeddings/{repo_id}/files")
 async def get_embedding_files(

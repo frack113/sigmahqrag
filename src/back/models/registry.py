@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
+
+from src.back.database import DatabaseService
 
 
 class UnifiedRegistry:
@@ -12,57 +13,110 @@ class UnifiedRegistry:
     def __init__(self, registry_path: Path | None = None) -> None:
         self._registry_path = registry_path or Path("data/models/registry.json")
         self._registry: dict[str, dict[str, dict]] = {"llm": {}, "embeddings": {}}
-        self._load()
+        self._loaded = False
+
+    def _ensure_loaded(self) -> None:
+        if self._loaded:
+            return
+        self._loaded = True
+        db = DatabaseService.get_instance()
+        if db is None:
+            return
+        models = db.get_models()
+        for m in models:
+            repo_id = m["repo_id"]
+            model_type = m["model_type"]
+            entry = {
+                "local_path": m.get("local_path"),
+                "file_size": m.get("file_size", 0),
+                "status": m.get("status", "ready"),
+            }
+            if model_type == "llm":
+                files = m.get("files")
+                if files:
+                    entry["files"] = files
+            elif model_type == "embeddings":
+                dim = m.get("dimension")
+                if dim is not None:
+                    entry["dimension"] = dim
+                index_path = m.get("index_path")
+                if index_path:
+                    entry["index_path"] = index_path
+            if model_type == "llm":
+                self._registry["llm"][repo_id] = entry
+            elif model_type == "embeddings":
+                self._registry["embeddings"][repo_id] = entry
 
     def _load(self) -> None:
-        if self._registry_path.exists():
-            with open(self._registry_path) as f:
-                self._registry = json.load(f)
-        if "llm" not in self._registry:
-            self._registry["llm"] = {}
-        if "embeddings" not in self._registry:
-            self._registry["embeddings"] = {}
+        self._ensure_loaded()
 
     def _save(self) -> None:
-        self._registry_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(self._registry_path, "w") as f:
-            json.dump(self._registry, f, indent=2)
+        db = DatabaseService.get_instance()
+        if db is None:
+            return
+        for model_type in ("llm", "embeddings"):
+            for repo_id, record in self._registry[model_type].items():
+                data = {
+                    "repo_id": repo_id,
+                    "model_type": model_type,
+                    "local_path": record.get("local_path"),
+                    "file_size": record.get("file_size", 0),
+                    "status": record.get("status", "ready"),
+                    "files": record.get("files"),
+                }
+                if model_type == "embeddings":
+                    data["dimension"] = record.get("dimension")
+                    data["index_path"] = record.get("index_path")
+                db.upsert_model(data)
 
     def get_llm(self, repo_id: str) -> dict | None:
+        self._ensure_loaded()
         return self._registry["llm"].get(repo_id)
 
     def get_embedding(self, repo_id: str) -> dict | None:
+        self._ensure_loaded()
         return self._registry["embeddings"].get(repo_id)
 
     def list_llms(self) -> dict[str, dict]:
+        self._ensure_loaded()
         return self._registry["llm"]
 
     def list_embeddings(self) -> dict[str, dict]:
+        self._ensure_loaded()
         return self._registry["embeddings"]
 
     def add_llm(self, repo_id: str, record: dict) -> None:
+        self._ensure_loaded()
         self._registry["llm"][repo_id] = record
         self._save()
 
     def add_embedding(self, repo_id: str, record: dict) -> None:
+        self._ensure_loaded()
         self._registry["embeddings"][repo_id] = record
         self._save()
 
     def remove_llm(self, repo_id: str) -> bool:
+        self._ensure_loaded()
         if repo_id in self._registry["llm"]:
             del self._registry["llm"][repo_id]
-            self._save()
+            db = DatabaseService.get_instance()
+            if db:
+                db.delete_model(repo_id)
             return True
         return False
 
     def remove_embedding(self, repo_id: str) -> bool:
+        self._ensure_loaded()
         if repo_id in self._registry["embeddings"]:
             del self._registry["embeddings"][repo_id]
-            self._save()
+            db = DatabaseService.get_instance()
+            if db:
+                db.delete_model(repo_id)
             return True
         return False
 
     def sync_llm_folder(self, llm_dir: Path) -> None:
+        self._ensure_loaded()
         if not llm_dir.exists():
             return
 
@@ -108,6 +162,7 @@ class UnifiedRegistry:
         self._save()
 
     def sync_embeddings_folder(self, embeddings_dir: Path) -> None:
+        self._ensure_loaded()
         if not embeddings_dir.exists():
             return
 

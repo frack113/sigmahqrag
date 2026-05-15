@@ -101,9 +101,10 @@ async def check_service_health() -> dict[str, Any]:
                 # llama-server.exe returns {"status": "ok"} when ready, not
                 # {"status": "healthy"} — the previous check was permanently
                 # inactive even with a healthy server.
-                if response.status_code == 200 and response.json().get(
-                    "status"
-                ) in {"ok", "healthy"}:
+                if response.status_code == 200 and response.json().get("status") in {
+                    "ok",
+                    "healthy",
+                }:
                     result["llama_cpp"]["status"] = "active"
             except Exception:
                 result["llama_cpp"]["status"] = "inactive"

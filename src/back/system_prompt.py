@@ -4,40 +4,48 @@ from __future__ import annotations
 
 import re
 import uuid
-from pathlib import Path
 
-from src.shared.toml_service import TOMLService
+from src.back.database import DatabaseService
 
-PROMPTS_FILE = Path("data/system_prompt.toml")
-
-_prompts_service: TOMLService | None = None
-
-
-def _get_prompts_service() -> TOMLService:
-    """Get or create the prompts TOML service singleton."""
-    global _prompts_service
-    if _prompts_service is None:
-        _prompts_service = TOMLService(PROMPTS_FILE)
-    elif _prompts_service.file_path != PROMPTS_FILE:
-        _prompts_service = TOMLService(PROMPTS_FILE)
-    return _prompts_service
+_prompts: dict[str, Prompt] = {}
 
 
 def _load_all() -> dict[str, Prompt]:
-    """Load all prompts from TOML file."""
-    toml_service = _get_prompts_service()
-    data = toml_service.load()
+    db = DatabaseService.get_instance()
+    if db is None:
+        return {}
+    prompts_list = db.get_prompts()
     return {
-        p_id: Prompt.from_dict(p_data)
-        for p_id, p_data in data.get("prompts", {}).items()
+        p["id"]: Prompt(
+            prompt_id=p["id"],
+            name=p["name"],
+            description=p.get("description", ""),
+            content=p["content"],
+            is_active=p.get("is_active", False),
+        )
+        for p in prompts_list
     }
 
 
 def _save_all(prompts: dict[str, Prompt]) -> None:
-    """Save all prompts to TOML file."""
-    toml_service = _get_prompts_service()
-    data = {"prompts": {p_id: p.to_dict() for p_id, p in prompts.items()}}
-    toml_service.save(data)
+    db = DatabaseService.get_instance()
+    if db is None:
+        return
+    for p in prompts.values():
+        db.upsert_prompt(
+            {
+                "id": p.id,
+                "name": p.name,
+                "description": p.description,
+                "content": p.content,
+                "is_active": p.is_active,
+            }
+        )
+
+
+def _ensure_loaded() -> None:
+    global _prompts
+    _prompts = _load_all()
 
 
 def validate_name(name: str) -> None:
@@ -91,21 +99,9 @@ class Prompt:
         )
 
 
-_prompts: dict[str, Prompt] = {}
-
-
-def _initialize_prompts() -> None:
-    """Initialize prompts from TOML file."""
-    global _prompts
-    _prompts = _load_all()
-
-
-# Initialize prompts on module load
-_initialize_prompts()
-
-
 def list_prompts() -> list[dict]:
     """List all prompts."""
+    _ensure_loaded()
     return [
         {
             "id": p.id,
@@ -119,23 +115,27 @@ def list_prompts() -> list[dict]:
 
 def get_prompt_content(prompt_id: str) -> str | None:
     """Get prompt content by ID."""
+    _ensure_loaded()
     prompt = _prompts.get(prompt_id)
     return prompt.content if prompt else None
 
 
 def get_prompt_description(prompt_id: str) -> str | None:
     """Get prompt description by ID."""
+    _ensure_loaded()
     prompt = _prompts.get(prompt_id)
     return prompt.description if prompt else None
 
 
 def get_prompt_by_id(prompt_id: str) -> Prompt | None:
     """Get a prompt by ID."""
+    _ensure_loaded()
     return _prompts.get(prompt_id)
 
 
 def get_prompt_by_name(name: str) -> Prompt | None:
     """Get a prompt by its name."""
+    _ensure_loaded()
     for prompt in _prompts.values():
         if prompt.name == name:
             return prompt
@@ -144,6 +144,7 @@ def get_prompt_by_name(name: str) -> Prompt | None:
 
 def get_active_prompt() -> Prompt | None:
     """Get the active prompt."""
+    _ensure_loaded()
     for prompt in _prompts.values():
         if prompt.is_active:
             return prompt
@@ -167,6 +168,7 @@ def update_prompt(
     prompt_id: str, name: str = None, description: str = None, content: str = None
 ) -> bool:
     """Update an existing prompt."""
+    _ensure_loaded()
     prompt = _prompts.get(prompt_id)
     if not prompt:
         return False
@@ -186,6 +188,7 @@ def update_prompt(
 
 def set_active_prompt(prompt_id: str) -> bool:
     """Set a prompt as active."""
+    _ensure_loaded()
     for p in _prompts.values():
         p.is_active = p.id == prompt_id
     _save_all(_prompts)
@@ -194,8 +197,11 @@ def set_active_prompt(prompt_id: str) -> bool:
 
 def delete_prompt(prompt_id: str) -> None:
     """Delete a prompt by ID."""
+    _ensure_loaded()
     if prompt_id in _prompts:
         del _prompts[prompt_id]
-        _save_all(_prompts)
+        db = DatabaseService.get_instance()
+        if db:
+            db.delete_prompt(prompt_id)
     else:
         raise ValueError(f"Prompt ID '{prompt_id}' not found")

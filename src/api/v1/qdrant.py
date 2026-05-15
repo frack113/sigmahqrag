@@ -70,26 +70,30 @@ async def _run_embed_sigmaref(
     try:
         registry_entries = load_registry_files(registry_path)
         if not registry_entries:
-            await progress_queue.put({
-                "status": "completed",
-                "task_id": task_id,
-                "message": "No files found in registry",
-                "total": 0,
-                "processed": 0,
-            })
+            await progress_queue.put(
+                {
+                    "status": "completed",
+                    "task_id": task_id,
+                    "message": "No files found in registry",
+                    "total": 0,
+                    "processed": 0,
+                }
+            )
             _embed_tasks[task_id]["status"] = "completed"
             return
 
         total = len(registry_entries)
         _embed_tasks[task_id]["total"] = total
         _embed_tasks[task_id]["processed"] = 0
-        await progress_queue.put({
-            "status": "processing",
-            "task_id": task_id,
-            "total": total,
-            "processed": 0,
-            "current_file": "",
-        })
+        await progress_queue.put(
+            {
+                "status": "processing",
+                "task_id": task_id,
+                "total": total,
+                "processed": 0,
+                "current_file": "",
+            }
+        )
 
         from llama_index.core.schema import Document
 
@@ -102,17 +106,23 @@ async def _run_embed_sigmaref(
             file_hash = entry.get("hash", entry.get("id", ""))
             file_name = entry.get("file_name", "")
             relative_path = entry.get("path", entry.get("file_path", file_hash))
-            file_path = base_dir / file_hash if not (base_dir / relative_path).exists() else base_dir / relative_path
+            file_path = (
+                base_dir / file_hash
+                if not (base_dir / relative_path).exists()
+                else base_dir / relative_path
+            )
 
             _embed_tasks[task_id]["processed"] = idx
             _embed_tasks[task_id]["current_file"] = file_name or file_hash
-            await progress_queue.put({
-                "status": "processing",
-                "task_id": task_id,
-                "total": total,
-                "processed": idx,
-                "current_file": file_name or file_hash,
-            })
+            await progress_queue.put(
+                {
+                    "status": "processing",
+                    "task_id": task_id,
+                    "total": total,
+                    "processed": idx,
+                    "current_file": file_name or file_hash,
+                }
+            )
 
             # Read the document
             doc_text = ""
@@ -120,11 +130,15 @@ async def _run_embed_sigmaref(
                 doc_text = file_path.read_text(encoding="utf-8")
             except FileNotFoundError:
                 logger.warning(f"File not found: {file_path}, skipping")
-                _embed_tasks[task_id].setdefault("skipped", []).append(file_name or file_hash)
+                _embed_tasks[task_id].setdefault("skipped", []).append(
+                    file_name or file_hash
+                )
                 continue
             except Exception as e:
                 logger.warning(f"Error reading {file_path}: {e}")
-                _embed_tasks[task_id].setdefault("errors", []).append({"file": file_name or file_hash, "error": str(e)})
+                _embed_tasks[task_id].setdefault("errors", []).append(
+                    {"file": file_name or file_hash, "error": str(e)}
+                )
                 continue
 
             # Create metadata from registry entry
@@ -138,39 +152,50 @@ async def _run_embed_sigmaref(
                 builder.run(documents=[doc])
             except Exception as e:
                 logger.error(f"Error embedding {file_name or file_hash}: {e}")
-                _embed_tasks[task_id].setdefault("errors", []).append({"file": file_name or file_hash, "error": str(e)})
+                _embed_tasks[task_id].setdefault("errors", []).append(
+                    {"file": file_name or file_hash, "error": str(e)}
+                )
 
             # Small yield to prevent blocking
             await asyncio.sleep(0)
 
-        processed = len(registry_entries) - len(_embed_tasks[task_id].get("errors", [])) - len(_embed_tasks[task_id].get("skipped", []))
+        processed = (
+            len(registry_entries)
+            - len(_embed_tasks[task_id].get("errors", []))
+            - len(_embed_tasks[task_id].get("skipped", []))
+        )
         _embed_tasks[task_id]["status"] = "completed"
         _embed_tasks[task_id]["processed"] = processed
         _embed_tasks[task_id]["total"] = total
-        await progress_queue.put({
-            "status": "completed",
-            "task_id": task_id,
-            "total": total,
-            "processed": processed,
-            "errors": len(_embed_tasks[task_id].get("errors", [])),
-            "skipped": len(_embed_tasks[task_id].get("skipped", [])),
-            "message": f"Processed {processed}/{total} files",
-        })
+        await progress_queue.put(
+            {
+                "status": "completed",
+                "task_id": task_id,
+                "total": total,
+                "processed": processed,
+                "errors": len(_embed_tasks[task_id].get("errors", [])),
+                "skipped": len(_embed_tasks[task_id].get("skipped", [])),
+                "message": f"Processed {processed}/{total} files",
+            }
+        )
 
     except Exception as e:
         logger.error(f"Embed SigmaRef task {task_id} failed: {e}")
         _embed_tasks[task_id]["status"] = "failed"
-        await progress_queue.put({
-            "status": "failed",
-            "task_id": task_id,
-            "error": str(e),
-        })
+        await progress_queue.put(
+            {
+                "status": "failed",
+                "task_id": task_id,
+                "error": str(e),
+            }
+        )
     finally:
         # Clean up after a delay
         async def _cleanup():
             await asyncio.sleep(300)
             _embed_tasks.pop(task_id, None)
             _embed_progress_queues.pop(task_id, None)
+
         asyncio.create_task(_cleanup())
 
 
@@ -245,8 +270,17 @@ async def embed_progress(task_id: str):
     """Get the status of an embed_sigmaref task."""
     task = _embed_tasks.get(task_id)
     if not task:
-        return JSONResponse(status_code=404, content={"status": "not_found", "message": "Task not found"})
-    return JSONResponse(content={"status": task.get("status", "unknown"), "task_id": task_id, "details": task})
+        return JSONResponse(
+            status_code=404,
+            content={"status": "not_found", "message": "Task not found"},
+        )
+    return JSONResponse(
+        content={
+            "status": task.get("status", "unknown"),
+            "task_id": task_id,
+            "details": task,
+        }
+    )
 
 
 @router.get("/embed/{task_id}/stream")
@@ -416,7 +450,11 @@ async def qdrant_action(request: QdrantActionRequest) -> QdrantActionResponse:
                 )
 
             # Check if a task is already running
-            existing_running = [tid for tid, t in _embed_tasks.items() if t.get("status") in ("running", "pending")]
+            existing_running = [
+                tid
+                for tid, t in _embed_tasks.items()
+                if t.get("status") in ("running", "pending")
+            ]
             if existing_running:
                 return QdrantActionResponse(
                     status="error",

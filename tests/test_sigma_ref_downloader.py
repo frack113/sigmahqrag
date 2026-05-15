@@ -26,19 +26,31 @@ from src.back.documents.sigma_ref_downloader import (
 class TestNormalizeUrl:
     def test_github_blob_main(self) -> None:
         url = "https://github.com/user/repo/blob/main/doc.md"
-        assert normalize_url(url) == "https://raw.githubusercontent.com/user/repo/main/doc.md"
+        assert (
+            normalize_url(url)
+            == "https://raw.githubusercontent.com/user/repo/main/doc.md"
+        )
 
     def test_github_blob_commit_sha(self) -> None:
         url = "https://github.com/user/repo/blob/abc123def456/doc.md"
-        assert normalize_url(url) == "https://raw.githubusercontent.com/user/repo/abc123def456/doc.md"
+        assert (
+            normalize_url(url)
+            == "https://raw.githubusercontent.com/user/repo/abc123def456/doc.md"
+        )
 
     def test_github_blob_refs_heads(self) -> None:
         url = "https://github.com/user/repo/blob/refs/heads/feature/doc.md"
-        assert normalize_url(url) == "https://raw.githubusercontent.com/user/repo/feature/doc.md"
+        assert (
+            normalize_url(url)
+            == "https://raw.githubusercontent.com/user/repo/feature/doc.md"
+        )
 
     def test_github_blob_with_query(self) -> None:
         url = "https://github.com/user/repo/blob/main/doc.md?raw=true"
-        assert normalize_url(url) == "https://raw.githubusercontent.com/user/repo/main/doc.md"
+        assert (
+            normalize_url(url)
+            == "https://raw.githubusercontent.com/user/repo/main/doc.md"
+        )
 
     def test_non_github_url_pass_through(self) -> None:
         url = "https://learn.microsoft.com/en-us/doc"
@@ -64,7 +76,10 @@ class TestDetectUrlType:
         assert _detect_url_type("https://example.com/doc.pdf") is None
 
     def test_no_extension_with_markdown_content_type(self) -> None:
-        assert _detect_url_type("https://example.com/doc", content_type="text/markdown") == "markdown"
+        assert (
+            _detect_url_type("https://example.com/doc", content_type="text/markdown")
+            == "markdown"
+        )
 
     def test_no_extension_no_content_type(self) -> None:
         assert _detect_url_type("https://example.com/doc") is None
@@ -79,7 +94,9 @@ class TestDownloadFile:
         output = tmp_path / "test.md"
 
         with patch("httpx.Client") as mock_client:
-            mock_response = mock_client.return_value.__enter__.return_value.get.return_value
+            mock_response = (
+                mock_client.return_value.__enter__.return_value.get.return_value
+            )
             mock_response.raise_for_status.return_value = None
             mock_response.content = b"# Hello"
             mock_response.status_code = 200
@@ -97,6 +114,7 @@ class TestDownloadFile:
             status_code = 200
             headers = {}
             content = b"success"
+
             def raise_for_status(self) -> None:
                 pass
 
@@ -204,13 +222,19 @@ class TestRegistry:
 
 class TestSha256:
     def test_consistent(self) -> None:
-        assert _sha256("hello") == "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+        assert (
+            _sha256("hello")
+            == "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+        )
 
     def test_different_inputs(self) -> None:
         assert _sha256("a") != _sha256("b")
 
     def test_empty_string(self) -> None:
-        assert _sha256("") == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        assert (
+            _sha256("")
+            == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        )
 
 
 class TestDownloadReferences:
@@ -231,7 +255,9 @@ references:
   - https://example.com/valid.md
 """)
 
-        with patch("src.back.documents.sigma_ref_downloader._download_file", return_value=True):
+        with patch(
+            "src.back.documents.sigma_ref_downloader._download_file", return_value=True
+        ):
             result = download_references(str(rules_dir), str(tmp_path / "output"))
             assert result["downloaded"] == 1
             assert result["total_refs"] == 1
@@ -272,7 +298,9 @@ references:
   - https://example.com/doc.md
 """)
 
-        with patch("src.back.documents.sigma_ref_downloader._download_file", return_value=True):
+        with patch(
+            "src.back.documents.sigma_ref_downloader._download_file", return_value=True
+        ):
             first = download_references(str(rules_dir), str(output_dir))
             assert first["downloaded"] == 1
 
@@ -296,13 +324,18 @@ references:
   - https://github.com/user/repo/blob/main/docs/guide.md
 """)
 
-        def check_normalized_url(url: str, output_path: Path, timeout: int = 30) -> bool:
+        def check_normalized_url(
+            url: str, output_path: Path, timeout: int = 30
+        ) -> bool:
             assert "raw.githubusercontent.com" in url
             output_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.write_text("# content")
             return True
 
-        with patch("src.back.documents.sigma_ref_downloader._download_file", check_normalized_url):
+        with patch(
+            "src.back.documents.sigma_ref_downloader._download_file",
+            check_normalized_url,
+        ):
             result = download_references(str(rules_dir), str(output_dir))
             assert result["downloaded"] == 1
 
@@ -335,7 +368,9 @@ references:
   - https://example.com/test.md
 """)
 
-        with patch("src.back.documents.sigma_ref_downloader._download_file", return_value=True):
+        with patch(
+            "src.back.documents.sigma_ref_downloader._download_file", return_value=True
+        ):
             result = download_references(str(rules_dir), str(output_dir))
             assert result["downloaded"] == 1
             assert output_dir.exists()
@@ -356,7 +391,9 @@ references:
   - https://example.com/fail.md
 """)
 
-        with patch("src.back.documents.sigma_ref_downloader._download_file", return_value=False):
+        with patch(
+            "src.back.documents.sigma_ref_downloader._download_file", return_value=False
+        ):
             result = download_references(str(rules_dir), str(output_dir))
             assert result["failed"] == 1
             assert result["downloaded"] == 0
@@ -391,7 +428,9 @@ references:
             output_path.write_text("# content")
             return True
 
-        with patch("src.back.documents.sigma_ref_downloader._download_file", capture_url):
+        with patch(
+            "src.back.documents.sigma_ref_downloader._download_file", capture_url
+        ):
             result = download_references(str(rules_dir), str(output_dir))
             assert result["downloaded"] == 2
             assert len(urls_downloaded) == 2
@@ -419,15 +458,23 @@ references:
 """)
 
         written_files: list[Path] = []
+
         def write_on_download(url: str, output_path: Path, timeout: int = 30) -> bool:
             written_files.append(output_path)
             output_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.write_text("# content")
             return True
 
-        with patch("src.back.documents.sigma_ref_downloader._download_file", write_on_download), \
-             patch("time.sleep"):
-            result = download_references(str(rules_dir), str(output_dir), request_delay=0)
+        with (
+            patch(
+                "src.back.documents.sigma_ref_downloader._download_file",
+                write_on_download,
+            ),
+            patch("time.sleep"),
+        ):
+            result = download_references(
+                str(rules_dir), str(output_dir), request_delay=0
+            )
             assert result["downloaded"] == 1
             reg = json.loads((output_dir / "registry.json").read_text())
             entry = list(reg.values())[0]
@@ -456,28 +503,40 @@ references:
         output_file.write_text("content on disk")
 
         reg_path = output_dir / "registry.json"
-        reg_path.write_text(json.dumps({
-            url_hash: {
-                "original_url": "https://example.com/test.md",
-                "normalized_url": "https://example.com/test.md",
-                "content_type": "markdown",
-                "rule_id": "rule-009",
-                "title": "Test Rule",
-                "timestamp": _iso_now(),
-                "content_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-            }
-        }))
+        reg_path.write_text(
+            json.dumps(
+                {
+                    url_hash: {
+                        "original_url": "https://example.com/test.md",
+                        "normalized_url": "https://example.com/test.md",
+                        "content_type": "markdown",
+                        "rule_id": "rule-009",
+                        "title": "Test Rule",
+                        "timestamp": _iso_now(),
+                        "content_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+                    }
+                }
+            )
+        )
 
         download_calls: list[str] = []
+
         def tracking_download(url: str, output_path: Path, timeout: int = 30) -> bool:
             download_calls.append(url)
             output_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.write_text("new content")
             return True
 
-        with patch("src.back.documents.sigma_ref_downloader._download_file", tracking_download), \
-             patch("time.sleep"):
-            result = download_references(str(rules_dir), str(output_dir), request_delay=0)
+        with (
+            patch(
+                "src.back.documents.sigma_ref_downloader._download_file",
+                tracking_download,
+            ),
+            patch("time.sleep"),
+        ):
+            result = download_references(
+                str(rules_dir), str(output_dir), request_delay=0
+            )
             assert result["downloaded"] == 1
             assert len(download_calls) == 1
 
@@ -504,25 +563,34 @@ references:
         same_sha = _sha256_file(output_file)
 
         reg_path = output_dir / "registry.json"
-        reg_path.write_text(json.dumps({
-            url_hash: {
-                "original_url": "https://example.com/test.md",
-                "normalized_url": "https://example.com/test.md",
-                "content_type": "markdown",
-                "rule_id": "rule-010",
-                "title": "Test Rule",
-                "timestamp": _iso_now(),
-                "content_sha256": same_sha,
-            }
-        }))
+        reg_path.write_text(
+            json.dumps(
+                {
+                    url_hash: {
+                        "original_url": "https://example.com/test.md",
+                        "normalized_url": "https://example.com/test.md",
+                        "content_type": "markdown",
+                        "rule_id": "rule-010",
+                        "title": "Test Rule",
+                        "timestamp": _iso_now(),
+                        "content_sha256": same_sha,
+                    }
+                }
+            )
+        )
 
         download_calls: list[str] = []
+
         def tracking_download(url: str, output_path: Path, timeout: int = 30) -> bool:
             download_calls.append(url)
             return True
 
-        with patch("src.back.documents.sigma_ref_downloader._download_file", tracking_download):
-            result = download_references(str(rules_dir), str(output_dir), request_delay=0)
+        with patch(
+            "src.back.documents.sigma_ref_downloader._download_file", tracking_download
+        ):
+            result = download_references(
+                str(rules_dir), str(output_dir), request_delay=0
+            )
             assert result["skipped"] >= 1
             assert len(download_calls) == 0
 
@@ -548,24 +616,33 @@ references:
         output_file.write_text("some content")
 
         reg_path = output_dir / "registry.json"
-        reg_path.write_text(json.dumps({
-            url_hash: {
-                "original_url": "https://example.com/test.md",
-                "normalized_url": "https://example.com/test.md",
-                "content_type": "markdown",
-                "rule_id": "rule-011",
-                "title": "Test Rule",
-                "timestamp": _iso_now(),
-            }
-        }))
+        reg_path.write_text(
+            json.dumps(
+                {
+                    url_hash: {
+                        "original_url": "https://example.com/test.md",
+                        "normalized_url": "https://example.com/test.md",
+                        "content_type": "markdown",
+                        "rule_id": "rule-011",
+                        "title": "Test Rule",
+                        "timestamp": _iso_now(),
+                    }
+                }
+            )
+        )
 
         download_calls: list[str] = []
+
         def tracking_download(url: str, output_path: Path, timeout: int = 30) -> bool:
             download_calls.append(url)
             return True
 
-        with patch("src.back.documents.sigma_ref_downloader._download_file", tracking_download):
-            result = download_references(str(rules_dir), str(output_dir), request_delay=0)
+        with patch(
+            "src.back.documents.sigma_ref_downloader._download_file", tracking_download
+        ):
+            result = download_references(
+                str(rules_dir), str(output_dir), request_delay=0
+            )
             assert result["skipped"] >= 1
             assert len(download_calls) == 0
 
@@ -591,9 +668,16 @@ references:
   - HTTP://example.com/test.md
 """)
 
-        with patch("src.back.documents.sigma_ref_downloader._download_file", return_value=True), \
-             patch("time.sleep"):
-            result = download_references(str(rules_dir), str(output_dir), request_delay=0)
+        with (
+            patch(
+                "src.back.documents.sigma_ref_downloader._download_file",
+                return_value=True,
+            ),
+            patch("time.sleep"),
+        ):
+            result = download_references(
+                str(rules_dir), str(output_dir), request_delay=0
+            )
             assert result["downloaded"] == 1
 
     def test_uppercase_github_blob(self) -> None:
@@ -606,7 +690,10 @@ references:
 class TestFragmentHandling:
     def test_github_url_with_fragment(self) -> None:
         url = "https://github.com/user/repo/blob/main/doc.md#section"
-        assert normalize_url(url) == "https://raw.githubusercontent.com/user/repo/main/doc.md"
+        assert (
+            normalize_url(url)
+            == "https://raw.githubusercontent.com/user/repo/main/doc.md"
+        )
 
     def test_github_url_with_query_and_fragment(self) -> None:
         url = "https://github.com/user/repo/blob/main/doc.md?raw=true#section"
@@ -652,7 +739,10 @@ class TestSha256File:
     def test_file_sha(self, tmp_path: Path) -> None:
         f = tmp_path / "test.txt"
         f.write_text("hello")
-        assert _sha256_file(f) == "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+        assert (
+            _sha256_file(f)
+            == "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+        )
 
     def test_missing_file(self, tmp_path: Path) -> None:
         assert _sha256_file(tmp_path / "nonexistent") == ""

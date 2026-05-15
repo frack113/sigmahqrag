@@ -35,7 +35,7 @@ class VRAMEstimator:
         if layers and heads and head_dim:
             kv_cache = 2 * layers * heads * head_dim * precision_bytes * context_length
         else:
-            kv_cache = model_size_bytes * 0.1
+            kv_cache = int(model_size_bytes * 0.1)
 
         buffer = max(self.buffer_mb * 1024 * 1024, model_vram * 0.1)
         total_vram = model_vram + kv_cache + buffer
