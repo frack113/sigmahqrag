@@ -20,7 +20,7 @@ DDL: list[str] = [
         repo_id TEXT PRIMARY KEY,
         model_type TEXT NOT NULL CHECK(model_type IN ('llm', 'embeddings')),
         local_path TEXT,
-        file_size INTEGER DEFAULT 0,
+        file_size BIGINT DEFAULT 0,
         status TEXT DEFAULT 'ready',
         dimension INTEGER,
         index_path TEXT,
