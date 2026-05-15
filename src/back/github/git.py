@@ -74,12 +74,19 @@ def clone_repo(
     repos_dir = Path(repos_dir).resolve()
     repos_dir.mkdir(parents=True, exist_ok=True)
 
+    # Defensive: a __temp__ left over from a previous crashed/failed clone
+    # makes git reject every subsequent attempt with
+    # `fatal: destination path '...' already exists and is not an empty directory`.
+    # Always prune it before we try to use it.
+    temp_dir = repos_dir / "__temp__"
+    shutil.rmtree(temp_dir, ignore_errors=True)
+
     # Extract org/name from URL using gitpython's remote
     if org is None or name is None:
-        temp_clone = Repo.clone_from(
-            url, repos_dir / "__temp__" / "__extract__", depth=1
-        )
         try:
+            temp_clone = Repo.clone_from(
+                url, temp_dir / "__extract__", depth=1
+            )
             remote_url = temp_clone.remote().url
             # git@github.com:org/name.git or https://github.com/org/name.git
             parts = remote_url.rstrip("/").replace(".git", "").split("/")
@@ -90,7 +97,7 @@ def clone_repo(
                 org = parts[-2]
                 name = parts[-1]
         finally:
-            shutil.rmtree(repos_dir / "__temp__", ignore_errors=True)
+            shutil.rmtree(temp_dir, ignore_errors=True)
 
     if org is None or name is None:
         return {"success": False, "error": "Could not determine org/name from URL"}

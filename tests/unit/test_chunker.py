@@ -2,13 +2,13 @@
 
 from pathlib import Path
 
-from src.rag.chunker import (
+from src.back.rag.chunker import (
     SigmaChunker,
     _format_detection,
     chunk_sigma_rule,
     count_tokens,
 )
-from src.schemas.sigma_rule import SigmaRule
+from src.shared.schemas.sigma_rule import SigmaRule
 
 
 class TestCountTokens:

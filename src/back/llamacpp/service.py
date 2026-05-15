@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -49,15 +50,35 @@ class LlamaBinaryService:
                 "error": f"llama.cpp directory not found: {self.llama_bin}",
             }
 
-        llama_exe = None
-        for exe in self.llama_bin.glob("*.exe"):
-            llama_exe = exe
-            break
+        # llama.cpp upstream ships per-OS prebuilt server binaries:
+        #   Windows : llama-server.exe
+        #   Linux   : llama-server
+        #   macOS   : llama-server
+        # On Windows prefer .exe, on other platforms prefer the bare name.
+        # The previous code globbed `*.exe` and took the first alphabetical
+        # match, which spawned `llama-batched-bench.exe` and crashed with
+        # "invalid argument: --port"; on Linux/macOS it found nothing at all.
+        if sys.platform == "win32":
+            candidates = ("llama-server.exe", "llama-server")
+        else:
+            candidates = ("llama-server", "llama-server.exe")
+
+        llama_exe: Path | None = None
+        for name in candidates:
+            candidate = self.llama_bin / name
+            if candidate.is_file():
+                llama_exe = candidate
+                break
 
         if not llama_exe:
             return {
                 "success": False,
-                "error": f"llama.cpp executable not found in {self.llama_bin}",
+                "error": (
+                    f"llama-server executable not found in {self.llama_bin}. "
+                    "Expected the llama.cpp HTTP server binary "
+                    "(llama-server / llama-server.exe), not llama-cli / "
+                    "llama-batched-bench / etc."
+                ),
             }
 
         log_file = self.logs_dir / "llama.cpp.log"
