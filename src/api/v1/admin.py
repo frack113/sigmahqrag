@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import time
 from typing import Any
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, Header
 from fastapi.responses import JSONResponse
@@ -47,6 +48,18 @@ def _cleanup_expired_entries() -> None:
             del _idempotency_store[k]
 
 
+def _parse_llama_url(base_url: str) -> tuple[str, int]:
+    """Extract host and port from a llama base URL.
+
+    Returns:
+        Tuple of (host, port). Defaults to (``127.0.0.1``, ``8080``).
+    """
+    parsed = urlparse(base_url.rstrip("/"))
+    host = parsed.hostname or "127.0.0.1"
+    port = parsed.port or 8080
+    return host, port
+
+
 async def check_service_health() -> dict[str, Any]:
     """Check health of llama.cpp and Qdrant services (AC3 - <500ms by parallel checks)."""
     import asyncio
@@ -59,7 +72,8 @@ async def check_service_health() -> dict[str, Any]:
     llama_version = config.llamacpp_version or "Not installed"
     qdrant_version = config.qdrant_version or "Not installed"
 
-    llama_port = 8080
+    base_url = config.llama_base_url or "http://127.0.0.1:8080"
+    llama_host, llama_port = _parse_llama_url(base_url)
     qdrant_port = config.qdrant_port
 
     result: dict[str, Any] = {
@@ -82,12 +96,14 @@ async def check_service_health() -> dict[str, Any]:
         async def check_llama():
             try:
                 response = await client.get(
-                    f"http://localhost:{llama_port}/health", timeout=2.0
+                    f"http://{llama_host}:{llama_port}/health", timeout=2.0
                 )
-                if (
-                    response.status_code == 200
-                    and response.json().get("status") == "healthy"
-                ):
+                # llama-server.exe returns {"status": "ok"} when ready, not
+                # {"status": "healthy"} — the previous check was permanently
+                # inactive even with a healthy server.
+                if response.status_code == 200 and response.json().get(
+                    "status"
+                ) in {"ok", "healthy"}:
                     result["llama_cpp"]["status"] = "active"
             except Exception:
                 result["llama_cpp"]["status"] = "inactive"
@@ -155,8 +171,12 @@ async def post_backend(request: dict) -> JSONResponse:
                 from src.back.llamacpp.service import create_llama_service
 
                 service_manager = create_llama_service()
+                base_url = get_config().llama_base_url or "http://127.0.0.1:8080"
+                _, llama_port = _parse_llama_url(base_url)
                 result = await service_manager.start(
-                    model_path=model_path, port=8080, context_size=4096
+                    model_path=model_path,
+                    port=llama_port,
+                    context_size=4096,
                 )
 
             elif service == "qdrant":

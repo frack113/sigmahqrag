@@ -29,7 +29,7 @@ DEFAULT_EMBED_BATCH_SIZE = 8
 DEFAULT_NUM_WORKERS = 4
 DEFAULT_SIMILARITY_TOP_K = 5
 CACHE_DIR = Path("data/rag_cache")
-OV_MODEL_DIR = Path("data/ov_models")
+LOCAL_EMBEDDINGS_DIR = Path("data/models/embeddings")
 
 _pipeline_registry: dict[tuple[str, str], IngestionPipeline] = {}
 
@@ -41,44 +41,24 @@ def _first_configured_model(config: dict) -> str | None:
     return None
 
 
-def _sanitize_model_name(model_name: str) -> str:
-    return model_name.replace("/", "--").replace(" ", "_")
-
-
 def build_embed_model(model_name: str) -> BaseEmbedding:
-    from llama_index.embeddings.huggingface_openvino import OpenVINOEmbedding
-
-    ov_path = OV_MODEL_DIR / _sanitize_model_name(model_name)
-
-    if ov_path.exists():
-        try:
-            embed_model = OpenVINOEmbedding(model_id_or_path=str(ov_path), device="cpu")
-            logger.info("OpenVINO model loaded from cache at %s", ov_path)
-            return embed_model
-        except Exception as e:
-            logger.warning("Failed to load cached OpenVINO model: %s", e)
-
+    local_path = LOCAL_EMBEDDINGS_DIR / model_name
+    model_path = str(local_path) if local_path.exists() else model_name
     try:
-        ov_path.mkdir(parents=True, exist_ok=True)
-        OpenVINOEmbedding.create_and_save_openvino_model(model_name, str(ov_path))
-        embed_model = OpenVINOEmbedding(model_id_or_path=str(ov_path), device="cpu")
-        logger.info("Exported and loaded OpenVINO model at %s", ov_path)
-        return embed_model
-    except Exception:
-        logger.warning(
-            "OpenVINO export unavailable for %s, falling back to HuggingFace", model_name
+        logger.info("Loading embedding model from %s", model_path)
+        return HuggingFaceEmbedding(
+            model_name=model_path,
+            device="cpu",
+            embed_batch_size=DEFAULT_EMBED_BATCH_SIZE,
         )
-        try:
-            return HuggingFaceEmbedding(
-                model_name=model_name,
-                device="cpu",
-                embed_batch_size=DEFAULT_EMBED_BATCH_SIZE,
-            )
-        except Exception as e:
-            logger.error(
-                "Embedding model %s failed to load with Torch backend: %s", model_name, e
-            )
-            raise
+    except Exception as e:
+        logger.error(
+            "Embedding model %s failed to load (path: %s): %s",
+            model_name,
+            model_path,
+            e,
+        )
+        raise
 
 
 class IngestionPipelineBuilder:

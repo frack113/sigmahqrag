@@ -9,4 +9,4 @@ DEFAULT_PORT = 6333
 
 async def check_health(timeout: float = 2.0, port: int = DEFAULT_PORT) -> dict:
     """Check health of Qdrant service."""
-    return await _check(component="qdrant", port=port, timeout=timeout)
+    return await _check(component="qdrant", port=port, path="/healthz", timeout=timeout)

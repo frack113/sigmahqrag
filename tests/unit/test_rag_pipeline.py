@@ -1,6 +1,7 @@
 """Test RAG pipeline."""
 
 import pytest
+
 from src.back.rag.pipeline import RAGPipeline
 
 

@@ -9,7 +9,7 @@ from typing import Any
 import yaml
 from jinja2 import Environment, FileSystemLoader
 
-from src.back.llamacpp import LlamaService
+from src.back.llamacpp import LlamaClient
 from src.back.rag.search import SearchEngine
 
 from .cache import ResponseCache
@@ -24,7 +24,12 @@ class RAGPipeline:
 
     def __init__(self) -> None:
         self.search_engine = SearchEngine()
-        self.llm_client = LlamaService()
+        # Was ``LlamaService()``, which is an alias for
+        # ``LlamaBinaryService`` — the binary *process manager*, not an
+        # LLM client. It has no ``.generate()`` method, so the chat
+        # pipeline crashed with AttributeError on the first call.
+        # ``LlamaClient`` talks to the llama-server HTTP API.
+        self.llm_client = LlamaClient()
         self.cache = ResponseCache()
         self.env = Environment(
             loader=FileSystemLoader(PROMPT_DIR),

@@ -52,7 +52,7 @@ class VectorSearchPayload(BaseModel):
 class EmbedSigmaRefPayload(BaseModel):
     action: Literal["embed_sigmaref"] = "embed_sigmaref"
     registry_path: str = "data/documents/sigmaref/registry.json"
-    collection_name: str = "sigma_rules"
+    collection_name: str = "sigma_doc"
 
 
 class QdrantActionRequest(BaseModel):

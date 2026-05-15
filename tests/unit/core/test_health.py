@@ -8,7 +8,6 @@ import httpx
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-
 from src.core.health import check_all, check_llama_cpp, check_qdrant
 
 

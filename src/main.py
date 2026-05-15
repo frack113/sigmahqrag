@@ -24,7 +24,7 @@ from src.api.v1.feedback import router as feedback_v1_router
 from src.api.v1.github import router as github_v1_router
 from src.api.v1.llamacpp import router as llama_router
 from src.api.v1.logs import router as logs_v1_router
-from src.api.v1.model import router as model_v1_router
+from src.api.v1.models import router as models_v1_router
 from src.api.v1.qdrant import router as qdrant_router
 from src.api.v1.search import router as search_v1_router
 from src.api.v1.system_prompt import router as prompts_v1_router
@@ -88,6 +88,7 @@ def create_app() -> FastAPI:
         title="SigmaHQ RAG",
         version="0.1.0",
         description="Local RAG system for Sigma rules",
+        lifespan=lifespan,
     )
 
     static_dir = str(Path(__file__).parent / "front" / "static")
@@ -98,20 +99,29 @@ def create_app() -> FastAPI:
     app.include_router(config_v1_router)
     app.include_router(coverage_v1_router)
     app.include_router(explain_v1_router)
-    app.include_router(search_v1_router)
     app.include_router(github_v1_router)
     app.include_router(llama_router)
     app.include_router(logs_v1_router)
+    app.include_router(models_v1_router)
     app.include_router(qdrant_router)
-    app.include_router(model_v1_router)
+    app.include_router(search_v1_router)
+    app.include_router(prompts_v1_router)
+    app.include_router(chat_v1_router)
     app.include_router(chat_page_router)
     app.include_router(data_page_router)
-    app.include_router(chat_v1_router)
     app.include_router(documents_v1_router)
     app.include_router(embedding_config_v1_router)
     app.include_router(embeddings_v1_router)
     app.include_router(feedback_v1_router)
-    app.include_router(prompts_v1_router)
+
+    @app.exception_handler(SigmaError)
+    async def sigma_error_handler(request: Request, exc: SigmaError) -> JSONResponse:
+        """Global handler for SigmaError exceptions."""
+        logger.error(f"SigmaError ({exc.code}): {exc.message}")
+        return JSONResponse(
+            status_code=exc.http_status,
+            content=exc.to_dict(),
+        )
 
     @app.exception_handler(SigmaError)
     async def sigma_error_handler(request: Request, exc: SigmaError) -> JSONResponse:

@@ -22,7 +22,10 @@ from src.back.qdrant.storage import delete_point, store_embeddings
 from src.back.qdrant.storage import search as qdrant_search
 from src.back.utils.file_utils import load_registry_files
 from src.shared.download_manager import create_download_manager
-from src.shared.schemas.qdrant import EmbedSigmaRefPayload, QdrantActionRequest, QdrantActionResponse
+from src.shared.schemas.qdrant import (
+    QdrantActionRequest,
+    QdrantActionResponse,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -78,6 +81,8 @@ async def _run_embed_sigmaref(
             return
 
         total = len(registry_entries)
+        _embed_tasks[task_id]["total"] = total
+        _embed_tasks[task_id]["processed"] = 0
         await progress_queue.put({
             "status": "processing",
             "task_id": task_id,
@@ -86,8 +91,9 @@ async def _run_embed_sigmaref(
             "current_file": "",
         })
 
-        from src.back.rag.ingestion import IngestionPipelineBuilder
         from llama_index.core.schema import Document
+
+        from src.back.rag.ingestion import IngestionPipelineBuilder
 
         builder = IngestionPipelineBuilder(collection_name=collection_name)
         base_dir = registry_path.parent
@@ -98,6 +104,8 @@ async def _run_embed_sigmaref(
             relative_path = entry.get("path", entry.get("file_path", file_hash))
             file_path = base_dir / file_hash if not (base_dir / relative_path).exists() else base_dir / relative_path
 
+            _embed_tasks[task_id]["processed"] = idx
+            _embed_tasks[task_id]["current_file"] = file_name or file_hash
             await progress_queue.put({
                 "status": "processing",
                 "task_id": task_id,
@@ -136,6 +144,9 @@ async def _run_embed_sigmaref(
             await asyncio.sleep(0)
 
         processed = len(registry_entries) - len(_embed_tasks[task_id].get("errors", [])) - len(_embed_tasks[task_id].get("skipped", []))
+        _embed_tasks[task_id]["status"] = "completed"
+        _embed_tasks[task_id]["processed"] = processed
+        _embed_tasks[task_id]["total"] = total
         await progress_queue.put({
             "status": "completed",
             "task_id": task_id,
@@ -145,7 +156,6 @@ async def _run_embed_sigmaref(
             "skipped": len(_embed_tasks[task_id].get("skipped", [])),
             "message": f"Processed {processed}/{total} files",
         })
-        _embed_tasks[task_id]["status"] = "completed"
 
     except Exception as e:
         logger.error(f"Embed SigmaRef task {task_id} failed: {e}")
@@ -189,11 +199,12 @@ async def _progress_generator(download_id: str) -> AsyncGenerator[str, None]:
 async def qdrant_status():
     """Get status and version for qdrant service."""
     try:
-        is_healthy = await check_health()
+        health_result = await check_health()
         from src.shared import get_config
 
         config = get_config()
         version = config.qdrant_version
+        is_healthy = health_result.get("status") == "active"
 
         manager = create_download_manager()
         downloads = {

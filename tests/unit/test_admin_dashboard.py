@@ -3,7 +3,6 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
 from src.core.version_manager import check_for_updates, get_current_version
 
 

@@ -4,8 +4,8 @@ from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
-
 from src.core.system_prompt import _prompts, add_prompt
+
 from src.main import create_app
 
 

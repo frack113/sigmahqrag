@@ -24,47 +24,6 @@ class EmbeddingEmbedRequest(BaseModel):
 router = APIRouter(prefix="/api/v1/embeddings", tags=["v1-embeddings"])
 
 
-@router.get("/search")
-async def search_embedding_models(
-    query: str,
-    limit: int = 20,
-    manager: EmbeddingManager = Depends(get_embedding_manager),
-) -> JSONResponse:
-    """Search for embedding models on HuggingFace."""
-    try:
-        results = await manager.search_models(query, limit=limit)
-        return JSONResponse(content={"models": results})
-    except Exception as e:
-        logger.error(f"Search failed: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
-
-
-@router.get("/{repo_id}/files")
-async def get_embedding_files(
-    repo_id: str, manager: EmbeddingManager = Depends(get_embedding_manager)
-) -> JSONResponse:
-    """Get files for an embedding model repo."""
-    try:
-        files = await manager.get_repo_files(repo_id)
-        return JSONResponse(content={"files": files})
-    except Exception as e:
-        logger.error(f"Get files failed: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
-
-
-@router.get("/installed")
-async def list_installed_embeddings(
-    manager: EmbeddingManager = Depends(get_embedding_manager),
-) -> JSONResponse:
-    """List installed embedding models."""
-    try:
-        models = await manager.list_installed()
-        return JSONResponse(content={"models": models})
-    except Exception as e:
-        logger.error(f"List failed: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
-
-
 @router.post("/embed")
 async def embed_text(
     request: EmbeddingEmbedRequest,
