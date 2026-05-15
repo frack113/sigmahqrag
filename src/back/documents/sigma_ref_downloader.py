@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import re
 import threading
@@ -14,6 +13,7 @@ from typing import Any
 import httpx
 import yaml
 
+from src.back.database import DatabaseService
 from src.back.utils.identify_file_type import SUPPORTED_DOC_EXTENSION_MAP
 
 logger = logging.getLogger(__name__)
@@ -101,7 +101,9 @@ def _download_file(
     """
     for attempt in range(1, max_retries + 1):
         try:
-            with httpx.Client(timeout=httpx.Timeout(timeout), follow_redirects=True) as client:
+            with httpx.Client(
+                timeout=httpx.Timeout(timeout), follow_redirects=True
+            ) as client:
                 response = client.get(url)
                 response.raise_for_status()
             output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -127,7 +129,11 @@ def _download_file(
                     wait = _backoff_delay(attempt)
                 logger.warning(
                     "HTTP %d on attempt %d/%d for %s — waiting %ds",
-                    status, attempt, max_retries, url, wait,
+                    status,
+                    attempt,
+                    max_retries,
+                    url,
+                    wait,
                 )
                 time.sleep(wait)
                 continue
@@ -139,11 +145,17 @@ def _download_file(
                 wait = _backoff_delay(attempt)
                 logger.warning(
                     "Network error on attempt %d/%d for %s: %s — waiting %ds",
-                    attempt, max_retries, url, exc, wait,
+                    attempt,
+                    max_retries,
+                    url,
+                    exc,
+                    wait,
                 )
                 time.sleep(wait)
                 continue
-            logger.warning("Network error for %s after %d attempts: %s", url, max_retries, exc)
+            logger.warning(
+                "Network error for %s after %d attempts: %s", url, max_retries, exc
+            )
             return False
 
     return False
@@ -172,54 +184,47 @@ def _get_retry_after(response: httpx.Response) -> int | None:
 
 
 def _load_registry(path: Path) -> dict[str, Any]:
-    """Load the registry JSON file.
+    """Load the registry from DuckDB.
 
-    Returns an empty dict if the file is missing or corrupt.
-    Attempts to recover a stale .tmp file if the target does not exist.
+    Returns an empty dict if DB not available.
     """
-    if not path.exists():
-        tmp_path = path.with_suffix(".tmp")
-        if tmp_path.exists():
-            logger.warning("Found stale .tmp file, attempting recovery: %s", tmp_path)
-            try:
-                tmp_path.replace(path)
-            except OSError as exc:
-                logger.warning("Failed to recover .tmp file %s: %s", tmp_path, exc)
-    if not path.exists():
+    db = DatabaseService.get_instance()
+    if db is None:
         return {}
-    try:
-        raw = path.read_text(encoding="utf-8")
-        data = json.loads(raw)
-        if isinstance(data, dict):
-            return data
-        logger.warning("Registry is not a dict, resetting")
-        return {}
-    except (json.JSONDecodeError, OSError, UnicodeDecodeError) as exc:
-        logger.warning("Failed to read registry %s: %s — starting fresh", path, exc)
-        return {}
+    entries = db.get_doc_registry()
+    registry = {}
+    for entry in entries:
+        url_hash = entry["url_hash"]
+        registry[url_hash] = {
+            "original_url": entry.get("original_url", ""),
+            "normalized_url": entry.get("normalized_url"),
+            "content_type": entry.get("content_type"),
+            "rule_id": entry.get("rule_id"),
+            "title": entry.get("title"),
+            "timestamp": entry.get("timestamp"),
+            "content_sha256": entry.get("content_sha256"),
+        }
+    return registry
 
 
 def _save_registry(registry: dict[str, Any], path: Path) -> None:
-    """Save the registry JSON file atomically.
-
-    Writes to a .tmp file first, then replaces the target.
-
-    Args:
-        registry: Registry dictionary.
-        path: Target path for the JSON file.
-    """
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp_path = path.with_suffix(".tmp")
-    try:
-        tmp_path.write_text(
-            json.dumps(registry, indent=2, ensure_ascii=False),
-            encoding="utf-8",
-        )
-        tmp_path.replace(path)
-    except OSError as exc:
-        logger.error("Failed to save registry: %s", exc)
-        if tmp_path.exists():
-            tmp_path.unlink()
+    """Save the registry to DuckDB atomically."""
+    db = DatabaseService.get_instance()
+    if db is None:
+        return
+    for url_hash, entry in registry.items():
+        if isinstance(entry, dict):
+            row = {
+                "url_hash": url_hash,
+                "original_url": entry.get("original_url", ""),
+                "normalized_url": entry.get("normalized_url"),
+                "content_type": entry.get("content_type"),
+                "rule_id": entry.get("rule_id"),
+                "title": entry.get("title"),
+                "timestamp": entry.get("timestamp"),
+                "content_sha256": entry.get("content_sha256"),
+            }
+            db.upsert_doc_entry(row)
 
 
 def download_references(
@@ -272,7 +277,9 @@ def download_references(
         if not yml_file.is_file():
             continue
         try:
-            data = yaml.safe_load(yml_file.read_text(encoding="utf-8", errors="replace"))
+            data = yaml.safe_load(
+                yml_file.read_text(encoding="utf-8", errors="replace")
+            )
         except Exception as exc:
             logger.warning("Failed to parse YAML %s: %s", yml_file, exc)
             continue
@@ -305,13 +312,20 @@ def download_references(
                 output_file = output_path / f"{url_hash}{ext}"
                 if output_file.exists():
                     existing_sha = existing.get("content_sha256")
-                    if existing_sha is not None and _sha256_file(output_file) != existing_sha:
-                        logger.info("Content changed for %s, re-downloading", normalized)
+                    if (
+                        existing_sha is not None
+                        and _sha256_file(output_file) != existing_sha
+                    ):
+                        logger.info(
+                            "Content changed for %s, re-downloading", normalized
+                        )
                         if _download_file(normalized, output_file):
                             registry[url_hash] = {
                                 "original_url": ref,
                                 "normalized_url": normalized,
-                                "content_type": existing.get("content_type", "markdown"),
+                                "content_type": existing.get(
+                                    "content_type", "markdown"
+                                ),
                                 "rule_id": rule_id,
                                 "title": rule_title,
                                 "timestamp": _iso_now(),
@@ -370,12 +384,14 @@ def download_references(
 def _sha256(text: str) -> str:
     """Compute SHA256 hex digest of a string."""
     import hashlib
+
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 def _sha256_file(path: Path) -> str:
     """Compute SHA256 hex digest of a file's contents."""
     import hashlib
+
     h = hashlib.sha256()
     try:
         with open(path, "rb") as f:
@@ -394,10 +410,17 @@ def _url_ext(url: str) -> str:
 
 def _empty_summary() -> dict[str, Any]:
     """Return an empty summary dict."""
-    return {"total_rules": 0, "total_refs": 0, "downloaded": 0, "skipped": 0, "failed": 0}
+    return {
+        "total_rules": 0,
+        "total_refs": 0,
+        "downloaded": 0,
+        "skipped": 0,
+        "failed": 0,
+    }
 
 
 def _iso_now() -> str:
     """Return current UTC timestamp in ISO 8601 format."""
     from datetime import datetime, timezone
+
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")  # noqa: UP017

@@ -31,7 +31,9 @@ class RAGPipeline:
         """Search for similar documents."""
         return await self.search_engine.search(query, top_k=limit)
 
-    def index_documents(self, documents: list[Document], num_workers: int = 4) -> list[Any]:
+    def index_documents(
+        self, documents: list[Document], num_workers: int = 4
+    ) -> list[Any]:
         """Index documents via IngestionPipelineBuilder."""
         try:
             return self.builder.run(documents, num_workers=num_workers)

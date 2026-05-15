@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from src.back.database import DatabaseService
+
 logger = logging.getLogger(__name__)
 
 
@@ -181,17 +183,49 @@ class Config:
 
     def save(self) -> bool:
         try:
-            from src.shared.toml_service import TOMLService
-
-            toml_service = TOMLService(CONFIG_FILE)
-            return toml_service.save(self.to_dict())
+            db = DatabaseService.get_instance()
+            if db is None:
+                logger.warning("DatabaseService not available, config not saved")
+                return False
+            db.set_config("backend.os", {"value": self.os})
+            db.set_config("backend.gpu_type", {"value": self.gpu_type})
+            db.set_config("llamacpp_version", {"value": self.llamacpp_version})
+            db.set_config("qdrant_version", {"value": self.qdrant_version})
+            db.set_config("qdrant_webui_version", {"value": self.qdrant_webui_version})
+            return True
         except Exception as e:
-            logger.error(f"Failed to save config to {CONFIG_FILE}: {e}")
+            logger.error(f"Failed to save config to DB: {e}")
             return False
+
+    def apply_db_overrides(self) -> None:
+        db = DatabaseService.get_instance()
+        if db is None:
+            return
+        overrides = {
+            "backend.os": "os",
+            "backend.gpu_type": "gpu_type",
+            "llamacpp_version": "llamacpp_version",
+            "qdrant_version": "qdrant_version",
+            "qdrant_webui_version": "qdrant_webui_version",
+        }
+        for key, attr in overrides.items():
+            val = db.get_config(key)
+            if val is not None and isinstance(val, dict):
+                v = val.get("value")
+                if v is not None:
+                    current = getattr(self, attr, None)
+                    if isinstance(current, int) and isinstance(v, str):
+                        try:
+                            v = int(v)
+                        except (ValueError, TypeError):
+                            pass
+                    setattr(self, attr, v)
 
     @classmethod
     def reload(cls) -> Config:
-        return cls()
+        cfg = cls()
+        cfg.apply_db_overrides()
+        return cfg
 
     def resolve_llamacpp_bin_path(self) -> Path:
         """Resolve llama binary path with fallback to old location."""

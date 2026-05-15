@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
-
-def load_registry_files(registry_path: Path) -> list[dict[str, any]]:
+def load_registry_files(registry_path: Path) -> list[dict[str, Any]]:
     """
     Loads the registry from a JSON file and returns a list of entries.
     Each entry is a dictionary containing the metadata for a file.
@@ -17,7 +17,7 @@ def load_registry_files(registry_path: Path) -> list[dict[str, any]]:
 
     # The registry is a dict where keys are hashes and values are metadata
     # We embed the hash and filename into each entry
-    entries: list[dict[str, any]] = []
+    entries: list[dict[str, Any]] = []
     for key, value in registry_data.items():
         entry = dict(value)
         entry["hash"] = key

@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-import json
 import shutil
 from pathlib import Path
 
+from src.back.database import DatabaseService
 from src.back.models.download import HFDownloadService
 from src.back.models.exceptions import DownloadError
 from src.back.models.types import HFRepo
@@ -18,21 +18,46 @@ class EmbeddingManager:
     def __init__(self, embeddings_dir: Path | None = None) -> None:
         self.embeddings_dir = embeddings_dir or EMBEDDINGS_DIR
         self.embeddings_dir.mkdir(parents=True, exist_ok=True)
-        self._registry_path = self.embeddings_dir / "embeddings_registry.json"
         self.download_service = HFDownloadService()
 
     async def _load_registry(self) -> dict:
-        """Load embeddings registry."""
-        if self._registry_path.exists():
-            with open(self._registry_path) as f:
-                return json.load(f)
-        return {}
+        db = DatabaseService.get_instance()
+        if db is None:
+            return {}
+        models = db.get_models()
+        registry = {}
+        for m in models:
+            if m["model_type"] == "embeddings":
+                repo_id = m["repo_id"]
+                entry = {
+                    "local_path": m.get("local_path"),
+                    "file_size": m.get("file_size", 0),
+                    "status": m.get("status", "ready"),
+                }
+                dim = m.get("dimension")
+                if dim is not None:
+                    entry["dimension"] = dim
+                index_path = m.get("index_path")
+                if index_path:
+                    entry["index_path"] = index_path
+                registry[repo_id] = entry
+        return registry
 
     async def _save_registry(self, data: dict) -> None:
-        """Save embeddings registry."""
-        self._registry_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(self._registry_path, "w") as f:
-            json.dump(data, f, indent=2)
+        db = DatabaseService.get_instance()
+        if db is None:
+            return
+        for repo_id, record in data.items():
+            entry = {
+                "repo_id": repo_id,
+                "model_type": "embeddings",
+                "local_path": record.get("local_path"),
+                "file_size": record.get("file_size", 0),
+                "status": record.get("status", "ready"),
+                "dimension": record.get("dimension"),
+                "index_path": record.get("index_path"),
+            }
+            db.upsert_model(entry)
 
     async def search_models(
         self, query: str = "sentence-transformers", limit: int = 10
