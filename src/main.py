@@ -17,6 +17,7 @@ from src.api.v1.chat import router as chat_v1_router
 from src.api.v1.config import router as config_v1_router
 from src.api.v1.coverage import router as coverage_v1_router
 from src.api.v1.documents import router as documents_v1_router
+from src.api.v1.embedding_config import router as embedding_config_v1_router
 from src.api.v1.embeddings import router as embeddings_v1_router
 from src.api.v1.explain import router as explain_v1_router
 from src.api.v1.feedback import router as feedback_v1_router
@@ -109,8 +110,18 @@ def create_app() -> FastAPI:
     app.include_router(chat_page_router)
     app.include_router(data_page_router)
     app.include_router(documents_v1_router)
+    app.include_router(embedding_config_v1_router)
     app.include_router(embeddings_v1_router)
     app.include_router(feedback_v1_router)
+
+    @app.exception_handler(SigmaError)
+    async def sigma_error_handler(request: Request, exc: SigmaError) -> JSONResponse:
+        """Global handler for SigmaError exceptions."""
+        logger.error(f"SigmaError ({exc.code}): {exc.message}")
+        return JSONResponse(
+            status_code=exc.http_status,
+            content=exc.to_dict(),
+        )
 
     @app.exception_handler(SigmaError)
     async def sigma_error_handler(request: Request, exc: SigmaError) -> JSONResponse:
