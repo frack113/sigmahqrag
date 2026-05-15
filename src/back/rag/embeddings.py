@@ -112,25 +112,27 @@ async def embed_documents(documents: list[Document]) -> list[list[float]]:
         return []
 
 
-def store_embeddings(
+async def store_embeddings(
     documents: list[Document],
     embeddings: list[list[float]],
     collection_name: str = "sigma_rules",
 ) -> bool:
-    """Store embeddings in Qdrant."""
-    import asyncio
+    """Store embeddings in Qdrant.
 
+    Async by design — callers in FastAPI handlers run in an event loop
+    already, so the previous ``asyncio.run`` wrapper crashed with
+    ``RuntimeError: asyncio.run() cannot be called from a running event
+    loop`` the moment this was invoked from an API route.
+    """
     texts = [doc.text for doc in documents]
     metadata = [doc.metadata for doc in documents]
 
-    return asyncio.run(
-        _store_embeddings(
-            embeddings=embeddings,
-            documents=texts,
-            metadata=metadata,
-            collection_name=collection_name,
-            vector_size=EMBEDDING_DIM,
-        )
+    return await _store_embeddings(
+        embeddings=embeddings,
+        documents=texts,
+        metadata=metadata,
+        collection_name=collection_name,
+        vector_size=EMBEDDING_DIM,
     )
 
 
@@ -157,10 +159,10 @@ class EmbeddingGenerator:
         """Generate embeddings for documents."""
         return await embed_documents(documents)
 
-    def store(
+    async def store(
         self,
         documents: list[Document],
         embeddings: list[list[float]],
     ) -> bool:
         """Store embeddings in Qdrant."""
-        return store_embeddings(documents, embeddings)
+        return await store_embeddings(documents, embeddings)
