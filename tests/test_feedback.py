@@ -5,6 +5,7 @@ import tempfile
 import uuid
 
 import pytest
+
 from src.back.feedback.models import FeedbackIn, FeedbackResponse, FeedbackStats, hash_query
 from src.back.feedback.repository import FeedbackRepository
 from src.back.feedback.service import FeedbackService

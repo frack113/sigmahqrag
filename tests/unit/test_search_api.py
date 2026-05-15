@@ -12,6 +12,7 @@ class TestSearchAPI:
     async def test_search_empty_query(self):
         """Test search with empty query returns empty response."""
         from src.api.routes.search import search_rules
+
         from src.shared.schemas.search import SearchRequest
 
         request = SearchRequest(query="", limit=10)
@@ -25,6 +26,7 @@ class TestSearchAPI:
     async def test_search_whitespace_query(self):
         """Test search with whitespace only returns empty response."""
         from src.api.routes.search import search_rules
+
         from src.shared.schemas.search import SearchRequest
 
         request = SearchRequest(query="   ", limit=10)
@@ -37,6 +39,7 @@ class TestSearchAPI:
     async def test_search_returns_citation(self):
         """Test search returns formatted citation."""
         from src.api.routes.search import search_rules
+
         from src.back.rag.search import SearchEngine
         from src.shared.schemas.search import SearchRequest
 
@@ -67,6 +70,7 @@ class TestSearchAPI:
         """Test search timeout raises HTTPException."""
         from fastapi.exceptions import HTTPException
         from src.api.routes.search import search_rules
+
         from src.back.rag.search import SearchEngine
         from src.shared.schemas.search import SearchRequest
 

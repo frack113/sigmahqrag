@@ -24,7 +24,7 @@ class LlamaBinaryService:
         from src.shared import get_config
 
         self._config = config or get_config()
-        self.llama_bin = Path(self._config.llama_binary_path).resolve()
+        self.llama_bin = self._config.resolve_llamacpp_bin_path()
         self.logs_dir = Path(self._config.paths_logs_dir).resolve()
         self.pid_dir = Path(
             self._config.paths_logs_dir.replace("logs", "pids")

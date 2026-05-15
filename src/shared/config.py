@@ -193,9 +193,23 @@ class Config:
     def reload(cls) -> Config:
         return cls()
 
+    def resolve_llamacpp_bin_path(self) -> Path:
+        """Resolve llama binary path with fallback to old location."""
+        path = Path(self.llama_binary_path).resolve()
+        if path.exists():
+            return path
+        old_path = Path("data/bin/llamacpp").resolve()
+        if old_path.exists():
+            logger.warning(
+                "Using old llama binary path %s; update config services.llama.binary_path",
+                old_path,
+            )
+            return old_path
+        return path
+
     @staticmethod
     def get_llamacpp_bin_path() -> Path:
-        return Path(Config().llama_binary_path).resolve()
+        return Config().resolve_llamacpp_bin_path()
 
     @staticmethod
     def get_qdrant_bin_path() -> Path:

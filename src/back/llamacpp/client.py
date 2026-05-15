@@ -11,7 +11,7 @@ def _default_base_url() -> str:
         from src.shared import get_config
 
         return get_config().llama_base_url or "http://127.0.0.1:8080"
-    except Exception:
+    except ImportError:
         return "http://127.0.0.1:8080"
 
 
@@ -53,7 +53,8 @@ class LlamaClient:
                 choices = payload.get("choices") or []
                 if not choices:
                     return ""
-                return choices[0].get("text", "")
+                text = choices[0].get("text")
+                return text if text is not None else ""
             except Exception as e:
                 raise RuntimeError(f"Llama.cpp generate failed: {e}") from e
 
@@ -61,16 +62,35 @@ class LlamaClient:
         """Legacy alias for :meth:`generate` (kept for back-compat)."""
         return await self.generate(prompt)
 
-    async def chat(self, messages: list[dict[str, Any]]) -> str:
+    async def chat(
+        self,
+        messages: list[dict[str, Any]],
+        temperature: float = 0.3,
+        max_tokens: int | None = None,
+    ) -> str:
         """Generate chat completion via OpenAI-compatible endpoint."""
+        body: dict[str, Any] = {
+            "messages": messages,
+            "temperature": temperature,
+        }
+        if max_tokens is not None:
+            body["max_tokens"] = max_tokens
+
         async with httpx.AsyncClient() as client:
             try:
                 response = await client.post(
                     f"{self.base_url}/v1/chat/completions",
-                    json={"messages": messages, "temperature": 0.3},
+                    json=body,
                     timeout=120.0,
                 )
                 response.raise_for_status()
-                return response.json()["choices"][0]["message"]["content"]
+                payload = response.json()
+                choices = payload.get("choices") or []
+                if not choices:
+                    return ""
+                choice = choices[0]
+                message = choice.get("message") or {}
+                content = message.get("content")
+                return content if content is not None else ""
             except Exception as e:
                 raise RuntimeError(f"Llama.cpp chat failed: {e}") from e
