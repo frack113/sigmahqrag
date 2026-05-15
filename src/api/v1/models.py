@@ -2,16 +2,21 @@
 
 from __future__ import annotations
 
+import json
 import logging
+import re
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 
-from src.back.models import HFRepo
+from src.api.dependencies import get_embedding_manager, get_unified_registry
+from src.back.embedding_config import EmbeddingTypeConfig
+from src.back.models import EmbeddingManager, HFRepo
+from src.back.utils.identify_file_type import FileType
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/v1/model", tags=["v1-model"])
+router = APIRouter(prefix="/api/v1/models", tags=["v1-models"])
 
 # Global download progress tracker
 _download_progress = {}
@@ -35,8 +40,6 @@ async def get_download_progress(repo_id: str) -> JSONResponse:
 @router.get("/llm/installed")
 async def list_installed_llm_models() -> JSONResponse:
     """List installed LLM models."""
-    from src.api.dependencies import get_unified_registry
-
     try:
         reg = get_unified_registry()
         from src.shared import LLM_DIR
@@ -178,7 +181,6 @@ async def delete_llm_model_file(repo_id: str, filename: str) -> JSONResponse:
     """Delete a LLM model file."""
     from pathlib import Path
 
-    from src.api.dependencies import get_unified_registry
     from src.back.models.exceptions import ModelNotFoundError
 
     try:
@@ -209,8 +211,6 @@ async def delete_llm_model_file(repo_id: str, filename: str) -> JSONResponse:
 @router.get("/embedding/installed")
 async def list_installed_embedding_models() -> JSONResponse:
     """List installed embedding models."""
-    from src.api.dependencies import get_unified_registry
-
     try:
         reg = get_unified_registry()
         from src.shared import EMBEDDINGS_DIR
@@ -239,8 +239,6 @@ async def download_embedding_model(
 ) -> JSONResponse:
     """Download an embedding model from HuggingFace."""
     import asyncio
-
-    from src.api.dependencies import get_embedding_manager
 
     def set_emb_progress(r: str, p: int, s: str = "downloading"):
         _download_progress[f"emb_{r}"] = {"progress": p, "status": s}
@@ -273,8 +271,6 @@ async def delete_embedding_model(repo_id: str) -> JSONResponse:
     import shutil
     from pathlib import Path
 
-    from src.api.dependencies import get_unified_registry
-
     try:
         reg = get_unified_registry()
         record = reg.get_embedding(repo_id)
@@ -292,4 +288,74 @@ async def delete_embedding_model(repo_id: str) -> JSONResponse:
         return JSONResponse(content={"success": True, "repo_id": repo_id})
     except Exception as e:
         logger.error(f"Delete failed: {e}")
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+@router.get("/embeddings/search")
+async def search_embedding_models(
+    query: str,
+    limit: int = 20,
+    manager: EmbeddingManager = Depends(get_embedding_manager),
+) -> JSONResponse:
+    """Search for embedding models on HuggingFace."""
+    try:
+        results = await manager.search_models(query, limit=limit)
+        return JSONResponse(content={"models": results})
+    except Exception as e:
+        logger.error(f"Search failed: {e}")
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+# ============= Embedding Config =============
+_config_manager = EmbeddingTypeConfig()
+MODEL_ID_RE = re.compile(r"^[\w.-]+/[\w.-]+$")
+VALID_TYPE_KEYS = {ft.value for ft in FileType}
+
+@router.get("/embeddings/config")
+async def get_embedding_config() -> JSONResponse:
+    """Get the full embedding type configuration."""
+    config = _config_manager.load()
+    return JSONResponse(content=json.loads(json.dumps(config, default=str)))
+
+
+@router.put("/embeddings/config/{type_key}")
+async def update_type_config(type_key: str, body: dict) -> JSONResponse:
+    """Update or remove a type's embedding config.
+
+    Sending model="" removes the type from config.
+    Accepts a generic dict for forward-compatibility.
+    """
+    if not type_key.strip():
+        return JSONResponse(
+            status_code=400, content={"error": "type_key must not be empty"}
+        )
+
+    if type_key not in VALID_TYPE_KEYS:
+        return JSONResponse(
+            status_code=400, content={"error": f"Unknown type_key: {type_key}"}
+        )
+
+    if "model" not in body:
+        return JSONResponse(status_code=400, content={"error": "model is required"})
+
+    model = (body.get("model") or "").strip()
+    if model and not MODEL_ID_RE.match(model):
+        return JSONResponse(
+            status_code=400,
+            content={"error": "Invalid model ID format (expected: org/model)"},
+        )
+
+    config = _config_manager.update_type(type_key, body)
+    if config is None:
+        return JSONResponse(status_code=500, content={"error": "Failed to save config"})
+    return JSONResponse(content=json.loads(json.dumps(config, default=str)))
+
+@router.get("/embeddings/{repo_id}/files")
+async def get_embedding_files(
+    repo_id: str, manager: EmbeddingManager = Depends(get_embedding_manager)
+) -> JSONResponse:
+    """Get files for an embedding model repo."""
+    try:
+        files = await manager.get_repo_files(repo_id)
+        return JSONResponse(content={"files": files})
+    except Exception as e:
+        logger.error(f"Files failed: {e}")
         return JSONResponse(status_code=500, content={"error": str(e)})

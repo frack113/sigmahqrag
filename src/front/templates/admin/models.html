@@ -56,7 +56,7 @@
 
 <script>
 function loadModels() {
-    fetch('/api/v1/model/llm/installed')
+    fetch('/api/v1/models/llm/installed')
         .then(r => r.json())
         .then(data => {
             const models = data.models || [];
@@ -82,7 +82,7 @@ function loadModels() {
         });
 
     // Embeddings
-    fetch('/api/v1/model/embedding/installed')
+    fetch('/api/v1/models/embedding/installed')
         .then(r => r.json())
         .then(data => {
             const modelsObj = data.models || {};
@@ -126,7 +126,7 @@ function loadFiles() {
         fileSelect.innerHTML = '<option value="">Loading...</option>';
 
         console.log('Fetching files for:', repoId);
-        fetch(`/api/v1/model/llm/files?repo_id=${encodeURIComponent(repoId)}`)
+        fetch(`/api/v1/models/llm/files?repo_id=${encodeURIComponent(repoId)}`)
             .then(r => r.json())
             .then(data => {
                 console.log('Response:', data);
@@ -173,7 +173,7 @@ function downloadModel() {
     document.getElementById('download-progress').value = 0;
     document.getElementById('progress-text').textContent = 'Starting download...';
 
-    const basePath = modelType === 'embedding' ? '/api/v1/model/embedding' : '/api/v1/model/llm';
+    const basePath = modelType === 'embedding' ? '/api/v1/models/embedding' : '/api/v1/models/llm';
     let url = `${basePath}/download?repo_id=${encodeURIComponent(repoId)}`;
     if (filename) {
         url += `&filename=${encodeURIComponent(filename)}`;
@@ -219,7 +219,7 @@ function downloadModel() {
 function deleteModel(repoId, filename) {
     if (!confirm(`Delete ${repoId}/${filename}?`)) return;
 
-    fetch(`/api/v1/model/llm/${encodeURIComponent(repoId)}/file/${encodeURIComponent(filename)}`, {
+    fetch(`/api/v1/models/llm/${encodeURIComponent(repoId)}/file/${encodeURIComponent(filename)}`, {
         method: 'DELETE'
     })
     .then(r => r.json())
@@ -235,7 +235,7 @@ function deleteModel(repoId, filename) {
 function deleteEmbedding(repoId) {
     if (!confirm(`Delete embedding ${repoId}?`)) return;
 
-    fetch(`/api/v1/model/embedding/${encodeURIComponent(repoId)}`, {
+    fetch(`/api/v1/models/embedding/${encodeURIComponent(repoId)}`, {
         method: 'DELETE'
     })
     .then(r => r.json())

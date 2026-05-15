@@ -117,7 +117,7 @@ function showLogs(service) {
 
 
 function loadModels() {
-    fetch('/api/v1/model/llm/installed')
+    fetch('/api/v1/models/llm/installed')
         .then(r => r.json())
         .then(data => {
             const models = data.models || [];
@@ -147,7 +147,7 @@ function refreshStatus() {
 function deleteModel(repoId, filename) {
     if (!confirm('Delete this model?')) return;
 
-    fetch(`/api/v1/model/llm/${encodeURIComponent(repoId)}/file/${encodeURIComponent(filename)}`, {
+    fetch(`/api/v1/models/llm/${encodeURIComponent(repoId)}/file/${encodeURIComponent(filename)}`, {
         method: 'DELETE'
     })
     .then(r => r.json())

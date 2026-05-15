@@ -117,7 +117,7 @@ async function saveTypeConfig(typeKey) {
     btn.textContent = 'Saving...';
 
     try {
-        const response = await fetch('/api/v1/embedding-config/' + encodeURIComponent(typeKey), {
+        const response = await fetch('/api/v1/models/embeddings/config/' + encodeURIComponent(typeKey), {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body)
