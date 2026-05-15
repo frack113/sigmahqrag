@@ -81,3 +81,9 @@ async def data_embedding_page(request: Request):
         name="data/embedding.html",
         context={"file_types": file_types, "config": safe_config, "models": models},
     )
+
+
+@router.get("/data/vectordb")
+async def data_vectordb_page(request: Request):
+    """Serve the Vector DB status page."""
+    return templates.TemplateResponse(request=request, name="data/vectordb.html")

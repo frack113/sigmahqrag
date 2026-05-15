@@ -1,0 +1,611 @@
+{% extends "data/base.html" %}
+
+{% block title %}Vector DB - Data Sources{% endblock %}
+
+{% block page_content %}
+<h1 class="mb-4">Vector Database</h1>
+<p class="text-muted">Qdrant vector database status and collection management.</p>
+
+<div id="vectordb-loading" class="vectordb-loading">
+    <p>Loading Vector DB status...</p>
+</div>
+
+<div id="vectordb-error" class="vectordb-error" style="display:none;">
+    <p>Failed to load Vector DB status.</p>
+    <button class="btn btn-primary" onclick="loadVectorDB()">Retry</button>
+</div>
+
+<div id="vectordb-content" style="display:none;">
+    <div class="vectordb-status-cards">
+        <div class="vectordb-status-card">
+            <h3>Status</h3>
+            <div class="vectordb-status-value">
+                <span class="status-dot" id="health-dot"></span>
+                <span id="health-text">Unknown</span>
+            </div>
+        </div>
+
+        <div class="vectordb-status-card">
+            <h3>Version</h3>
+            <div class="vectordb-status-value">
+                <span id="vectordb-version">—</span>
+            </div>
+        </div>
+
+        <div class="vectordb-status-card">
+            <h3>Mode</h3>
+            <div class="vectordb-status-value">
+                <span class="status-badge" id="vectordb-mode-badge">—</span>
+            </div>
+        </div>
+
+    </div>
+
+    <div id="vectordb-collections" class="vectordb-collections-section">
+        <h2>Collections</h2>
+        <div id="collections-list" class="vectordb-collection-list"></div>
+    </div>
+
+    <!-- SigmaRef Embedding Card -->
+    <div class="vectordb-card" id="sigmaref-embed-card">
+        <div class="vectordb-card-header">
+            <h2>SigmaRef Embedding</h2>
+            <span class="badge badge-info">Sigma Doc</span>
+        </div>
+        <div class="vectordb-card-body">
+            <p class="vectordb-card-description">
+                Embed all SigmaRef documents listed in <code>data/documents/sigmaref/registry.json</code>
+                into the vector database. Processes each file one by one with its associated metadata.
+            </p>
+
+            <!-- Progress Section -->
+            <div id="sigmaref-progress-section" style="display:none;">
+                <div class="vectordb-progress-bar-container">
+                    <div class="vectordb-progress-bar" id="sigmaref-progress-bar">
+                        <div class="vectordb-progress-fill" id="sigmaref-progress-fill"></div>
+                    </div>
+                    <span class="vectordb-progress-text" id="sigmaref-progress-text">0%</span>
+                </div>
+                <div class="vectordb-progress-details">
+                    <span id="sigmaref-progress-filename" class="vectordb-progress-filename"></span>
+                    <span id="sigmaref-progress-count" class="vectordb-progress-count"></span>
+                </div>
+            </div>
+
+            <!-- Status / Result Message -->
+            <div id="sigmaref-message" class="vectordb-message" style="display:none;"></div>
+
+            <!-- Action Buttons -->
+            <div class="vectordb-card-actions">
+                <button class="btn btn-success" id="btn-index-docs" onclick="startSigmaRefEmbedding()">
+                    [index docs]
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+const API_BASE = '/api/v1/qdrant';
+let isProcessing = false;
+let embedTaskId = null;
+let embedEventSource = null;
+
+async function loadVectorDB() {
+    if (isProcessing) return;
+    isProcessing = true;
+
+    document.getElementById('vectordb-loading').style.display = 'block';
+    document.getElementById('vectordb-content').style.display = 'none';
+    document.getElementById('vectordb-error').style.display = 'none';
+
+    try {
+        const statusResp = await fetch(API_BASE + '/status');
+        if (!statusResp.ok) throw new Error('Status API error');
+        const status = await statusResp.json();
+
+        if (!status || typeof status !== 'object') throw new Error('Invalid status data');
+
+        const healthy = !!status.healthy;
+        const version = status.current_version || 'unknown';
+        const mode = status.mode || 'managed';
+        const isExternal = mode === 'external';
+
+        const healthDot = document.getElementById('health-dot');
+        const healthText = document.getElementById('health-text');
+        if (healthy) {
+            healthDot.className = 'status-dot active';
+            healthText.textContent = 'Connected';
+        } else {
+            healthDot.className = 'status-dot error';
+            healthText.textContent = 'Disconnected';
+        }
+
+        document.getElementById('vectordb-version').textContent = version;
+
+        const modeBadge = document.getElementById('vectordb-mode-badge');
+        modeBadge.textContent = mode.charAt(0).toUpperCase() + mode.slice(1);
+        modeBadge.className = 'status-badge ' + (isExternal ? 'warning' : 'success');
+
+        if (healthy) {
+            await loadCollections();
+        } else {
+            document.getElementById('vectordb-collection-count').textContent = '—';
+            document.getElementById('collections-list').innerHTML =
+                '<div class="vectordb-empty"><p>Vector DB is not connected.</p></div>';
+        }
+
+        document.getElementById('vectordb-loading').style.display = 'none';
+        document.getElementById('vectordb-content').style.display = 'block';
+    } catch (error) {
+        console.error('Failed to load Vector DB status:', error);
+        document.getElementById('vectordb-loading').style.display = 'none';
+        document.getElementById('vectordb-error').style.display = 'block';
+    } finally {
+        isProcessing = false;
+    }
+}
+
+async function loadCollections() {
+    try {
+        const resp = await fetch(API_BASE, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'collection_management',
+                payload: {
+                    operation: 'list',
+                    collection_name: ''
+                }
+            })
+        });
+        const result = await resp.json();
+        const list = document.getElementById('collections-list');
+        if (result.status === 'success' && Array.isArray(result.data)) {
+            if (result.data.length === 0) {
+                list.innerHTML = '<div class="vectordb-empty"><p>No collections found.</p></div>';
+            } else {
+                list.innerHTML = result.data.map(col =>
+                    `<div class="vectordb-collection-item">
+                        <div class="collection-info">
+                            <span class="collection-name">${col.name || col}</span>
+                        </div>
+                    </div>`
+                ).join('');
+            }
+        } else {
+            list.innerHTML = '<div class="vectordb-empty"><p>Failed to load collections.</p></div>';
+        }
+    } catch (error) {
+        console.error('Failed to load collections:', error);
+        document.getElementById('collections-list').innerHTML =
+            '<div class="vectordb-empty"><p>Error loading collections.</p></div>';
+    }
+}
+
+function showSigmaRefMessage(type, text) {
+    const msgEl = document.getElementById('sigmaref-message');
+    msgEl.style.display = 'block';
+    msgEl.className = 'vectordb-message ' + type;
+    msgEl.textContent = text;
+}
+
+function hideSigmaRefMessage() {
+    document.getElementById('sigmaref-message').style.display = 'none';
+}
+
+function showSigmaRefProgress() {
+    document.getElementById('sigmaref-progress-section').style.display = 'block';
+}
+
+function hideSigmaRefProgress() {
+    document.getElementById('sigmaref-progress-section').style.display = 'none';
+}
+
+function updateSigmaRefProgress(percent, filename, current, total) {
+    const fill = document.getElementById('sigmaref-progress-fill');
+    const text = document.getElementById('sigmaref-progress-text');
+    const fileEl = document.getElementById('sigmaref-progress-filename');
+    const countEl = document.getElementById('sigmaref-progress-count');
+
+    fill.style.width = percent + '%';
+    text.textContent = percent.toFixed(1) + '%';
+
+    if (filename) {
+        fileEl.textContent = 'File: ' + filename;
+    }
+    if (total > 0) {
+        countEl.textContent = 'Progress: ' + current + ' / ' + total;
+    }
+}
+
+function setIndexButtonEnabled(enabled) {
+    const btn = document.getElementById('btn-index-docs');
+    btn.disabled = !enabled;
+    btn.textContent = enabled ? '[index docs]' : 'Processing...';
+}
+
+async function startSigmaRefEmbedding() {
+    if (isProcessing) return;
+    isProcessing = true;
+
+    setIndexButtonEnabled(false);
+    hideSigmaRefMessage();
+    showSigmaRefProgress();
+    updateSigmaRefProgress(0, '', 0, 0);
+
+    try {
+        const response = await fetch(API_BASE, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                action: 'embed_sigmaref',
+                payload: {
+                    registry_path: 'data/documents/sigmaref/registry.json',
+                    collection_name: 'sigma_rules'
+                }
+            })
+        });
+        const result = await response.json();
+
+        if (result.status === 'success') {
+            embedTaskId = result.data.task_id;
+            // Start SSE stream for progress
+            connectEmbedSSE(embedTaskId);
+        } else {
+            hideSigmaRefProgress();
+            showSigmaRefMessage('error', 'Error: ' + (result.message || 'Unknown error'));
+            setIndexButtonEnabled(true);
+            isProcessing = false;
+        }
+    } catch (error) {
+        console.error('Failed to start SigmaRef embedding:', error);
+        hideSigmaRefProgress();
+        showSigmaRefMessage('error', 'Failed to start embedding: ' + error.message);
+        setIndexButtonEnabled(true);
+        isProcessing = false;
+    }
+}
+
+function connectEmbedSSE(taskId) {
+    if (embedEventSource) {
+        embedEventSource.close();
+    }
+
+    embedEventSource = new EventSource(API_BASE + '/embed/' + taskId + '/stream');
+
+    embedEventSource.onmessage = function(event) {
+        try {
+            const data = JSON.parse(event.data);
+            handleEmbedProgress(data);
+        } catch (e) {
+            console.error('Failed to parse SSE data:', e);
+        }
+    };
+
+    embedEventSource.onerror = function() {
+        console.error('SSE connection error, falling back to polling');
+        embedEventSource.close();
+        embedEventSource = null;
+        pollEmbedStatus(taskId);
+    };
+}
+
+function handleEmbedProgress(data) {
+    if (data.status === 'processing') {
+        const total = data.total || 0;
+        const processed = data.processed || 0;
+        const percent = total > 0 ? (processed / total) * 100 : 0;
+        const filename = data.current_file || '';
+        updateSigmaRefProgress(percent, filename, processed, total);
+    } else if (data.status === 'completed') {
+        hideSigmaRefProgress();
+        const msg = data.message || 'Completed successfully';
+        const detail = data.errors > 0 ? ' (' + data.errors + ' errors, ' + data.skipped + ' skipped)' : '';
+        showSigmaRefMessage('success', msg + detail);
+        setIndexButtonEnabled(true);
+        isProcessing = false;
+        if (embedEventSource) {
+            embedEventSource.close();
+            embedEventSource = null;
+        }
+    } else if (data.status === 'failed') {
+        hideSigmaRefProgress();
+        showSigmaRefMessage('error', 'Failed: ' + (data.error || 'Unknown error'));
+        setIndexButtonEnabled(true);
+        isProcessing = false;
+        if (embedEventSource) {
+            embedEventSource.close();
+            embedEventSource = null;
+        }
+    }
+}
+
+async function pollEmbedStatus(taskId) {
+    const interval = setInterval(async () => {
+        if (!taskId) {
+            clearInterval(interval);
+            return;
+        }
+        try {
+            const resp = await fetch(API_BASE + '/embed/' + taskId);
+            if (!resp.ok) {
+                clearInterval(interval);
+                return;
+            }
+            const data = await resp.json();
+            if (data.status === 'completed') {
+                clearInterval(interval);
+                hideSigmaRefProgress();
+                showSigmaRefMessage('success', 'Completed successfully');
+                setIndexButtonEnabled(true);
+                isProcessing = false;
+            } else if (data.status === 'failed') {
+                clearInterval(interval);
+                hideSigmaRefProgress();
+                showSigmaRefMessage('error', 'Failed: ' + (data.details?.error || 'Unknown error'));
+                setIndexButtonEnabled(true);
+                isProcessing = false;
+            }
+        } catch (e) {
+            console.error('Poll error:', e);
+            clearInterval(interval);
+            setIndexButtonEnabled(true);
+            isProcessing = false;
+        }
+    }, 2000);
+}
+
+async function runRegistryIndexing() {
+    // Legacy function kept for compatibility with existing Actions card button
+    await startSigmaRefEmbedding();
+}
+
+document.addEventListener('DOMContentLoaded', loadVectorDB);
+
+</script>
+
+{% endblock %}
+
+{% block styles %}
+{{ super() }}
+<style>
+.vectordb-status-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 16px;
+    margin: 20px 0;
+}
+.vectordb-status-card {
+    background: #ffffff;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+.vectordb-status-card h3 {
+    margin: 0 0 8px;
+    font-size: 14px;
+    color: #7f8c8d;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.vectordb-status-value {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 1.1em;
+    font-weight: 600;
+     color: #1a1a1a;
+}
+.vectordb-collections-section {
+    margin-top: 24px;
+}
+.vectordb-collections-section h2 {
+    font-size: 1.2em;
+    margin-bottom: 12px;
+    color: #1a1a1a;
+}
+.vectordb-collection-list {
+    display: grid;
+    gap: 8px;
+}
+.vectordb-collection-item {
+    background: #ffffff;
+    padding: 16px 20px;
+    border-radius: 6px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+.collection-info {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.collection-name {
+    font-family: monospace;
+    font-size: 1em;
+    color: #1a1a1a;
+    font-weight: 500;
+}
+.vectordb-loading,
+.vectordb-error,
+.vectordb-empty {
+    padding: 40px;
+    text-align: center;
+    color: #7f8c8d;
+    background: #ffffff;
+    border-radius: 8px;
+     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin: 20px 0;
+}
+.vectordb-error {
+    color: #e74c3c;
+}
+.vectordb-error p {
+    margin-bottom: 12px;
+}
+
+/* --- Card component --- */
+.vectordb-card {
+    background: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin: 20px 0;
+    overflow: hidden;
+}
+.vectordb-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    background: #f8f9fa;
+    border-bottom: 1px solid #e9ecef;
+}
+.vectordb-card-header h2 {
+    margin: 0;
+    font-size: 1.1em;
+    color: #1a1a1a;
+}
+.vectordb-card-body {
+    padding: 20px;
+}
+.vectordb-card-description {
+    margin: 0 0 16px;
+    color: #555;
+    font-size: 0.95em;
+    line-height: 1.5;
+}
+.vectordb-card-description code {
+    background: #f0f0f0;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.9em;
+}
+.vectordb-card-actions {
+    margin-top: 16px;
+}
+
+/* --- Progress bar --- */
+.vectordb-progress-bar-container {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+.vectordb-progress-bar {
+    flex: 1;
+    height: 20px;
+    background: #e9ecef;
+    border-radius: 10px;
+    overflow: hidden;
+}
+.vectordb-progress-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #27ae60, #2ecc71);
+    border-radius: 10px;
+    transition: width 0.3s ease;
+}
+.vectordb-progress-text {
+    font-size: 0.9em;
+    font-weight: 600;
+    color: #1a1a1a;
+    min-width: 45px;
+    text-align: right;
+}
+.vectordb-progress-details {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.85em;
+    color: #7f8c8d;
+    margin-bottom: 8px;
+}
+.vectordb-progress-filename {
+    font-family: monospace;
+}
+.vectordb-progress-count {
+    font-weight: 500;
+}
+
+/* --- Messages --- */
+.vectordb-message {
+    padding: 12px 16px;
+    border-radius: 6px;
+    margin-bottom: 12px;
+    font-weight: 500;
+}
+.vectordb-message.success {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+.vectordb-message.error {
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+.vectordb-message.info {
+    background: #d1ecf1;
+    color: #0c5460;
+    border: 1px solid #bee5eb;
+}
+
+/* --- Badges --- */
+.badge {
+    display: inline-block;
+    padding: 4px 10px;
+    font-size: 0.75em;
+    font-weight: 600;
+    border-radius: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.badge-info {
+    background: #d1ecf1;
+    color: #0c5460;
+}
+
+.btn-success {
+    background: #27ae60;
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+}
+.btn-success:hover {
+    background: #219a52;
+}
+.btn-danger {
+    background: #e74c3c;
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+}
+.btn-danger:hover {
+    background: #c0392b;
+}
+.btn-secondary {
+    background: #7f8c8d;
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+}
+.btn-secondary:hover {
+     background: #6c7a7d;
+}
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+</style>
+{% endblock %}

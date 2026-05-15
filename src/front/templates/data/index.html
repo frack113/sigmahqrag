@@ -4,13 +4,20 @@
 
 {% block page_content %}
 <h1>Data Sources</h1>
-<p>Manage Sigma rule corpora indexed for retrieval.</p>
+<p>Manage your data sources for RAG processing.</p>
 
-<div class="data-overview">
-    <article class="data-card">
-        <h2><a href="/data/github">GitHub Repositories</a></h2>
-        <p>Clone Sigma rule repositories from GitHub (e.g. SigmaHQ/sigma) and choose which directories to index.</p>
-        <a class="btn btn-primary" href="/data/github">Open</a>
-    </article>
+<div class="data-cards">
+    <a href="/data/github" class="data-card">
+        <h3>GitHub</h3>
+        <p>Connect GitHub repositories to index Sigma rules.</p>
+    </a>
+    <div class="data-card disabled">
+        <h3>Local Files</h3>
+        <p>Index local Sigma rule files (coming soon).</p>
+    </div>
+    <a href="/data/vectordb" class="data-card">
+        <h3>Vector DB</h3>
+        <p>Manage Qdrant vector database.</p>
+    </a>
 </div>
 {% endblock %}

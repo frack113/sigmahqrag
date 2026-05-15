@@ -46,12 +46,13 @@ venv.bak/
 
 _bmad-output/
 /data/
-/logs/
 *.log
 *.tmp
 
 # Opencode need it to not kill my code everey time I run it
+.opencode/
 AGENTS.md
 
-# qdrant created the file at startup, we can ignore it
-.qdrant-initialized
+# Snyk Security
+.snyk
+.dcignore
