@@ -30,9 +30,7 @@ async def get_full_config() -> JSONResponse:
         return JSONResponse(content={"status": "success", "data": config.to_dict()})
     except Exception as e:
         logger.error(f"Failed to load config: {e}")
-        return JSONResponse(
-            status_code=500, content={"status": "error", "error": str(e)}
-        )
+        return JSONResponse(status_code=500, content={"status": "error", "error": str(e)})
 
 
 @router.post("/config")
@@ -60,6 +58,4 @@ async def update_config(request: ConfigUpdateRequest) -> JSONResponse:
         )
     except Exception as e:
         logger.error(f"Failed to update config: {e}")
-        return JSONResponse(
-            status_code=500, content={"status": "error", "error": str(e)}
-        )
+        return JSONResponse(status_code=500, content={"status": "error", "error": str(e)})

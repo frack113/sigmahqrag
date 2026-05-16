@@ -195,9 +195,7 @@ async def delete_llm_model_file(repo_id: str, filename: str) -> JSONResponse:
             path.unlink()
         del record["files"][filename]
         reg._save()
-        return JSONResponse(
-            content={"success": True, "repo_id": repo_id, "filename": filename}
-        )
+        return JSONResponse(content={"success": True, "repo_id": repo_id, "filename": filename})
     except ModelNotFoundError as e:
         return JSONResponse(status_code=404, content={"error": str(e)})
     except Exception as e:
@@ -226,9 +224,7 @@ async def list_installed_embedding_models() -> JSONResponse:
 @router.get("/embedding/progress/{repo_id}")
 async def get_embedding_progress(repo_id: str) -> JSONResponse:
     """Get embedding download progress."""
-    progress = _download_progress.get(
-        f"emb_{repo_id}", {"progress": 0, "status": "idle"}
-    )
+    progress = _download_progress.get(f"emb_{repo_id}", {"progress": 0, "status": "idle"})
     return JSONResponse(content=progress)
 
 
@@ -275,9 +271,7 @@ async def delete_embedding_model(repo_id: str) -> JSONResponse:
         reg = get_unified_registry()
         record = reg.get_embedding(repo_id)
         if not record:
-            return JSONResponse(
-                status_code=404, content={"error": f"Model {repo_id} not found"}
-            )
+            return JSONResponse(status_code=404, content={"error": f"Model {repo_id} not found"})
         path = Path(record.get("local_path", ""))
         if path.exists():
             if path.is_dir():
@@ -327,14 +321,10 @@ async def update_type_config(type_key: str, body: dict) -> JSONResponse:
     Accepts a generic dict for forward-compatibility.
     """
     if not type_key.strip():
-        return JSONResponse(
-            status_code=400, content={"error": "type_key must not be empty"}
-        )
+        return JSONResponse(status_code=400, content={"error": "type_key must not be empty"})
 
     if type_key not in VALID_TYPE_KEYS:
-        return JSONResponse(
-            status_code=400, content={"error": f"Unknown type_key: {type_key}"}
-        )
+        return JSONResponse(status_code=400, content={"error": f"Unknown type_key: {type_key}"})
 
     if "model" not in body:
         return JSONResponse(status_code=400, content={"error": "model is required"})

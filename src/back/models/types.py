@@ -37,9 +37,7 @@ class HFRepo:
         """
         parts = repo_id.split("/")
         if len(parts) != 2:
-            raise ValueError(
-                f"Invalid repo_id format: '{repo_id}'. Expected 'owner/name'."
-            )
+            raise ValueError(f"Invalid repo_id format: '{repo_id}'. Expected 'owner/name'.")
         return cls(owner=parts[0], name=parts[1])
 
     def __repr__(self) -> str:

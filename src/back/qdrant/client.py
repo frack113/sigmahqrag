@@ -42,7 +42,5 @@ def get_qdrant_client(
 
     if _client_instance is not None:
         return _client_instance
-    _client_instance = qdrant_client.QdrantClient(
-        host=resolved_host, port=resolved_port
-    )
+    _client_instance = qdrant_client.QdrantClient(host=resolved_host, port=resolved_port)
     return _client_instance

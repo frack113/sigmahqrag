@@ -159,9 +159,7 @@ class RAGPipeline:
             return response
         except Exception as e:
             logger.error(f"LLM generation failed: {e}")
-            return (
-                f"Found {len(related_results)} related rules for coverage comparison."
-            )
+            return f"Found {len(related_results)} related rules for coverage comparison."
 
     def _format_search_results(self, results: list[dict[str, Any]]) -> str:
         """Format search results for LLM context with proper citations."""

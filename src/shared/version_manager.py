@@ -158,9 +158,7 @@ class VersionManager:
             logger.debug(f"Could not read GPU preference from config: {e}")
         return None
 
-    async def get_release(
-        self, service: str, version: str | None = None
-    ) -> ReleaseInfo:
+    async def get_release(self, service: str, version: str | None = None) -> ReleaseInfo:
         """Get release information for a service.
 
         Args:
@@ -203,9 +201,7 @@ class VersionManager:
                 assets=assets,
             )
 
-    def find_matching_asset(
-        self, release: ReleaseInfo, service: str
-    ) -> ReleaseAsset | None:
+    def find_matching_asset(self, release: ReleaseInfo, service: str) -> ReleaseAsset | None:
         """Find the asset matching the current platform.
 
         Args:
@@ -267,16 +263,12 @@ class VersionManager:
                     and arch in asset_name
                 ):
                     return asset
-                elif (
-                    os_name == "macos" and "macos" in asset_name and arch in asset_name
-                ):
+                elif os_name == "macos" and "macos" in asset_name and arch in asset_name:
                     return asset
 
             elif service == "qdrant":
                 # For Qdrant, prioritize OS-specific match
-                logger.info(
-                    f"QDRANT: Looking for {os_name} asset, asset_name={asset_name}"
-                )
+                logger.info(f"QDRANT: Looking for {os_name} asset, asset_name={asset_name}")
 
                 if os_name == "windows":
                     # Look for windows-msvc first
@@ -298,9 +290,7 @@ class VersionManager:
                             return asset
                 elif os_name == "macos":
                     if "macos" in asset_name or "apple" in asset_name:
-                        logger.info(
-                            f"QDRANT: Matched macOS pattern for asset '{asset.name}'"
-                        )
+                        logger.info(f"QDRANT: Matched macOS pattern for asset '{asset.name}'")
                         return asset
 
                 # Fallback: check for OS in asset name

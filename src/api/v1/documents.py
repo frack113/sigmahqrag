@@ -69,9 +69,7 @@ async def ingest_sigma_rules(
                         file=file_path,
                         success=False,
                         rule_id=rule.id,
-                        error="; ".join(
-                            f"{e.field}: {e.message}" for e in validation.errors
-                        ),
+                        error="; ".join(f"{e.field}: {e.message}" for e in validation.errors),
                     )
                 )
                 continue

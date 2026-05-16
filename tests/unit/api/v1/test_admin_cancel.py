@@ -28,9 +28,7 @@ class TestQdrantCancel:
     """Test POST /api/v1/qdrant endpoint with cancel action."""
 
     @patch("src.back.download_manager.create_download_manager")
-    def test_qdrant_cancel_returns_200(
-        self, mock_dm: AsyncMock, client: TestClient
-    ) -> None:
+    def test_qdrant_cancel_returns_200(self, mock_dm: AsyncMock, client: TestClient) -> None:
         """Given cancel action called, when POST /api/v1/post/qdrant called, then returns 200 (FR16)."""
         mock_manager = AsyncMock()
         mock_dm.return_value = mock_manager

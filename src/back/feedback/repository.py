@@ -56,9 +56,7 @@ class FeedbackRepository:
         self._initialized = True
         logger.info(f"Feedback database initialized at {self._db_path}")
 
-    async def create(
-        self, query: str, helpful: bool, session_id: str | None = None
-    ) -> Feedback:
+    async def create(self, query: str, helpful: bool, session_id: str | None = None) -> Feedback:
         """Create a new feedback entry."""
         await self.initialize()
 
@@ -95,9 +93,7 @@ class FeedbackRepository:
 
         async with aiosqlite.connect(self._db_path) as db:
             db.row_factory = aiosqlite.Row
-            async with db.execute(
-                "SELECT * FROM feedback ORDER BY timestamp DESC"
-            ) as cursor:
+            async with db.execute("SELECT * FROM feedback ORDER BY timestamp DESC") as cursor:
                 rows = await cursor.fetchall()
 
         feedbacks = []
@@ -136,9 +132,7 @@ class FeedbackRepository:
             helpful_percentage=helpful_percentage,
         )
 
-    async def get_by_date_range(
-        self, start_date: datetime, end_date: datetime
-    ) -> list[Feedback]:
+    async def get_by_date_range(self, start_date: datetime, end_date: datetime) -> list[Feedback]:
         """Get feedback within a date range."""
         await self.initialize()
 

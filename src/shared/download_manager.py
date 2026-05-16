@@ -114,9 +114,7 @@ class DownloadManager:
 
         asset = self.version_manager.find_matching_asset(release, service)
         if not asset:
-            raise DownloadError(
-                f"No matching binary found for {service} on this platform"
-            )
+            raise DownloadError(f"No matching binary found for {service} on this platform")
 
         download_id = str(uuid.uuid4())
         file_ext = ".zip" if asset.name.endswith(".zip") else ".tar.gz"
@@ -153,9 +151,7 @@ class DownloadManager:
             "target_path": str(target_path),
         }
 
-    async def _download_file(
-        self, download_id: str, github_token: str | None = None
-    ) -> None:
+    async def _download_file(self, download_id: str, github_token: str | None = None) -> None:
         """Download a file with progress tracking.
 
         Args:
@@ -197,9 +193,7 @@ class DownloadManager:
                                 task.status = "cancelled"
                                 self.temp_manager.cleanup(task.temp_path)
                                 if task.progress_queue:
-                                    await task.progress_queue.put(
-                                        {"status": "cancelled"}
-                                    )
+                                    await task.progress_queue.put({"status": "cancelled"})
                                 del self.active_downloads[download_id]
                                 return
 
@@ -210,11 +204,7 @@ class DownloadManager:
                             time_delta = current_time - last_update
                             if time_delta >= 0.5:
                                 bytes_delta = downloaded - last_bytes
-                                speed = (
-                                    int(bytes_delta / time_delta)
-                                    if time_delta > 0
-                                    else 0
-                                )
+                                speed = int(bytes_delta / time_delta) if time_delta > 0 else 0
                                 task.speed_bps = speed
                                 last_update = current_time
                                 last_bytes = downloaded
@@ -224,9 +214,7 @@ class DownloadManager:
                                 await task.progress_queue.put(
                                     {
                                         "percentage": (
-                                            (downloaded / total * 100)
-                                            if total > 0
-                                            else 0
+                                            (downloaded / total * 100) if total > 0 else 0
                                         ),
                                         "bytes_downloaded": downloaded,
                                         "total_bytes": total,
@@ -238,9 +226,7 @@ class DownloadManager:
                     task.status = "completed"
                     task.bytes_downloaded = downloaded
 
-                    await self._extract_and_install(
-                        task.temp_path, task.target_path, task.service
-                    )
+                    await self._extract_and_install(task.temp_path, task.target_path, task.service)
 
                     if task.post_install_callback:
                         await task.post_install_callback(task.target_path)
@@ -282,9 +268,7 @@ class DownloadManager:
                     }
                 )
 
-    async def _extract_and_install(
-        self, temp_path: Path, target_path: Path, service: str
-    ) -> None:
+    async def _extract_and_install(self, temp_path: Path, target_path: Path, service: str) -> None:
         """Extract archive and install to bin directory.
 
         Args:
@@ -336,9 +320,7 @@ class DownloadManager:
 
                     # Find the top-level directory in the zip
                     items = list(Path(tmp_dir).iterdir())
-                    logger.info(
-                        f"ZIP contains {len(items)} items: {[i.name for i in items]}"
-                    )
+                    logger.info(f"ZIP contains {len(items)} items: {[i.name for i in items]}")
                     if len(items) == 1 and items[0].is_dir():
                         # Single directory - copy contents to service_dir
                         extracted_dir = items[0]
@@ -350,9 +332,7 @@ class DownloadManager:
                                 shutil.copy2(f, dst)
                             elif f.is_dir():
                                 shutil.copytree(f, dst, dirs_exist_ok=True)
-                        logger.info(
-                            f"Copied files from {extracted_dir.name} to {service_dir}"
-                        )
+                        logger.info(f"Copied files from {extracted_dir.name} to {service_dir}")
                     else:
                         # Direct files - copy to service_dir
                         for f in items:
@@ -378,9 +358,7 @@ class DownloadManager:
 
                     # Find the top-level directory
                     items = list(Path(tmp_dir).iterdir())
-                    logger.info(
-                        f"TAR.GZ contains {len(items)} items: {[i.name for i in items]}"
-                    )
+                    logger.info(f"TAR.GZ contains {len(items)} items: {[i.name for i in items]}")
                     if len(items) == 1 and items[0].is_dir():
                         extracted_dir = items[0]
                         logger.info(f"Copying from subdirectory: {extracted_dir.name}")
@@ -391,9 +369,7 @@ class DownloadManager:
                                 shutil.copy2(f, dst)
                             elif f.is_dir():
                                 shutil.copytree(f, dst, dirs_exist_ok=True)
-                        logger.info(
-                            f"Copied files from {extracted_dir.name} to {service_dir}"
-                        )
+                        logger.info(f"Copied files from {extracted_dir.name} to {service_dir}")
                     else:
                         # Direct files
                         for f in Path(tmp_dir).iterdir():

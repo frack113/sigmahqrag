@@ -104,17 +104,11 @@ class TestPostAdminDownload:
         assert data["error"]["code"] == 503
         assert "llama.cpp" in data["error"]["message"].lower()
 
-    def test_download_without_idempotency_key_processes_normally(
-        self, client: TestClient
-    ) -> None:
+    def test_download_without_idempotency_key_processes_normally(self, client: TestClient) -> None:
         """Given request has no idempotency key, when API receives it, then processes normally (backward compatible, NFR20)."""
         with (
-            patch(
-                "src.api.v1.admin.check_service_health", new_callable=AsyncMock
-            ) as mock_health,
-            patch(
-                "src.api.v1.admin.start_download", new_callable=AsyncMock
-            ) as mock_start,
+            patch("src.api.v1.admin.check_service_health", new_callable=AsyncMock) as mock_health,
+            patch("src.api.v1.admin.start_download", new_callable=AsyncMock) as mock_start,
         ):
             mock_start.return_value = {"job_id": "job-789", "status": "started"}
             mock_health.return_value = {

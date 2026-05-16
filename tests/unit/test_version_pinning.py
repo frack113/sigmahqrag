@@ -111,9 +111,7 @@ class TestVersionPinning:
 
         # Check that critical packages use ==
         for pkg, expected_ver in critical_packages.items():
-            assert (
-                pkg in deps_dict
-            ), f"Critical package '{pkg}' not found in dependencies"
+            assert pkg in deps_dict, f"Critical package '{pkg}' not found in dependencies"
             operator, version = deps_dict[pkg]
             assert (
                 operator == "=="

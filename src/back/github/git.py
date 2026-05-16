@@ -177,9 +177,7 @@ def update_repo(
         return {"success": False, "error": str(e)}
 
 
-def delete_repo(
-    org: str, name: str, repos_dir: Path = DEFAULT_REPOS_DIR
-) -> dict[str, Any]:
+def delete_repo(org: str, name: str, repos_dir: Path = DEFAULT_REPOS_DIR) -> dict[str, Any]:
     """Delete a local repository."""
     repos_dir = Path(repos_dir).resolve()
     repo_path = _get_repo_path(repos_dir, org, name)
@@ -244,9 +242,7 @@ def save_metadata(
     db.set_git_metadata(repo_key, metadata)
 
 
-def get_metadata(
-    org: str, name: str, repos_dir: Path = DEFAULT_REPOS_DIR
-) -> dict[str, Any] | None:
+def get_metadata(org: str, name: str, repos_dir: Path = DEFAULT_REPOS_DIR) -> dict[str, Any] | None:
     """Get metadata for a repository from DuckDB."""
     db = DatabaseService.get_instance()
     repo_key = f"{org}/{name}"
@@ -326,9 +322,7 @@ def save_selected_dirs(
         return {"success": False, "error": str(e)}
 
 
-def get_selected_dirs(
-    org: str, name: str, repos_dir: Path = DEFAULT_REPOS_DIR
-) -> list[str]:
+def get_selected_dirs(org: str, name: str, repos_dir: Path = DEFAULT_REPOS_DIR) -> list[str]:
     """Get selected directories for a repository from DuckDB.
 
     Args:
@@ -348,9 +342,7 @@ def get_selected_dirs(
         return []
 
 
-def get_last_commit_date(
-    org: str, name: str, repos_dir: Path = DEFAULT_REPOS_DIR
-) -> str | None:
+def get_last_commit_date(org: str, name: str, repos_dir: Path = DEFAULT_REPOS_DIR) -> str | None:
     """Get the date of the last commit in the repository."""
     repos_dir = Path(repos_dir).resolve()
     repo_path = _get_repo_path(repos_dir, org, name)

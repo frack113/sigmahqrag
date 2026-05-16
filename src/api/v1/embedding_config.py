@@ -37,14 +37,10 @@ async def update_type_config(type_key: str, body: dict) -> JSONResponse:
     Accepts a generic dict for forward-compatibility.
     """
     if not type_key.strip():
-        return JSONResponse(
-            status_code=400, content={"error": "type_key must not be empty"}
-        )
+        return JSONResponse(status_code=400, content={"error": "type_key must not be empty"})
 
     if type_key not in VALID_TYPE_KEYS:
-        return JSONResponse(
-            status_code=400, content={"error": f"Unknown type_key: {type_key}"}
-        )
+        return JSONResponse(status_code=400, content={"error": f"Unknown type_key: {type_key}"})
 
     if "model" not in body:
         return JSONResponse(status_code=400, content={"error": "model is required"})

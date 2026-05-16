@@ -61,9 +61,7 @@ class DatabaseService:
 
     # Config
     def get_config(self, key: str) -> Any | None:
-        result = self._conn.execute(
-            "SELECT value FROM config WHERE key = ?", [key]
-        ).fetchone()
+        result = self._conn.execute("SELECT value FROM config WHERE key = ?", [key]).fetchone()
         if result:
             try:
                 return json.loads(result[0])
@@ -135,9 +133,7 @@ class DatabaseService:
 
     def delete_model(self, repo_id: str) -> bool:
         with self._lock:
-            result = self._conn.execute(
-                "DELETE FROM models WHERE repo_id = ?", [repo_id]
-            )
+            result = self._conn.execute("DELETE FROM models WHERE repo_id = ?", [repo_id])
             self._conn.commit()
             return result.rowcount > 0
 
@@ -255,9 +251,7 @@ class DatabaseService:
 
     def delete_git_metadata(self, repo_key: str) -> None:
         with self._lock:
-            self._conn.execute(
-                "DELETE FROM git_metadata WHERE repo_key = ?", [repo_key]
-            )
+            self._conn.execute("DELETE FROM git_metadata WHERE repo_key = ?", [repo_key])
             self._conn.commit()
 
     # Git selected dirs
@@ -270,9 +264,7 @@ class DatabaseService:
 
     def set_selected_dirs(self, repo_key: str, dirs: list[str]) -> None:
         with self._lock:
-            self._conn.execute(
-                "DELETE FROM git_selected_dirs WHERE repo_key = ?", [repo_key]
-            )
+            self._conn.execute("DELETE FROM git_selected_dirs WHERE repo_key = ?", [repo_key])
             for d in dirs:
                 self._conn.execute(
                     "INSERT INTO git_selected_dirs (repo_key, dir_path) VALUES (?, ?)",
@@ -282,9 +274,7 @@ class DatabaseService:
 
     def delete_selected_dirs(self, repo_key: str) -> None:
         with self._lock:
-            self._conn.execute(
-                "DELETE FROM git_selected_dirs WHERE repo_key = ?", [repo_key]
-            )
+            self._conn.execute("DELETE FROM git_selected_dirs WHERE repo_key = ?", [repo_key])
             self._conn.commit()
 
     # Embedding config
@@ -321,7 +311,5 @@ class DatabaseService:
 
     def delete_embedding_config(self, doc_type: str) -> None:
         with self._lock:
-            self._conn.execute(
-                "DELETE FROM embedding_config WHERE doc_type = ?", [doc_type]
-            )
+            self._conn.execute("DELETE FROM embedding_config WHERE doc_type = ?", [doc_type])
             self._conn.commit()

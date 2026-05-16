@@ -43,9 +43,7 @@ class TestSearchAPI:
         from src.back.rag.search import SearchEngine
         from src.shared.schemas.search import SearchRequest
 
-        with patch.object(
-            SearchEngine, "search", new_callable=AsyncMock
-        ) as mock_search:
+        with patch.object(SearchEngine, "search", new_callable=AsyncMock) as mock_search:
             mock_search.return_value = [
                 {
                     "text": "test rule content",
@@ -74,9 +72,7 @@ class TestSearchAPI:
         from src.back.rag.search import SearchEngine
         from src.shared.schemas.search import SearchRequest
 
-        with patch.object(
-            SearchEngine, "search", new_callable=AsyncMock
-        ) as mock_search:
+        with patch.object(SearchEngine, "search", new_callable=AsyncMock) as mock_search:
 
             mock_search.side_effect = TimeoutError()
 

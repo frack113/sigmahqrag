@@ -69,9 +69,7 @@ class IngestionPipelineBuilder:
         num_workers: int = DEFAULT_NUM_WORKERS,
     ) -> None:
         config_data = EmbeddingTypeConfig().load()
-        self._model_name = (
-            model_name or _first_configured_model(config_data) or DEFAULT_MODEL
-        )
+        self._model_name = model_name or _first_configured_model(config_data) or DEFAULT_MODEL
         self._collection_name = collection_name or "sigma_rules"
         self._num_workers = num_workers
         self._embed_model = build_embed_model(self._model_name)

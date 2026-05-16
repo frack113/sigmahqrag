@@ -85,9 +85,7 @@ class ChatService:
             return "No Sigma rule uploaded. Please upload a .yaml file first."
 
         try:
-            related = await self.search_engine.search(
-                self._uploaded_rule.get("name", "")
-            )
+            related = await self.search_engine.search(self._uploaded_rule.get("name", ""))
             return await self.rag_pipeline.explain_rule(self._uploaded_rule, related)
         except Exception as e:
             logger.error(f"RAG pipeline failed: {e}")
@@ -103,9 +101,7 @@ class ChatService:
             return "No related rules found for coverage analysis."
 
         try:
-            return await self.rag_pipeline.analyze_coverage(
-                self._uploaded_rule, results
-            )
+            return await self.rag_pipeline.analyze_coverage(self._uploaded_rule, results)
         except Exception as e:
             logger.error(f"RAG pipeline failed: {e}")
             return f"Found {len(results)} related rules for coverage comparison."

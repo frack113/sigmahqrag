@@ -40,9 +40,7 @@ def load_sigma_rule(file_path: Path) -> list[SigmaRule]:
     return rules
 
 
-def load_sigma_rules_from_directory(
-    directory: Path, pattern: str = "*.yaml"
-) -> list[SigmaRule]:
+def load_sigma_rules_from_directory(directory: Path, pattern: str = "*.yaml") -> list[SigmaRule]:
     """Load all Sigma rules from a directory."""
     rules: list[SigmaRule] = []
     for file_path in directory.glob(pattern):
@@ -120,9 +118,7 @@ def chunk_sigma_rule(rule: SigmaRule) -> list[Document]:
     emit_chunk("\n".join(chunk_content), metadata.copy())
 
     if not chunks:
-        chunks.append(
-            Document(text=f"{rule.title}: {detection_str}", metadata=metadata)
-        )
+        chunks.append(Document(text=f"{rule.title}: {detection_str}", metadata=metadata))
 
     return chunks
 
@@ -163,9 +159,7 @@ class SigmaChunker:
             chunks.extend(rule_chunks)
         return chunks
 
-    def chunk_directory(
-        self, directory: Path, pattern: str = "*.yaml"
-    ) -> list[Document]:
+    def chunk_directory(self, directory: Path, pattern: str = "*.yaml") -> list[Document]:
         """Chunk all Sigma rules in a directory."""
         rules = load_sigma_rules_from_directory(directory, pattern)
         chunks: list[Document] = []

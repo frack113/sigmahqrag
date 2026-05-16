@@ -61,9 +61,7 @@ class QdrantVectorService:
 
         config = get_config()
         self.collection_name = collection_name or config.qdrant_collection_name
-        self.vector_size = (
-            vector_size if vector_size is not None else config.qdrant_vector_size
-        )
+        self.vector_size = vector_size if vector_size is not None else config.qdrant_vector_size
         self.host = host or config.qdrant_host
         self.port = port if port is not None else config.qdrant_port
         self._client: object | None = None
@@ -101,9 +99,7 @@ class QdrantVectorService:
 
         nodes = [
             TextNode(text=doc, metadata=meta or {})
-            for doc, meta in zip(
-                documents, metadata or [{}] * len(documents), strict=True
-            )
+            for doc, meta in zip(documents, metadata or [{}] * len(documents), strict=True)
         ]
 
         self._vector_store.add(nodes)  # type: ignore[union-attr]

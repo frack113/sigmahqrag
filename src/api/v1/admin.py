@@ -41,9 +41,7 @@ def _cleanup_expired_entries() -> None:
     # Patch 2: Size limit
     if len(_idempotency_store) > _IDEMPOTENCY_MAX_SIZE:
         # Remove oldest entries
-        sorted_keys = sorted(
-            _idempotency_store.keys(), key=lambda k: _idempotency_store[k][1]
-        )
+        sorted_keys = sorted(_idempotency_store.keys(), key=lambda k: _idempotency_store[k][1])
         for k in sorted_keys[: len(sorted_keys) // 2]:
             del _idempotency_store[k]
 
@@ -95,9 +93,7 @@ async def check_service_health() -> dict[str, Any]:
 
         async def check_llama():
             try:
-                response = await client.get(
-                    f"http://{llama_host}:{llama_port}/health", timeout=2.0
-                )
+                response = await client.get(f"http://{llama_host}:{llama_port}/health", timeout=2.0)
                 # llama-server.exe returns {"status": "ok"} when ready, not
                 # {"status": "healthy"} — the previous check was permanently
                 # inactive even with a healthy server.
@@ -111,9 +107,7 @@ async def check_service_health() -> dict[str, Any]:
 
         async def check_qdrant():
             try:
-                response = await client.get(
-                    f"http://localhost:{qdrant_port}/readyz", timeout=2.0
-                )
+                response = await client.get(f"http://localhost:{qdrant_port}/readyz", timeout=2.0)
                 if response.status_code == 200:
                     result["qdrant"]["status"] = "active"
             except Exception:
@@ -281,20 +275,14 @@ async def start_download(service: str = None, target: str = None) -> dict[str, A
 
         return {
             "job_id": job_id,
-            "status": (
-                "completed" if all_success else ("partial" if any_success else "failed")
-            ),
+            "status": ("completed" if all_success else ("partial" if any_success else "failed")),
             "service": target_service,
-            "binary_version": (
-                QDRANT_BINARY_VERSION if binary_result.get("success") else None
-            ),
+            "binary_version": (QDRANT_BINARY_VERSION if binary_result.get("success") else None),
             "ui_version": QDRANT_UI_VERSION if ui_result.get("success") else None,
             "binary_error": (
                 binary_result.get("error") if not binary_result.get("success") else None
             ),
-            "ui_error": (
-                ui_result.get("error") if not ui_result.get("success") else None
-            ),
+            "ui_error": (ui_result.get("error") if not ui_result.get("success") else None),
         }
 
     return {"job_id": job_id, "status": "started", "service": target_service}
@@ -338,9 +326,7 @@ async def download_action(
     response_content = {
         "data": result,
         "status": (
-            "success"
-            if result.get("status") == "completed"
-            else result.get("status", "success")
+            "success" if result.get("status") == "completed" else result.get("status", "success")
         ),
     }
 
@@ -445,9 +431,7 @@ async def get_models() -> JSONResponse:
                     }
                 )
 
-        return JSONResponse(
-            content={"status": "success", "data": {"models": model_list}}
-        )
+        return JSONResponse(content={"status": "success", "data": {"models": model_list}})
     except Exception as e:
         logger.error(f"Failed to list models: {e}")
         return JSONResponse(
@@ -490,9 +474,7 @@ async def delete_model(request: dict) -> JSONResponse:
             content={"status": "success", "message": f"Deleted {repo_id}/{filename}"}
         )
     except ModelNotFoundError as e:
-        return JSONResponse(
-            status_code=404, content={"status": "error", "error": str(e)}
-        )
+        return JSONResponse(status_code=404, content={"status": "error", "error": str(e)})
     except Exception as e:
         logger.error(f"Failed to delete model: {e}")
         return JSONResponse(

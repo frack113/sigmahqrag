@@ -23,12 +23,8 @@ def chat_service() -> ChatService:
     service.rag_pipeline.explain_rule = AsyncMock(
         return_value="This rule detects failed login attempts..."
     )
-    service.rag_pipeline.answer_search_query = AsyncMock(
-        return_value="I found 2 relevant rules..."
-    )
-    service.rag_pipeline.analyze_coverage = AsyncMock(
-        return_value="Coverage analysis: ..."
-    )
+    service.rag_pipeline.answer_search_query = AsyncMock(return_value="I found 2 relevant rules...")
+    service.rag_pipeline.analyze_coverage = AsyncMock(return_value="Coverage analysis: ...")
     service.rag_pipeline.cache = MagicMock()
     service.rag_pipeline.cache.invalidate = MagicMock()
 
@@ -104,9 +100,7 @@ async def test_coverage_flow(chat_service: ChatService) -> None:
     )
 
     # Mock RAG pipeline response
-    chat_service.rag_pipeline.analyze_coverage = AsyncMock(
-        return_value="Coverage analysis: ..."
-    )
+    chat_service.rag_pipeline.analyze_coverage = AsyncMock(return_value="Coverage analysis: ...")
 
     response = await chat_service._handle_coverage("check coverage")
     assert "coverage" in response.lower()
@@ -132,9 +126,7 @@ detection:
 async def test_fallback_when_llm_unavailable(chat_service: ChatService) -> None:
     """Test fallback responses when LLM fails."""
     # Mock RAG pipeline to raise exception
-    chat_service.rag_pipeline.answer_search_query = AsyncMock(
-        side_effect=Exception("LLM down")
-    )
+    chat_service.rag_pipeline.answer_search_query = AsyncMock(side_effect=Exception("LLM down"))
 
     # Mock search results
     chat_service.search_engine.search = AsyncMock(

@@ -40,15 +40,11 @@ def validate_sigma_rule(rule: SigmaRule) -> ValidationResult:
         errors.append(ValidationError(field="title", message="Title cannot be empty"))
 
     if not rule.condition or not str(rule.condition).strip():
-        errors.append(
-            ValidationError(field="condition", message="Condition cannot be empty")
-        )
+        errors.append(ValidationError(field="condition", message="Condition cannot be empty"))
 
     if not rule.detection or not isinstance(rule.detection, dict):
         errors.append(
-            ValidationError(
-                field="detection", message="Detection must be a non-empty dict"
-            )
+            ValidationError(field="detection", message="Detection must be a non-empty dict")
         )
 
     if rule.level is not None:
