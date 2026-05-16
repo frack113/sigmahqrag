@@ -32,12 +32,15 @@ class DatabaseService:
 
     def __init__(self, db_path: str | None = None) -> None:
         self.db_path = Path(db_path or DEFAULT_DB_PATH)
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._conn = duckdb.connect(str(self.db_path))
         DatabaseService._instance = self
 
     @classmethod
-    def get_instance(cls) -> DatabaseService | None:
+    def get_instance(cls) -> DatabaseService:
+        if cls._instance is None:
+            raise RuntimeError(
+                "DatabaseService not initialized. Call main() first or run python main.py"
+            )
         return cls._instance
 
     def initialize(self) -> None:
@@ -310,8 +313,8 @@ class DatabaseService:
                 [
                     doc_type,
                     cfg.get("model", ""),
-                    cfg.get("chunk_size", 1024),
-                    cfg.get("overlap", 64),
+                    cfg.get("chunk_size", 512),
+                    cfg.get("overlap", 50),
                 ],
             )
             self._conn.commit()

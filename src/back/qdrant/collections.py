@@ -7,13 +7,15 @@ from typing import Any
 
 import qdrant_client
 
+from .client import get_qdrant_client
+
 logger = logging.getLogger(__name__)
 
 
 async def list_collections(host: str, port: int) -> list[str]:
     """List all collections in Qdrant."""
     try:
-        client = qdrant_client.QdrantClient(host=host, port=port)
+        client = get_qdrant_client(host=host, port=port)
         collections_response = client.get_collections()
         return [info.name for info in collections_response.collections]
     except Exception as e:
@@ -26,7 +28,7 @@ async def create_collection(
 ) -> bool:
     """Create a new collection."""
     try:
-        client = qdrant_client.QdrantClient(host=host, port=port)
+        client = get_qdrant_client(host=host, port=port)
         client.create_collection(
             collection_name=collection_name,
             vectors_config=qdrant_client.models.VectorParams(
@@ -43,7 +45,7 @@ async def create_collection(
 async def delete_collection(host: str, port: int, collection_name: str) -> bool:
     """Delete an existing collection."""
     try:
-        client = qdrant_client.QdrantClient(host=host, port=port)
+        client = get_qdrant_client(host=host, port=port)
         client.delete_collection(collection_name=collection_name)
         logger.info(f"Collection '{collection_name}' deleted successfully.")
         return True
@@ -55,7 +57,7 @@ async def delete_collection(host: str, port: int, collection_name: str) -> bool:
 async def get_collection(host: str, port: int, collection_name: str) -> dict[str, Any]:
     """Get information about a collection."""
     try:
-        client = qdrant_client.QdrantClient(host=host, port=port)
+        client = get_qdrant_client(host=host, port=port)
         info = client.get_collection(collection_name=collection_name)
         return {
             "name": info.name,

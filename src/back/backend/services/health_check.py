@@ -52,9 +52,9 @@ class HealthCheckService:
 
         if basic_check["status"] == "active":
             try:
-                from qdrant_client import QdrantClient
+                from src.back.qdrant.client import get_qdrant_client
 
-                client = QdrantClient(host=host, port=port, timeout=TIMEOUT)
+                client = get_qdrant_client(host=host, port=port, timeout=TIMEOUT)
                 collections = client.get_collections().collections
                 collection_exists = any(c.name == collection for c in collections)
                 result = {

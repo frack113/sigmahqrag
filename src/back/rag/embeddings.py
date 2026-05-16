@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import logging
 import os
-from pathlib import Path
 from typing import Any
 
 from llama_index.core.schema import Document
 
 from src.back.qdrant.storage import store_embeddings as _store_embeddings
+from src.shared import EMBEDDINGS_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +44,7 @@ def get_embedding_model() -> Any:
 
     from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 
-    embeddings_dir = Path("models/embeddings")
+    embeddings_dir = EMBEDDINGS_DIR
     model_path = None
 
     if embeddings_dir.exists():

@@ -15,15 +15,11 @@ class EmbeddingTypeConfig:
     def load(self) -> dict:
         """Load the current config. Returns {} if missing."""
         db = DatabaseService.get_instance()
-        if db is None:
-            return {}
         return db.get_embedding_config()
 
     def save(self, data: dict) -> bool:
         """Save config dict to DuckDB."""
         db = DatabaseService.get_instance()
-        if db is None:
-            return False
         try:
             for doc_type, cfg in data.items():
                 if isinstance(cfg, dict):
@@ -35,8 +31,6 @@ class EmbeddingTypeConfig:
 
     def update_type(self, type_key: str, body: dict) -> dict | None:
         db = DatabaseService.get_instance()
-        if db is None:
-            return None
         model = (body.get("model") or "").strip()
         if not model:
             db.delete_embedding_config(type_key)

@@ -7,7 +7,7 @@ from typing import Any
 
 import yaml
 
-from src.shared.errors import ValidationError
+from src.shared.exceptions import ValidationError
 
 logger = logging.getLogger(__name__)
 

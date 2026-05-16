@@ -8,6 +8,7 @@ from typing import Any
 import qdrant_client
 from llama_index.vector_stores.qdrant import QdrantVectorStore
 
+from .client import get_qdrant_client
 from .collections import (
     create_collection,
     delete_collection,
@@ -139,7 +140,7 @@ class QdrantVectorService:
     async def health_check(self) -> bool:
         """Check if service is healthy."""
         try:
-            client = qdrant_client.QdrantClient(host=self.host, port=self.port)
+            client = get_qdrant_client(host=self.host, port=self.port)
             collections = client.get_collections()
             return collections is not None
         except Exception as e:

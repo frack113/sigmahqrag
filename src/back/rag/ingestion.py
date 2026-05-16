@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import Any
 
 import portalocker
-import qdrant_client
 from llama_index.core import VectorStoreIndex
 from llama_index.core.base.embeddings.base import BaseEmbedding
 from llama_index.core.ingestion import IngestionPipeline
@@ -18,7 +17,6 @@ from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.vector_stores.qdrant import QdrantVectorStore
 
 from src.back.embedding_config import EmbeddingTypeConfig
-from src.shared import get_config
 
 logger = logging.getLogger(__name__)
 
@@ -83,11 +81,9 @@ class IngestionPipelineBuilder:
 
     def _get_qdrant_store(self) -> QdrantVectorStore | None:
         try:
-            config = get_config()
-            client = qdrant_client.QdrantClient(
-                host=config.qdrant_host,
-                port=config.qdrant_port,
-            )
+            from src.back.qdrant.client import get_qdrant_client
+
+            client = get_qdrant_client()
             return QdrantVectorStore(
                 client=client,
                 collection_name=self._collection_name,
@@ -98,11 +94,9 @@ class IngestionPipelineBuilder:
 
     def _check_qdrant_health(self) -> bool:
         try:
-            config = get_config()
-            client = qdrant_client.QdrantClient(
-                host=config.qdrant_host,
-                port=config.qdrant_port,
-            )
+            from src.back.qdrant.client import get_qdrant_client
+
+            client = get_qdrant_client()
             client.get_collections()
             return True
         except Exception:

@@ -189,8 +189,6 @@ def _load_registry(path: Path) -> dict[str, Any]:
     Returns an empty dict if DB not available.
     """
     db = DatabaseService.get_instance()
-    if db is None:
-        return {}
     entries = db.get_doc_registry()
     registry = {}
     for entry in entries:
@@ -210,8 +208,6 @@ def _load_registry(path: Path) -> dict[str, Any]:
 def _save_registry(registry: dict[str, Any], path: Path) -> None:
     """Save the registry to DuckDB atomically."""
     db = DatabaseService.get_instance()
-    if db is None:
-        return
     for url_hash, entry in registry.items():
         if isinstance(entry, dict):
             row = {

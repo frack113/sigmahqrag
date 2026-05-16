@@ -6,8 +6,8 @@ DDL: list[str] = [
     """CREATE TABLE IF NOT EXISTS embedding_config (
         doc_type TEXT PRIMARY KEY,
         model TEXT NOT NULL DEFAULT '',
-        chunk_size INTEGER DEFAULT 1024,
-        overlap INTEGER DEFAULT 64
+        chunk_size INTEGER DEFAULT 512,
+        overlap INTEGER DEFAULT 50
     )""",
     """CREATE TABLE IF NOT EXISTS system_prompts (
         id TEXT PRIMARY KEY,

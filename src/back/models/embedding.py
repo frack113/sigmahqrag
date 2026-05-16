@@ -17,13 +17,10 @@ class EmbeddingManager:
 
     def __init__(self, embeddings_dir: Path | None = None) -> None:
         self.embeddings_dir = embeddings_dir or EMBEDDINGS_DIR
-        self.embeddings_dir.mkdir(parents=True, exist_ok=True)
         self.download_service = HFDownloadService()
 
     async def _load_registry(self) -> dict:
         db = DatabaseService.get_instance()
-        if db is None:
-            return {}
         models = db.get_models()
         registry = {}
         for m in models:
@@ -45,8 +42,6 @@ class EmbeddingManager:
 
     async def _save_registry(self, data: dict) -> None:
         db = DatabaseService.get_instance()
-        if db is None:
-            return
         for repo_id, record in data.items():
             entry = {
                 "repo_id": repo_id,

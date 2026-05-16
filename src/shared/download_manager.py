@@ -237,7 +237,6 @@ class DownloadManager:
 
                     task.status = "completed"
                     task.bytes_downloaded = downloaded
-                    BIN_DIR.mkdir(parents=True, exist_ok=True)
 
                     await self._extract_and_install(
                         task.temp_path, task.target_path, task.service
@@ -326,8 +325,6 @@ class DownloadManager:
         logger.info(f"Created service directory: {service_dir}")
 
         try:
-            BIN_DIR.mkdir(parents=True, exist_ok=True)
-
             if temp_path.suffix == ".zip":
                 logger.info(f"Extracting ZIP: {temp_path}")
                 # Extract to a temp location first

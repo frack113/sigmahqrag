@@ -5,13 +5,14 @@ from __future__ import annotations
 from pathlib import Path
 
 from src.back.database import DatabaseService
+from src.shared import MODELS_DIR
 
 
 class UnifiedRegistry:
     """Unified registry for LLM and embedding models."""
 
     def __init__(self, registry_path: Path | None = None) -> None:
-        self._registry_path = registry_path or Path("data/models/registry.json")
+        self._registry_path = registry_path or MODELS_DIR / "registry.json"
         self._registry: dict[str, dict[str, dict]] = {"llm": {}, "embeddings": {}}
         self._loaded = False
 
@@ -20,8 +21,6 @@ class UnifiedRegistry:
             return
         self._loaded = True
         db = DatabaseService.get_instance()
-        if db is None:
-            return
         models = db.get_models()
         for m in models:
             repo_id = m["repo_id"]
@@ -52,8 +51,6 @@ class UnifiedRegistry:
 
     def _save(self) -> None:
         db = DatabaseService.get_instance()
-        if db is None:
-            return
         for model_type in ("llm", "embeddings"):
             for repo_id, record in self._registry[model_type].items():
                 data = {
@@ -100,8 +97,7 @@ class UnifiedRegistry:
         if repo_id in self._registry["llm"]:
             del self._registry["llm"][repo_id]
             db = DatabaseService.get_instance()
-            if db:
-                db.delete_model(repo_id)
+            db.delete_model(repo_id)
             return True
         return False
 
@@ -110,8 +106,7 @@ class UnifiedRegistry:
         if repo_id in self._registry["embeddings"]:
             del self._registry["embeddings"][repo_id]
             db = DatabaseService.get_instance()
-            if db:
-                db.delete_model(repo_id)
+            db.delete_model(repo_id)
             return True
         return False
 

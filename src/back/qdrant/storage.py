@@ -7,6 +7,8 @@ from typing import Any
 
 import qdrant_client
 
+from src.back.qdrant.client import get_qdrant_client
+
 logger = logging.getLogger(__name__)
 
 DEFAULT_VECTOR_SIZE = 384
@@ -93,7 +95,7 @@ async def delete_point(
 ) -> bool:
     """Delete a point from the collection."""
     try:
-        client = qdrant_client.QdrantClient(host=host, port=port)
+        client = get_qdrant_client(host=host, port=port)
         client.delete(
             collection_name=collection_name,
             points_selector=qdrant_client.models.PointIdsList(points=[point_id]),

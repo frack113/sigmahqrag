@@ -240,9 +240,6 @@ def save_metadata(
 ) -> None:
     """Save metadata for a repository to DuckDB."""
     db = DatabaseService.get_instance()
-    if db is None:
-        logger.error("DatabaseService not available, cannot save metadata")
-        return
     repo_key = f"{org}/{name}"
     db.set_git_metadata(repo_key, metadata)
 
@@ -252,8 +249,6 @@ def get_metadata(
 ) -> dict[str, Any] | None:
     """Get metadata for a repository from DuckDB."""
     db = DatabaseService.get_instance()
-    if db is None:
-        return None
     repo_key = f"{org}/{name}"
     return db.get_git_metadata(repo_key)
 
@@ -321,8 +316,6 @@ def save_selected_dirs(
         Result dict with success status
     """
     db = DatabaseService.get_instance()
-    if db is None:
-        return {"success": False, "error": "DatabaseService not available"}
     repo_key = _get_repo_key(org, name)
     try:
         db.set_selected_dirs(repo_key, selected)
@@ -347,8 +340,6 @@ def get_selected_dirs(
         List of selected folder paths, empty if not found
     """
     db = DatabaseService.get_instance()
-    if db is None:
-        return []
     repo_key = _get_repo_key(org, name)
     try:
         return db.get_selected_dirs(repo_key)

@@ -43,8 +43,6 @@ class SubprocessManager:
         """
         self.logs_dir = Path(logs_dir)
         self.pid_dir = Path(pid_dir)
-        self.logs_dir.mkdir(parents=True, exist_ok=True)
-        self.pid_dir.mkdir(parents=True, exist_ok=True)
 
         self._processes: dict[str, ServiceProcess] = {}
         self._sync_from_pid_files()

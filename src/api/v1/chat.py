@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException, UploadFile, status
 from fastapi.responses import StreamingResponse
 
 from src.back.backend.services.chat_service import ChatService
-from src.shared.errors import ValidationError
+from src.shared.exceptions import ValidationError
 from src.shared.schemas.chat import ChatMessageRequest, ChatMessageResponse
 
 logger = logging.getLogger(__name__)

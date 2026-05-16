@@ -10,6 +10,7 @@ from typing import Any
 
 from src.back.models.exceptions import DownloadError
 from src.back.models.types import HFRepo
+from src.shared import TEMP_DIR
 
 
 class HFDownloadService:
@@ -20,7 +21,7 @@ class HFDownloadService:
         temp_dir: Path | None = None,
         token: str | None = None,
     ) -> None:
-        self.temp_dir = temp_dir or Path("data/temp/downloads")
+        self.temp_dir = temp_dir or TEMP_DIR
         self.token = token or os.environ.get("HF_TOKEN")
         self.temp_dir.mkdir(parents=True, exist_ok=True)
         self._metadata_path = self.temp_dir / "metadata.json"

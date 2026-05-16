@@ -155,7 +155,7 @@ async def post_backend(request: dict) -> JSONResponse:
                 from src.shared import LLM_DIR
 
                 # Find any available model
-                models = list(Path(LLM_DIR).rglob("*.gguf")) if LLM_DIR.exists() else []
+                models = list(Path(LLM_DIR).rglob("*.gguf"))
                 model_path = str(models[0]) if models else None
 
                 if not model_path:

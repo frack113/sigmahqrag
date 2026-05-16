@@ -184,9 +184,6 @@ class Config:
     def save(self) -> bool:
         try:
             db = DatabaseService.get_instance()
-            if db is None:
-                logger.warning("DatabaseService not available, config not saved")
-                return False
             db.set_config("backend.os", {"value": self.os})
             db.set_config("backend.gpu_type", {"value": self.gpu_type})
             db.set_config("llamacpp_version", {"value": self.llamacpp_version})
@@ -199,8 +196,6 @@ class Config:
 
     def apply_db_overrides(self) -> None:
         db = DatabaseService.get_instance()
-        if db is None:
-            return
         overrides = {
             "backend.os": "os",
             "backend.gpu_type": "gpu_type",
@@ -250,22 +245,6 @@ class Config:
         return Path(Config().qdrant_binary_path).resolve()
 
     @staticmethod
-    def ensure_data_folder() -> None:
-        BASE_DIR.mkdir(parents=True, exist_ok=True)
-        for subdir in (
-            BIN_DIR,
-            MODELS_DIR,
-            LLM_DIR,
-            EMBEDDINGS_DIR,
-            LOGS_DIR,
-            PID_DIR,
-            QDRANT_STORAGE_DIR,
-            TEMP_DIR,
-        ):
-            subdir.mkdir(parents=True, exist_ok=True)
-        logger.info(f"Data folder ensured at {BASE_DIR}")
-
-    @staticmethod
     def ensure_config_file() -> None:
         if not CONFIG_FILE.exists():
             default_config = Config()
@@ -312,7 +291,6 @@ class Config:
 
     @staticmethod
     def init_app() -> Config:
-        Config.ensure_data_folder()
         Config.ensure_config_file()
         Config.ensure_qdrant_config()
         return Config()

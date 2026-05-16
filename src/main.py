@@ -38,8 +38,9 @@ logger = logging.getLogger(__name__)
 
 def _setup_logging() -> None:
     """Setup logging to file with rotation."""
-    log_file = Path("data/logs/sigmahqrag.log")
-    log_file.parent.mkdir(parents=True, exist_ok=True)
+    from src.shared import LOGS_DIR
+
+    log_file = LOGS_DIR / "sigmahqrag.log"
 
     handler = RotatingFileHandler(
         log_file, maxBytes=10 * 1024 * 1024, backupCount=5, encoding="utf-8"
@@ -90,8 +91,7 @@ async def lifespan(app: FastAPI) -> None:
 
     Config.init_app()
 
-    db_path = "data/duckdb/sigmahq.duckdb"
-    db = DatabaseService(db_path)
+    db = DatabaseService()
     db.initialize()
     app.state.db = db
 
