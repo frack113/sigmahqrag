@@ -99,11 +99,28 @@ async def ingest_sigma_rules(
         except Exception as e:
             logger.error(f"Failed to index rules: {e}")
 
-    return JSONResponse(
-        content=IngestResponse(
-            total_files=len(files),
-            successful=len(successful_rules),
-            failed=len(files) - len(successful_rules),
-            results=results,
-        ).model_dump()
-    )
+@router.post("/index-sigma-ref")
+async def index_sigma_ref(
+    request: IngestRequest | None = None,
+) -> JSONResponse:
+    """Download and prepare Sigma reference documents."""
+    # For now, we use default paths for sigma ref
+    rules_dir = os.environ.get("SIGMA_RULES_DIR", "data/sigma_rules")
+    output_dir = "data/sigma_ref_docs"
+
+    try:
+        summary = download_references(
+            rules_dir=rules_dir,
+            output_dir=output_dir,
+            supported_types={"markdown"}
+        )
+        return JSONResponse(content=summary)
+    except Exception as e:
+        logger.error(
+            f"Failed to index sigma ref: {e}",
+            exc_info=True
+        )
+        return JSONResponse(
+            status_code=500,
+            content={"success": False, "error": str(e)}
+        )
