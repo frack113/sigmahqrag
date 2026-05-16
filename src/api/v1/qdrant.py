@@ -385,7 +385,7 @@ async def qdrant_action(request: QdrantActionRequest) -> QdrantActionResponse:
                 data = await list_collections(host, port)
                 return QdrantActionResponse(status="success", action=action, data=data)
             elif op == "create":
-                v_size = payload.config.vector_size if payload.config else 384
+                v_size = payload.config.get("vector_size", 384) if payload.config else 384
                 await create_collection(host, port, name, v_size)
                 return QdrantActionResponse(
                     status="success",

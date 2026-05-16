@@ -29,7 +29,7 @@ class CancelPayload(BaseModel):
 class CollectionManagementPayload(BaseModel):
     action: Literal["collection_management"] = "collection_management"
     operation: Literal["create", "delete", "list", "get"]
-    collection_name: str
+    collection_name: str | None = None
     config: dict[str, Any] | None = None
 
 
