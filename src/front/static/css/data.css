@@ -57,58 +57,7 @@
     color: #1a1a1a;
 }
 
-.data-cards {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 24px;
-    margin-top: 24px;
-}
 
-.data-card {
-    display: block;
-    padding: 32px;
-    background: #ffffff;
-    border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    text-decoration: none;
-    color: #1a1a1a;
-    transition: all 0.2s ease;
-    cursor: pointer;
-    border: 2px solid transparent;
-}
-
-.data-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 8px 24px rgba(0,0,0,0.15);
-    border-color: #3498db;
-}
-
-.data-card.disabled {
-    background: #f0f0f0;
-    color: #999;
-    cursor: not-allowed;
-}
-
-.data-card h3 {
-    margin: 0 0 12px;
-    color: #1a1a1a;
-    font-size: 1.25em;
-    font-weight: 600;
-}
-
-.data-card p {
-    margin: 0;
-    color: #666;
-    font-size: 0.95em;
-    line-height: 1.5;
-}
-
-.github-container {
-    padding: 16px;
-    background: #ffffff;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
 
 #add_repo_form input {
     padding: 8px 12px;
@@ -190,14 +139,25 @@
     background: #c0392b;
 }
 
-.github-container {
-    margin-top: 24px;
-}
-
 .github-actions {
     margin-bottom: 20px;
     display: flex;
     gap: 12px;
+}
+
+/* Status messages */
+.status-message {
+    margin-top: 15px;
+    padding: 10px;
+    border-radius: 4px;
+}
+.status-message.success {
+    background: #d4edda;
+    color: #155724;
+}
+.status-message.error {
+    background: #f8d7da;
+    color: #721c24;
 }
 
 .btn {
@@ -208,14 +168,46 @@
     font-size: 14px;
     transition: background 0.2s;
 }
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.btn-sm {
+    padding: 6px 12px;
+    font-size: 12px;
+}
 
 .btn-primary {
     background: #3498db;
     color: white;
 }
-
 .btn-primary:hover {
     background: #2980b9;
+}
+
+.btn-success {
+    background: #27ae60;
+    color: white;
+}
+.btn-success:hover {
+    background: #219a52;
+}
+
+.btn-danger {
+    background: #e74c3c;
+    color: white;
+}
+.btn-danger:hover {
+    background: #c0392b;
+}
+
+.btn-secondary {
+    background: #7f8c8d;
+    color: white;
+}
+.btn-secondary:hover {
+    background: #6c7a7d;
 }
 
 .modal {
@@ -284,20 +276,6 @@
     gap: 8px;
 }
 
-.btn-danger {
-    background: #e74c3c;
-    color: white;
-    padding: 8px 16px;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 13px;
-}
-
-.btn-danger:hover {
-    background: #c0392b;
-}
-
 /* Modal form styles */
 .form-group {
     margin-bottom: 16px;
@@ -364,15 +342,7 @@
     gap: 12px;
 }
 
-.type-card {
-    background: #ffffff;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    padding: 20px;
-    transition: box-shadow 0.2s;
-}
-
-.type-card:hover {
+.type-cards .card:hover {
     box-shadow: 0 4px 12px rgba(0,0,0,0.15);
 }
 

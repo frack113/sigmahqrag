@@ -84,8 +84,8 @@ async function loadPrompts() {
                     <td><strong>${escapeHtml(p.name)}</strong></td>
                     <td class="text-muted">${escapeHtml(p.description || '')}</td>
                     <td class="text-end">
-                        <button class="btn btn-sm btn-outline-primary" onclick="editPrompt('${escapeHtml(p.id)}')">Edit</button>
-                        <button class="btn btn-sm btn-outline-danger" onclick="deletePrompt('${escapeHtml(p.id)}', '${escapeHtml(p.name)}')">Delete</button>
+                        <button class="btn btn-sm btn-primary" onclick="editPrompt('${escapeHtml(p.id)}')">Edit</button>
+                        <button class="btn btn-sm btn-danger" onclick="deletePrompt('${escapeHtml(p.id)}', '${escapeHtml(p.name)}')">Delete</button>
                     </td>
                 `;
                 tbody.appendChild(tr);

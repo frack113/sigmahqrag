@@ -10,7 +10,7 @@
     <div class="type-cards">
         {% for ft in file_types %}
         {% set type_config = config.get(ft.value, {}) %}
-        <div class="type-card" data-type="{{ ft.value }}">
+        <div class="card" data-type="{{ ft.value }}">
             <div class="type-header">
                 <span class="type-name">{{ ft.name }}</span>
                 <span class="type-extensions">{{ ft.extensions | join(', ') }}</span>
@@ -99,7 +99,7 @@ function restorePrevious(card) {
 }
 
 async function saveTypeConfig(typeKey) {
-    const card = document.querySelector(`.type-card[data-type="${typeKey}"]`);
+    const card = document.querySelector(`.type-cards .card[data-type="${typeKey}"]`);
     if (!card) {
         showToast('Configuration card not found', 'error');
         return;
@@ -140,7 +140,7 @@ async function saveTypeConfig(typeKey) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    document.querySelectorAll('.type-card').forEach(card => {
+    document.querySelectorAll('.type-cards .card').forEach(card => {
         savePrevious(card);
     });
 });

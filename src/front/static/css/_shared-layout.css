@@ -122,47 +122,81 @@ body {
 
 /* Cards */
 .card {
-    background: #2c3e50;
-    padding: 20px;
+    background: #ffffff;
     border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.card h2 {
+    font-size: 1.2em;
+    margin-bottom: 15px;
+    color: #1a1a1a;
 }
 
 .card h3 {
-    margin: 0 0 12px;
-    color: #ffffff;
-    font-size: 1.1em;
+    margin: 0 0 8px;
+    font-size: 14px;
+    color: #7f8c8d;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
 .card p {
-    color: #bdc3c7;
-    font-size: 0.9em;
+    color: #555;
+    font-size: 0.95em;
+    line-height: 1.5;
+}
+
+.card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 12px;
+    margin-bottom: 12px;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.card-header h2 {
+    margin: 0;
+}
+
+.card-body {
+    padding: 0;
 }
 
 /* Cards grid */
 .cards-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
     gap: 16px;
+    margin-bottom: 20px;
 }
 
 /* Status indicators */
 .status-dot {
-    width: 8px;
-    height: 8px;
+    display: inline-block;
+    width: 12px;
+    height: 12px;
     border-radius: 50%;
+    margin-right: 8px;
     background: #7f8c8d;
+    transition: background 0.3s ease;
 }
 
-.status-dot.active {
+.status-dot.active,
+.status-dot.status-ok {
     background: #27ae60;
 }
 
-.status-dot.error {
+.status-dot.error,
+.status-dot.status-error {
     background: #e74c3c;
 }
 
-.status-dot.warning {
+.status-dot.warning,
+.status-dot.status-warning {
     background: #f39c12;
 }
 
@@ -188,6 +222,11 @@ body {
 .status-badge.warning {
     background: #f39c12;
     color: #1a1a1a;
+}
+
+.status-badge.info {
+    background: #d1ecf1;
+    color: #0c5460;
 }
 
 /* Toast notifications */
