@@ -20,7 +20,7 @@ from src.back.qdrant import (
 from src.back.qdrant.service import create_qdrant_service
 from src.back.qdrant.storage import delete_point, store_embeddings
 from src.back.qdrant.storage import search as qdrant_search
-from src.back.utils.file_utils import load_registry_files
+from src.back.database.service import DatabaseService
 from src.shared.download_manager import create_download_manager
 from src.shared.schemas.qdrant import (
     QdrantActionRequest,
@@ -68,7 +68,18 @@ async def _run_embed_sigmaref(
     _embed_tasks[task_id]["status"] = "running"
 
     try:
-        registry_entries = load_registry_files(registry_path)
+        db = DatabaseService.get_instance()
+        raw_entries = db.get_doc_registry()
+        registry_entries = []
+        for e in raw_entries:
+            registry_entries.append(
+                {
+                    "hash": e.get("url_hash", ""),
+                    "file_name": f"{e.get('url_hash', '')}.md",
+                    "path": f"{e.get('url_hash', '')}.md",
+                    **{k: v for k, v in e.items() if k not in ("url_hash",)},
+                }
+            )
         if not registry_entries:
             await progress_queue.put(
                 {
@@ -100,7 +111,7 @@ async def _run_embed_sigmaref(
         from src.back.rag.ingestion import IngestionPipelineBuilder
 
         builder = IngestionPipelineBuilder(collection_name=collection_name)
-        base_dir = registry_path.parent
+        base_dir = registry_path
 
         for idx, entry in enumerate(registry_entries):
             file_hash = entry.get("hash", entry.get("id", ""))
@@ -130,9 +141,7 @@ async def _run_embed_sigmaref(
                 doc_text = file_path.read_text(encoding="utf-8")
             except FileNotFoundError:
                 logger.warning(f"File not found: {file_path}, skipping")
-                _embed_tasks[task_id].setdefault("skipped", []).append(
-                    file_name or file_hash
-                )
+                _embed_tasks[task_id].setdefault("skipped", []).append(file_name or file_hash)
                 continue
             except Exception as e:
                 logger.warning(f"Error reading {file_path}: {e}")
@@ -318,9 +327,7 @@ async def qdrant_action(request: QdrantActionRequest) -> QdrantActionResponse:
                     from src.shared.config import Config
 
                     Config.ensure_qdrant_config()
-                    logger.info(
-                        "Qdrant config generated via Config.ensure_qdrant_config()"
-                    )
+                    logger.info("Qdrant config generated via Config.ensure_qdrant_config()")
                 except Exception as e:
                     import traceback
 
@@ -346,9 +353,7 @@ async def qdrant_action(request: QdrantActionRequest) -> QdrantActionResponse:
             if command == "start":
                 from src.shared import QDRANT_STORAGE_DIR
 
-                result = await service_manager.start(
-                    storage_path=str(QDRANT_STORAGE_DIR)
-                )
+                result = await service_manager.start(storage_path=str(QDRANT_STORAGE_DIR))
             elif command == "stop":
                 result = await service_manager.stop()
             elif command == "restart":
@@ -441,19 +446,10 @@ async def qdrant_action(request: QdrantActionRequest) -> QdrantActionResponse:
 
         elif action == "embed_sigmaref":
             registry_path = Path(payload.registry_path)
-            if not registry_path.exists():
-                return QdrantActionResponse(
-                    status="error",
-                    action=action,
-                    error_code="REGISTRY_MISSING",
-                    message="Registry file not found",
-                )
 
             # Check if a task is already running
             existing_running = [
-                tid
-                for tid, t in _embed_tasks.items()
-                if t.get("status") in ("running", "pending")
+                tid for tid, t in _embed_tasks.items() if t.get("status") in ("running", "pending")
             ]
             if existing_running:
                 return QdrantActionResponse(

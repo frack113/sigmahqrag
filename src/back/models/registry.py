@@ -5,14 +5,12 @@ from __future__ import annotations
 from pathlib import Path
 
 from src.back.database import DatabaseService
-from src.shared import MODELS_DIR
 
 
 class UnifiedRegistry:
     """Unified registry for LLM and embedding models."""
 
-    def __init__(self, registry_path: Path | None = None) -> None:
-        self._registry_path = registry_path or MODELS_DIR / "registry.json"
+    def __init__(self) -> None:
         self._registry: dict[str, dict[str, dict]] = {"llm": {}, "embeddings": {}}
         self._loaded = False
 
@@ -164,13 +162,13 @@ class UnifiedRegistry:
         for model_dir in embeddings_dir.iterdir():
             if not model_dir.is_dir() or model_dir.name.startswith("."):
                 continue
-            if model_dir.name in ("cache", "temp", "embeddings_registry.json"):
+            if model_dir.name in ("cache", "temp"):
                 continue
 
             for sub_dir in model_dir.iterdir():
                 if not sub_dir.is_dir() or sub_dir.name.startswith("."):
                     continue
-                if sub_dir.name in ("cache", "temp", "embeddings_registry.json"):
+                if sub_dir.name in ("cache", "temp"):
                     continue
 
                 repo_id = f"{model_dir.name}/{sub_dir.name}"

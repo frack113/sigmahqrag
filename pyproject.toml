@@ -114,4 +114,5 @@ dev = [
 ]
 
 [tool.black]
-target-version = "py312"
+target-version = ["py312"]
+line-length = 100

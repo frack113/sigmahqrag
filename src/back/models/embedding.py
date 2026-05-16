@@ -152,7 +152,7 @@ class EmbeddingManager:
                 continue
             if model_dir.name.startswith("."):
                 continue
-            if model_dir.name in ("cache", "temp", "embeddings_registry.json"):
+            if model_dir.name in ("cache", "temp"):
                 continue
 
             for sub_dir in model_dir.iterdir():
@@ -160,7 +160,7 @@ class EmbeddingManager:
                     continue
                 if sub_dir.name.startswith("."):
                     continue
-                if sub_dir.name in ("cache", "temp", "embeddings_registry.json"):
+                if sub_dir.name in ("cache", "temp"):
                     continue
 
                 repo_id = f"{model_dir.name}/{sub_dir.name}"

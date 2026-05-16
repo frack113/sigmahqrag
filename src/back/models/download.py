@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import os
 from pathlib import Path
 from typing import Any
 
+from src.back.database.service import DatabaseService
 from src.back.models.exceptions import DownloadError
 from src.back.models.types import HFRepo
 from src.shared import TEMP_DIR
@@ -24,21 +24,24 @@ class HFDownloadService:
         self.temp_dir = temp_dir or TEMP_DIR
         self.token = token or os.environ.get("HF_TOKEN")
         self.temp_dir.mkdir(parents=True, exist_ok=True)
-        self._metadata_path = self.temp_dir / "metadata.json"
         self._metadata: dict[str, dict] = {}
         self._load_metadata()
 
     def _load_metadata(self) -> None:
-        """Load download metadata from disk."""
-        if self._metadata_path.exists():
-            with open(self._metadata_path) as f:
-                self._metadata = json.load(f)
+        """Load download metadata from DuckDB."""
+        try:
+            data = DatabaseService.get_instance().get_config("download_metadata")
+            if data:
+                self._metadata = data
+        except RuntimeError:
+            pass
 
     def _save_metadata(self) -> None:
-        """Save download metadata to disk."""
-        self._metadata_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(self._metadata_path, "w") as f:
-            json.dump(self._metadata, f, indent=2)
+        """Save download metadata to DuckDB."""
+        try:
+            DatabaseService.get_instance().set_config("download_metadata", self._metadata)
+        except RuntimeError:
+            pass
 
     def list_gguf_files(
         self,
@@ -63,9 +66,7 @@ class HFDownloadService:
                     )
             return results
         except Exception as e:
-            raise DownloadError(
-                f"Failed to list GGUF files for {repo.full_id}: {e}"
-            ) from e
+            raise DownloadError(f"Failed to list GGUF files for {repo.full_id}: {e}") from e
 
     def get_model_info(self, repo: HFRepo):
         """Get model info from HuggingFace."""
@@ -74,9 +75,7 @@ class HFDownloadService:
         api = HfApi(token=self.token)
         return api.model_info(repo_id=repo.full_id)
 
-    def download_gguf(
-        self, repo: HFRepo, target_dir: Path, filename: str | None = None
-    ) -> Path:
+    def download_gguf(self, repo: HFRepo, target_dir: Path, filename: str | None = None) -> Path:
         """Download a GGUF file."""
         from huggingface_hub import hf_hub_download
 

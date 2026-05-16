@@ -25,7 +25,6 @@ GITHUB_BLOB_PATTERN = re.compile(
 MAX_RETRIES = 3
 BACKOFF_DELAYS = [1, 4, 9]
 RETRY_STATUSES = {429, 500, 502, 503, 504}
-REGISTRY_FILENAME = "registry.json"
 DEFAULT_REQUEST_DELAY = 0.5
 SUPPORTED_EXTENSIONS: dict[str, str] = {
     ext: ft.value for ext, ft in SUPPORTED_DOC_EXTENSION_MAP.items()
@@ -101,9 +100,7 @@ def _download_file(
     """
     for attempt in range(1, max_retries + 1):
         try:
-            with httpx.Client(
-                timeout=httpx.Timeout(timeout), follow_redirects=True
-            ) as client:
+            with httpx.Client(timeout=httpx.Timeout(timeout), follow_redirects=True) as client:
                 response = client.get(url)
                 response.raise_for_status()
             output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -153,9 +150,7 @@ def _download_file(
                 )
                 time.sleep(wait)
                 continue
-            logger.warning(
-                "Network error for %s after %d attempts: %s", url, max_retries, exc
-            )
+            logger.warning("Network error for %s after %d attempts: %s", url, max_retries, exc)
             return False
 
     return False
@@ -249,14 +244,14 @@ def download_references(
 
     rules_path = Path(rules_dir)
     output_path = Path(output_dir)
-    registry_path = output_path / REGISTRY_FILENAME
+    output_path.mkdir(parents=True, exist_ok=True)
 
     if not rules_path.is_dir():
         logger.warning("Rules directory does not exist: %s", rules_dir)
         return _empty_summary()
 
     with _registry_lock:
-        registry = _load_registry(registry_path)
+        registry = _load_registry(output_path)
 
     total_rules = 0
     total_refs = 0
@@ -273,9 +268,7 @@ def download_references(
         if not yml_file.is_file():
             continue
         try:
-            data = yaml.safe_load(
-                yml_file.read_text(encoding="utf-8", errors="replace")
-            )
+            data = yaml.safe_load(yml_file.read_text(encoding="utf-8", errors="replace"))
         except Exception as exc:
             logger.warning("Failed to parse YAML %s: %s", yml_file, exc)
             continue
@@ -308,27 +301,20 @@ def download_references(
                 output_file = output_path / f"{url_hash}{ext}"
                 if output_file.exists():
                     existing_sha = existing.get("content_sha256")
-                    if (
-                        existing_sha is not None
-                        and _sha256_file(output_file) != existing_sha
-                    ):
-                        logger.info(
-                            "Content changed for %s, re-downloading", normalized
-                        )
+                    if existing_sha is not None and _sha256_file(output_file) != existing_sha:
+                        logger.info("Content changed for %s, re-downloading", normalized)
                         if _download_file(normalized, output_file):
                             registry[url_hash] = {
                                 "original_url": ref,
                                 "normalized_url": normalized,
-                                "content_type": existing.get(
-                                    "content_type", "markdown"
-                                ),
+                                "content_type": existing.get("content_type", "markdown"),
                                 "rule_id": rule_id,
                                 "title": rule_title,
                                 "timestamp": _iso_now(),
                                 "content_sha256": _sha256_file(output_file),
                             }
                             with _registry_lock:
-                                _save_registry(registry, registry_path)
+                                _save_registry(registry, output_path)
                             downloaded += 1
                         else:
                             failed += 1
@@ -358,7 +344,7 @@ def download_references(
                     "content_sha256": content_hash,
                 }
                 with _registry_lock:
-                    _save_registry(registry, registry_path)
+                    _save_registry(registry, output_path)
                 downloaded += 1
             else:
                 failed += 1
