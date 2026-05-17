@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import hashlib
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
@@ -22,6 +24,8 @@ from src.back.github.git import (
     save_selected_dirs,
     update_repo,
 )
+from src.back.database.service import DatabaseService
+from src.back.utils.identify_file_type import SUPPORTED_DOC_EXTENSION_MAP
 
 router = APIRouter(prefix="/api/v1/github", tags=["v1-github"])
 
@@ -172,6 +176,97 @@ async def get_repo(org: str, name: str) -> RepositoryStatus:
     )
 
 
+def _scan_repo_files(db: DatabaseService, base_path: Path, org: str, repo: str) -> int:
+    """Scan a repo directory and register all supported files in doc_registry.
+    
+    Returns the number of files registered.
+    """
+    logger = __import__('logging').getLogger(__name__)
+    logger.info(f"_scan_repo_files: base_path={base_path}, org={org}, repo={repo}, exists={base_path.exists()}")
+    if not base_path.exists():
+        return 0
+
+    selected_dirs = []
+    repo_key = f"{org}/{repo}"
+    if org and repo:
+        try:
+            selected_dirs = db.get_selected_dirs(repo_key)
+        except Exception:
+            selected_dirs = []
+
+    files_found = 0
+    for ext in SUPPORTED_DOC_EXTENSION_MAP.keys():
+        # ext already includes the dot (e.g. '.md', '.markdown'), so strip it for glob
+        pattern = f"**/*{ext}"
+        for found_file in base_path.glob(pattern):
+            rel_path = found_file.relative_to(base_path).as_posix()
+
+            # If selected_dirs is set, filter by them
+            if selected_dirs:
+                if not any(rel_path.startswith(sd.lstrip('./')) for sd in selected_dirs):
+                    continue
+
+            # Compute hash and size
+            try:
+                file_bytes = found_file.read_bytes()
+                content_hash = hashlib.sha256(file_bytes).hexdigest()
+                file_size = found_file.stat().st_size
+            except Exception:
+                content_hash = ""
+                file_size = 0
+
+            # Determine content type
+            rel_lower = rel_path.lower()
+            if rel_lower.startswith("rules") or "/rules/" in rel_lower:
+                content_type = "rules"
+            elif rel_lower.startswith("specification") or "/specification/" in rel_lower:
+                content_type = "specification"
+            else:
+                content_type = ext.lstrip(".")
+
+            db.upsert_doc_registry({
+                "org": org,
+                "repo": repo,
+                "content_type": content_type,
+                "file_name": rel_path,
+                "content_hash": content_hash,
+                "file_size": file_size,
+                "status": "discovered",
+            })
+            files_found += 1
+
+    return files_found
+
+
+@router.post("/scan-all", response_model=RepositoryResponse)
+async def scan_all_repos(background_tasks: BackgroundTasks = None) -> RepositoryResponse:
+    """Scan all repositories and register discovered files in doc_registry."""
+    db = DatabaseService.get_instance()
+    try:
+        repos = list_repos()
+        total_files = 0
+
+        for repo in repos:
+            org = repo.get("org", "")
+            name = repo.get("name", "")
+            base_path = Path("data/github") / org / name
+            count = _scan_repo_files(db, base_path, org, name)
+            total_files += count
+
+        # Also scan local data/documents if it exists
+        local_path = Path("data/documents")
+        if local_path.exists():
+            count = _scan_repo_files(db, local_path, "", "")
+            total_files += count
+
+        return RepositoryResponse(
+            success=True,
+            message=f"Scan complete: {total_files} files registered in doc_registry",
+        )
+    except Exception as e:
+        return RepositoryResponse(success=False, error=str(e))
+
+
 @router.post("/repos/{org}/{name}/sync", response_model=RepositoryResponse)
 async def sync_repo(
     org: str,
@@ -202,17 +297,15 @@ async def sync_repo(
                 {
                     "status": "synced",
                     "last_synced": datetime.now().isoformat(),
+                    "branch": branch,
                 },
             )
         return result
 
-    background_tasks.add_task(sync_with_status)
+    if background_tasks is not None:
+        background_tasks.add_task(sync_with_status)
 
-    return RepositoryResponse(
-        success=True,
-        message=f"Syncing repository '{org}/{name}' in background",
-        data={"org": org, "name": name, "status": "syncing"},
-    )
+    return RepositoryResponse(success=True, message="Sync started in background")
 
 
 @router.delete("/repos/{org}/{name}", response_model=RepositoryResponse)

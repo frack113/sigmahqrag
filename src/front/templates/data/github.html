@@ -7,10 +7,11 @@
 <p>Manage GitHub repositories for Sigma rule indexing.</p>
 
 <div class="card">
-    <div class="github-actions">
+<div class="github-actions">
         <button id="add-repo-btn" class="btn btn-primary">Add Repository</button>
         <button id="refresh-btn" class="btn btn-secondary" onclick="loadRepos()">Refresh list</button>
         <button id="download-ref-btn" class="btn btn-secondary" onclick="downloadRefs()">Download ref</button>
+        <button id="list-files-btn" class="btn btn-info" onclick="listFiles()">List Files</button>
     </div>
 
     <div id="repos-list" class="repos-grid"></div>
@@ -31,9 +32,69 @@
             <h3>Select Directories to Index</h3>
             <div class="directory-actions">
                 <button id="expand-all-btn" class="btn btn-sm" onclick="expandAll()">Expand All</button>
-                <button id="collapse-all-btn" class="btn btn-sm" onclick="collapseAll()">Collapse All</button>
-                <button id="scan-selected-btn" class="btn btn-primary" onclick="saveSelectedDirs()">Scan Selected</button>
+                <button id="collapse-all-btn" class="btn btn-sm" onclick="collapseAll()">Collapse All</int>
             </div>
+        </div>
+        <div id="directory-tree" class="directory-tree"></div>
+        <div id="selected-count" class="selected-count"></div>
+    </div>
+</div>
+
+<div id="add-repo-modal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <h2>Add GitHub Repository</h2>
+        <form id="add-repo-form">
+            <div class="form-group">
+                <label for="repo-url">Repository (owner/repo)</label>
+                <input type="text" id="repo-url" name="url" placeholder="SigmaHQ/sigma" required>
+            </div>
+            <div class="form-group">
+                <label for="repo-branch">Branch</label>
+                <input type="text" id="repo-branch" name="branch" placeholder="main" value="main">
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Add</button>
+                <button type="button" class="btn" onclick="closeModal()">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+
+    <div id="repos-list" class="repos-grid"></div>
+
+    <div id="select-repo-prompt" class="select-repo-prompt" style="display: none;">
+        <p>Click "Browse" on a repository to view and select directories for indexing.</p>
+    </div>
+</div>
+
+
+    <div id="repos-list" class="repos-grid"></div>
+
+    <div id="select-repo-prompt" class="select-repo-prompt" style="display: none;">
+        <p>Click "Browse" on a repository to view and select directories for indexing.</p>
+    </div>
+</div>
+
+<div id="repo-detail" class="repo-detail-section" style="display: none;">
+    <div class="repo-detail-header">
+        <h2 id="selected-repo-name">Repository</h2>
+        <button id="close-detail-btn" class="btn" onclick="closeRepoDetail()">Close</button>
+    </div>
+
+    <div class="directory-browser">
+        <div class="directory-header">
+            <h3>Select Directories to Index</h3>
+            <div class="directory-actions">
+                <button id="expand-all-btn" class="btn btn-sm" onclick="expandAll()">Expand All</button>
+                <button id="collapse-all-btn" class="btn btn-sm" onclick="collapseAll()">Collapse All</button>
+            </div>
+        </div>
+        <div id="directory-tree" class="directory-tree"></div>
+        <div id="selected-count" class="selected-count"></div>
+    </div>
+</div>
+
         </div>
         <div id="directory-tree" class="directory-tree"></div>
         <div id="selected-count" class="selected-count"></div>
@@ -218,34 +279,6 @@ function updateSelectedCount() {
         checked + ' folder(s) selected' : '';
 }
 
-async function saveSelectedDirs() {
-    if (!currentRepo) return;
-    
-    const selected = Array.from(document.querySelectorAll('.folder-checkbox:checked'))
-        .map(cb => cb.value);
-    
-    if (selected.length === 0) {
-        alert('Please select at least one directory');
-        return;
-    }
-    
-    try {
-        const response = await fetch(API_BASE + '/repos/' + currentRepo.org + '/' + currentRepo.name + '/select-dirs', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ selected: selected })
-        });
-        const result = await response.json();
-        if (result.success) {
-            alert('Saved ' + selected.length + ' directory selection(s)');
-        } else {
-            alert(result.error || 'Failed to save selections');
-        }
-    } catch (error) {
-        alert('Failed to save selections');
-    }
-}
-
 document.getElementById('add-repo-btn').onclick = () => {
     document.getElementById('add-repo-modal').style.display = 'block';
 };
@@ -313,6 +346,28 @@ async function downloadRefs() {
         btn.textContent = 'Download ref';
     }
 }
+
+async function listFiles() {
+    const btn = document.getElementById('list-files-btn');
+    btn.disabled = true;
+    btn.textContent = 'Scanning...';
+    try {
+        const response = await fetch(API_BASE + '/scan-all', { method: 'POST' });
+        const result = await response.json();
+        if (result.success) {
+            alert('Scan started in background');
+            loadRepos();
+        } else {
+            alert(result.error || 'Scan failed');
+        }
+    } catch (error) {
+        alert('Failed to initiate scan');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'List Files';
+    }
+}
+
 
 document.getElementById('add-repo-form').onsubmit = async (e) => {
     e.preventDefault();

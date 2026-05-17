@@ -42,9 +42,27 @@ class DatabaseService:
         return cls._instance
 
     def initialize(self) -> None:
-        """Execute schema.sql DDL statements."""
+        """Execute schema.sql DDL statements and apply any schema migrations."""
         self._conn.execute(open("src/back/database/schema.sql").read())
         self._conn.commit()
+
+        # Schema migrations for existing databases
+        # Add missing columns to embed_progress table (columns added after initial schema creation)
+        for col_def in [
+            ("task_type", "TEXT DEFAULT 'embeddings'"),
+            ("source_type", "TEXT DEFAULT ''"),
+            ("total", "INTEGER DEFAULT 0"),
+            ("processed", "INTEGER DEFAULT 0"),
+            ("skipped", "INTEGER DEFAULT 0"),
+        ]:
+            col_name, col_type = col_def
+            try:
+                self._conn.execute(f"ALTER TABLE embed_progress ADD COLUMN IF NOT EXISTS {col_name} {col_type}")
+            except Exception:
+                # Fallback for older DuckDB versions that don't support IF NOT EXISTS
+                pass
+        self._conn.commit()
+
         logger.info("Schema initialized successfully")
 
     def close(self) -> None:
@@ -286,10 +304,11 @@ class DatabaseService:
     def upsert_embed_progress(
         self,
         task_id: str,
+        task_type: str = "embeddings",
         source_type: str = "",
         status: str = "pending",
         total: int = 0,
-        processed: int = 0,
+        processed:int = 0,
         errors: str = "",
         skipped: int = 0,
         current_file: str = "",
@@ -299,9 +318,10 @@ class DatabaseService:
         """Upsert embedding progress record."""
         with self._lock:
             self._conn.execute(
-                """INSERT INTO embed_progress (task_id, source_type, status, total, processed, errors, skipped, current_file, collection_name, progress_percent, updated_at)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """INSERT INTO embed_progress (task_id, task_type, source_type, status, total, processed, errors, skipped, current_file, collection_name, progress_percent, updated_at)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                  ON CONFLICT (task_id) DO UPDATE SET
+                     task_type = EXCLUDED.task_type,
                      source_type = EXCLUDED.source_type,
                      status = EXCLUDED.status,
                      total = EXCLUDED.total,
@@ -314,6 +334,7 @@ class DatabaseService:
                      updated_at = EXCLUDED.updated_at""",
                 (
                     task_id,
+                    task_type,
                     source_type,
                     status,
                     total,
@@ -331,45 +352,26 @@ class DatabaseService:
     def get_embed_status(self, task_id: str) -> dict | None:
         """Get progress status for a task."""
         result = self._conn.execute(
-            "SELECT task_id, status, total, processed, errors, skipped, current_file, collection_name, progress_percent, updated_at FROM embed_progress WHERE task_id = ?",
+            "SELECT task_id, task_type, source_type, status, total, processed, errors, skipped, current_file, collection_name, progress_percent, updated_at FROM embed_progress WHERE task_id = ?",
             (task_id,)
         ).fetchone()
         if not result:
             return None
         return {
             "task_id": result[0],
-            "status": result[1],
-            "total": result[2],
-            "processed": result[3],
-            "errors": result[4],
-            "skipped": result[5],
-            "current_file": result[6],
-            "collection_name": result[7],
-            "progress_percent": result[8],
-            "updated_at": result[9],
+            "task_type": result[1],
+            "source_type": result[2],
+            "status": result[3],
+            "total": result[4],
+            "processed": result[5],
+            "errors": result[6],
+            "skipped": result[7],
+            "current_file": result[8],
+            "collection_name": result[9],
+            "progress_percent": result[10],
+            "updated_at": result[11],
         }
 
-    def get_active_embed_tasks(self) -> list[dict]:
-        """Get all pending and running tasks."""
-        results = self._conn.execute(
-            "SELECT task_id, source_type, status, total, processed, errors, skipped, current_file, collection_name, progress_percent, updated_at FROM embed_progress WHERE status IN ('pending', 'running')"
-        ).fetchall()
-        return [
-            {
-                "task_id": row[0],
-                "source_type": row[1],
-                "status": row[2],
-                "total": row[3],
-                "processed": row[4],
-                "errors": row[5],
-                "skipped": row[6],
-                "current_file": row[7],
-                "collection_name": row[8],
-                "progress_percent": row[9],
-                "updated_at": row[10],
-            }
-            for row in results
-        ]
 
     def reset_stale_embed_tasks(self) -> None:
         """Mark running tasks older than 1 hour as failed."""
@@ -380,31 +382,105 @@ class DatabaseService:
             )
             self._conn.commit()
 
-    def get_running_embed_tasks(self) -> list[dict]:
-        """Get all running tasks."""
+    def get_active_embed_tasks(self) -> list[dict]:
+        """Get all pending and running tasks."""
         results = self._conn.execute(
-            "SELECT task_id, source_type, status, total, processed, errors, skipped, current_file, collection_name, progress_percent, updated_at FROM embed_progress WHERE status = 'running'"
+            "SELECT task_id, task_type, source_type, status, total, processed, errors, skipped, current_file, collection_name, progress_percent, updated_at FROM embed_progress WHERE status IN ('pending', 'running')"
         ).fetchall()
         return [
             {
                 "task_id": row[0],
-                "source_type": row[1],
-                "status": row[2],
-                "total": row[3],
-                "processed": row[4],
-                "errors": row[5],
-                "skipped": row[6],
-                "current_file": row[7],
-                "collection_name": row[8],
-                "progress_percent": row[9],
-                "updated_at": row[10],
+                "task_type": row[1],
+                "source_type": row[2],
+                "status": row[3],
+                "total": row[4],
+                "processed": row[5],
+                "errors": row[6],
+                "skipped": row[7],
+                "current_file": row[8],
+                "collection_name": row[9],
+                "progress_percent": row[10],
+                "updated_at": row[11],
+            }
+            for row in results
+        ]
+
+    def get_running_embed_tasks(self) -> list[dict]:
+        """Get all running tasks."""
+        results = self._conn.execute(
+            "SELECT task_id, task_type, source_type, status, total, processed, errors, skipped, current_file, collection_name, progress_percent, updated_at FROM embed_progress WHERE status = 'running'"
+        ).fetchall()
+        return [
+            {
+                "task_id": row[0],
+                "task_type": row[1],
+                "source_type": row[2],
+                "status": row[3],
+                "total": row[4],
+                "processed": row[5],
+                "errors": row[6],
+                "skipped": row[7],
+                "current_file": row[8],
+                "collection_name": row[9],
+                "progress_percent": row[10],
+                "updated_at": row[11],
             }
             for row in results
         ]
 
     # =========================================================================
+    # DOC_REGISTRY TABLE (File Discovery Results)
+    # =========================================================================
+
+    def upsert_doc_registry(self, data: dict) -> None:
+        """Upsert a file record into doc_registry."""
+        with self._lock:
+            self._conn.execute(
+                """INSERT INTO doc_registry (org, repo, content_type, file_name, content_hash, file_size, last_seen, status)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                 ON CONFLICT (org, repo, content_hash) DO UPDATE SET
+                     content_type = EXCLUDED.content_type,
+                     file_name = EXCLUDED.file_name,
+                     file_size = EXCLUDED.file_size,
+                     last_seen = EXCLUDED.last_seen,
+                     status = EXCLUDED.status""",
+                (
+                    data.get("org"),
+                    data.get("repo"),
+                    data.get("content_type"),
+                    data.get("file_name"),
+                    data.get("content_hash"),
+                    data.get("file_size"),
+                    _iso_now(),
+                    data.get("status", "discovered"),
+                ),
+            )
+            self._conn.commit()
+
+    def get_doc_registry(self, limit: int = 100, offset: int = 0) -> list[dict]:
+        """Fetch paginated registry records."""
+        with self._lock:
+            results = self._conn.execute(
+                f"SELECT org, repo, content_type, file_name, content_hash, file_size, last_seen, status FROM doc_registry LIMIT ? OFFSET ?",
+                [limit, offset],
+            ).fetchall()
+            col_names = [desc[0] for desc in self._conn.description]
+        return [dict(zip(col_names, row)) for row in results]
+
+    def delete_doc_registry_by_repo(self, org: str, repo: str) -> None:
+        """Clear registry records for a specific repository."""
+        with self._lock:
+            self._conn.execute("DELETE FROM doc_registry WHERE org = ? AND repo = ?", (org, repo))
+            self._conn.commit()
+
+    # =========================================================================
     # GIT_METADATA TABLE
     # =========================================================================
+
+    def get_git_metadata_list(self) -> list[str]:
+        """Return all repo_keys from git_metadata."""
+        with self._lock:
+            return [row[0] for row in self._conn.execute("SELECT repo_key FROM git_metadata").fetchall()]
 
     def get_git_metadata(self, repo_key: str) -> dict | None:
         """Get metadata for a repository."""

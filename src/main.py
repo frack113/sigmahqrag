@@ -1,5 +1,6 @@
 """Main application entry point."""
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from logging.handlers import RotatingFileHandler
@@ -33,6 +34,7 @@ from src.api.v1.system_prompt import router as prompts_v1_router
 from src.back.database import DatabaseService
 from src.back.qdrant.auto_start import start_qdrant, stop_qdrant
 from src.back.service_manager import shutdown_all_services
+from src.back.worker.processor import TaskDispatcher
 from src.shared.exceptions import SigmaError
 
 logger = logging.getLogger(__name__)
@@ -105,9 +107,16 @@ async def lifespan(app: FastAPI) -> None:
 
     db.reset_stale_embed_tasks()
 
+    # Start the background task dispatcher
+    dispatcher = TaskDispatcher(poll_interval=5)
+    app.state.dispatcher = dispatcher
+    dispatcher_task = asyncio.create_task(dispatcher.run())
+
     _validate_services()
     await start_qdrant()
     yield
+    dispatcher.stop()
+    dispatcher_task.cancel()
     await shutdown_all_services()
     await stop_qdrant()
     db.close()
