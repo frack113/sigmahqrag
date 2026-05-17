@@ -109,37 +109,25 @@ def main() -> None:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     p_list = subparsers.add_parser("list", help="List GGUF files")
-    p_list.add_argument(
-        "repo_id", nargs="?", default="meta-llama/Llama-3.2-1B-Instruct-GGUF"
-    )
+    p_list.add_argument("repo_id", nargs="?", default="meta-llama/Llama-3.2-1B-Instruct-GGUF")
 
     p_installed = subparsers.add_parser("installed", help="List installed models")
     _ = p_installed
 
     p_info = subparsers.add_parser("info", help="Get model info")
-    p_info.add_argument(
-        "repo_id", nargs="?", default="meta-llama/Llama-3.2-1B-Instruct-GGUF"
-    )
+    p_info.add_argument("repo_id", nargs="?", default="meta-llama/Llama-3.2-1B-Instruct-GGUF")
 
     p_download = subparsers.add_parser("download", help="Download a model")
     p_download.add_argument("--filename", "-n", help="Specific filename")
-    p_download.add_argument(
-        "--force", "-f", action="store_true", help="Skip confirmation"
-    )
-    p_download.add_argument(
-        "repo_id", nargs="?", default="meta-llama/Llama-3.2-1B-Instruct-GGUF"
-    )
+    p_download.add_argument("--force", "-f", action="store_true", help="Skip confirmation")
+    p_download.add_argument("repo_id", nargs="?", default="meta-llama/Llama-3.2-1B-Instruct-GGUF")
     p_download.add_argument(
         "filename", nargs="?", help="Specific filename (alternative to --filename)"
     )
 
     p_delete = subparsers.add_parser("delete", help="Delete a model")
-    p_delete.add_argument(
-        "--force", "-f", action="store_true", help="Skip confirmation"
-    )
-    p_delete.add_argument(
-        "repo_id", nargs="?", default="meta-llama/Llama-3.2-1B-Instruct-GGUF"
-    )
+    p_delete.add_argument("--force", "-f", action="store_true", help="Skip confirmation")
+    p_delete.add_argument("repo_id", nargs="?", default="meta-llama/Llama-3.2-1B-Instruct-GGUF")
     p_delete.add_argument("filename", nargs="?", help="Specific filename to delete")
 
     args = parser.parse_args()

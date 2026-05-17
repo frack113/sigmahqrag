@@ -85,25 +85,15 @@ def main() -> None:
     _ = p_installed
 
     p_info = subparsers.add_parser("info", help="Get model info")
-    p_info.add_argument(
-        "repo_id", nargs="?", default="sentence-transformers/all-MiniLM-L6-v2"
-    )
+    p_info.add_argument("repo_id", nargs="?", default="sentence-transformers/all-MiniLM-L6-v2")
 
     p_download = subparsers.add_parser("download", help="Download a model")
-    p_download.add_argument(
-        "--force", "-f", action="store_true", help="Skip confirmation"
-    )
-    p_download.add_argument(
-        "repo_id", nargs="?", default="sentence-transformers/all-MiniLM-L6-v2"
-    )
+    p_download.add_argument("--force", "-f", action="store_true", help="Skip confirmation")
+    p_download.add_argument("repo_id", nargs="?", default="sentence-transformers/all-MiniLM-L6-v2")
 
     p_delete = subparsers.add_parser("delete", help="Delete a model")
-    p_delete.add_argument(
-        "--force", "-f", action="store_true", help="Skip confirmation"
-    )
-    p_delete.add_argument(
-        "repo_id", nargs="?", default="sentence-transformers/all-MiniLM-L6-v2"
-    )
+    p_delete.add_argument("--force", "-f", action="store_true", help="Skip confirmation")
+    p_delete.add_argument("repo_id", nargs="?", default="sentence-transformers/all-MiniLM-L6-v2")
 
     args = parser.parse_args()
 

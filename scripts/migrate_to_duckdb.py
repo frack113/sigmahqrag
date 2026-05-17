@@ -121,9 +121,7 @@ def _migrate_models(db: DatabaseService, fail_after: int) -> int:
                         "local_path": record.get("local_path"),
                         "file_size": record.get("file_size", 0),
                         "files": record.get("files", {}),
-                        "updated_at": datetime.now(timezone.utc).strftime(
-                            "%Y-%m-%dT%H:%M:%SZ"
-                        ),
+                        "updated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
                     }
                     db.upsert_model(entry)
                     count += 1
@@ -144,9 +142,7 @@ def _migrate_models(db: DatabaseService, fail_after: int) -> int:
                         "status": record.get("status", "ready"),
                         "dimension": record.get("dimension"),
                         "index_path": record.get("index_path"),
-                        "updated_at": datetime.now(timezone.utc).strftime(
-                            "%Y-%m-%dT%H:%M:%SZ"
-                        ),
+                        "updated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
                     }
                     db.upsert_model(entry)
                     count += 1

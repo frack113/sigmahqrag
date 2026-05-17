@@ -99,6 +99,7 @@ async def ingest_sigma_rules(
         except Exception as e:
             logger.error(f"Failed to index rules: {e}")
 
+
 @router.post("/index-sigma-ref")
 async def index_sigma_ref(
     request: IngestRequest | None = None,
@@ -110,17 +111,9 @@ async def index_sigma_ref(
 
     try:
         summary = download_references(
-            rules_dir=rules_dir,
-            output_dir=output_dir,
-            supported_types={"markdown"}
+            rules_dir=rules_dir, output_dir=output_dir, supported_types={"markdown"}
         )
         return JSONResponse(content=summary)
     except Exception as e:
-        logger.error(
-            f"Failed to index sigma ref: {e}",
-            exc_info=True
-        )
-        return JSONResponse(
-            status_code=500,
-            content={"success": False, "error": str(e)}
-        )
+        logger.error(f"Failed to index sigma ref: {e}", exc_info=True)
+        return JSONResponse(status_code=500, content={"success": False, "error": str(e)})

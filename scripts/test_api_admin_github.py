@@ -135,9 +135,7 @@ def main() -> None:
     p_update.add_argument("name", help="Repository name")
     p_update.add_argument("--branch", help="Branch to update")
 
-    p_update_meta = subparsers.add_parser(
-        "update-metadata", help="Update repository metadata"
-    )
+    p_update_meta = subparsers.add_parser("update-metadata", help="Update repository metadata")
     p_update_meta.add_argument("org", help="Organization name")
     p_update_meta.add_argument("name", help="Repository name")
     p_update_meta.add_argument("--branch", help="Branch to track")
@@ -146,9 +144,7 @@ def main() -> None:
     )
 
     p_delete = subparsers.add_parser("delete", help="Delete a repository")
-    p_delete.add_argument(
-        "--force", "-f", action="store_true", help="Skip confirmation"
-    )
+    p_delete.add_argument("--force", "-f", action="store_true", help="Skip confirmation")
     p_delete.add_argument("org", help="Organization name")
     p_delete.add_argument("name", help="Repository name")
 

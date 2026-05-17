@@ -12,11 +12,13 @@ from fastapi.staticfiles import StaticFiles
 from src.api.routes.page_admin import router as admin_pages_router
 from src.api.routes.page_chat import router as chat_page_router
 from src.api.routes.page_data import router as data_page_router
+from src.api.routes.page_duckdb import router as duckdb_page_router
 from src.api.v1.admin import router as admin_v1_router
 from src.api.v1.chat import router as chat_v1_router
 from src.api.v1.config import router as config_v1_router
 from src.api.v1.coverage import router as coverage_v1_router
 from src.api.v1.documents import router as documents_v1_router
+from src.api.v1.duckdb import router as duckdb_v1_router
 from src.api.v1.embedding_config import router as embedding_config_v1_router
 from src.api.v1.embeddings import router as embeddings_v1_router
 from src.api.v1.explain import router as explain_v1_router
@@ -136,6 +138,8 @@ def create_app() -> FastAPI:
 
     app.include_router(admin_pages_router)
     app.include_router(admin_v1_router)
+    app.include_router(duckdb_page_router)
+    app.include_router(duckdb_v1_router)
     app.include_router(config_v1_router)
     app.include_router(coverage_v1_router)
     app.include_router(explain_v1_router)

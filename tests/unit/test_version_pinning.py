@@ -113,13 +113,13 @@ class TestVersionPinning:
         for pkg, expected_ver in critical_packages.items():
             assert pkg in deps_dict, f"Critical package '{pkg}' not found in dependencies"
             operator, version = deps_dict[pkg]
-            assert (
-                operator == "=="
-            ), f"Package '{pkg}' uses '{operator}' but must use '==' for Air-Gap reproducibility"
+            assert operator == "==", (
+                f"Package '{pkg}' uses '{operator}' but must use '==' for Air-Gap reproducibility"
+            )
             if expected_ver:
-                assert (
-                    version == expected_ver
-                ), f"Package '{pkg}' version mismatch: expected '{expected_ver}', got '{version}'"
+                assert version == expected_ver, (
+                    f"Package '{pkg}' version mismatch: expected '{expected_ver}', got '{version}'"
+                )
 
     def test_uv_lock_not_in_gitignore(self):
         """Validate that uv.lock is NOT in .gitignore."""

@@ -36,7 +36,6 @@ async def test_check_for_updates_update_available():
         patch("src.core.version_manager.get_current_version", new_callable=AsyncMock) as mock_ver,
         patch("src.core.version_manager.VersionManager") as mock_vm_class,
     ):
-
         mock_ver.return_value = "1.0.0"
 
         mock_vm = MagicMock()
@@ -60,7 +59,6 @@ async def test_check_for_updates_no_update():
         patch("src.core.version_manager.get_current_version", new_callable=AsyncMock) as mock_ver,
         patch("src.core.version_manager.VersionManager") as mock_vm_class,
     ):
-
         mock_ver.return_value = "2.0.0"
 
         mock_vm = MagicMock()

@@ -1,0 +1,28 @@
+{% extends "shared/layout.html" %}
+
+{% block title %}DuckDB - Sigmahqrag{% endblock %}
+
+{% block styles %}
+{{ super() }}
+<link rel="stylesheet" href="{{ url_for('static', path='/css/duckdb.css') }}">
+{% endblock %}
+
+{% block sidebar_title %}DuckDB{% endblock %}
+{% block sidebar_subtitle %}Browse parameters{% endblock %}
+
+{% block sidebar_nav %}
+<div id="table-list">
+    <p class="sidebar-loading">Loading tables...</p>
+</div>
+<div class="sidebar-footer">
+    <a href="/chat">← Chat</a>
+    <a href="/data">Data</a>
+    <a href="/admin">Admin</a>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', path='/js/duckdb.js') }}"></script>
+{% endblock %}
+
+{% block content %}{% endblock %}

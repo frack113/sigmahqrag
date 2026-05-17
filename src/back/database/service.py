@@ -59,6 +59,28 @@ class DatabaseService:
         result = self._conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()
         return result[0] if result else 0
 
+    def get_tables(self) -> list[str]:
+        return sorted(_VALID_TABLES)
+
+    def get_table_data(self, table_name: str, limit: int = 50, offset: int = 0) -> list[dict]:
+        if table_name not in _VALID_TABLES:
+            raise ValueError(f"Invalid table name: {table_name}")
+        limit = max(1, min(limit, 1000))
+        offset = max(0, offset)
+        with self._lock:
+            results = self._conn.execute(
+                f"SELECT * FROM {table_name} LIMIT ? OFFSET ?",
+                [limit, offset],
+            ).fetchall()
+            col_names = [desc[0] for desc in self._conn.description]
+        return [dict(zip(col_names, row)) for row in results]
+
+    def get_table_count(self, table_name: str) -> int:
+        if table_name not in _VALID_TABLES:
+            raise ValueError(f"Invalid table name: {table_name}")
+        result = self._conn.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()
+        return result[0] if result else 0
+
     # Config
     def get_config(self, key: str) -> Any | None:
         result = self._conn.execute("SELECT value FROM config WHERE key = ?", [key]).fetchone()

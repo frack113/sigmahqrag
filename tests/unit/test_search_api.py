@@ -73,7 +73,6 @@ class TestSearchAPI:
         from src.shared.schemas.search import SearchRequest
 
         with patch.object(SearchEngine, "search", new_callable=AsyncMock) as mock_search:
-
             mock_search.side_effect = TimeoutError()
 
             request = SearchRequest(query="test", limit=10)
