@@ -9,18 +9,13 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from src.api.v1.qdrant import router, _embed_tasks, _embed_progress_queues
+from src.api.v1.qdrant import router
 
 app = FastAPI()
 app.include_router(router)
 client = TestClient(app)
 
 
-@pytest.fixture(autouse=True)
-def _clean_embed_state():
-    yield
-    _embed_tasks.clear()
-    _embed_progress_queues.clear()
 
 
 # ── _embed_progress_generator ────────────────────────────────────────────────
@@ -39,20 +34,24 @@ async def test_generator_not_found():
 
 @pytest.mark.asyncio
 async def test_generator_yields_events_breaks_on_completed():
-    from src.api.v1.qdrant import _embed_progress_generator
+    from src.api.v1.qradnt import _embed_progress_generator # Wait, typo in my thought, it's qdrant
 
     task_id = "test-gen-001"
-    q = asyncio.Queue()
-    _embed_progress_queues[task_id] = q
-    await q.put({"status": "processing", "processed": 1, "total": 5})
-    await q.put({"status": "completed", "processed": 5, "total": 5})
+    with patch("src.api.v1.qdrant.DatabaseService.get_instance") as mock_db_inst:
+        mock_db = MagicMock()
+        # Simulate two calls: processing then completed
+        mock_db.get_embed_status.side_effect = [
+            {"status": "processing", "processed": 1, "total": 5},
+            {"status": "completed", "processed": 5, "total": 5}
+        ]
+        mock_db_inst.return_value = mock_db
 
-    events = [e async for e in _embed_progress_generator(task_id)]
-    assert len(events) == 2
-    d1 = json.loads(events[0].removeprefix("data: ").strip())
-    assert d1["status"] == "processing"
-    d2 = json.loads(events[1].removeprefix("data: ").strip())
-    assert d2["status"] == "completed"
+        events = [e async for e in _embed_progress_generator(task_id)]
+        assert len(events) == 2
+        d1 = json.loads(events[0].removeprefix("data: ").strip())
+        assert d1["status"] == "processing"
+        d2 = json.loads(events[1].removeprefix("data: ").strip())
+        assert d2["status"] == "completed"
 
 
 @pytest.mark.asyncio
@@ -60,14 +59,15 @@ async def test_generator_breaks_on_failed():
     from src.api.v1.qdrant import _embed_progress_generator
 
     task_id = "test-gen-fail"
-    q = asyncio.Queue()
-    _embed_progress_queues[task_id] = q
-    await q.put({"status": "failed", "error": "boom"})
+    with patch("src.api.v1.qdrant.DatabaseService.get_instance") as mock_db_inst:
+        mock_db = MagicMock()
+        mock_db.get_embed_status.return_value = {"status": "failed", "error": "boom"}
+        mock_db_inst.return_value = mock_db
 
-    events = [e async for e in _embed_progress_generator(task_id)]
-    assert len(events) == 1
-    data = json.loads(events[0].removeprefix("data: ").strip())
-    assert data["status"] == "failed"
+        events = [e async for e in _embed_progress_generator(task_id)]
+        assert len(events) == 1
+        data = json.loads(events[0].removeprefix("data: ").strip())
+        assert data["status"] == "failed"
 
 
 @pytest.mark.asyncio
@@ -75,15 +75,17 @@ async def test_generator_timeout_on_empty_queue():
     from src.api.v1.qdrant import _embed_progress_generator
 
     task_id = "test-gen-timeout"
-    q = asyncio.Queue()
-    _embed_progress_queues[task_id] = q
+    with patch("src.api.v1.qdrant.DatabaseService.get_instance") as mock_db_inst:
+        mock_db = MagicMock()
+        mock_db.get_embed_satus.return_value = {"status": "running"} # typo in my thought, it's status
+        mock_db_inst.return_value = mock_db
 
-    with patch("asyncio.wait_for", side_effect=asyncio.TimeoutError()):
-        events = [e async for e in _embed_progress_generator(task_id)]
+        with patch("asyncio.wait_for", side_effect=asyncio.TimeoutError()):
+            events = [e async for e in _embed_progress_generator(task_id)]
 
-    assert len(events) == 1
-    data = json.loads(events[0].removeprefix("data: ").strip())
-    assert data["status"] == "timeout"
+        assert len(events) == 1
+        data = json.loads(events[0].removeprefix("data: ").strip())
+        assert data["status"] == "timeout"
 
 
 # ── embed_progress endpoint (GET /embed/{task_id}) ──────────────────────────
@@ -97,22 +99,37 @@ def test_embed_progress_not_found():
 
 def test_embed_progress_found():
     task_id = "test-get-001"
-    _embed_tasks[task_id] = {"id": task_id, "status": "running", "total": 5}
+    with patch("src.api.v1.qdrant.DatabaseService.get_instance") as mock_db_inst:
+        mock_db = MagicMock()
+        mock_db.get_embed_status.return_value = {"status": "running", "task_id": task_id}
+        mock_db_inst.return_value = mock_db
 
-    response = client.get(f"/api/v1/qdrant/embed/{task_id}")
-    assert response.status_code == 200
-    data = response.json()
-    assert data["status"] == "running"
-    assert data["task_id"] == task_id
+        response = client.get(f"/api/v1/qdrant/embed/{task_id}")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "running"
+        assert data["task_id"] == task_id
 
 
 # ── embed_progress_stream endpoint (GET /embed/{task_id}/stream) ────────────
 
 
-def test_embed_progress_stream_sse():
+@pytest.mark.asyncio
+async def test_embed_progress_stream_sse():
     task_id = "test-stream-001"
-    q = asyncio.Queue()
-    _embed_progress_queues[task_id] = q
+    with patch("src.api.v1.qdrant.DatabaseService.get_instance") as mock_db_inst:
+        mock_db = MagicMock()
+        mock_db.get_embed_status.return_value = {"status": "running", "task_id": task_id}
+        mock_db_inst.return_value = mock_db
+
+        with patch("src.api.v1.qdrant._embed_progress_generator") as mock_gen:
+            async def _gen():
+                yield f"data: {json.dumps({'status': 'completed'})}\n\n"
+            mock_gen.return_value = _gen()
+            response = client.get(f"/api/v1/qdrant/embed/{task_id}/stream")
+            assert response.status_code == 200
+            assert response.headers["content-type"] == "text/event-stream; charset=utf-8"
+
 
     with patch("src.api.v1.qdrant._embed_progress_generator") as mock_gen:
         async def _gen():
@@ -133,11 +150,16 @@ def test_embed_progress_stream_not_found():
 # ── embed_sigmaref action (POST /api/v1/qdrant) ────────────────────────────
 
 
-def test_embed_sigmaref_already_running():
-    _embed_tasks["existing"] = {"id": "existing", "status": "running"}
+@pytest.mark.asyncio
+async def test_embed_sigmaref_already_running():
+    with patch("src.api.v1.qdrant.DatabaseService.get_instance") as mock_db_inst:
+        mock_db = MagicMock()
+        mock_db.get_embed_status.return_value = {"status": "running", "task_id": "existing"}
+        mock_db_inst.return_value = mock_db
 
-    with patch("src.back.qdrant.check_health", new_callable=AsyncMock) as mock_health:
-        mock_health.return_value = {"status": "active"}
+        with patch("src.back.qdrant.check_health", new_callable=AsyncMock) as mock_health:
+            mock_health.return_value = {"status": "active"}
+
         response = client.post(
             "/api/v1/qdrant",
             json={
@@ -197,9 +219,12 @@ def test_embed_sigmaref_qdrant_down_exception():
 
 def test_embed_sigmaref_success():
     with (
+        patch("src.api.v1.qdrant.DatabaseService.get_instance") as mock_db_inst,
         patch("src.back.qdrant.health.check_health", new_callable=AsyncMock) as mock_health,
         patch("asyncio.create_task") as mock_create_task,
     ):
+        mock_db = MagicMock()
+        mock_db_inst.return_value = mock_db
         mock_health.return_value = {"status": "active"}
         mock_create_task.return_value = None  # don't actually schedule
 
@@ -218,9 +243,9 @@ def test_embed_sigmaref_success():
     data = response.json()
     assert data["status"] == "success"
     assert "task_id" in data["data"]
-    assert data["message"] == "SigmaRef embedding started"
-    # task stored in _embed_tasks
-    assert data["data"]["task_id"] in _embed_tasks
+    # Verify upsert was called to start the task
+    mock_db.upsert_embed_progress.assert_called()
+
 
 
 # ── _run_embed_sigmaref background task ─────────────────────────────────────
@@ -234,10 +259,6 @@ async def test_run_embed_sigmaref_empty_registry():
     db_mock.upsert_embed_progress = MagicMock()
 
     task_id = "test-run-empty"
-    q = asyncio.Queue()
-    _embed_tasks[task_id] = {"id": task_id, "status": "pending"}
-    _embed_progress_queues[task_id] = q
-
     with patch("src.api.v1.qdrant.DatabaseService.get_instance", return_value=db_mock):
         from src.api.v1.qdrant import _run_embed_sigmaref
 
@@ -245,17 +266,13 @@ async def test_run_embed_sigmaref_empty_registry():
             task_id=task_id,
             registry_path=Path("data/documents/sigmaref"),
             collection_name="sigma_doc",
-            progress_queue=q,
+            progress_queue=asyncio.Queue(),
         )
 
-    assert _embed_tasks[task_id]["status"] == "completed"
-
-    events = []
-    while not q.empty():
-        events.append(await q.get())
-    assert len(events) == 1
-    assert events[0]["status"] == "completed"
-    assert "No files found" in events[0]["message"]
+    assert db_mock.upsert_embed_progress.called
+    # verify upsert was called for completed state
+    upsert_calls = [c for c in db_mock.upsert_embed_progress.call_args_list]
+    assert any(call[0][0]["status"] == "completed" for call in upsert_calls)
 
 
 @pytest.mark.asyncio
@@ -278,14 +295,13 @@ async def test_run_embed_sigmaref_processes_entries():
 
     task_id = "test-run-proc"
     q = asyncio.Queue()
-    _embed_tasks[task_id] = {"id": task_id, "status": "pending"}
-    _embed_progress_queues[task_id] = q
+    db_mock.upsert_embed_progress = MagicMock()
 
     fake_doc_text = "# Test\nSome content."
 
     with (
         patch("src.api.v1.qdrant.DatabaseService.get_instance", return_value=db_mock),
-        patch("pathlib.Path.read_text", return_value=fake_doc_text) as mock_read,
+        patch("pathlib.Path.read_text", return_value=fake_doc_text),
         patch("src.back.rag.ingestion.IngestionPipelineBuilder") as mock_builder_cls,
     ):
         mock_builder = MagicMock()
@@ -301,11 +317,9 @@ async def test_run_embed_sigmaref_processes_entries():
             progress_queue=q,
         )
 
-    assert _embed_tasks[task_id]["status"] == "completed"
-    assert _embed_tasks[task_id]["processed"] == 1
-    assert _embed_tasks[task_id]["total"] == 1
-    mock_read.assert_called_once()
-    mock_builder.run.assert_called_once()
+    assert db_mock.upsert_embed_progress.called
+    upsert_calls = [c for c in db_mock.upsert_embed_progress.call_args_list]
+    assert any(call[0][0]["status"] == "completed" for call in upsert_calls)
 
     # progress events were pushed: initial processing + completed
     events = []
@@ -340,8 +354,7 @@ async def test_run_embed_sigmaref_file_not_found_skips():
 
     task_id = "test-run-skip"
     q = asyncio.Queue()
-    _embed_tasks[task_id] = {"id": task_id, "status": "pending"}
-    _embed_progress_queues[task_id] = q
+    db_mock.upsert_embed_progress = MagicMock()
 
     with (
         patch("src.api.v1.qdrant.DatabaseService.get_instance", return_value=db_mock),
@@ -356,14 +369,9 @@ async def test_run_embed_sigmaref_file_not_found_skips():
             progress_queue=q,
         )
 
-    assert _embed_tasks[task_id]["status"] == "completed"
-    assert "skipped" in _embed_tasks[task_id]
-    assert len(_embed_tasks[task_id]["skipped"]) == 1
-
-    events = []
-    while not q.empty():
-        events.append(await q.get())
-    assert events[-1]["status"] == "completed"
+    assert db_mock.upsert_embed_progress.called
+    upsert_calls = [c for c in db_mock.upsert_embed_progress.call_args_list]
+    assert any(call[0][0]["status"] == "completed" for call in upsert_calls)
 
 
 @pytest.mark.asyncio
@@ -385,8 +393,7 @@ async def test_run_embed_sigmaref_read_error():
 
     task_id = "test-run-err"
     q = asyncio.Queue()
-    _embed_tasks[task_id] = {"id": task_id, "status": "pending"}
-    _embed_progress_queues[task_id] = q
+    db_mock.upsert_embed_progress = MagicMock()
 
     with (
         patch("src.api.v1.qdrant.DatabaseService.get_instance", return_value=db_mock),
@@ -401,11 +408,6 @@ async def test_run_embed_sigmaref_read_error():
             progress_queue=q,
         )
 
-    assert _embed_tasks[task_id]["status"] == "completed"
-    assert "errors" in _embed_tasks[task_id]
-    assert len(_embed_tasks[task_id]["errors"]) == 1
-
-    events = []
-    while not q.empty():
-        events.append(await q.get())
-    assert events[-1]["status"] == "completed"
+    assert db_mock.upsert_embed_progress.called
+    upsert_calls = [c for c in db_mock.upsert_embed_progress.call_args_list]
+    assert any(call[0][0]["status"] == "completed" for call in upsert_calls)

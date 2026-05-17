@@ -5,7 +5,6 @@ import json
 import logging
 import uuid
 from collections.abc import AsyncGenerator
-from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import APIRouter
@@ -21,7 +20,7 @@ from src.back.qdrant import (
 from src.back.qdrant.service import create_qdrant_service
 from src.back.qdrant.storage import delete_point, store_embeddings
 from src.back.qdrant.storage import search as qdrant_search
-from src.back.database.service import DatabaseService
+from src.back.database.service import DatabaseService, _iso_now
 from src.shared.download_manager import create_download_manager
 from src.shared.schemas.qdrant import (
     QdrantActionRequest,
@@ -34,46 +33,42 @@ router = APIRouter(prefix="/api/v1/qdrant", tags=["v1-qdrant"])
 
 SERVICE_NAME = "qdrant"
 
-# In-memory store for embed_sigmaref task progress
-_embed_tasks: dict[str, dict] = {}
-_embed_progress_queues: dict[str, asyncio.Queue] = {}
-
-
-def _iso_now() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
 
 async def _embed_progress_generator(task_id: str) -> AsyncGenerator[str, None]:
-    """Generate SSE progress updates for embed_sigmaref tasks."""
-    queue = _embed_progress_queues.get(task_id)
-
-    if not queue:
-        yield f"data: {json.dumps({'status': 'not_found'})}\n\n"
-        return
-
+    """Generate SSE progress updates by polling the database."""
+    db = DatabaseService.get_instance()
     while True:
         try:
-            data = await asyncio.wait_for(queue.get(), timeout=30.0)
-            yield f"data: {json.dumps(data)}\n\n"
-
-            if data.get("status") in ("completed", "failed"):
+            status_data = db.get_embed_status(task_id)
+            if not status_data:
+                yield f"data: {json.dumps({'status': 'not_found'})}\n\n"
                 break
-        except TimeoutError:
-            yield f"data: {json.dumps({'status': 'timeout'})}\n\n"
+
+            yield f"data: {json.dumps(status_data)}\n\n"
+
+            if status_data.get("status") in ("completed", "failed"):
+                break
+        except Exception as e:
+            logger.error(f"SSE error for {task_id}: {e}")
+            yield f"data: {json.dumps({'status': 'error', 'message': str(e)})}\n\n"
             break
+
+        await asyncio.sleep(2)
 
 
 async def _run_embed_sigmaref(
     task_id: str,
     registry_path: Path,
     collection_name: str,
-    progress_queue: asyncio.Queue,
 ) -> None:
     """Background task to embed all files from the SigmaRef registry."""
-    _embed_tasks[task_id]["status"] = "running"
+    db = DatabaseService.get_instance()
+    errors = []
+    skipped = []
+    processed = 0
+    total = 0
 
     try:
-        db = DatabaseService.get_instance()
         raw_entries = db.get_doc_sigma_ref()
         registry_entries = []
         for e in raw_entries:
@@ -86,43 +81,21 @@ async def _run_embed_sigmaref(
                 }
             )
         if not registry_entries:
-            await progress_queue.put(
-                {
-                    "status": "completed",
-                    "task_id": task_id,
-                    "message": "No files found in registry",
-                    "total": 0,
-                    "processed": 0,
-                }
+            await db.upsert_embed_progress(
+                task_id=task_id, status="completed", progress_percent=0.0, collection_name=collection_name
             )
-            _embed_tasks[task_id]["status"] = "completed"
             return
 
         total = len(registry_entries)
         now = _iso_now()
-        _embed_tasks[task_id]["total"] = total
-        _embed_tasks[task_id]["processed"] = 0
-        _embed_tasks[task_id]["started_at"] = now
+        
         db.upsert_embed_progress(
-            {
-                "task_id": task_id,
-                "status": "running",
-                "total": total,
-                "processed": 0,
-                "current_file": "",
-                "collection_name": collection_name,
-                "started_at": now,
-                "updated_at": now,
-            }
-        )
-        await progress_queue.put(
-            {
-                "status": "processing",
-                "task_id": task_id,
-                "total": total,
-                "processed": 0,
-                "current_file": "",
-            }
+            task_id=task_id,
+            status="running",
+            progress_percent=0.0,
+            current_file="",
+            collection_name=collection_name,
+            updated_at=now,
         )
 
         from llama_index.core.schema import Document
@@ -135,38 +108,27 @@ async def _run_embed_sigmaref(
         for idx, entry in enumerate(registry_entries):
             file_hash = entry.get("hash", entry.get("id", ""))
             file_name = entry.get("file_name", "")
-            relative_path = entry.get("path", entry.get("file_path", file_hash))
-            file_path = (
-                base_dir / file_hash
-                if not (base_dir / relative_path).exists()
-                else base_dir / relative_path
-            )
 
-            _embed_tasks[task_id]["processed"] = idx
-            _embed_tasks[task_id]["current_file"] = file_name or file_hash
-            await progress_queue.put(
-                {
-                    "status": "processing",
-                    "task_id": task_id,
-                    "total": total,
-                    "processed": idx,
-                    "current_file": file_name or file_hash,
-                }
-            )
+            # Find the file (extension varies: .md, .txt, etc.)
+            file_path = None
+            for candidate in (base_dir / file_name, base_dir / file_hash):
+                if candidate.exists():
+                    file_path = candidate
+                    break
+            if file_path is None:
+                matches = sorted(base_dir.glob(f"{file_hash}.*"))
+                file_path = matches[0] if matches else base_dir / f"{file_hash}.md"
 
+            processed = idx + 1
+            current_file = file_name or file_hash
+            
             db.upsert_embed_progress(
-                {
-                    "task_id": task_id,
-                    "status": "running",
-                    "total": total,
-                    "processed": idx,
-                    "errors": len(_embed_tasks[task_id].get("errors", [])),
-                    "skipped": len(_embed_tasks[task_id].get("skipped", [])),
-                    "current_file": file_name or file_hash,
-                    "collection_name": collection_name,
-                    "started_at": _embed_tasks[task_id].get("started_at"),
-                    "updated_at": _iso_now(),
-                }
+                task_id=task_id,
+                status="running",
+                progress_percent=(processed / total) * 100,
+                current_file=current_file,
+                collection_name=collection_name,
+                updated_at=_iso_now(),
             )
 
             # Read the document
@@ -175,13 +137,11 @@ async def _run_embed_sigmaref(
                 doc_text = file_path.read_text(encoding="utf-8")
             except FileNotFoundError:
                 logger.warning(f"File not found: {file_path}, skipping")
-                _embed_tasks[task_id].setdefault("skipped", []).append(file_name or file_hash)
+                skipped.append(current_file)
                 continue
             except Exception as e:
-                logger.warning(f"Error reading {file_path}: {e}")
-                _embed_tasks[task_id].setdefault("errors", []).append(
-                    {"file": file_name or file_hash, "error": str(e)}
-                )
+                logger.warning(f"error reading {file_path}: {e}")
+                errors.append({"file": current_file, "error": str(e)})
                 continue
 
             # Create metadata from registry entry
@@ -194,83 +154,39 @@ async def _run_embed_sigmaref(
             try:
                 builder.run(documents=[doc])
             except Exception as e:
-                logger.error(f"Error embedding {file_name or file_hash}: {e}")
-                _embed_tasks[task_id].setdefault("errors", []).append(
-                    {"file": file_name or file_hash, "error": str(e)}
-                )
+                logger.error(f"Error embedding {current_file}: {e}")
+                errors.append({"file": current_file, "error": str(e)})
 
             # Small yield to prevent blocking
             await asyncio.sleep(0)
 
-        processed = (
-            len(registry_entries)
-            - len(_embed_tasks[task_id].get("errors", []))
-            - len(_embed_tasks[task_id].get("skipped", []))
-        )
-        _embed_tasks[task_id]["status"] = "completed"
-        _embed_tasks[task_id]["processed"] = processed
-        _embed_tasks[task_id]["total"] = total
+        processed = total - len(errors) - len(skipped)
         db.upsert_embed_progress(
-            {
-                "task_id": task_id,
-                "status": "completed",
-                "total": total,
-                "processed": processed,
-                "errors": len(_embed_tasks[task_id].get("errors", [])),
-                "skipped": len(_embed_tasks[task_id].get("skipped", [])),
-                "current_file": "",
-                "collection_name": collection_name,
-                "started_at": _embed_tasks[task_id].get("started_at"),
-                "updated_at": _iso_now(),
-            }
-        )
-        await progress_queue.put(
-            {
-                "status": "completed",
-                "task_id": task_id,
-                "total": total,
-                "processed": processed,
-                "errors": len(_embed_tasks[task_id].get("errors", [])),
-                "skipped": len(_embed_tasks[task_id].get("skipped", [])),
-                "message": f"Processed {processed}/{total} files",
-            }
+            task_id=task_id,
+            status="completed",
+            progress_percent=100.0,
+            current_file="",
+            collection_name=collection_name,
+            updated_at=_iso_now(),
         )
 
     except Exception as e:
         logger.error(f"Embed SigmaRef task {task_id} failed: {e}")
-        _embed_tasks[task_id]["status"] = "failed"
         try:
             db.upsert_embed_progress(
-                {
-                    "task_id": task_id,
-                    "status": "failed",
-                    "total": _embed_tasks[task_id].get("total", 0),
-                    "processed": _embed_tasks[task_id].get("processed", 0),
-                    "errors": len(_embed_tasks[task_id].get("errors", [])),
-                    "skipped": len(_embed_tasks[task_id].get("skipped", [])),
-                    "current_file": _embed_tasks[task_id].get("current_file", ""),
-                    "collection_name": collection_name,
-                    "started_at": _embed_tasks[task_id].get("started_at"),
-                    "updated_at": _iso_now(),
-                }
+                task_id=task_id,
+                status="failed",
+                progress_percent=0.0,
+                current_file="",
+                collection_name=collection_name,
+                errors=str(e),
+                updated_at=_iso_now(),
             )
         except Exception as db_err:
             logger.error(f"Failed to persist embed_progress for {task_id}: {db_err}")
-        await progress_queue.put(
-            {
-                "status": "failed",
-                "task_id": task_id,
-                "error": str(e),
-            }
-        )
+        await asyncio.sleep(0) # Just in case
     finally:
-        # Clean up after a delay
-        async def _cleanup():
-            await asyncio.sleep(300)
-            _embed_tasks.pop(task_id, None)
-            _embed_progress_queues.pop(task_id, None)
-
-        asyncio.create_task(_cleanup())
+        pass
 
 
 async def _progress_generator(download_id: str) -> AsyncGenerator[str, None]:
@@ -342,17 +258,32 @@ async def qdrant_progress(download_id: str):
 @router.get("/embed/{task_id}")
 async def embed_progress(task_id: str):
     """Get the status of an embed_sigmaref task."""
-    task = _embed_tasks.get(task_id)
-    if not task:
+    db = DatabaseService.get_instance()
+    status_data = db.get_embed_status(task_id)
+    if not status_data:
         return JSONResponse(
             status_code=404,
             content={"status": "not_found", "message": "Task not found"},
         )
     return JSONResponse(
         content={
-            "status": task.get("status", "unknown"),
+            "status": status_data.get("status", "unknown"),
             "task_id": task_id,
-            "details": task,
+            "details": status_data,
+        }
+    )
+    return JSONResponse(
+        content={
+            "status": status_data.get("status", "unknown"),
+            "task_id": task_id,
+            "details": status_data,
+        }
+    )
+    return JSONResponse(
+        content={
+            "status": status_data.get("status", "unknown"),
+            "task_id": task_id,
+            "details": status_data,
         }
     )
 
@@ -387,17 +318,13 @@ async def qdrant_action(request: QdrantActionRequest) -> QdrantActionResponse:
             manager = create_download_manager()
 
             async def post_install_call(target_path: Path):
-                logger.info(f"post_install_call triggered: {target_path}")
+                logger.info(f"post_intall_call triggered: {target_path}")
                 try:
                     from src.shared.config import Config
-
                     Config.ensure_qdrant_config()
                     logger.info("Qdrant config generated via Config.ensure_qdrant_config()")
                 except Exception as e:
-                    import traceback
-
                     logger.error(f"Failed to generate Qdrant config: {e}")
-                    logger.error(traceback.format_exc())
 
             download_id = await manager.start_download(
                 service="qdrant",
@@ -417,7 +344,6 @@ async def qdrant_action(request: QdrantActionRequest) -> QdrantActionResponse:
             command = payload.command
             if command == "start":
                 from src.shared import QDRANT_STORAGE_DIR
-
                 result = await service_manager.start(storage_path=str(QDRANT_STORAGE_DIR))
             elif command == "stop":
                 result = await service_manager.stop()
@@ -513,10 +439,9 @@ async def qdrant_action(request: QdrantActionRequest) -> QdrantActionResponse:
             registry_path = Path(payload.registry_path)
 
             # Check if a task is already running
-            existing_running = [
-                tid for tid, t in _embed_tasks.items() if t.get("status") in ("running", "pending")
-            ]
-            if existing_running:
+            db = DatabaseService.get_instance()
+            active_tasks = db.get_active_embed_tasks()
+            if any(t["status"] in ("running", "pending") for t in active_tasks):
                 return QdrantActionResponse(
                     status="error",
                     action=action,
@@ -544,16 +469,6 @@ async def qdrant_action(request: QdrantActionRequest) -> QdrantActionResponse:
                 )
 
             task_id = str(uuid.uuid4())
-            progress_queue = asyncio.Queue()
-            _embed_tasks[task_id] = {
-                "id": task_id,
-                "status": "pending",
-                "action": action,
-                "collection_name": payload.collection_name,
-                "registry_path": str(payload.registry_path),
-                "started_at": _iso_now(),
-            }
-            _embed_progress_queues[task_id] = progress_queue
 
             # Launch the background task
             asyncio.create_task(
@@ -561,7 +476,6 @@ async def qdrant_action(request: QdrantActionRequest) -> QdrantActionResponse:
                     task_id=task_id,
                     registry_path=registry_path,
                     collection_name=payload.collection_name,
-                    progress_queue=progress_queue,
                 )
             )
 
@@ -583,5 +497,8 @@ async def qdrant_action(request: QdrantActionRequest) -> QdrantActionResponse:
     except Exception as e:
         logger.error(f"Qdrant action error ({action}): {e}")
         return QdrantActionResponse(
-            status="error", action=action, error_code="ACTION_FAILED", message=str(e)
+            status="error",
+            action=action,
+            error_code="ACTION_FAILED",
+            message=str(e),
         )

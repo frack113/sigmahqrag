@@ -211,33 +211,33 @@ class TestDocSigmaRef:
 class TestEmbedProgress:
     def test_upsert_and_get(self, db: DatabaseService) -> None:
         db.upsert_embed_progress(
-            {
-                "task_id": "task-001",
-                "status": "running",
-                "total": 100,
-                "processed": 42,
-                "collection_name": "sigma_doc",
-            }
+            "github",
+            "repo-123",
+            "running",
+            0.42,
+            "file.txt",
+            None,
+            "sigma_doc",
         )
-        entry = db.get_embed_progress("task-001")
+        entry = db.get_embed_status("github", "repo-123")
         assert entry is not None
         assert entry["status"] == "running"
-        assert entry["processed"] == 42
+        assert entry["progress_percent"] == 0.42
 
     def test_get_nonexistent(self, db: DatabaseService) -> None:
-        assert db.get_embed_progress("no-such-task") is None
+        assert db.get_embed_status("github", "no-such-task") is None
 
     def test_running_tasks(self, db: DatabaseService) -> None:
-        db.upsert_embed_progress({"task_id": "t1", "status": "running"})
-        db.upsert_embed_progress({"task_id": "t2", "status": "completed"})
-        running = db.get_running_embed_tasks()
-        assert len(running) == 1
-        assert running[0]["task_id"] == "t1"
+        db.upsert_embed_progress("github", "t1", "running")
+        db.upsert_embed_progress("github", "t2", "completed")
+        active = db.get_active_embed_tasks()
+        assert len(active) == 1
+        assert active[0]["source_id"] == "t1"
 
     def test_reset_stale(self, db: DatabaseService) -> None:
-        db.upsert_embed_progress({"task_id": "stale", "status": "running"})
+        db.upsert_embed_progress("github", "stale", "running")
         db.reset_stale_embed_tasks()
-        entry = db.get_embed_progress("stale")
+        entry = db.get_embed_status("github", "stale")
         assert entry is not None
         assert entry["status"] == "failed"
 

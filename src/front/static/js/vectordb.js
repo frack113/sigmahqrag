@@ -95,7 +95,6 @@ async function startSigmaRefEmbedding() {
     const progressText = document.getElementById('sigmaref-progress-text');
     const messageEl = document.getElementById('sigmaref-message');
     const btnIndexDocs = document.getElementById('btn-index-docs');
-    let eventSource = null;
 
     if (btnIndexDocs) btnIndexDocs.disabled = true;
     if (messageEl) messageEl.style.display = 'none';
@@ -124,23 +123,32 @@ async function startSigmaRefEmbedding() {
             const taskId = result.data.task_id;
             localStorage.setItem('SIGMAREF_TASK_KEY', taskId);
 
-            await new Promise((resolve) => {
-                eventSource = new EventSource(`/api/v1/qdrant/embed/${taskId}/stream`);
+            const streamResp = await fetch(`/api/v1/qdrant/embed/${taskId}/stream`);
+            const reader = streamResp.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
 
-                const timeout = setTimeout(() => {
-                    eventSource.close();
-                    if (btnIndexDocs) btnIndexDocs.disabled = false;
-                    resolve();
-                }, 10000);
+            const timeout = setTimeout(() => {
+                reader.cancel();
+                done();
+            }, 10000);
 
-                function done() {
-                    clearTimeout(timeout);
-                    if (btnIndexDocs) btnIndexDocs.disabled = false;
-                    resolve();
-                }
+            function done() {
+                clearTimeout(timeout);
+                if (btnIndexDocs) btnIndexDocs.disabled = false;
+            }
 
-                eventSource.onmessage = function (e) {
-                    const data = JSON.parse(e.data);
+            while (true) {
+                const { done: streamDone, value } = await reader.read();
+                if (streamDone) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || '';
+
+                for (const line of lines) {
+                    if (!line.startsWith('data: ')) continue;
+                    const data = JSON.parse(line.slice(6));
 
                     if (data.status === 'processing') {
                         const pct = data.total > 0 ? Math.round((data.processed / data.total) * 100) : 0;
@@ -156,8 +164,8 @@ async function startSigmaRefEmbedding() {
                             messageEl.textContent = data.message || 'Completed';
                             messageEl.style.display = 'block';
                         }
-                        eventSource.close();
                         done();
+                        return;
                     } else if (data.status === 'failed') {
                         if (progressFill) {
                             progressFill.style.background = '#f44336';
@@ -166,26 +174,20 @@ async function startSigmaRefEmbedding() {
                             messageEl.textContent = 'Error: ' + (data.error || 'Task failed');
                             messageEl.style.display = 'block';
                         }
-                        eventSource.close();
                         done();
+                        return;
                     } else if (data.status === 'timeout' || data.status === 'not_found') {
-                        eventSource.close();
                         if (progressFill) progressFill.style.background = '#ff9800';
                         if (messageEl) {
                             messageEl.textContent = data.status === 'timeout' ? 'Connection timed out' : 'Task not found';
                             messageEl.style.display = 'block';
                         }
                         done();
+                        return;
                     }
-                };
-
-                eventSource.onerror = function () {
-                    if (messageEl) {
-                        messageEl.textContent = 'Connection lost, retrying...';
-                        messageEl.style.display = 'block';
-                    }
-                };
-            });
+                }
+            }
+            done();
         } else {
             throw new Error(result.message || 'Unknown error');
         }
