@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 import qdrant_client
@@ -63,8 +64,6 @@ async def delete_collection(host: str, port: int, collection_name: str) -> bool:
         raise
 
 
-import re
-
 async def get_collection(host: str, port: int, collection_name: str) -> dict[str, Any]:
     """Get information about a collection with defensive extraction."""
     try:
@@ -87,7 +86,8 @@ async def get_collection(host: str, port: int, collection_name: str) -> dict[str
             shards = int(shard_match.group(1))
         elif 'shard_number' in info_str: # Fallback for different formats
              match = re.search(r'(\d+)', info_str.split('shard_number')[-1].split(',')[0])
-             if match: shards = int(match.group(1))
+             if match:
+                 shards = int(match.group(1))
 
         vector_size = 384
         # Look for size=XXX or similar pattern in the config string

@@ -11,9 +11,9 @@ from fastapi.responses import JSONResponse
 from src.back.documents.indexing import index_sigma_rules
 from src.back.documents.models import (
     IngestRequest,
-    IngestResponse,
     IngestResult,
 )
+from src.back.documents.sigma_ref_downloader import download_references
 from src.back.documents.parser import parse_sigma_rule, scan_directory
 from src.back.documents.validator import validate_sigma_rule
 

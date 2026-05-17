@@ -35,9 +35,9 @@ async function loadVectorDB() {
                 row.innerHTML = `
                     <td>${col.name}</td>
                     <td><span class="badge bg-success">Active</span></td>
-                    <td>~${config.points || 0}</td>
-                    <td>${col.shards || 1}</td>
-                    <td>${config.vector_size || 384}-dim</td>
+                    <td class="num">~${config.points || 0}</td>
+                    <td class="num">${col.shards || 1}</td>
+                    <td class="num">${config.vector_size || 384}-dim</td>
                     <td>
                         <button class="btn btn-danger btn-sm" onclick="recreateCollection('${col.name}')">
                             [Re Create]
