@@ -95,12 +95,14 @@ async function startSigmaRefEmbedding() {
     const progressText = document.getElementById('sigmaref-progress-text');
     const messageEl = document.getElementById('sigmaref-message');
     const btnIndexDocs = document.getElementById('btn-index-docs');
+    let eventSource = null;
 
-    window.isProcessing = true;
     if (btnIndexDocs) btnIndexDocs.disabled = true;
     if (messageEl) messageEl.style.display = 'none';
-    if (progressSection) progressSection.style.display = 'inline-block';
-    if (progressFill) progressFill.style.width = '0%';
+    if (progressFill) {
+        progressFill.style.width = '0%';
+        progressFill.style.background = 'linear-gradient(to right, rgb(0, 0, 1), rgb(0, 0, 255))';
+    }
     if (progressText) progressText.textContent = '0%';
 
     try {
@@ -121,13 +123,69 @@ async function startSigmaRefEmbedding() {
         if (result.status === 'success') {
             const taskId = result.data.task_id;
             localStorage.setItem('SIGMAREF_TASK_KEY', taskId);
-            // In a real app, we'd start SSE here. For now, let's just show success.
-            if (progressFill) progressFill.style.width = '100%';
-            if (progressText) progressText.textContent = '100%';
-            if (messageEl) {
-                messageEl.textContent = 'Task started successfully!';
-                messageEl.style.display = 'block';
-            }
+
+            await new Promise((resolve) => {
+                eventSource = new EventSource(`/api/v1/qdrant/embed/${taskId}/stream`);
+
+                const timeout = setTimeout(() => {
+                    eventSource.close();
+                    if (btnIndexDocs) btnIndexDocs.disabled = false;
+                    resolve();
+                }, 10000);
+
+                function done() {
+                    clearTimeout(timeout);
+                    if (btnIndexDocs) btnIndexDocs.disabled = false;
+                    resolve();
+                }
+
+                eventSource.onmessage = function (e) {
+                    const data = JSON.parse(e.data);
+
+                    if (data.status === 'processing') {
+                        const pct = data.total > 0 ? Math.round((data.processed / data.total) * 100) : 0;
+                        if (progressFill) progressFill.style.width = pct + '%';
+                        if (progressText) progressText.textContent = pct + '%';
+                    } else if (data.status === 'completed') {
+                        if (progressFill) {
+                            progressFill.style.width = '100%';
+                            progressFill.style.background = '#4caf50';
+                        }
+                        if (progressText) progressText.textContent = '100%';
+                        if (messageEl) {
+                            messageEl.textContent = data.message || 'Completed';
+                            messageEl.style.display = 'block';
+                        }
+                        eventSource.close();
+                        done();
+                    } else if (data.status === 'failed') {
+                        if (progressFill) {
+                            progressFill.style.background = '#f44336';
+                        }
+                        if (messageEl) {
+                            messageEl.textContent = 'Error: ' + (data.error || 'Task failed');
+                            messageEl.style.display = 'block';
+                        }
+                        eventSource.close();
+                        done();
+                    } else if (data.status === 'timeout' || data.status === 'not_found') {
+                        eventSource.close();
+                        if (progressFill) progressFill.style.background = '#ff9800';
+                        if (messageEl) {
+                            messageEl.textContent = data.status === 'timeout' ? 'Connection timed out' : 'Task not found';
+                            messageEl.style.display = 'block';
+                        }
+                        done();
+                    }
+                };
+
+                eventSource.onerror = function () {
+                    if (messageEl) {
+                        messageEl.textContent = 'Connection lost, retrying...';
+                        messageEl.style.display = 'block';
+                    }
+                };
+            });
         } else {
             throw new Error(result.message || 'Unknown error');
         }
@@ -140,7 +198,6 @@ async function startSigmaRefEmbedding() {
         if (progressFill) progressFill.style.width = '0%';
         if (progressText) progressText.textContent = '0%';
     } finally {
-        window.isProcessing = false;
         if (btnIndexDocs) btnIndexDocs.disabled = false;
     }
 }

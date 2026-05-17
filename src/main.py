@@ -63,7 +63,7 @@ def _is_db_empty(db: DatabaseService) -> bool:
         "embedding_config",
         "system_prompts",
         "models",
-        "doc_registry",
+        "doc_sigma_ref",
         "git_metadata",
         "git_selected_dirs",
     ):
@@ -102,6 +102,8 @@ async def lifespan(app: FastAPI) -> None:
             "Run 'uv run python scripts/migrate_to_duckdb.py' to migrate data.",
             len(old_files),
         )
+
+    db.reset_stale_embed_tasks()
 
     _validate_services()
     await start_qdrant()

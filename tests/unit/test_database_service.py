@@ -179,12 +179,12 @@ class TestModels:
             db.upsert_model({"repo_id": "bad", "model_type": "invalid"})
 
 
-class TestDocRegistry:
+class TestDocSigmaRef:
     def test_empty(self, db: DatabaseService) -> None:
-        assert db.get_doc_registry() == []
+        assert db.get_doc_sigma_ref() == []
 
     def test_upsert_and_get(self, db: DatabaseService) -> None:
-        db.upsert_doc_entry(
+        db.upsert_doc_sigma_ref(
             {
                 "url_hash": "abc123",
                 "original_url": "https://example.com/doc",
@@ -192,20 +192,54 @@ class TestDocRegistry:
                 "rule_id": "rule-001",
             }
         )
-        entries = db.get_doc_registry()
+        entries = db.get_doc_sigma_ref()
         assert len(entries) == 1
         assert entries[0]["url_hash"] == "abc123"
 
     def test_exists(self, db: DatabaseService) -> None:
-        assert not db.doc_entry_exists("hash1")
-        db.upsert_doc_entry({"url_hash": "hash1", "original_url": "http://x"})
-        assert db.doc_entry_exists("hash1")
+        assert not db.doc_sigma_ref_exists("hash1")
+        db.upsert_doc_sigma_ref({"url_hash": "hash1", "original_url": "http://x"})
+        assert db.doc_sigma_ref_exists("hash1")
 
     def test_upsert_overwrite(self, db: DatabaseService) -> None:
-        db.upsert_doc_entry({"url_hash": "h1", "original_url": "http://a"})
-        db.upsert_doc_entry({"url_hash": "h1", "original_url": "http://b"})
-        entries = db.get_doc_registry()
+        db.upsert_doc_sigma_ref({"url_hash": "h1", "original_url": "http://a"})
+        db.upsert_doc_sigma_ref({"url_hash": "h1", "original_url": "http://b"})
+        entries = db.get_doc_sigma_ref()
         assert entries[0]["original_url"] == "http://b"
+
+
+class TestEmbedProgress:
+    def test_upsert_and_get(self, db: DatabaseService) -> None:
+        db.upsert_embed_progress(
+            {
+                "task_id": "task-001",
+                "status": "running",
+                "total": 100,
+                "processed": 42,
+                "collection_name": "sigma_doc",
+            }
+        )
+        entry = db.get_embed_progress("task-001")
+        assert entry is not None
+        assert entry["status"] == "running"
+        assert entry["processed"] == 42
+
+    def test_get_nonexistent(self, db: DatabaseService) -> None:
+        assert db.get_embed_progress("no-such-task") is None
+
+    def test_running_tasks(self, db: DatabaseService) -> None:
+        db.upsert_embed_progress({"task_id": "t1", "status": "running"})
+        db.upsert_embed_progress({"task_id": "t2", "status": "completed"})
+        running = db.get_running_embed_tasks()
+        assert len(running) == 1
+        assert running[0]["task_id"] == "t1"
+
+    def test_reset_stale(self, db: DatabaseService) -> None:
+        db.upsert_embed_progress({"task_id": "stale", "status": "running"})
+        db.reset_stale_embed_tasks()
+        entry = db.get_embed_progress("stale")
+        assert entry is not None
+        assert entry["status"] == "failed"
 
 
 class TestGitMetadata:
@@ -294,8 +328,8 @@ class TestRoundtrip:
         db.upsert_model({"repo_id": "org/m", "model_type": "llm"})
         assert len(db.get_models()) == 1
 
-        db.upsert_doc_entry({"url_hash": "h1", "original_url": "http://x"})
-        assert db.doc_entry_exists("h1")
+        db.upsert_doc_sigma_ref({"url_hash": "h1", "original_url": "http://x"})
+        assert db.doc_sigma_ref_exists("h1")
 
         db.set_git_metadata("org/repo", {"k": "v"})
         assert db.get_git_metadata("org/repo") == {"k": "v"}

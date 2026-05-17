@@ -5,6 +5,7 @@ import json
 import logging
 import uuid
 from collections.abc import AsyncGenerator
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import APIRouter
@@ -38,6 +39,10 @@ _embed_tasks: dict[str, dict] = {}
 _embed_progress_queues: dict[str, asyncio.Queue] = {}
 
 
+def _iso_now() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
 async def _embed_progress_generator(task_id: str) -> AsyncGenerator[str, None]:
     """Generate SSE progress updates for embed_sigmaref tasks."""
     queue = _embed_progress_queues.get(task_id)
@@ -69,7 +74,7 @@ async def _run_embed_sigmaref(
 
     try:
         db = DatabaseService.get_instance()
-        raw_entries = db.get_doc_registry()
+        raw_entries = db.get_doc_sigma_ref()
         registry_entries = []
         for e in raw_entries:
             registry_entries.append(
@@ -94,8 +99,22 @@ async def _run_embed_sigmaref(
             return
 
         total = len(registry_entries)
+        now = _iso_now()
         _embed_tasks[task_id]["total"] = total
         _embed_tasks[task_id]["processed"] = 0
+        _embed_tasks[task_id]["started_at"] = now
+        db.upsert_embed_progress(
+            {
+                "task_id": task_id,
+                "status": "running",
+                "total": total,
+                "processed": 0,
+                "current_file": "",
+                "collection_name": collection_name,
+                "started_at": now,
+                "updated_at": now,
+            }
+        )
         await progress_queue.put(
             {
                 "status": "processing",
@@ -132,6 +151,21 @@ async def _run_embed_sigmaref(
                     "total": total,
                     "processed": idx,
                     "current_file": file_name or file_hash,
+                }
+            )
+
+            db.upsert_embed_progress(
+                {
+                    "task_id": task_id,
+                    "status": "running",
+                    "total": total,
+                    "processed": idx,
+                    "errors": len(_embed_tasks[task_id].get("errors", [])),
+                    "skipped": len(_embed_tasks[task_id].get("skipped", [])),
+                    "current_file": file_name or file_hash,
+                    "collection_name": collection_name,
+                    "started_at": _embed_tasks[task_id].get("started_at"),
+                    "updated_at": _iso_now(),
                 }
             )
 
@@ -176,6 +210,20 @@ async def _run_embed_sigmaref(
         _embed_tasks[task_id]["status"] = "completed"
         _embed_tasks[task_id]["processed"] = processed
         _embed_tasks[task_id]["total"] = total
+        db.upsert_embed_progress(
+            {
+                "task_id": task_id,
+                "status": "completed",
+                "total": total,
+                "processed": processed,
+                "errors": len(_embed_tasks[task_id].get("errors", [])),
+                "skipped": len(_embed_tasks[task_id].get("skipped", [])),
+                "current_file": "",
+                "collection_name": collection_name,
+                "started_at": _embed_tasks[task_id].get("started_at"),
+                "updated_at": _iso_now(),
+            }
+        )
         await progress_queue.put(
             {
                 "status": "completed",
@@ -191,6 +239,23 @@ async def _run_embed_sigmaref(
     except Exception as e:
         logger.error(f"Embed SigmaRef task {task_id} failed: {e}")
         _embed_tasks[task_id]["status"] = "failed"
+        try:
+            db.upsert_embed_progress(
+                {
+                    "task_id": task_id,
+                    "status": "failed",
+                    "total": _embed_tasks[task_id].get("total", 0),
+                    "processed": _embed_tasks[task_id].get("processed", 0),
+                    "errors": len(_embed_tasks[task_id].get("errors", [])),
+                    "skipped": len(_embed_tasks[task_id].get("skipped", [])),
+                    "current_file": _embed_tasks[task_id].get("current_file", ""),
+                    "collection_name": collection_name,
+                    "started_at": _embed_tasks[task_id].get("started_at"),
+                    "updated_at": _iso_now(),
+                }
+            )
+        except Exception as db_err:
+            logger.error(f"Failed to persist embed_progress for {task_id}: {db_err}")
         await progress_queue.put(
             {
                 "status": "failed",
@@ -486,6 +551,7 @@ async def qdrant_action(request: QdrantActionRequest) -> QdrantActionResponse:
                 "action": action,
                 "collection_name": payload.collection_name,
                 "registry_path": str(payload.registry_path),
+                "started_at": _iso_now(),
             }
             _embed_progress_queues[task_id] = progress_queue
 

@@ -247,6 +247,24 @@ body {
     transition: width 0.3s ease;
 }
 
+.progress-text {
+    font-size: 0.9em;
+    font-weight: 600;
+    color: #1a1a1a;
+    min-width: 45px;
+    text-align: right;
+}
+
+.progress-bar-container {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+.progress-bar-container .progress-blue-gradient {
+    flex: 1;
+}
+
 /* Toast notifications */
 .toast-container {
     position: fixed;

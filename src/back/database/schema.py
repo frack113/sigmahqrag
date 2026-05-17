@@ -27,7 +27,7 @@ DDL: list[str] = [
         files TEXT,
         updated_at TEXT
     )""",
-    """CREATE TABLE IF NOT EXISTS doc_registry (
+    """CREATE TABLE IF NOT EXISTS doc_sigma_ref (
         url_hash TEXT PRIMARY KEY,
         original_url TEXT NOT NULL,
         normalized_url TEXT,
@@ -36,6 +36,18 @@ DDL: list[str] = [
         title TEXT,
         timestamp TEXT,
         content_sha256 TEXT
+    )""",
+    """CREATE TABLE IF NOT EXISTS embed_progress (
+        task_id TEXT PRIMARY KEY,
+        status TEXT NOT NULL DEFAULT 'pending',
+        total INTEGER DEFAULT 0,
+        processed INTEGER DEFAULT 0,
+        errors INTEGER DEFAULT 0,
+        skipped INTEGER DEFAULT 0,
+        current_file TEXT DEFAULT '',
+        collection_name TEXT DEFAULT '',
+        started_at TEXT,
+        updated_at TEXT
     )""",
     """CREATE TABLE IF NOT EXISTS git_metadata (
         repo_key TEXT PRIMARY KEY,
@@ -49,6 +61,7 @@ DDL: list[str] = [
     )""",
     """CREATE INDEX IF NOT EXISTS idx_models_type ON models(model_type)""",
     "CREATE INDEX IF NOT EXISTS idx_prompts_name ON system_prompts(name)",
-    "CREATE INDEX IF NOT EXISTS idx_doc_registry_rule ON doc_registry(rule_id)",
-    "CREATE INDEX IF NOT EXISTS idx_doc_registry_timestamp ON doc_registry(timestamp)",
+    "CREATE INDEX IF NOT EXISTS idx_doc_sigma_ref_rule ON doc_sigma_ref(rule_id)",
+    "CREATE INDEX IF NOT EXISTS idx_doc_sigma_ref_timestamp ON doc_sigma_ref(timestamp)",
+    "CREATE INDEX IF NOT EXISTS idx_embed_progress_status ON embed_progress(status)",
 ]

@@ -23,13 +23,14 @@ from src.back.documents.sigma_ref_downloader import (
 
 
 def _make_db(entries: list[dict] | None = None) -> MagicMock:
-    """Create a mock DatabaseService with in-memory doc_registry."""
+    """Create a mock DatabaseService with in-memory doc_sigma_ref."""
+
     data: dict[str, dict] = {}
     if entries:
         for e in entries:
             data[e["url_hash"]] = dict(e)
 
-    def get_doc_registry() -> list[dict]:
+    def get_doc_sigma_ref() -> list[dict]:
         return [
             {
                 "url_hash": k,
@@ -44,12 +45,12 @@ def _make_db(entries: list[dict] | None = None) -> MagicMock:
             for k, v in data.items()
         ]
 
-    def upsert_doc_entry(entry: dict) -> None:
+    def upsert_doc_sigma_ref(entry: dict) -> None:
         data[entry["url_hash"]] = dict(entry)
 
     db = MagicMock()
-    db.get_doc_registry = get_doc_registry
-    db.upsert_doc_entry = upsert_doc_entry
+    db.get_doc_sigma_ref = get_doc_sigma_ref
+    db.upsert_doc_sigma_ref = upsert_doc_sigma_ref
     return db
 
 
@@ -391,7 +392,7 @@ references:
             result = download_references(str(rules_dir), str(output_dir))
             assert result["downloaded"] == 1
 
-            entries = db.get_doc_registry()
+            entries = db.get_doc_sigma_ref()
             entry = list(entries)[0]
             assert "raw.githubusercontent.com" in entry["normalized_url"]
             assert "/blob/" not in entry["normalized_url"]
@@ -467,7 +468,7 @@ references:
             result = download_references(str(rules_dir), str(output_dir))
             assert result["failed"] == 1
             assert result["downloaded"] == 0
-            assert len(db.get_doc_registry()) == 0
+            assert len(db.get_doc_sigma_ref()) == 0
 
     def test_same_filename_diff_content(self, tmp_path: Path) -> None:
         """Two different URLs with same filename -> stored under different hashes."""
@@ -508,7 +509,7 @@ references:
             assert len(urls_downloaded) == 2
             assert urls_downloaded[0] != urls_downloaded[1]
 
-            assert len(db.get_doc_registry()) == 2
+            assert len(db.get_doc_sigma_ref()) == 2
 
 
 class TestContentSha256:
@@ -550,7 +551,7 @@ references:
         ):
             result = download_references(str(rules_dir), str(output_dir), request_delay=0)
             assert result["downloaded"] == 1
-            entries = db.get_doc_registry()
+            entries = db.get_doc_sigma_ref()
             entry = list(entries)[0]
             assert "content_sha256" in entry
             assert entry["content_sha256"] != ""

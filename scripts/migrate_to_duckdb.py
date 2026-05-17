@@ -24,7 +24,7 @@ OLD_FILES: dict[str, Path] = {
     "models_llm": Path("data/models/registry.json"),
     "models_embeddings": Path("data/models/registry.json"),
     "embeddings_registry": Path("data/models/embeddings/embeddings_registry.json"),
-    "doc_registry": Path("data/documents/sigmaref/registry.json"),
+    "doc_sigma_ref": Path("data/documents/sigmaref/registry.json"),
 }
 
 DATA_DIR = Path("data")
@@ -152,10 +152,10 @@ def _migrate_models(db: DatabaseService, fail_after: int) -> int:
     return count
 
 
-def _migrate_doc_registry(db: DatabaseService, fail_after: int) -> int:
-    path = OLD_FILES["doc_registry"]
+def _migrate_doc_sigma_ref(db: DatabaseService, fail_after: int) -> int:
+    path = OLD_FILES["doc_sigma_ref"]
     if not path.exists():
-        logger.info("Skipping doc_registry: %s not found", path)
+        logger.info("Skipping doc_sigma_ref: %s not found", path)
         return 0
     data = _load_json(path)
     if data is None:
@@ -173,7 +173,7 @@ def _migrate_doc_registry(db: DatabaseService, fail_after: int) -> int:
                 "timestamp": entry.get("timestamp"),
                 "content_sha256": entry.get("content_sha256"),
             }
-            db.upsert_doc_entry(row)
+            db.upsert_doc_sigma_ref(row)
             count += 1
             if fail_after and count >= fail_after:
                 raise RuntimeError(f"Injected failure after {count} items")
@@ -220,7 +220,7 @@ def main() -> None:
         total += _migrate_embedding_config(db, args.fail_after)
         total += _migrate_system_prompts(db, args.fail_after)
         total += _migrate_models(db, args.fail_after)
-        total += _migrate_doc_registry(db, args.fail_after)
+        total += _migrate_doc_sigma_ref(db, args.fail_after)
         logger.info("Migration complete: %d items migrated", total)
     except RuntimeError as e:
         logger.error("Migration aborted: %s", e)

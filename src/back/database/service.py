@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import threading
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, ClassVar
 
@@ -13,13 +14,18 @@ from src.back.database.schema import DDL
 logger = logging.getLogger(__name__)
 
 DEFAULT_DB_PATH = "data/duckdb/sigmahq.duckdb"
+
+
+def _iso_now() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 _VALID_TABLES = frozenset(
     {
         "config",
         "embedding_config",
         "system_prompts",
         "models",
-        "doc_registry",
+        "doc_sigma_ref",
+        "embed_progress",
         "git_metadata",
         "git_selected_dirs",
     }
@@ -200,10 +206,10 @@ class DatabaseService:
             self._conn.execute("DELETE FROM system_prompts WHERE id = ?", [prompt_id])
             self._conn.commit()
 
-    # Doc registry
-    def get_doc_registry(self) -> list[dict]:
+    # Doc sigma ref
+    def get_doc_sigma_ref(self) -> list[dict]:
         results = self._conn.execute(
-            "SELECT url_hash, original_url, normalized_url, content_type, rule_id, title, timestamp, content_sha256 FROM doc_registry ORDER BY url_hash"
+            "SELECT url_hash, original_url, normalized_url, content_type, rule_id, title, timestamp, content_sha256 FROM doc_sigma_ref ORDER BY url_hash"
         ).fetchall()
         return [
             {
@@ -219,10 +225,10 @@ class DatabaseService:
             for row in results
         ]
 
-    def upsert_doc_entry(self, data: dict) -> None:
+    def upsert_doc_sigma_ref(self, data: dict) -> None:
         with self._lock:
             self._conn.execute(
-                """INSERT INTO doc_registry (url_hash, original_url, normalized_url, content_type, rule_id, title, timestamp, content_sha256)
+                """INSERT INTO doc_sigma_ref (url_hash, original_url, normalized_url, content_type, rule_id, title, timestamp, content_sha256)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT (url_hash) DO UPDATE SET
                     original_url = EXCLUDED.original_url,
@@ -245,11 +251,90 @@ class DatabaseService:
             )
             self._conn.commit()
 
-    def doc_entry_exists(self, url_hash: str) -> bool:
+    def doc_sigma_ref_exists(self, url_hash: str) -> bool:
         result = self._conn.execute(
-            "SELECT 1 FROM doc_registry WHERE url_hash = ?", [url_hash]
+            "SELECT 1 FROM doc_sigma_ref WHERE url_hash = ?", [url_hash]
         ).fetchone()
         return result is not None
+
+    # Embed progress
+    def upsert_embed_progress(self, data: dict) -> None:
+        with self._lock:
+            self._conn.execute(
+                """INSERT INTO embed_progress (task_id, status, total, processed, errors, skipped, current_file, collection_name, started_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (task_id) DO UPDATE SET
+                    status = EXCLUDED.status,
+                    total = EXCLUDED.total,
+                    processed = EXCLUDED.processed,
+                    errors = EXCLUDED.errors,
+                    skipped = EXCLUDED.skipped,
+                    current_file = EXCLUDED.current_file,
+                    collection_name = EXCLUDED.collection_name,
+                    started_at = EXCLUDED.started_at,
+                    updated_at = EXCLUDED.updated_at""",
+                [
+                    data.get("task_id"),
+                    data.get("status", "pending"),
+                    data.get("total", 0),
+                    data.get("processed", 0),
+                    data.get("errors", 0),
+                    data.get("skipped", 0),
+                    data.get("current_file", ""),
+                    data.get("collection_name", ""),
+                    data.get("started_at"),
+                    data.get("updated_at"),
+                ],
+            )
+            self._conn.commit()
+
+    def get_embed_progress(self, task_id: str) -> dict | None:
+        result = self._conn.execute(
+            "SELECT task_id, status, total, processed, errors, skipped, current_file, collection_name, started_at, updated_at FROM embed_progress WHERE task_id = ?",
+            [task_id],
+        ).fetchone()
+        if not result:
+            return None
+        return {
+            "task_id": result[0],
+            "status": result[1],
+            "total": result[2],
+            "processed": result[3],
+            "errors": result[4],
+            "skipped": result[5],
+            "current_file": result[6],
+            "collection_name": result[7],
+            "started_at": result[8],
+            "updated_at": result[9],
+        }
+
+    def get_running_embed_tasks(self) -> list[dict]:
+        results = self._conn.execute(
+            "SELECT task_id, status, total, processed, errors, skipped, current_file, collection_name, started_at, updated_at FROM embed_progress WHERE status = 'running'"
+        ).fetchall()
+        return [
+            {
+                "task_id": row[0],
+                "status": row[1],
+                "total": row[2],
+                "processed": row[3],
+                "errors": row[4],
+                "skipped": row[5],
+                "current_file": row[6],
+                "collection_name": row[7],
+                "started_at": row[8],
+                "updated_at": row[9],
+            }
+            for row in results
+        ]
+
+    def reset_stale_embed_tasks(self) -> None:
+        with self._lock:
+            self._conn.execute(
+                "UPDATE embed_progress SET status = 'failed', updated_at = ? WHERE status = 'running'",
+                [_iso_now()],
+            )
+            self._conn.commit()
 
     # Git metadata
     def get_git_metadata(self, repo_key: str) -> dict | None:

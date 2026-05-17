@@ -47,7 +47,13 @@
             <h2>Embed documents</h2>
         </div>
         <div class="card-body">
-            <table class="table table-hover">
+            <table class="table table-hover" id="embed-table">
+                <thead>
+                    <tr>
+                        <th>Source</th>
+                        <th>Progress</th>
+                    </tr>
+                </thead>
                 <tbody>
                     <tr>
                         <td>Github repo</td>
@@ -56,11 +62,11 @@
                     <tr id="sigmaref-progress-row">
                         <td>Sigma Reference</td>
                         <td>
-                            <div id="sigmaref-progress-section" style="display:inline-block;">
-                                <div class="progress-blue-gradient" style="width: 150px; display: inline-block;">
+                            <div id="sigmaref-progress-section" class="progress-bar-container">
+                                <div class="progress-blue-gradient">
                                     <div class="progress-blue-gradient-fill" id="sigmaref-progress-fill"></div>
                                 </div>
-                                <span class="vectordb-progress-text" id="sigmaref-progress-text" style="min-width: unset; margin-left: 5px;">0%</span>
+                                <span class="progress-text" id="sigmaref-progress-text">0%</span>
                             </div>
                             <div id="sigmaref-message" class="vectordb-message" style="display:none;"></div>
                         </td>

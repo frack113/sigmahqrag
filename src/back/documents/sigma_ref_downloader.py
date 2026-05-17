@@ -184,7 +184,7 @@ def _load_registry(path: Path) -> dict[str, Any]:
     Returns an empty dict if DB not available.
     """
     db = DatabaseService.get_instance()
-    entries = db.get_doc_registry()
+    entries = db.get_doc_sigma_ref()
     registry = {}
     for entry in entries:
         url_hash = entry["url_hash"]
@@ -215,7 +215,7 @@ def _save_registry(registry: dict[str, Any], path: Path) -> None:
                 "timestamp": entry.get("timestamp"),
                 "content_sha256": entry.get("content_sha256"),
             }
-            db.upsert_doc_entry(row)
+            db.upsert_doc_sigma_ref(row)
 
 
 def download_references(
