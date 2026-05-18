@@ -15,6 +15,21 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_DB_PATH = "data/duckdb/sigmahq.duckdb"
 
+_VALID_TABLES = frozenset(
+    {
+        "config",
+        "embedding_config",
+        "system_prompts",
+        "models",
+        "doc_sigma_ref",
+        "embed_progress",
+        "worker_state",
+        "doc_registry",
+        "git_metadata",
+        "git_selected_dirs",
+    }
+)
+
 
 def _iso_now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -41,12 +56,12 @@ class DatabaseService:
         return cls._instance
 
     def initialize(self) -> None:
-        """Execute schema.sql DDL statements and apply any schema migrations."""
-        self._conn.execute(open("src/back/database/schema.sql").read())
+        """Execute initdb.sql (schema + seed data) and apply schema migrations."""
+        self._conn.execute(open("src/back/database/initdb.sql").read())
         self._conn.commit()
 
         # Schema migrations for existing databases
-        # Add missing columns to embed_progress table (columns added after initial schema creation)
+        # Add missing columns to embed_progress table
         for col_def in [
             ("task_type", "TEXT DEFAULT 'embeddings'"),
             ("source_type", "TEXT DEFAULT ''"),
@@ -56,18 +71,21 @@ class DatabaseService:
         ]:
             col_name, col_type = col_def
             try:
-                self._conn.execute(f"ALTER TABLE embed_progress ADD COLUMN IF NOT EXISTS {col_name} {col_type}")
+                self._conn.execute(
+                    f"ALTER TABLE embed_progress ADD COLUMN IF NOT EXISTS {col_name} {col_type}"
+                )
             except Exception:
-                # Fallback for older DuckDB versions that don't support IF NOT EXISTS
                 pass
         self._conn.commit()
 
-        # Add UNIQUE constraint to doc_registry if missing (migration from old schema)
+        # Add UNIQUE constraint to doc_registry if missing
         try:
-            self._conn.execute("ALTER TABLE doc_registry ADD CONSTRAINT uc_doc_registry UNIQUE (org, repo, content_hash)")
+            self._conn.execute(
+                "ALTER TABLE doc_registry ADD CONSTRAINT uc_doc_registry UNIQUE (org, repo, content_hash)"
+            )
             self._conn.commit()
         except Exception:
-            pass  # Constraint already exists or DuckDB doesn't support ALTER ADD CONSTRAINT
+            pass
 
         logger.info("Schema initialized successfully")
 
@@ -89,12 +107,19 @@ class DatabaseService:
 
     def get_tables(self) -> list[str]:
         """Return sorted list of valid table names."""
-        return sorted([row[0] for row in self._conn.execute("SELECT table_name FROM information_schema.tables WHERE table_type='BASE TABLE'").fetchall()])
+        return sorted(
+            [
+                row[0]
+                for row in self._conn.execute(
+                    "SELECT table_name FROM information_schema.tables WHERE table_type='BASE TABLE'"
+                ).fetchall()
+            ]
+        )
 
-    def get_table_data(
-        self, table_name: str, limit: int = 50, offset: int = 0
-    ) -> list[dict]:
+    def get_table_data(self, table_name: str, limit: int = 50, offset: int = 0) -> list[dict]:
         """Fetch paginated data from a table."""
+        if table_name not in _VALID_TABLES:
+            raise ValueError(f"Invalid table name: {table_name}")
         limit = max(1, min(limit, 1000))
         offset = max(0, offset)
         with self._lock:
@@ -107,14 +132,12 @@ class DatabaseService:
 
     def get_table_count(self, table_name: str) -> int:
         """Return row count for a table."""
+        if table_name not in _VALID_TABLES:
+            raise ValueError(f"Invalid table name: {table_name}")
         result = self._safe_query(
             f"SELECT COUNT(*) FROM {table_name}",
         )
         return result[0] if result else 0
-
-    def _row_count(self, table_name: str) -> int:
-        """Return row count for a table (alias for get_table_count)."""
-        return self.get_table_count(table_name)
 
     # =========================================================================
     # CONFIG TABLE
@@ -145,9 +168,10 @@ class DatabaseService:
 
     def get_models(self) -> list[dict]:
         """Fetch all models ordered by repo_id."""
-        results = self._conn.execute(
-            "SELECT repo_id, model_type, local_path, file_size, status, dimension, index_path, files, updated_at FROM models ORDER BY repo_id"
-        ).fetchall()
+        with self._lock:
+            results = self._conn.execute(
+                "SELECT repo_id, model_type, local_path, file_size, status, dimension, index_path, files, updated_at FROM models ORDER BY repo_id"
+            ).fetchall()
         rows = []
         for row in results:
             entry: dict[str, Any] = {
@@ -211,9 +235,10 @@ class DatabaseService:
 
     def get_prompts(self) -> list[dict]:
         """Fetch all active prompts."""
-        results = self._conn.execute(
-            "SELECT id, name, description, content, is_active FROM system_prompts ORDER BY name"
-        ).fetchall()
+        with self._lock:
+            results = self._conn.execute(
+                "SELECT id, name, description, content, is_active FROM system_prompts ORDER BY name"
+            ).fetchall()
         return [
             {
                 "id": row[0],
@@ -258,9 +283,10 @@ class DatabaseService:
 
     def get_doc_sigma_ref(self) -> list[dict]:
         """Fetch all document references."""
-        results = self._conn.execute(
-            "SELECT url_hash, original_url, normalized_url, content_type, rule_id, title, timestamp, content_sha256 FROM doc_sigma_ref ORDER BY url_hash"
-        ).fetchall()
+        with self._lock:
+            results = self._conn.execute(
+                "SELECT url_hash, original_url, normalized_url, content_type, rule_id, title, timestamp, content_sha256 FROM doc_sigma_ref ORDER BY url_hash"
+            ).fetchall()
         return [
             {
                 "url_hash": row[0],
@@ -318,7 +344,7 @@ class DatabaseService:
         source_type: str = "",
         status: str = "pending",
         total: int = 0,
-        processed:int = 0,
+        processed: int = 0,
         errors: str = "",
         skipped: int = 0,
         current_file: str = "",
@@ -361,10 +387,11 @@ class DatabaseService:
 
     def get_embed_status(self, task_id: str) -> dict | None:
         """Get progress status for a task."""
-        result = self._conn.execute(
-            "SELECT task_id, task_type, source_type, status, total, processed, errors, skipped, current_file, collection_name, progress_percent, updated_at FROM embed_progress WHERE task_id = ?",
-            (task_id,)
-        ).fetchone()
+        with self._lock:
+            result = self._conn.execute(
+                "SELECT task_id, task_type, source_type, status, total, processed, errors, skipped, current_file, collection_name, progress_percent, updated_at FROM embed_progress WHERE task_id = ?",
+                (task_id,),
+            ).fetchone()
         if not result:
             return None
         return {
@@ -382,10 +409,10 @@ class DatabaseService:
             "updated_at": result[11],
         }
 
-
     def reset_stale_embed_tasks(self) -> None:
         """Mark running tasks older than 1 hour as failed."""
         from datetime import timedelta
+
         cutoff = (datetime.now(timezone.utc) - timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
         with self._lock:
             self._conn.execute(
@@ -406,9 +433,10 @@ class DatabaseService:
 
     def get_active_embed_tasks(self) -> list[dict]:
         """Get all pending and running tasks."""
-        results = self._conn.execute(
-            "SELECT task_id, task_type, source_type, status, total, processed, errors, skipped, current_file, collection_name, progress_percent, updated_at FROM embed_progress WHERE status IN ('pending', 'running')"
-        ).fetchall()
+        with self._lock:
+            results = self._conn.execute(
+                "SELECT task_id, task_type, source_type, status, total, processed, errors, skipped, current_file, collection_name, progress_percent, updated_at FROM embed_progress WHERE status IN ('pending', 'running')"
+            ).fetchall()
         return [
             {
                 "task_id": row[0],
@@ -429,9 +457,10 @@ class DatabaseService:
 
     def get_running_embed_tasks(self) -> list[dict]:
         """Get all running tasks."""
-        results = self._conn.execute(
-            "SELECT task_id, task_type, source_type, status, total, processed, errors, skipped, current_file, collection_name, progress_percent, updated_at FROM embed_progress WHERE status = 'running'"
-        ).fetchall()
+        with self._lock:
+            results = self._conn.execute(
+                "SELECT task_id, task_type, source_type, status, total, processed, errors, skipped, current_file, collection_name, progress_percent, updated_at FROM embed_progress WHERE status = 'running'"
+            ).fetchall()
         return [
             {
                 "task_id": row[0],
@@ -502,9 +531,10 @@ class DatabaseService:
 
     def get_all_worker_states(self) -> list[dict]:
         """Get state for all workers."""
-        results = self._conn.execute(
-            "SELECT worker_type, status, last_heartbeat, current_task_id, started_at, error FROM worker_state ORDER BY worker_type"
-        ).fetchall()
+        with self._lock:
+            results = self._conn.execute(
+                "SELECT worker_type, status, last_heartbeat, current_task_id, started_at, error FROM worker_state ORDER BY worker_type"
+            ).fetchall()
         return [
             {
                 "worker_type": row[0],
@@ -528,12 +558,26 @@ class DatabaseService:
     def reset_stale_workers(self, stale_seconds: int = 3600) -> None:
         """Mark workers with stale heartbeats as idle."""
         from datetime import timedelta
-        cutoff = (datetime.now(timezone.utc) - timedelta(seconds=stale_seconds)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+        cutoff = (datetime.now(timezone.utc) - timedelta(seconds=stale_seconds)).strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        )
         with self._lock:
             self._conn.execute(
                 """UPDATE worker_state SET status = 'idle', current_task_id = '', error = 'Heartbeat timeout', last_heartbeat = ? WHERE last_heartbeat < ? AND status IN ('running', 'busy')""",
                 (_iso_now(), cutoff),
             )
+            self._conn.commit()
+
+    def init_worker_states(self, worker_types: list[str]) -> None:
+        """Ensure all worker types exist in worker_state with idle status."""
+        with self._lock:
+            for wt in worker_types:
+                self._conn.execute(
+                    "INSERT INTO worker_state (worker_type, status, last_heartbeat, current_task_id, started_at, error) "
+                    "VALUES (?, 'idle', ?, '', NULL, '') ON CONFLICT (worker_type) DO NOTHING",
+                    (wt, _iso_now()),
+                )
             self._conn.commit()
 
     # =========================================================================
@@ -588,11 +632,15 @@ class DatabaseService:
     def get_git_metadata_list(self) -> list[str]:
         """Return all repo_keys from git_metadata."""
         with self._lock:
-            return [row[0] for row in self._conn.execute("SELECT repo_key FROM git_metadata").fetchall()]
+            return [
+                row[0] for row in self._conn.execute("SELECT repo_key FROM git_metadata").fetchall()
+            ]
 
     def get_git_metadata(self, repo_key: str) -> dict | None:
         """Get metadata for a repository."""
-        result = self._safe_query("SELECT metadata FROM git_metadata WHERE repo_key = ?", (repo_key,))
+        result = self._safe_query(
+            "SELECT metadata FROM git_metadata WHERE repo_key = ?", (repo_key,)
+        )
         if result:
             try:
                 return json.loads(result[0])
@@ -621,18 +669,23 @@ class DatabaseService:
 
     def get_selected_dirs(self, repo_key: str) -> list[str]:
         """Get selected directories for a repository."""
-        results = self._conn.execute(
-            "SELECT dir_path FROM git_selected_dirs WHERE repo_key = ? ORDER BY dir_path",
-            (repo_key,),
-        ).fetchall()
+        with self._lock:
+            results = self._conn.execute(
+                "SELECT dir_path FROM git_selected_dirs WHERE repo_key = ? ORDER BY dir_path",
+                (repo_key,),
+            ).fetchall()
         return [row[0] for row in results]
 
     def set_selected_dirs(self, repo_key: str, dirs: list[str]) -> None:
         """Set selected directories for a repository."""
+        now = _iso_now()
         with self._lock:
             self._conn.execute("DELETE FROM git_selected_dirs WHERE repo_key = ?", (repo_key,))
             for d in dirs:
-                self._conn.execute("INSERT INTO git_selected_dirs (repo_key, dir_path) VALUES (?, ?)", (repo_key, d))
+                self._conn.execute(
+                    "INSERT INTO git_selected_dirs (repo_key, dir_path, updated) VALUES (?, ?, ?)",
+                    (repo_key, d, now),
+                )
             self._conn.commit()
 
     def delete_selected_dirs(self, repo_key: str) -> None:
@@ -647,9 +700,10 @@ class DatabaseService:
 
     def get_embedding_config(self) -> dict:
         """Get all embedding configurations."""
-        results = self._conn.execute(
-            "SELECT doc_type, model, chunk_size, overlap FROM embedding_config ORDER BY doc_type"
-        ).fetchall()
+        with self._lock:
+            results = self._conn.execute(
+                "SELECT doc_type, model, chunk_size, overlap FROM embedding_config ORDER BY doc_type"
+            ).fetchall()
         config: dict[str, dict[str, Any]] = {}
         for row in results:
             config[row[0]] = {

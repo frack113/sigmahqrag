@@ -178,11 +178,13 @@ async def get_repo(org: str, name: str) -> RepositoryStatus:
 
 def _scan_repo_files(db: DatabaseService, base_path: Path, org: str, repo: str) -> int:
     """Scan a repo directory and register all supported files in doc_registry.
-    
+
     Returns the number of files registered.
     """
-    logger = __import__('logging').getLogger(__name__)
-    logger.info(f"_scan_repo_files: base_path={base_path}, org={org}, repo={repo}, exists={base_path.exists()}")
+    logger = __import__("logging").getLogger(__name__)
+    logger.info(
+        f"_scan_repo_files: base_path={base_path}, org={org}, repo={repo}, exists={base_path.exists()}"
+    )
     if not base_path.exists():
         return 0
 
@@ -203,7 +205,7 @@ def _scan_repo_files(db: DatabaseService, base_path: Path, org: str, repo: str) 
 
             # If selected_dirs is set, filter by them
             if selected_dirs:
-                if not any(rel_path.startswith(sd.lstrip('./')) for sd in selected_dirs):
+                if not any(rel_path.startswith(sd.lstrip("./")) for sd in selected_dirs):
                     continue
 
             # Compute hash and size
@@ -224,15 +226,17 @@ def _scan_repo_files(db: DatabaseService, base_path: Path, org: str, repo: str) 
             else:
                 content_type = ext.lstrip(".")
 
-            db.upsert_doc_registry({
-                "org": org,
-                "repo": repo,
-                "content_type": content_type,
-                "file_name": rel_path,
-                "content_hash": content_hash,
-                "file_size": file_size,
-                "status": "discovered",
-            })
+            db.upsert_doc_registry(
+                {
+                    "org": org,
+                    "repo": repo,
+                    "content_type": content_type,
+                    "file_name": rel_path,
+                    "content_hash": content_hash,
+                    "file_size": file_size,
+                    "status": "discovered",
+                }
+            )
             files_found += 1
 
     return files_found

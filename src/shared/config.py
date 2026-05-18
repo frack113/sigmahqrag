@@ -184,11 +184,11 @@ class Config:
     def save(self) -> bool:
         try:
             db = DatabaseService.get_instance()
-            db.set_config("backend.os", {"value": self.os})
-            db.set_config("backend.gpu_type", {"value": self.gpu_type})
-            db.set_config("llamacpp_version", {"value": self.llamacpp_version})
-            db.set_config("qdrant_version", {"value": self.qdrant_version})
-            db.set_config("qdrant_webui_version", {"value": self.qdrant_webui_version})
+            db.set_config("backend.os", self.os)
+            db.set_config("backend.gpu_type", self.gpu_type)
+            db.set_config("llamacpp_version", self.llamacpp_version)
+            db.set_config("qdrant_version", self.qdrant_version)
+            db.set_config("qdrant_webui_version", self.qdrant_webui_version)
             return True
         except Exception as e:
             logger.error(f"Failed to save config to DB: {e}")
@@ -205,16 +205,18 @@ class Config:
         }
         for key, attr in overrides.items():
             val = db.get_config(key)
-            if val is not None and isinstance(val, dict):
-                v = val.get("value")
-                if v is not None:
+            if val is not None:
+                # Handle legacy {"value": ...} format and plain values
+                if isinstance(val, dict):
+                    val = val.get("value")
+                if val is not None:
                     current = getattr(self, attr, None)
-                    if isinstance(current, int) and isinstance(v, str):
+                    if isinstance(current, int) and isinstance(val, str):
                         try:
-                            v = int(v)
+                            val = int(val)
                         except (ValueError, TypeError):
                             pass
-                    setattr(self, attr, v)
+                    setattr(self, attr, val)
 
     @classmethod
     def reload(cls) -> Config:

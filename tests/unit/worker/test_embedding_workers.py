@@ -55,7 +55,9 @@ class TestSigmaRefEmbeddingWorker:
             "registry_path": str(registry_dir),
         }
 
-        with patch("src.back.worker.workers.sigmaref_embedding_worker.IngestionPipelineBuilder") as mock_builder_cls:
+        with patch(
+            "src.back.worker.workers.sigmaref_embedding_worker.IngestionPipelineBuilder"
+        ) as mock_builder_cls:
             mock_builder = MagicMock()
             mock_builder.run = MagicMock()
             mock_builder_cls.return_value = mock_builder
@@ -91,7 +93,9 @@ class TestSigmaRefEmbeddingWorker:
             "registry_path": str(registry_dir),
         }
 
-        with patch("src.back.worker.workers.sigmaref_embedding_worker.IngestionPipelineBuilder") as mock_builder_cls:
+        with patch(
+            "src.back.worker.workers.sigmaref_embedding_worker.IngestionPipelineBuilder"
+        ) as mock_builder_cls:
             mock_builder = MagicMock()
             mock_builder.run = MagicMock()
             mock_builder_cls.return_value = mock_builder
@@ -111,7 +115,11 @@ class TestSigmaRefEmbeddingWorker:
         (registry_dir / "abc123.md").write_text("# Test")
 
         mock_db.get_doc_sigma_ref.return_value = [
-            {"url_hash": "abc123", "original_url": "https://example.com/doc", "content_type": "markdown"}
+            {
+                "url_hash": "abc123",
+                "original_url": "https://example.com/doc",
+                "content_type": "markdown",
+            }
         ]
 
         task = {
@@ -121,7 +129,9 @@ class TestSigmaRefEmbeddingWorker:
             "registry_path": str(registry_dir),
         }
 
-        with patch("src.back.worker.workers.sigmaref_embedding_worker.IngestionPipelineBuilder") as mock_builder_cls:
+        with patch(
+            "src.back.worker.workers.sigmaref_embedding_worker.IngestionPipelineBuilder"
+        ) as mock_builder_cls:
             mock_builder = MagicMock()
             mock_builder.run = MagicMock()
             mock_builder_cls.return_value = mock_builder
@@ -140,7 +150,11 @@ class TestSigmaRefEmbeddingWorker:
         (registry_dir / "abc123.md").write_text("# Test")
 
         mock_db.get_doc_sigma_ref.return_value = [
-            {"url_hash": "abc123", "original_url": "https://example.com/doc", "content_type": "markdown"}
+            {
+                "url_hash": "abc123",
+                "original_url": "https://example.com/doc",
+                "content_type": "markdown",
+            }
         ]
 
         task = {
@@ -150,7 +164,9 @@ class TestSigmaRefEmbeddingWorker:
             "registry_path": str(registry_dir),
         }
 
-        with patch("src.back.worker.workers.sigmaref_embedding_worker.IngestionPipelineBuilder") as mock_builder_cls:
+        with patch(
+            "src.back.worker.workers.sigmaref_embedding_worker.IngestionPipelineBuilder"
+        ) as mock_builder_cls:
             mock_builder = MagicMock()
             mock_builder.run = MagicMock()
             mock_builder_cls.return_value = mock_builder
@@ -194,7 +210,9 @@ class TestGithubEmbeddingWorker:
             await worker.process(task)
 
     @pytest.mark.asyncio
-    async def test_process_completes_if_no_registry_entries(self, mock_db: MagicMock, tmp_path: Path) -> None:
+    async def test_process_completes_if_no_registry_entries(
+        self, mock_db: MagicMock, tmp_path: Path
+    ) -> None:
         repo_dir = tmp_path / "test-org" / "test-repo"
         repo_dir.mkdir(parents=True)
 
@@ -212,7 +230,9 @@ class TestGithubEmbeddingWorker:
             return tmp_path / "/".join(args)
 
         with patch("src.back.worker.workers.github_embedding_worker.Path", side_effect=mock_path):
-            with patch("src.back.worker.workers.github_embedding_worker.IngestionPipelineBuilder") as mock_builder_cls:
+            with patch(
+                "src.back.worker.workers.github_embedding_worker.IngestionPipelineBuilder"
+            ) as mock_builder_cls:
                 mock_builder = MagicMock()
                 mock_builder.run = MagicMock()
                 mock_builder_cls.return_value = mock_builder
@@ -226,7 +246,9 @@ class TestGithubEmbeddingWorker:
         assert final_call.kwargs["total"] == 0
 
     @pytest.mark.asyncio
-    async def test_process_embeds_discovered_files(self, mock_db: MagicMock, tmp_path: Path) -> None:
+    async def test_process_embeds_discovered_files(
+        self, mock_db: MagicMock, tmp_path: Path
+    ) -> None:
         repo_dir = tmp_path / "test-org" / "test-repo" / "rules"
         repo_dir.mkdir(parents=True)
         (repo_dir / "rule1.md").write_text("# Rule 1")
@@ -253,7 +275,9 @@ class TestGithubEmbeddingWorker:
             return tmp_path / "/".join(args)
 
         with patch("src.back.worker.workers.github_embedding_worker.Path", side_effect=mock_path):
-            with patch("src.back.worker.workers.github_embedding_worker.IngestionPipelineBuilder") as mock_builder_cls:
+            with patch(
+                "src.back.worker.workers.github_embedding_worker.IngestionPipelineBuilder"
+            ) as mock_builder_cls:
                 mock_builder = MagicMock()
                 mock_builder.run = MagicMock()
                 mock_builder_cls.return_value = mock_builder
@@ -268,12 +292,19 @@ class TestGithubEmbeddingWorker:
         assert final_call.kwargs["processed"] == 1
 
     @pytest.mark.asyncio
-    async def test_process_filters_by_org_and_repo(self, mock_db: MagicMock, tmp_path: Path) -> None:
+    async def test_process_filters_by_org_and_repo(
+        self, mock_db: MagicMock, tmp_path: Path
+    ) -> None:
         repo_dir = tmp_path / "test-org" / "test-repo"
         repo_dir.mkdir(parents=True)
 
         mock_db.get_doc_registry.return_value = [
-            {"org": "other-org", "repo": "other-repo", "file_name": "doc.md", "status": "discovered"},
+            {
+                "org": "other-org",
+                "repo": "other-repo",
+                "file_name": "doc.md",
+                "status": "discovered",
+            },
             {"org": "test-org", "repo": "test-repo", "file_name": "doc.md", "status": "discovered"},
         ]
 
@@ -289,7 +320,9 @@ class TestGithubEmbeddingWorker:
             return tmp_path / "/".join(args)
 
         with patch("src.back.worker.workers.github_embedding_worker.Path", side_effect=mock_path):
-            with patch("src.back.worker.workers.github_embedding_worker.IngestionPipelineBuilder") as mock_builder_cls:
+            with patch(
+                "src.back.worker.workers.github_embedding_worker.IngestionPipelineBuilder"
+            ) as mock_builder_cls:
                 mock_builder = MagicMock()
                 mock_builder.run = MagicMock()
                 mock_builder_cls.return_value = mock_builder
@@ -320,7 +353,9 @@ class TestGithubEmbeddingWorker:
             return tmp_path / "/".join(args)
 
         with patch("src.back.worker.workers.github_embedding_worker.Path", side_effect=mock_path):
-            with patch("src.back.worker.workers.github_embedding_worker.IngestionPipelineBuilder") as mock_builder_cls:
+            with patch(
+                "src.back.worker.workers.github_embedding_worker.IngestionPipelineBuilder"
+            ) as mock_builder_cls:
                 mock_builder = MagicMock()
                 mock_builder.run = MagicMock()
                 mock_builder_cls.return_value = mock_builder
@@ -351,7 +386,9 @@ class TestLocalEmbeddingWorker:
         assert final_call.kwargs["total"] == 0
 
     @pytest.mark.asyncio
-    async def test_process_completes_if_no_registry_entries(self, mock_db: MagicMock, tmp_path: Path) -> None:
+    async def test_process_completes_if_no_registry_entries(
+        self, mock_db: MagicMock, tmp_path: Path
+    ) -> None:
         local_dir = tmp_path / "local_docs"
         local_dir.mkdir()
 
@@ -373,7 +410,9 @@ class TestLocalEmbeddingWorker:
         assert final_call.kwargs["total"] == 0
 
     @pytest.mark.asyncio
-    async def test_process_embeds_discovered_files(self, mock_db: MagicMock, tmp_path: Path) -> None:
+    async def test_process_embeds_discovered_files(
+        self, mock_db: MagicMock, tmp_path: Path
+    ) -> None:
         local_dir = tmp_path / "local_docs"
         local_dir.mkdir()
         (local_dir / "doc1.md").write_text("# Local Doc 1")
@@ -395,7 +434,9 @@ class TestLocalEmbeddingWorker:
             "base_path": str(local_dir),
         }
 
-        with patch("src.back.worker.workers.local_embedding_worker.IngestionPipelineBuilder") as mock_builder_cls:
+        with patch(
+            "src.back.worker.workers.local_embedding_worker.IngestionPipelineBuilder"
+        ) as mock_builder_cls:
             mock_builder = MagicMock()
             mock_builder.run = MagicMock()
             mock_builder_cls.return_value = mock_builder
@@ -426,7 +467,9 @@ class TestLocalEmbeddingWorker:
             "base_path": str(local_dir),
         }
 
-        with patch("src.back.worker.workers.local_embedding_worker.IngestionPipelineBuilder") as mock_builder_cls:
+        with patch(
+            "src.back.worker.workers.local_embedding_worker.IngestionPipelineBuilder"
+        ) as mock_builder_cls:
             mock_builder = MagicMock()
             mock_builder.run = MagicMock()
             mock_builder_cls.return_value = mock_builder

@@ -36,12 +36,14 @@ class SigmaRefEmbeddingWorker(BaseWorker):
 
         registry_entries = []
         for e in raw_entries:
-            registry_entries.append({
-                "hash": e.get("url_hash", ""),
-                "file_name": f"{e.get('url_hash', '')}.md",
-                "path": f"{e.get('url_hash', '')}.md",
-                **{k: v for k, v in e.items() if k not in ("url_hash",)},
-            })
+            registry_entries.append(
+                {
+                    "hash": e.get("url_hash", ""),
+                    "file_name": f"{e.get('url_hash', '')}.md",
+                    "path": f"{e.get('url_hash', '')}.md",
+                    **{k: v for k, v in e.items() if k not in ("url_hash",)},
+                }
+            )
 
         total = len(registry_entries)
         errors = []

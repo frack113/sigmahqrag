@@ -69,7 +69,7 @@ def _is_db_empty(db: DatabaseService) -> bool:
         "git_metadata",
         "git_selected_dirs",
     ):
-        if db._row_count(table) > 0:
+        if db.get_table_count(table) > 0:
             return False
     return True
 
@@ -106,6 +106,36 @@ async def lifespan(app: FastAPI) -> None:
         )
 
     db.reset_stale_embed_tasks()
+
+    # Initialize worker states so the frontend always sees all workers
+    db.init_worker_states(list(TaskDispatcher._WORKER_TYPES.keys()))
+
+    # Sync filesystem repos into git_metadata if missing
+    from src.back.github.git import list_repos, get_metadata, save_metadata
+
+    for repo in list_repos():
+        repo_key = f"{repo['org']}/{repo['name']}"
+        if get_metadata(repo["org"], repo["name"]) is None:
+            logger.info("Syncing filesystem repo %s into git_metadata", repo_key)
+            save_metadata(
+                repo["org"],
+                repo["name"],
+                {
+                    "org": repo["org"],
+                    "name": repo["name"],
+                    "url": repo.get("remote_url", ""),
+                    "branch": repo.get("branch", "main"),
+                    "status": "synced",
+                },
+            )
+
+    # Sync filesystem models into DuckDB models table
+    from src.api.dependencies import get_unified_registry
+    from src.shared import LLM_DIR, EMBEDDINGS_DIR
+
+    reg = get_unified_registry()
+    reg.sync_llm_folder(LLM_DIR)
+    reg.sync_embeddings_folder(EMBEDDINGS_DIR)
 
     # Start the background task dispatcher
     dispatcher = TaskDispatcher(poll_interval=5)

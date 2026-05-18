@@ -74,9 +74,9 @@ class TestGetTableData:
             db.get_table_count("bad_table")
 
     def test_service_layer_clamps_limit(self, db: DatabaseService):
-        data = db.get_table_data("config", limit=-5)
+        data = db.get_table_data("git_selected_dirs", limit=-5)
         assert len(data) == 0
 
     def test_service_layer_clamps_offset(self, db: DatabaseService):
-        data = db.get_table_data("config", limit=5, offset=-10)
+        data = db.get_table_data("git_selected_dirs", limit=5, offset=-10)
         assert len(data) == 0

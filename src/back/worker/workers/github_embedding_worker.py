@@ -135,6 +135,7 @@ class GithubEmbeddingWorker(BaseWorker):
         """Get doc_registry entries for a specific GitHub repo."""
         all_entries = self.db.get_doc_registry(limit=10000)
         return [
-            e for e in all_entries
+            e
+            for e in all_entries
             if e.get("org") == org and e.get("repo") == repo and e.get("status") == "discovered"
         ]

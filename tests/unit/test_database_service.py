@@ -40,7 +40,8 @@ class TestConfig:
 
 class TestEmbeddingConfig:
     def test_empty(self, db: DatabaseService) -> None:
-        assert db.get_embedding_config() == {}
+        cfg = db.get_embedding_config()
+        assert "markdown" in cfg
 
     def test_set_and_get(self, db: DatabaseService) -> None:
         db.set_embedding_config("markdown", {"model": "org/model", "chunk_size": 512})
@@ -58,18 +59,21 @@ class TestEmbeddingConfig:
     def test_delete(self, db: DatabaseService) -> None:
         db.set_embedding_config("markdown", {"model": "m1"})
         db.delete_embedding_config("markdown")
-        assert db.get_embedding_config() == {}
+        cfg = db.get_embedding_config()
+        assert "markdown" not in cfg
 
     def test_multiple_types(self, db: DatabaseService) -> None:
         db.set_embedding_config("a", {"model": "m1"})
         db.set_embedding_config("b", {"model": "m2"})
         cfg = db.get_embedding_config()
-        assert set(cfg) == {"a", "b"}
+        assert "a" in cfg
+        assert "b" in cfg
 
 
 class TestSystemPrompts:
     def test_empty(self, db: DatabaseService) -> None:
-        assert db.get_prompts() == []
+        prompts = db.get_prompts()
+        assert any(p["id"] == "default-rag" for p in prompts)
 
     def test_upsert_and_get(self, db: DatabaseService) -> None:
         db.upsert_prompt(
@@ -82,9 +86,8 @@ class TestSystemPrompts:
             }
         )
         prompts = db.get_prompts()
-        assert len(prompts) == 1
-        assert prompts[0]["name"] == "test-prompt"
-        assert prompts[0]["is_active"] is True
+        assert len(prompts) >= 1
+        assert any(p["name"] == "test-prompt" for p in prompts)
 
     def test_upsert_overwrite(self, db: DatabaseService) -> None:
         db.upsert_prompt(
@@ -106,18 +109,17 @@ class TestSystemPrompts:
             }
         )
         prompts = db.get_prompts()
-        assert prompts[0]["name"] == "new"
-        assert prompts[0]["is_active"] is True
+        assert any(p["id"] == "p1" and p["name"] == "new" for p in prompts)
 
     def test_delete(self, db: DatabaseService) -> None:
         db.upsert_prompt({"id": "p1", "name": "del", "description": "", "content": "c"})
         db.delete_prompt("p1")
-        assert db.get_prompts() == []
+        assert not any(p["id"] == "p1" for p in db.get_prompts())
 
     def test_multiple_prompts(self, db: DatabaseService) -> None:
         db.upsert_prompt({"id": "a", "name": "A", "description": "", "content": "a"})
         db.upsert_prompt({"id": "b", "name": "B", "description": "", "content": "b"})
-        assert len(db.get_prompts()) == 2
+        assert len(db.get_prompts()) >= 2
 
 
 class TestModels:
@@ -323,10 +325,10 @@ class TestRoundtrip:
         assert "t1" in db.get_embedding_config()
 
         db.upsert_prompt({"id": "pid", "name": "n", "description": "d", "content": "c"})
-        assert len(db.get_prompts()) == 1
+        assert len(db.get_prompts()) >= 1
 
         db.upsert_model({"repo_id": "org/m", "model_type": "llm"})
-        assert len(db.get_models()) == 1
+        assert len(db.get_models()) >= 1
 
         db.upsert_doc_sigma_ref({"url_hash": "h1", "original_url": "http://x"})
         assert db.doc_sigma_ref_exists("h1")

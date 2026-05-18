@@ -94,7 +94,13 @@ class TestSigmaRefDiscoveryWorker:
 
         with patch(
             "src.back.worker.workers.sigmaref_discovery_worker.download_references",
-            return_value={"total_rules": 0, "total_refs": 0, "downloaded": 0, "skipped": 0, "failed": 0},
+            return_value={
+                "total_rules": 0,
+                "total_refs": 0,
+                "downloaded": 0,
+                "skipped": 0,
+                "failed": 0,
+            },
         ):
             worker = SigmaRefDiscoveryWorker(mock_db)
             await worker.process(task)

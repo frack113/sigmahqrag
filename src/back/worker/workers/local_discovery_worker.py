@@ -73,15 +73,17 @@ class LocalDiscoveryWorker(BaseWorker):
 
                 content_type = file_path.suffix.lower().lstrip(".")
 
-                self.db.upsert_doc_registry({
-                    "org": "local",
-                    "repo": collection_name,
-                    "content_type": content_type,
-                    "file_name": file_rel_path,
-                    "content_hash": content_hash,
-                    "file_size": file_size,
-                    "status": "discovered",
-                })
+                self.db.upsert_doc_registry(
+                    {
+                        "org": "local",
+                        "repo": collection_name,
+                        "content_type": content_type,
+                        "file_name": file_rel_path,
+                        "content_hash": content_hash,
+                        "file_size": file_size,
+                        "status": "discovered",
+                    }
+                )
 
                 self.db.upsert_embed_progress(
                     task_id=task_id,

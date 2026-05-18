@@ -17,18 +17,20 @@ logger = logging.getLogger(__name__)
 class TaskDispatcher:
     """Main engine that dispatches tasks to specialized workers."""
 
+    _WORKER_TYPES: Dict[str, Type[BaseWorker]] = {
+        "sigmaref_discovery": SigmaRefDiscoveryWorker,
+        "github_discovery": GithubDiscoveryWorker,
+        "local_discovery": LocalDiscoveryWorker,
+        "sigmaref_embeddings": SigmaRefEmbeddingWorker,
+        "github_embeddings": GithubEmbeddingWorker,
+        "local_embeddings": LocalEmbeddingWorker,
+    }
+
     def __init__(self, poll_interval: int = 5):
         self.poll_interval = poll_interval
         self.db = DatabaseService.get_instance()
         self._running = False
-        self._workers: Dict[str, Type[BaseWorker]] = {
-            "sigmaref_discovery": SigmaRefDiscoveryWorker,
-            "github_discovery": GithubDiscoveryWorker,
-            "local_discovery": LocalDiscoveryWorker,
-            "sigmaref_embeddings": SigmaRefEmbeddingWorker,
-            "github_embeddings": GithubEmbeddingWorker,
-            "local_embeddings": LocalEmbeddingWorker,
-        }
+        self._workers = dict(self._WORKER_TYPES)
 
     async def run(self):
         """Main loop to monitor and dispatch tasks."""

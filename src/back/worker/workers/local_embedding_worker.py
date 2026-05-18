@@ -139,6 +139,9 @@ class LocalEmbeddingWorker(BaseWorker):
         """Get doc_registry entries for local documents."""
         all_entries = self.db.get_doc_registry(limit=10000)
         return [
-            e for e in all_entries
-            if e.get("org") == "local" and e.get("repo") == collection_name and e.get("status") == "discovered"
+            e
+            for e in all_entries
+            if e.get("org") == "local"
+            and e.get("repo") == collection_name
+            and e.get("status") == "discovered"
         ]

@@ -1,4 +1,10 @@
--- SigmaHQ RAG - DuckDB Schema
+-- SigmaHQ RAG - DuckDB Schema + Seed Data
+-- Single source of truth for database initialization.
+-- All CREATE TABLE are IF NOT EXISTS and INSERT are OR IGNORE for idempotency.
+
+-- =========================================================================
+-- SCHEMA
+-- =========================================================================
 
 -- config
 CREATE TABLE IF NOT EXISTS config (
@@ -64,7 +70,6 @@ CREATE TABLE IF NOT EXISTS embed_progress (
     updated_at TEXT
 );
 
-
 -- doc_registry (for file discovery results)
 CREATE TABLE IF NOT EXISTS doc_registry (
     id INTEGER PRIMARY KEY,
@@ -79,6 +84,7 @@ CREATE TABLE IF NOT EXISTS doc_registry (
     UNIQUE(org, repo, content_hash)
 );
 
+-- git_metadata
 CREATE TABLE IF NOT EXISTS git_metadata (
     repo_key TEXT PRIMARY KEY,
     metadata TEXT NOT NULL
@@ -108,3 +114,27 @@ CREATE INDEX IF NOT EXISTS idx_prompts_name ON system_prompts(name);
 CREATE INDEX IF NOT EXISTS idx_doc_sigma_ref_rule ON doc_sigma_ref(rule_id);
 CREATE INDEX IF NOT EXISTS idx_doc_sigma_ref_timestamp ON doc_sigma_ref(timestamp);
 CREATE INDEX IF NOT EXISTS idx_embed_progress_status ON embed_progress(status);
+
+-- =========================================================================
+-- SEED DATA
+-- =========================================================================
+
+-- Embedding config defaults
+INSERT OR IGNORE INTO embedding_config (doc_type, model, chunk_size, overlap) VALUES
+    ('markdown', 'sentence-transformers/all-MiniLM-L6-v2', 512, 50);
+
+-- Default system prompt for RAG chat
+INSERT OR IGNORE INTO system_prompts (id, name, description, content, is_active) VALUES
+    ('default-rag',
+     'default-rag',
+     'Default RAG assistant for SigmaHQ rules',
+     'You are a security analyst assistant specializing in Sigma detection rules. '
+     'Answer questions based on the provided context from the knowledge base. '
+     'If the context does not contain enough information, say so clearly. '
+     'Always cite the source rule or document when referencing specific detections.',
+     TRUE);
+
+-- Default app config
+INSERT OR IGNORE INTO config (key, value) VALUES
+    ('app_version', '"0.1.0"'),
+    ('theme', '"dark"');

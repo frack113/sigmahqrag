@@ -174,6 +174,7 @@ async def qdrant_action(request: QdrantActionRequest) -> QdrantActionResponse:
                 logger.info(f"post_intall_call triggered: {target_path}")
                 try:
                     from src.shared.config import Config
+
                     Config.ensure_qdrant_config()
                     logger.info("Qdrant config generated via Config.ensure_qdrant_config()")
                 except Exception as e:
@@ -197,6 +198,7 @@ async def qdrant_action(request: QdrantActionRequest) -> QdrantActionResponse:
             command = payload.command
             if command == "start":
                 from src.shared import QDRANT_STORAGE_DIR
+
                 result = await service_manager.start(storage_path=str(QDRANT_STORAGE_DIR))
             elif command == "stop":
                 result = await service_manager.stop()

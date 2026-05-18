@@ -10,7 +10,6 @@ import qdrant_client
 
 from .client import get_qdrant_client
 
-
 logger = logging.getLogger(__name__)
 
 

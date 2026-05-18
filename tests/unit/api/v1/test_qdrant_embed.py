@@ -16,8 +16,6 @@ app.include_router(router)
 client = TestClient(app)
 
 
-
-
 # ── _embed_progress_generator ────────────────────────────────────────────────
 
 
@@ -34,7 +32,7 @@ async def test_generator_not_found():
 
 @pytest.mark.asyncio
 async def test_generator_yields_events_breaks_on_completed():
-    from src.api.v1.qradnt import _embed_progress_generator # Wait, typo in my thought, it's qdrant
+    from src.api.v1.qradnt import _embed_progress_generator  # Wait, typo in my thought, it's qdrant
 
     task_id = "test-gen-001"
     with patch("src.api.v1.qdrant.DatabaseService.get_instance") as mock_db_inst:
@@ -42,7 +40,7 @@ async def test_generator_yields_events_breaks_on_completed():
         # Simulate two calls: processing then completed
         mock_db.get_embed_status.side_effect = [
             {"status": "processing", "processed": 1, "total": 5},
-            {"status": "completed", "processed": 5, "total": 5}
+            {"status": "completed", "processed": 5, "total": 5},
         ]
         mock_db_inst.return_value = mock_db
 
@@ -77,7 +75,9 @@ async def test_generator_timeout_on_empty_queue():
     task_id = "test-gen-timeout"
     with patch("src.api.v1.qdrant.DatabaseService.get_instance") as mock_db_inst:
         mock_db = MagicMock()
-        mock_db.get_embed_satus.return_value = {"status": "running"} # typo in my thought, it's status
+        mock_db.get_embed_satus.return_value = {
+            "status": "running"
+        }  # typo in my thought, it's status
         mock_db_inst.return_value = mock_db
 
         with patch("asyncio.wait_for", side_effect=asyncio.TimeoutError()):
@@ -123,17 +123,20 @@ async def test_embed_progress_stream_sse():
         mock_db_inst.return_value = mock_db
 
         with patch("src.api.v1.qdrant._embed_progress_generator") as mock_gen:
+
             async def _gen():
                 yield f"data: {json.dumps({'status': 'completed'})}\n\n"
+
             mock_gen.return_value = _gen()
             response = client.get(f"/api/v1/qdrant/embed/{task_id}/stream")
             assert response.status_code == 200
             assert response.headers["content-type"] == "text/event-stream; charset=utf-8"
 
-
     with patch("src.api.v1.qdrant._embed_progress_generator") as mock_gen:
+
         async def _gen():
             yield f"data: {json.dumps({'status': 'completed'})}\n\n"
+
         mock_gen.return_value = _gen()
         response = client.get(f"/api/v1/qdrant/embed/{task_id}/stream")
         assert response.status_code == 200
@@ -245,7 +248,6 @@ def test_embed_sigmaref_success():
     assert "task_id" in data["data"]
     # Verify upsert was called to start the task
     mock_db.upsert_embed_progress.assert_called()
-
 
 
 # ── _run_embed_sigmaref background task ─────────────────────────────────────
