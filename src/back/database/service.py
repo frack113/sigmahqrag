@@ -87,6 +87,21 @@ class DatabaseService:
         except Exception:
             pass
 
+        # Add embed_status column to doc_sigma_ref if missing
+        try:
+            # Check if column exists
+            result = self._conn.execute(
+                "SELECT column_name FROM information_schema.columns WHERE table_name = 'doc_sigma_ref' AND column_name = 'embed_status'"
+            ).fetchone()
+            if not result:
+                self._conn.execute(
+                    "ALTER TABLE doc_sigma_ref ADD COLUMN embed_status TEXT DEFAULT 'pending'"
+                )
+                self._conn.commit()
+                logger.info("Added embed_status column to doc_sigma_ref")
+        except Exception as e:
+            logger.warning(f"Failed to add embed_status column: {e}")
+
         logger.info("Schema initialized successfully")
 
     def close(self) -> None:
@@ -285,7 +300,7 @@ class DatabaseService:
         """Fetch all document references."""
         with self._lock:
             results = self._conn.execute(
-                "SELECT url_hash, original_url, normalized_url, content_type, rule_id, title, timestamp, content_sha256 FROM doc_sigma_ref ORDER BY url_hash"
+                "SELECT url_hash, original_url, normalized_url, content_type, rule_id, title, timestamp, content_sha256, embed_status FROM doc_sigma_ref ORDER BY url_hash"
             ).fetchall()
         return [
             {
@@ -297,16 +312,47 @@ class DatabaseService:
                 "title": row[5],
                 "timestamp": row[6],
                 "content_sha256": row[7],
+                "embed_status": row[8],
             }
             for row in results
         ]
+
+    def get_pending_sigma_ref(self) -> list[dict]:
+        """Fetch document references pending embedding (embed_status='discovered')."""
+        with self._lock:
+            results = self._conn.execute(
+                "SELECT url_hash, original_url, normalized_url, content_type, rule_id, title, timestamp, content_sha256, embed_status FROM doc_sigma_ref WHERE embed_status = 'discovered' ORDER BY url_hash"
+            ).fetchall()
+        return [
+            {
+                "url_hash": row[0],
+                "original_url": row[1],
+                "normalized_url": row[2],
+                "content_type": row[3],
+                "rule_id": row[4],
+                "title": row[5],
+                "timestamp": row[6],
+                "content_sha256": row[7],
+                "embed_status": row[8],
+            }
+            for row in results
+        ]
+
+    def update_sigma_ref_embed_status(self, url_hash: str, status: str) -> None:
+        """Update embedding status for a document reference."""
+        with self._lock:
+            self._conn.execute(
+                "UPDATE doc_sigma_ref SET embed_status = ? WHERE url_hash = ?",
+                (status, url_hash),
+            )
+            self._conn.commit()
 
     def upsert_doc_sigma_ref(self, data: dict) -> None:
         """Upsert a document reference."""
         with self._lock:
             self._conn.execute(
-                """INSERT INTO doc_sigma_ref (url_hash, original_url, normalized_url, content_type, rule_id, title, timestamp, content_sha256)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """INSERT INTO doc_sigma_ref (url_hash, original_url, normalized_url, content_type, rule_id, title, timestamp, content_sha256, embed_status)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                  ON CONFLICT (url_hash) DO UPDATE SET
                      original_url = EXCLUDED.original_url,
                      normalized_url = EXCLUDED.normalized_url,
@@ -314,7 +360,8 @@ class DatabaseService:
                      rule_id = EXCLUDED.rule_id,
                      title = EXCLUDED.title,
                      timestamp = EXCLUDED.timestamp,
-                     content_sha256 = EXCLUDED.content_sha256""",
+                     content_sha256 = EXCLUDED.content_sha256,
+                     embed_status = EXCLUDED.embed_status""",
                 (
                     data.get("url_hash"),
                     data.get("original_url"),
@@ -324,6 +371,7 @@ class DatabaseService:
                     data.get("title"),
                     data.get("timestamp"),
                     data.get("content_sha256"),
+                    data.get("embed_status", "discovered"),
                 ),
             )
             self._conn.commit()

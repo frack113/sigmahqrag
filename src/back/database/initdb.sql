@@ -51,7 +51,8 @@ CREATE TABLE IF NOT EXISTS doc_sigma_ref (
     rule_id TEXT,
     title TEXT,
     timestamp TEXT,
-    content_sha256 TEXT
+    content_sha256 TEXT,
+    embed_status TEXT DEFAULT 'pending'
 );
 
 -- embed_progress
@@ -113,6 +114,7 @@ CREATE INDEX IF NOT EXISTS idx_models_type ON models(model_type);
 CREATE INDEX IF NOT EXISTS idx_prompts_name ON system_prompts(name);
 CREATE INDEX IF NOT EXISTS idx_doc_sigma_ref_rule ON doc_sigma_ref(rule_id);
 CREATE INDEX IF NOT EXISTS idx_doc_sigma_ref_timestamp ON doc_sigma_ref(timestamp);
+CREATE INDEX IF NOT EXISTS idx_doc_sigma_ref_embed ON doc_sigma_ref(embed_status);
 CREATE INDEX IF NOT EXISTS idx_embed_progress_status ON embed_progress(status);
 
 -- =========================================================================

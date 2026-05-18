@@ -9,9 +9,9 @@
 <div class="card">
 <div class="github-actions">
         <button id="add-repo-btn" class="btn btn-primary">Add Repository</button>
-        <button id="refresh-btn" class="btn btn-secondary" onclick="loadRepos()">Refresh list</button>
-        <button id="download-ref-btn" class="btn btn-secondary" onclick="downloadRefs()">Download ref</button>
-        <button id="list-files-btn" class="btn btn-info" onclick="listFiles()">List Files</button>
+        <button id="refresh-btn" class="btn btn-primary" onclick="loadRepos()">Refresh list</button>
+        <button id="download-ref-btn" class="btn btn-primary" onclick="downloadRefs()">Download ref</button>
+        <button id="list-files-btn" class="btn btn-primary" onclick="listFiles()">List Files</button>
     </div>
 
     <div id="repos-list" class="repos-grid"></div>
@@ -337,7 +337,11 @@ async function downloadRefs() {
         if (result.success) {
             alert(result.message || 'Download started in background');
         } else {
-            alert(result.error || 'Download failed');
+            if (result.error && result.error.includes('busy')) {
+                alert('A reference download is already in progress. Please wait for it to complete.');
+            } else {
+                alert(result.error || 'Download failed');
+            }
         }
     } catch (error) {
         alert('Failed to download references');

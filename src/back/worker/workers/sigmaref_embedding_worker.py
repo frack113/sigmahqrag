@@ -20,9 +20,9 @@ class SigmaRefEmbeddingWorker(BaseWorker):
 
         logger.info(f"[SigmaRefEmbeddingWorker] Embedding SigmaRef docs into {collection_name}")
 
-        raw_entries = self.db.get_doc_sigma_ref()
+        raw_entries = self.db.get_pending_sigma_ref()
         if not raw_entries:
-            logger.info("[SigmaRefEmbeddingWorker] No entries in doc_sigma_ref, nothing to embed")
+            logger.info("[SigmaRefEmbeddingWorker] No pending entries in doc_sigma_ref, nothing to embed")
             self.db.upsert_embed_progress(
                 task_id=task_id,
                 status="completed",
@@ -95,10 +95,12 @@ class SigmaRefEmbeddingWorker(BaseWorker):
             except FileNotFoundError:
                 logger.warning(f"[SigmaRefEmbeddingWorker] File not found: {file_path}")
                 skipped.append(current_file)
+                self.db.update_sigma_ref_embed_status(file_hash, "error")
                 continue
             except Exception as e:
                 logger.warning(f"[SigmaRefEmbeddingWorker] Error reading {file_path}: {e}")
                 errors.append({"file": current_file, "error": str(e)})
+                self.db.update_sigma_ref_embed_status(file_hash, "error")
                 continue
 
             metadata = dict(entry)
@@ -109,9 +111,11 @@ class SigmaRefEmbeddingWorker(BaseWorker):
             doc = Document(text=doc_text, metadata=metadata)
             try:
                 builder.run(documents=[doc])
+                self.db.update_sigma_ref_embed_status(file_hash, "embedded")
             except Exception as e:
                 logger.error(f"[SigmaRefEmbeddingWorker] Error embedding {current_file}: {e}")
                 errors.append({"file": current_file, "error": str(e)})
+                self.db.update_sigma_ref_embed_status(file_hash, "error")
 
             await asyncio.sleep(0)
 

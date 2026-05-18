@@ -15,7 +15,7 @@ from src.back.worker.workers.sigmaref_embedding_worker import SigmaRefEmbeddingW
 class TestSigmaRefEmbeddingWorker:
     @pytest.mark.asyncio
     async def test_process_completes_if_no_entries(self, mock_db: MagicMock) -> None:
-        mock_db.get_doc_sigma_ref.return_value = []
+        mock_db.get_pending_sigma_ref.return_value = []
 
         task = {
             "task_id": "sr-emb-001",
@@ -38,13 +38,14 @@ class TestSigmaRefEmbeddingWorker:
         registry_dir.mkdir()
         (registry_dir / "abc123.md").write_text("# Test Doc")
 
-        mock_db.get_doc_sigma_ref.return_value = [
+        mock_db.get_pending_sigma_ref.return_value = [
             {
                 "url_hash": "abc123",
                 "original_url": "https://example.com/doc1",
                 "content_type": "markdown",
                 "rule_id": "rule-001",
                 "title": "Test Doc",
+                "embed_status": "discovered",
             }
         ]
 
@@ -76,13 +77,14 @@ class TestSigmaRefEmbeddingWorker:
         registry_dir = tmp_path / "sigmaref"
         registry_dir.mkdir()
 
-        mock_db.get_doc_sigma_ref.return_value = [
+        mock_db.get_pending_sigma_ref.return_value = [
             {
                 "url_hash": "missing123",
                 "original_url": "https://example.com/missing",
                 "content_type": "markdown",
                 "rule_id": "rule-002",
                 "title": "Missing Doc",
+                "embed_status": "discovered",
             }
         ]
 
@@ -114,11 +116,12 @@ class TestSigmaRefEmbeddingWorker:
         registry_dir.mkdir()
         (registry_dir / "abc123.md").write_text("# Test")
 
-        mock_db.get_doc_sigma_ref.return_value = [
+        mock_db.get_pending_sigma_ref.return_value = [
             {
                 "url_hash": "abc123",
                 "original_url": "https://example.com/doc",
                 "content_type": "markdown",
+                "embed_status": "discovered",
             }
         ]
 
@@ -149,11 +152,12 @@ class TestSigmaRefEmbeddingWorker:
         registry_dir.mkdir()
         (registry_dir / "abc123.md").write_text("# Test")
 
-        mock_db.get_doc_sigma_ref.return_value = [
+        mock_db.get_pending_sigma_ref.return_value = [
             {
                 "url_hash": "abc123",
                 "original_url": "https://example.com/doc",
                 "content_type": "markdown",
+                "embed_status": "discovered",
             }
         ]
 

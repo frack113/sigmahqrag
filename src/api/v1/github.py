@@ -366,13 +366,36 @@ async def download_ref_handler(
     request: DownloadRefRequest | None = None,
 ) -> DownloadRefResponse:
     """Download Sigma rule references for all managed repositories."""
+    db = DatabaseService.get_instance()
+    if db.is_worker_busy("sigmaref_discovery"):
+        return DownloadRefResponse(
+            success=False,
+            error="Worker is busy - a reference download is already in progress",
+        )
+
     if request is None:
         request = DownloadRefRequest()
 
     rules_dir = request.rules_dir or "data/github/sigmahq/sigma/rules"
     output_dir = request.output_dir or "data/documents/sigmaref"
 
-    background_tasks.add_task(download_references, rules_dir, output_dir)
+    def run_with_state():
+        db.upsert_worker_state(
+            worker_type="sigmaref_discovery",
+            status="running",
+            current_task_id="download-ref",
+        )
+        try:
+            download_references(rules_dir, output_dir)
+        finally:
+            db.upsert_worker_state(
+                worker_type="sigmaref_discovery",
+                status="idle",
+                current_task_id="",
+                error="",
+            )
+
+    background_tasks.add_task(run_with_state)
 
     return DownloadRefResponse(
         success=True,
