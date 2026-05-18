@@ -75,7 +75,8 @@ CREATE TABLE IF NOT EXISTS doc_registry (
     content_hash TEXT,
     file_size BIGINT,
     last_seen TEXT,
-    status TEXT
+    status TEXT,
+    UNIQUE(org, repo, content_hash)
 );
 
 CREATE TABLE IF NOT EXISTS git_metadata (
@@ -89,6 +90,16 @@ CREATE TABLE IF NOT EXISTS git_selected_dirs (
     dir_path TEXT NOT NULL,
     updated TEXT,
     PRIMARY KEY (repo_key, dir_path)
+);
+
+-- worker_state (worker lifecycle tracking)
+CREATE TABLE IF NOT EXISTS worker_state (
+    worker_type TEXT PRIMARY KEY,
+    status TEXT NOT NULL DEFAULT 'idle',
+    last_heartbeat TEXT,
+    current_task_id TEXT DEFAULT '',
+    started_at TEXT,
+    error TEXT DEFAULT ''
 );
 
 -- Indexes

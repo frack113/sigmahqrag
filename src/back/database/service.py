@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import logging
 import threading
-import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -63,6 +62,13 @@ class DatabaseService:
                 pass
         self._conn.commit()
 
+        # Add UNIQUE constraint to doc_registry if missing (migration from old schema)
+        try:
+            self._conn.execute("ALTER TABLE doc_registry ADD CONSTRAINT uc_doc_registry UNIQUE (org, repo, content_hash)")
+            self._conn.commit()
+        except Exception:
+            pass  # Constraint already exists or DuckDB doesn't support ALTER ADD CONSTRAINT
+
         logger.info("Schema initialized successfully")
 
     def close(self) -> None:
@@ -105,6 +111,10 @@ class DatabaseService:
             f"SELECT COUNT(*) FROM {table_name}",
         )
         return result[0] if result else 0
+
+    def _row_count(self, table_name: str) -> int:
+        """Return row count for a table (alias for get_table_count)."""
+        return self.get_table_count(table_name)
 
     # =========================================================================
     # CONFIG TABLE
@@ -375,12 +385,24 @@ class DatabaseService:
 
     def reset_stale_embed_tasks(self) -> None:
         """Mark running tasks older than 1 hour as failed."""
+        from datetime import timedelta
+        cutoff = (datetime.now(timezone.utc) - timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
         with self._lock:
             self._conn.execute(
-                """UPDATE embed_progress SET status = 'failed', errors = 'Stale task detected', updated_at = ? WHERE status = 'running' AND updated_at < ?""",
-                (_iso_now(), _iso_now()),
+                """UPDATE embed_progress SET status = 'failed', errors = 'Stale task detected (older than 1h)', updated_at = ? WHERE status = 'running' AND updated_at < ?""",
+                (_iso_now(), cutoff),
             )
             self._conn.commit()
+
+    def claim_task(self, task_id: str) -> bool:
+        """Atomically claim a pending task as running. Returns True if claimed."""
+        with self._lock:
+            result = self._conn.execute(
+                """UPDATE embed_progress SET status = 'running', updated_at = ? WHERE task_id = ? AND status = 'pending'""",
+                (_iso_now(), task_id),
+            )
+            self._conn.commit()
+            return result.rowcount > 0
 
     def get_active_embed_tasks(self) -> list[dict]:
         """Get all pending and running tasks."""
@@ -429,6 +451,92 @@ class DatabaseService:
         ]
 
     # =========================================================================
+    # WORKER_STATE TABLE
+    # =========================================================================
+
+    def upsert_worker_state(
+        self,
+        worker_type: str,
+        status: str = "idle",
+        current_task_id: str = "",
+        error: str = "",
+    ) -> None:
+        """Upsert worker state record."""
+        with self._lock:
+            self._conn.execute(
+                """INSERT INTO worker_state (worker_type, status, last_heartbeat, current_task_id, started_at, error)
+                 VALUES (?, ?, ?, ?, ?, ?)
+                 ON CONFLICT (worker_type) DO UPDATE SET
+                     status = EXCLUDED.status,
+                     last_heartbeat = EXCLUDED.last_heartbeat,
+                     current_task_id = EXCLUDED.current_task_id,
+                     started_at = CASE WHEN EXCLUDED.started_at IS NOT NULL AND EXCLUDED.started_at != '' THEN EXCLUDED.started_at ELSE worker_state.started_at END,
+                     error = EXCLUDED.error""",
+                (
+                    worker_type,
+                    status,
+                    _iso_now(),
+                    current_task_id,
+                    _iso_now() if status in ("running", "busy") else None,
+                    error,
+                ),
+            )
+            self._conn.commit()
+
+    def get_worker_state(self, worker_type: str) -> dict | None:
+        """Get state for a specific worker type."""
+        result = self._safe_query(
+            "SELECT worker_type, status, last_heartbeat, current_task_id, started_at, error FROM worker_state WHERE worker_type = ?",
+            (worker_type,),
+        )
+        if not result:
+            return None
+        return {
+            "worker_type": result[0],
+            "status": result[1],
+            "last_heartbeat": result[2],
+            "current_task_id": result[3],
+            "started_at": result[4],
+            "error": result[5],
+        }
+
+    def get_all_worker_states(self) -> list[dict]:
+        """Get state for all workers."""
+        results = self._conn.execute(
+            "SELECT worker_type, status, last_heartbeat, current_task_id, started_at, error FROM worker_state ORDER BY worker_type"
+        ).fetchall()
+        return [
+            {
+                "worker_type": row[0],
+                "status": row[1],
+                "last_heartbeat": row[2],
+                "current_task_id": row[3],
+                "started_at": row[4],
+                "error": row[5],
+            }
+            for row in results
+        ]
+
+    def is_worker_busy(self, worker_type: str) -> bool:
+        """Check if a worker is currently busy (running a task)."""
+        result = self._safe_query(
+            "SELECT 1 FROM worker_state WHERE worker_type = ? AND status IN ('running', 'busy')",
+            (worker_type,),
+        )
+        return result is not None
+
+    def reset_stale_workers(self, stale_seconds: int = 3600) -> None:
+        """Mark workers with stale heartbeats as idle."""
+        from datetime import timedelta
+        cutoff = (datetime.now(timezone.utc) - timedelta(seconds=stale_seconds)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        with self._lock:
+            self._conn.execute(
+                """UPDATE worker_state SET status = 'idle', current_task_id = '', error = 'Heartbeat timeout', last_heartbeat = ? WHERE last_heartbeat < ? AND status IN ('running', 'busy')""",
+                (_iso_now(), cutoff),
+            )
+            self._conn.commit()
+
+    # =========================================================================
     # DOC_REGISTRY TABLE (File Discovery Results)
     # =========================================================================
 
@@ -461,7 +569,7 @@ class DatabaseService:
         """Fetch paginated registry records."""
         with self._lock:
             results = self._conn.execute(
-                f"SELECT org, repo, content_type, file_name, content_hash, file_size, last_seen, status FROM doc_registry LIMIT ? OFFSET ?",
+                "SELECT org, repo, content_type, file_name, content_hash, file_size, last_seen, status FROM doc_registry LIMIT ? OFFSET ?",
                 [limit, offset],
             ).fetchall()
             col_names = [desc[0] for desc in self._conn.description]

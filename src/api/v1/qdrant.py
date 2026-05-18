@@ -20,7 +20,7 @@ from src.back.qdrant import (
 from src.back.qdrant.service import create_qdrant_service
 from src.back.qdrant.storage import delete_point, store_embeddings
 from src.back.qdrant.storage import search as qdrant_search
-from src.back.database.service import DatabaseService, _iso_now
+from src.back.database.service import DatabaseService
 from src.shared.download_manager import create_download_manager
 from src.shared.schemas.qdrant import (
     QdrantActionRequest,
@@ -54,139 +54,6 @@ async def _embed_progress_generator(task_id: str) -> AsyncGenerator[str, None]:
             break
 
         await asyncio.sleep(2)
-
-
-async def _run_embed_sigmaref(
-    task_id: str,
-    registry_path: Path,
-    collection_name: str,
-) -> None:
-    """Background task to embed all files from the SigmaRef registry."""
-    db = DatabaseService.get_instance()
-    errors = []
-    skipped = []
-    processed = 0
-    total = 0
-
-    try:
-        raw_entries = db.get_doc_sigma_ref()
-        registry_entries = []
-        for e in raw_entries:
-            registry_entries.append(
-                {
-                    "hash": e.get("url_hash", ""),
-                    "file_name": f"{e.get('url_hash', '')}.md",
-                    "path": f"{e.get('url_hash', '')}.md",
-                    **{k: v for k, v in e.items() if k not in ("url_hash",)},
-                }
-            )
-        if not registry_entries:
-            await db.upsert_embed_progress(
-                task_id=task_id, status="completed", progress_percent=0.0, collection_name=collection_name
-            )
-            return
-
-        total = len(registry_entries)
-        now = _iso_now()
-        
-        db.upsert_embed_progress(
-            task_id=task_id,
-            status="running",
-            progress_percent=0.0,
-            current_file="",
-            collection_name=collection_name,
-            updated_at=now,
-        )
-
-        from llama_index.core.schema import Document
-
-        from src.back.rag.ingestion import IngestionPipelineBuilder
-
-        builder = IngestionPipelineBuilder(collection_name=collection_name)
-        base_dir = registry_path
-
-        for idx, entry in enumerate(registry_entries):
-            file_hash = entry.get("hash", entry.get("id", ""))
-            file_name = entry.get("file_name", "")
-
-            # Find the file (extension varies: .md, .txt, etc.)
-            file_path = None
-            for candidate in (base_dir / file_name, base_dir / file_hash):
-                if candidate.exists():
-                    file_path = candidate
-                    break
-            if file_path is None:
-                matches = sorted(base_dir.glob(f"{file_hash}.*"))
-                file_path = matches[0] if matches else base_dir / f"{file_hash}.md"
-
-            processed = idx + 1
-            current_file = file_name or file_hash
-            
-            db.upsert_embed_progress(
-                task_id=task_id,
-                status="running",
-                progress_percent=(processed / total) * 100,
-                current_file=current_file,
-                collection_name=collection_name,
-                updated_at=_iso_now(),
-            )
-
-            # Read the document
-            doc_text = ""
-            try:
-                doc_text = file_path.read_text(encoding="utf-8")
-            except FileNotFoundError:
-                logger.warning(f"File not found: {file_path}, skipping")
-                skipped.append(current_file)
-                continue
-            except Exception as e:
-                logger.warning(f"error reading {file_path}: {e}")
-                errors.append({"file": current_file, "error": str(e)})
-                continue
-
-            # Create metadata from registry entry
-            metadata = dict(entry)
-            metadata.pop("hash", None)
-            metadata["source"] = "sigmaref"
-            metadata["collection"] = collection_name
-
-            doc = Document(text=doc_text, metadata=metadata)
-            try:
-                builder.run(documents=[doc])
-            except Exception as e:
-                logger.error(f"Error embedding {current_file}: {e}")
-                errors.append({"file": current_file, "error": str(e)})
-
-            # Small yield to prevent blocking
-            await asyncio.sleep(0)
-
-        processed = total - len(errors) - len(skipped)
-        db.upsert_embed_progress(
-            task_id=task_id,
-            status="completed",
-            progress_percent=100.0,
-            current_file="",
-            collection_name=collection_name,
-            updated_at=_iso_now(),
-        )
-
-    except Exception as e:
-        logger.error(f"Embed SigmaRef task {task_id} failed: {e}")
-        try:
-            db.upsert_embed_progress(
-                task_id=task_id,
-                status="failed",
-                progress_percent=0.0,
-                current_file="",
-                collection_name=collection_name,
-                errors=str(e),
-                updated_at=_iso_now(),
-            )
-        except Exception as db_err:
-            logger.error(f"Failed to persist embed_progress for {task_id}: {db_err}")
-        await asyncio.sleep(0) # Just in case
-    finally:
-        pass
 
 
 async def _progress_generator(download_id: str) -> AsyncGenerator[str, None]:
@@ -265,20 +132,6 @@ async def embed_progress(task_id: str):
             status_code=404,
             content={"status": "not_found", "message": "Task not found"},
         )
-    return JSONResponse(
-        content={
-            "status": status_data.get("status", "unknown"),
-            "task_id": task_id,
-            "details": status_data,
-        }
-    )
-    return JSONResponse(
-        content={
-            "status": status_data.get("status", "unknown"),
-            "task_id": task_id,
-            "details": status_data,
-        }
-    )
     return JSONResponse(
         content={
             "status": status_data.get("status", "unknown"),
@@ -436,12 +289,9 @@ async def qdrant_action(request: QdrantActionRequest) -> QdrantActionResponse:
             return QdrantActionResponse(status="success", action=action, data=results)
 
         elif action == "embed_sigmaref":
-            registry_path = Path(payload.registry_path)
-
-            # Check if a task is already running
             db = DatabaseService.get_instance()
-            active_tasks = db.get_active_embed_tasks()
-            if any(t["status"] in ("running", "pending") for t in active_tasks):
+
+            if db.is_worker_busy("sigmaref_embeddings"):
                 return QdrantActionResponse(
                     status="error",
                     action=action,
@@ -449,7 +299,6 @@ async def qdrant_action(request: QdrantActionRequest) -> QdrantActionResponse:
                     message="Task already in progress",
                 )
 
-            # Check Qdrant health
             try:
                 from src.back.qdrant import check_health as qdrant_health
 
@@ -470,20 +319,19 @@ async def qdrant_action(request: QdrantActionRequest) -> QdrantActionResponse:
 
             task_id = str(uuid.uuid4())
 
-            # Launch the background task
-            asyncio.create_task(
-                _run_embed_sigmaref(
-                    task_id=task_id,
-                    registry_path=registry_path,
-                    collection_name=payload.collection_name,
-                )
+            db.upsert_embed_progress(
+                task_id=task_id,
+                task_type="sigmaref_embeddings",
+                source_type="sigmaref",
+                status="pending",
+                collection_name=payload.collection_name,
             )
 
             return QdrantActionResponse(
                 status="success",
                 action=action,
                 data={"task_id": task_id},
-                message="SigmaRef embedding started",
+                message="SigmaRef embedding queued (will start within 5s)",
             )
 
         else:
