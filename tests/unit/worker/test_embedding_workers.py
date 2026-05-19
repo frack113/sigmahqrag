@@ -220,7 +220,7 @@ class TestGithubEmbeddingWorker:
         repo_dir = tmp_path / "test-org" / "test-repo"
         repo_dir.mkdir(parents=True)
 
-        mock_db.get_doc_registry.return_value = []
+        mock_db.get_pending_doc_registry.return_value = []
 
         task = {
             "task_id": "gh-emb-003",
@@ -257,13 +257,15 @@ class TestGithubEmbeddingWorker:
         repo_dir.mkdir(parents=True)
         (repo_dir / "rule1.md").write_text("# Rule 1")
 
-        mock_db.get_doc_registry.return_value = [
+        mock_db.get_pending_doc_registry.return_value = [
             {
+                "id": 1,
                 "org": "test-org",
                 "repo": "test-repo",
                 "file_name": "rules/rule1.md",
                 "content_type": "rules",
                 "status": "discovered",
+                "embed_status": "discovered",
             }
         ]
 
@@ -294,6 +296,7 @@ class TestGithubEmbeddingWorker:
         final_call = calls[-1]
         assert final_call.kwargs["status"] == "completed"
         assert final_call.kwargs["processed"] == 1
+        mock_db.update_doc_registry_embed_status.assert_called_with(1, "embedded")
 
     @pytest.mark.asyncio
     async def test_process_filters_by_org_and_repo(
@@ -302,14 +305,15 @@ class TestGithubEmbeddingWorker:
         repo_dir = tmp_path / "test-org" / "test-repo"
         repo_dir.mkdir(parents=True)
 
-        mock_db.get_doc_registry.return_value = [
+        mock_db.get_pending_doc_registry.return_value = [
             {
-                "org": "other-org",
-                "repo": "other-repo",
+                "id": 2,
+                "org": "test-org",
+                "repo": "test-repo",
                 "file_name": "doc.md",
                 "status": "discovered",
+                "embed_status": "discovered",
             },
-            {"org": "test-org", "repo": "test-repo", "file_name": "doc.md", "status": "discovered"},
         ]
 
         task = {
@@ -343,7 +347,7 @@ class TestGithubEmbeddingWorker:
         repo_dir = tmp_path / "test-org" / "test-repo"
         repo_dir.mkdir(parents=True)
 
-        mock_db.get_doc_registry.return_value = []
+        mock_db.get_pending_doc_registry.return_value = []
 
         task = {
             "task_id": "gh-emb-006",

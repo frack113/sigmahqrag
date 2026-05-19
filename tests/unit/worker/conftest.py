@@ -31,11 +31,18 @@ def mock_db() -> MagicMock:
     db.upsert_embed_progress = MagicMock()
     db.upsert_worker_state = MagicMock()
     db.upsert_doc_registry = MagicMock()
+    db.upsert_doc_sigma_ref = MagicMock()
     db.claim_task = MagicMock(return_value=True)
     db.is_worker_busy = MagicMock(return_value=False)
     db.get_active_embed_tasks = MagicMock(return_value=[])
     db.reset_stale_embed_tasks = MagicMock()
     db.reset_stale_workers = MagicMock()
+    db.get_pending_sigma_ref = MagicMock(return_value=[])
+    db.update_sigma_ref_embed_status = MagicMock()
+    db.get_pending_doc_registry = MagicMock(return_value=[])
+    db.update_doc_registry_embed_status = MagicMock()
+    db.get_repos_with_selected_dirs = MagicMock(return_value=[])
+    db.get_selected_dirs = MagicMock(return_value=[])
     return db
 
 

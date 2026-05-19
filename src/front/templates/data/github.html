@@ -359,10 +359,14 @@ async function listFiles() {
         const response = await fetch(API_BASE + '/scan-all', { method: 'POST' });
         const result = await response.json();
         if (result.success) {
-            alert('Scan started in background');
+            alert(result.message || 'Scan started in background');
             loadRepos();
         } else {
-            alert(result.error || 'Scan failed');
+            if (result.error && result.error.includes('busy')) {
+                alert('A file scan is already in progress. Please wait for it to complete.');
+            } else {
+                alert(result.error || 'Scan failed');
+            }
         }
     } catch (error) {
         alert('Failed to initiate scan');

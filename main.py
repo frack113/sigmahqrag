@@ -71,4 +71,4 @@ if __name__ == "__main__":
     _ensure_data_folders()
     _ensure_duckdb_tables()
 
-    uvicorn.run("src.main:create_app", host="0.0.0.0", port=7860, factory=True, reload=True)
+    uvicorn.run("src.main:create_app", host="0.0.0.0", port=7860, factory=True)

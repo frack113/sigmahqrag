@@ -113,118 +113,131 @@ class TestSigmaRefDiscoveryWorker:
 
 class TestGithubDiscoveryWorker:
     @pytest.mark.asyncio
-    async def test_process_raises_if_path_missing(self, mock_db: MagicMock, tmp_path: Path) -> None:
+    async def test_process_completes_if_no_repos(self, mock_db: MagicMock) -> None:
+        mock_db.get_repos_with_selected_dirs.return_value = []
+
         task = {
             "task_id": "gh-disc-001",
             "task_type": "github_discovery",
-            "collection_name": "test-org/test-repo",
-        }
-
-        def mock_path(*args):
-            if args == ("data/github",):
-                return tmp_path
-            return tmp_path / "/".join(args)
-
-        with patch("src.back.worker.workers.github_discovery_worker.Path", side_effect=mock_path):
-            worker = GithubDiscoveryWorker(mock_db)
-            with pytest.raises(FileNotFoundError, match="Repository path does not exist"):
-                await worker.process(task)
-
-    @pytest.mark.asyncio
-    async def test_process_raises_invalid_collection_name(self, mock_db: MagicMock) -> None:
-        task = {
-            "task_id": "gh-disc-002",
-            "task_type": "github_discovery",
-            "collection_name": "invalid-no-slash",
+            "collection_name": "all",
         }
 
         worker = GithubDiscoveryWorker(mock_db)
-        with pytest.raises(ValueError, match="Invalid collection name"):
-            await worker.process(task)
+        await worker.process(task)
+
+        calls = mock_db.upsert_embed_progress.call_args_list
+        final_call = calls[-1]
+        assert final_call.kwargs["status"] == "completed"
+        assert final_call.kwargs["total"] == 0
 
     @pytest.mark.asyncio
-    async def test_process_scans_repository(self, mock_db: MagicMock, tmp_path: Path) -> None:
-        repo_dir = tmp_path / "test-org" / "test-repo" / "rules"
-        repo_dir.mkdir(parents=True)
-        (repo_dir / "rule1.md").write_text("# Rule 1")
-        (repo_dir / "rule2.md").write_text("# Rule 2")
+    async def test_process_scans_multiple_repos(self, mock_db: MagicMock, tmp_path: Path) -> None:
+        repo1 = tmp_path / "test-org" / "test-repo" / "rules"
+        repo1.mkdir(parents=True)
+        (repo1 / "rule1.md").write_text("# Rule 1")
+        (repo1 / "rule2.md").write_text("# Rule 2")
+
+        repo2 = tmp_path / "other-org" / "other-repo" / "docs"
+        repo2.mkdir(parents=True)
+        (repo2 / "doc1.md").write_text("# Doc 1")
+
+        mock_db.get_repos_with_selected_dirs.return_value = [
+            "test-org/test-repo",
+            "other-org/other-repo",
+        ]
+        mock_db.get_selected_dirs.return_value = []
 
         task = {
             "task_id": "gh-disc-003",
             "task_type": "github_discovery",
-            "collection_name": "test-org/test-repo",
+            "collection_name": "all",
         }
 
-        mock_db.get_selected_dirs.return_value = []
+        worker = GithubDiscoveryWorker(mock_db)
+        worker.github_base_dir = str(tmp_path)
+        await worker.process(task)
 
-        def mock_path(*args):
-            if args == ("data/github",):
-                return tmp_path
-            return tmp_path / "/".join(args)
-
-        with patch("src.back.worker.workers.github_discovery_worker.Path", side_effect=mock_path):
-            worker = GithubDiscoveryWorker(mock_db)
-            await worker.process(task)
-
-        assert mock_db.upsert_doc_registry.call_count == 2
+        assert mock_db.upsert_doc_registry.call_count == 3
         calls = mock_db.upsert_embed_progress.call_args_list
         final_call = calls[-1]
         assert final_call.kwargs["status"] == "completed"
-        assert final_call.kwargs["processed"] == 2
+        assert final_call.kwargs["processed"] == 3
+        assert final_call.kwargs["collection_name"] == "all"
 
     @pytest.mark.asyncio
     async def test_process_respects_selected_dirs(self, mock_db: MagicMock, tmp_path: Path) -> None:
         repo_dir = tmp_path / "test-org" / "test-repo"
-        (repo_dir / "rules" / "rule1.md").mkdir(parents=True)
-        (repo_dir / "rules" / "rule1.md").write_text("# Rule 1")
-        (repo_dir / "specs" / "spec1.md").mkdir(parents=True)
-        (repo_dir / "specs" / "spec1.md").write_text("# Spec 1")
+        rules_dir = repo_dir / "rules"
+        rules_dir.mkdir(parents=True)
+        (rules_dir / "rule1.md").write_text("# Rule 1")
+        specs_dir = repo_dir / "specs"
+        specs_dir.mkdir(parents=True)
+        (specs_dir / "spec1.md").write_text("# Spec 1")
+
+        mock_db.get_repos_with_selected_dirs.return_value = ["test-org/test-repo"]
+        mock_db.get_selected_dirs.return_value = ["rules"]
 
         task = {
             "task_id": "gh-disc-004",
             "task_type": "github_discovery",
-            "collection_name": "test-org/test-repo",
+            "collection_name": "all",
         }
 
-        mock_db.get_selected_dirs.return_value = ["rules"]
-
-        def mock_path(*args):
-            if args == ("data/github",):
-                return tmp_path
-            return tmp_path / "/".join(args)
-
-        with patch("src.back.worker.workers.github_discovery_worker.Path", side_effect=mock_path):
-            worker = GithubDiscoveryWorker(mock_db)
-            await worker.process(task)
+        worker = GithubDiscoveryWorker(mock_db)
+        worker.github_base_dir = str(tmp_path)
+        await worker.process(task)
 
         assert mock_db.upsert_doc_registry.call_count == 1
 
     @pytest.mark.asyncio
-    async def test_process_reports_progress(self, mock_db: MagicMock, tmp_path: Path) -> None:
-        repo_dir = tmp_path / "test-org" / "test-repo" / "rules"
+    async def test_process_skips_missing_repos(self, mock_db: MagicMock, tmp_path: Path) -> None:
+        repo_dir = tmp_path / "test-org" / "test-repo"
         repo_dir.mkdir(parents=True)
-        (repo_dir / "rule1.md").write_text("# Rule 1")
+        (repo_dir / "file.md").write_text("# File")
+
+        mock_db.get_repos_with_selected_dirs.return_value = [
+            "test-org/test-repo",
+            "missing-org/missing-repo",
+        ]
+        mock_db.get_selected_dirs.return_value = []
 
         task = {
             "task_id": "gh-disc-005",
             "task_type": "github_discovery",
-            "collection_name": "test-org/test-repo",
+            "collection_name": "all",
         }
 
+        worker = GithubDiscoveryWorker(mock_db)
+        worker.github_base_dir = str(tmp_path)
+        await worker.process(task)
+
+        assert mock_db.upsert_doc_registry.call_count == 1
+        calls = mock_db.upsert_embed_progress.call_args_list
+        final_call = calls[-1]
+        assert final_call.kwargs["status"] == "completed"
+
+    @pytest.mark.asyncio
+    async def test_process_sets_embed_status(self, mock_db: MagicMock, tmp_path: Path) -> None:
+        repo_dir = tmp_path / "test-org" / "test-repo"
+        repo_dir.mkdir(parents=True)
+        (repo_dir / "file.md").write_text("# File")
+
+        mock_db.get_repos_with_selected_dirs.return_value = ["test-org/test-repo"]
         mock_db.get_selected_dirs.return_value = []
 
-        def mock_path(*args):
-            if args == ("data/github",):
-                return tmp_path
-            return tmp_path / "/".join(args)
+        task = {
+            "task_id": "gh-disc-006",
+            "task_type": "github_discovery",
+            "collection_name": "all",
+        }
 
-        with patch("src.back.worker.workers.github_discovery_worker.Path", side_effect=mock_path):
-            worker = GithubDiscoveryWorker(mock_db)
-            await worker.process(task)
+        worker = GithubDiscoveryWorker(mock_db)
+        worker.github_base_dir = str(tmp_path)
+        await worker.process(task)
 
-        calls = mock_db.upsert_embed_progress.call_args_list
-        assert any(c.kwargs["status"] == "running" for c in calls)
-        assert any(c.kwargs["status"] == "completed" for c in calls)
+        assert mock_db.upsert_doc_registry.call_count >= 1
+        call_args = mock_db.upsert_doc_registry.call_args_list[0][0][0]
+        assert call_args["embed_status"] == "discovered"
 
 
 class TestLocalDiscoveryWorker:
