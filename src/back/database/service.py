@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import threading
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -96,6 +96,31 @@ class DatabaseService:
                 logger.info("Added embed_status column to doc_registry")
         except Exception as e:
             logger.warning(f"Failed to add embed_status column to doc_registry: {e}")
+
+        # Add progress_percent and current_file columns to worker_state if missing
+        try:
+            result = self._conn.execute(
+                "SELECT column_name FROM information_schema.columns WHERE table_name = 'worker_state' AND column_name = 'progress_percent'"
+            ).fetchone()
+            if not result:
+                self._conn.execute(
+                    "ALTER TABLE worker_state ADD COLUMN progress_percent REAL DEFAULT 0"
+                )
+                self._conn.commit()
+                logger.info("Added progress_percent column to worker_state")
+        except Exception as e:
+            logger.warning(f"Failed to add progress_percent column: {e}")
+
+        try:
+            result = self._conn.execute(
+                "SELECT column_name FROM information_schema.columns WHERE table_name = 'worker_state' AND column_name = 'current_file'"
+            ).fetchone()
+            if not result:
+                self._conn.execute("ALTER TABLE worker_state ADD COLUMN current_file TEXT")
+                self._conn.commit()
+                logger.info("Added current_file column to worker_state")
+        except Exception as e:
+            logger.warning(f"Failed to add current_file column: {e}")
 
         logger.info("Schema initialized successfully")
 
@@ -386,18 +411,22 @@ class DatabaseService:
         status: str = "idle",
         current_task_id: str = "",
         error: str = "",
+        progress_percent: float = 0.0,
+        current_file: str | None = None,
     ) -> None:
         """Upsert worker state record."""
         with self._lock:
             self._conn.execute(
-                """INSERT INTO worker_state (worker_type, status, last_heartbeat, current_task_id, started_at, error)
-                 VALUES (?, ?, ?, ?, ?, ?)
+                """INSERT INTO worker_state (worker_type, status, last_heartbeat, current_task_id, started_at, error, progress_percent, current_file)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                  ON CONFLICT (worker_type) DO UPDATE SET
                      status = EXCLUDED.status,
                      last_heartbeat = EXCLUDED.last_heartbeat,
                      current_task_id = EXCLUDED.current_task_id,
                      started_at = CASE WHEN EXCLUDED.started_at IS NOT NULL AND EXCLUDED.started_at != '' THEN EXCLUDED.started_at ELSE worker_state.started_at END,
-                     error = EXCLUDED.error""",
+                     error = EXCLUDED.error,
+                     progress_percent = EXCLUDED.progress_percent,
+                     current_file = EXCLUDED.current_file""",
                 (
                     worker_type,
                     status,
@@ -405,6 +434,8 @@ class DatabaseService:
                     current_task_id,
                     _iso_now() if status in ("running", "busy") else None,
                     error,
+                    progress_percent,
+                    current_file,
                 ),
             )
             self._conn.commit()
@@ -412,7 +443,7 @@ class DatabaseService:
     def get_worker_state(self, worker_type: str) -> dict | None:
         """Get state for a specific worker type."""
         result = self._safe_query(
-            "SELECT worker_type, status, last_heartbeat, current_task_id, started_at, error FROM worker_state WHERE worker_type = ?",
+            "SELECT worker_type, status, last_heartbeat, current_task_id, started_at, error, progress_percent, current_file FROM worker_state WHERE worker_type = ?",
             (worker_type,),
         )
         if not result:
@@ -424,13 +455,15 @@ class DatabaseService:
             "current_task_id": result[3],
             "started_at": result[4],
             "error": result[5],
+            "progress_percent": result[6],
+            "current_file": result[7],
         }
 
     def get_all_worker_states(self) -> list[dict]:
         """Get state for all workers."""
         with self._lock:
             results = self._conn.execute(
-                "SELECT worker_type, status, last_heartbeat, current_task_id, started_at, error FROM worker_state ORDER BY worker_type"
+                "SELECT worker_type, status, last_heartbeat, current_task_id, started_at, error, progress_percent, current_file FROM worker_state ORDER BY worker_type"
             ).fetchall()
         return [
             {
@@ -440,6 +473,8 @@ class DatabaseService:
                 "current_task_id": row[3],
                 "started_at": row[4],
                 "error": row[5],
+                "progress_percent": row[6],
+                "current_file": row[7],
             }
             for row in results
         ]
@@ -680,3 +715,37 @@ class DatabaseService:
         with self._lock:
             self._conn.execute("DELETE FROM embedding_config WHERE doc_type = ?", (doc_type,))
             self._conn.commit()
+
+    # =========================================================================
+    # WORKER PROGRESS (uses worker_state table)
+    # =========================================================================
+
+    def update_worker_progress(
+        self,
+        worker_type: str,
+        progress_percent: float,
+        current_file: str | None = None,
+    ) -> None:
+        """Update progress for a running worker."""
+        with self._lock:
+            self._conn.execute(
+                """UPDATE worker_state SET progress_percent = ?, current_file = ?, last_heartbeat = ? WHERE worker_type = ? AND status IN ('running', 'busy')""",
+                (progress_percent, current_file, _iso_now(), worker_type),
+            )
+            self._conn.commit()
+
+    def get_worker_progress(self, worker_type: str) -> dict | None:
+        """Get progress for a specific worker."""
+        result = self._safe_query(
+            "SELECT status, progress_percent, current_file, current_task_id, error FROM worker_state WHERE worker_type = ?",
+            (worker_type,),
+        )
+        if not result:
+            return None
+        return {
+            "status": result[0],
+            "progress_percent": result[1],
+            "current_file": result[2],
+            "task_id": result[3],
+            "error": result[4],
+        }

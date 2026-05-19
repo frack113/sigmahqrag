@@ -95,7 +95,9 @@ CREATE TABLE IF NOT EXISTS worker_state (
     last_heartbeat TEXT,
     current_task_id TEXT DEFAULT '',
     started_at TEXT,
-    error TEXT DEFAULT ''
+    error TEXT DEFAULT '',
+    progress_percent REAL DEFAULT 0,
+    current_file TEXT
 );
 
 -- Indexes

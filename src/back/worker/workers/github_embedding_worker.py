@@ -15,6 +15,7 @@ class GithubEmbeddingWorker(BaseWorker):
 
     async def process(self, task: dict) -> None:
         collection_name = task.get("collection_name", "")
+        task_id = task.get("task_id", "")
         org = task.get("org", "")
         repo = task.get("repo", "")
 
@@ -40,6 +41,13 @@ class GithubEmbeddingWorker(BaseWorker):
         total = len(registry_entries)
         errors = []
         skipped = []
+
+        self.db.upsert_worker_state(
+            worker_type="github_embeddings",
+            status="running",
+            current_task_id=task_id,
+            progress_percent=0.0,
+        )
 
         builder = IngestionPipelineBuilder(collection_name=collection_name)
 
@@ -79,9 +87,21 @@ class GithubEmbeddingWorker(BaseWorker):
                 errors.append({"file": file_name, "error": str(e)})
                 self.db.update_doc_registry_embed_status(entry.get("url_hash"), "error")
 
+            processed = idx + 1 - len(errors) - len(skipped)
+            progress = (processed / total) * 100 if total > 0 else 0
+            self.db.update_worker_progress(
+                worker_type="github_embeddings",
+                progress_percent=round(progress, 2),
+                current_file=file_name,
+            )
+
             await asyncio.sleep(0)
 
         processed = total - len(errors) - len(skipped)
+        self.db.update_worker_progress(
+            worker_type="github_embeddings",
+            progress_percent=100.0,
+        )
 
         logger.info(
             f"[GithubEmbeddingWorker] Complete: {processed}/{total} embedded, "

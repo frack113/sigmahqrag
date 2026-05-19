@@ -56,7 +56,9 @@ class GithubDiscoveryWorker(BaseWorker):
             try:
                 selected_dirs = self.db.get_selected_dirs(repo_key)
             except Exception as e:
-                logger.error(f"[GithubDiscoveryWorker] Error fetching selected dirs for {repo_key}: {e}")
+                logger.error(
+                    f"[GithubDiscoveryWorker] Error fetching selected dirs for {repo_key}: {e}"
+                )
 
             for ext in SUPPORTED_DOC_EXTENSION_MAP.keys():
                 pattern = f"**/*{ext}"
@@ -71,7 +73,9 @@ class GithubDiscoveryWorker(BaseWorker):
         processed_count = 0
         skipped_count = 0
 
-        logger.info(f"[GithubDiscoveryWorker] Found {total_files} files across {len(repo_keys)} repos")
+        logger.info(
+            f"[GithubDiscoveryWorker] Found {total_files} files across {len(repo_keys)} repos"
+        )
 
         for file_path, base_path, org, repo in all_files:
             try:

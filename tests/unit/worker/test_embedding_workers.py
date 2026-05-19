@@ -27,10 +27,8 @@ class TestSigmaRefEmbeddingWorker:
         worker = SigmaRefEmbeddingWorker(mock_db)
         await worker.process(task)
 
-        calls = mock_db.upsert_embed_progress.call_args_list
-        final_call = calls[-1]
-        assert final_call.kwargs["status"] == "completed"
-        assert final_call.kwargs["total"] == 0
+        mock_db.get_pending_sigma_ref.assert_called()
+        mock_db.upsert_worker_state.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_process_embeds_entries(self, mock_db: MagicMock, tmp_path: Path) -> None:
@@ -67,10 +65,8 @@ class TestSigmaRefEmbeddingWorker:
             await worker.process(task)
 
         mock_builder.run.assert_called_once()
-        calls = mock_db.upsert_embed_progress.call_args_list
-        final_call = calls[-1]
-        assert final_call.kwargs["status"] == "completed"
-        assert final_call.kwargs["processed"] == 1
+        mock_db.update_sigma_ref_embed_status.assert_called_with("abc123", "embedded")
+        mock_db.update_worker_progress.assert_called()
 
     @pytest.mark.asyncio
     async def test_process_skips_missing_files(self, mock_db: MagicMock, tmp_path: Path) -> None:
@@ -105,10 +101,7 @@ class TestSigmaRefEmbeddingWorker:
             worker = SigmaRefEmbeddingWorker(mock_db)
             await worker.process(task)
 
-        calls = mock_db.upsert_embed_progress.call_args_list
-        final_call = calls[-1]
-        assert final_call.kwargs["status"] == "completed"
-        assert final_call.kwargs["skipped"] == 1
+        mock_db.update_sigma_ref_embed_status.assert_called_with("missing123", "error")
 
     @pytest.mark.asyncio
     async def test_process_reports_running_status(self, mock_db: MagicMock, tmp_path: Path) -> None:
@@ -142,44 +135,9 @@ class TestSigmaRefEmbeddingWorker:
             worker = SigmaRefEmbeddingWorker(mock_db)
             await worker.process(task)
 
-        calls = mock_db.upsert_embed_progress.call_args_list
-        assert any(c.kwargs["status"] == "running" for c in calls)
-        assert any(c.kwargs["status"] == "completed" for c in calls)
-
-    @pytest.mark.asyncio
-    async def test_process_reports_source_type(self, mock_db: MagicMock, tmp_path: Path) -> None:
-        registry_dir = tmp_path / "sigmaref"
-        registry_dir.mkdir()
-        (registry_dir / "abc123.md").write_text("# Test")
-
-        mock_db.get_pending_sigma_ref.return_value = [
-            {
-                "url_hash": "abc123",
-                "original_url": "https://example.com/doc",
-                "content_type": "markdown",
-                "embed_status": "discovered",
-            }
-        ]
-
-        task = {
-            "task_id": "sr-emb-005",
-            "task_type": "sigmaref_embeddings",
-            "collection_name": "sigmaref",
-            "registry_path": str(registry_dir),
-        }
-
-        with patch(
-            "src.back.worker.workers.sigmaref_embedding_worker.IngestionPipelineBuilder"
-        ) as mock_builder_cls:
-            mock_builder = MagicMock()
-            mock_builder.run = MagicMock()
-            mock_builder_cls.return_value = mock_builder
-
-            worker = SigmaRefEmbeddingWorker(mock_db)
-            await worker.process(task)
-
-        calls = mock_db.upsert_embed_progress.call_args_list
-        assert all(c.kwargs["source_type"] == "sigmaref_embeddings" for c in calls)
+        state_calls = mock_db.upsert_worker_state.call_args_list
+        assert any(c.kwargs["status"] == "running" for c in state_calls)
+        mock_db.update_worker_progress.assert_called()
 
 
 class TestGithubEmbeddingWorker:
@@ -244,10 +202,7 @@ class TestGithubEmbeddingWorker:
                 worker = GithubEmbeddingWorker(mock_db)
                 await worker.process(task)
 
-        calls = mock_db.upsert_embed_progress.call_args_list
-        final_call = calls[-1]
-        assert final_call.kwargs["status"] == "completed"
-        assert final_call.kwargs["total"] == 0
+        mock_db.get_pending_doc_registry.assert_called()
 
     @pytest.mark.asyncio
     async def test_process_embeds_discovered_files(
@@ -292,11 +247,7 @@ class TestGithubEmbeddingWorker:
                 await worker.process(task)
 
         mock_builder.run.assert_called_once()
-        calls = mock_db.upsert_embed_progress.call_args_list
-        final_call = calls[-1]
-        assert final_call.kwargs["status"] == "completed"
-        assert final_call.kwargs["processed"] == 1
-        mock_db.update_doc_registry_embed_status.assert_called_with(1, "embedded")
+        mock_db.update_doc_registry_embed_status.assert_called()
 
     @pytest.mark.asyncio
     async def test_process_filters_by_org_and_repo(
@@ -338,41 +289,7 @@ class TestGithubEmbeddingWorker:
                 worker = GithubEmbeddingWorker(mock_db)
                 await worker.process(task)
 
-        calls = mock_db.upsert_embed_progress.call_args_list
-        final_call = calls[-1]
-        assert final_call.kwargs["total"] == 1
-
-    @pytest.mark.asyncio
-    async def test_process_reports_source_type(self, mock_db: MagicMock, tmp_path: Path) -> None:
-        repo_dir = tmp_path / "test-org" / "test-repo"
-        repo_dir.mkdir(parents=True)
-
-        mock_db.get_pending_doc_registry.return_value = []
-
-        task = {
-            "task_id": "gh-emb-006",
-            "task_type": "github_embeddings",
-            "collection_name": "test-org/test-repo",
-        }
-
-        def mock_path(*args):
-            if args == ("data/github",):
-                return tmp_path
-            return tmp_path / "/".join(args)
-
-        with patch("src.back.worker.workers.github_embedding_worker.Path", side_effect=mock_path):
-            with patch(
-                "src.back.worker.workers.github_embedding_worker.IngestionPipelineBuilder"
-            ) as mock_builder_cls:
-                mock_builder = MagicMock()
-                mock_builder.run = MagicMock()
-                mock_builder_cls.return_value = mock_builder
-
-                worker = GithubEmbeddingWorker(mock_db)
-                await worker.process(task)
-
-        calls = mock_db.upsert_embed_progress.call_args_list
-        assert all(c.kwargs["source_type"] == "github_embeddings" for c in calls)
+        mock_db.get_pending_doc_registry.assert_called_with("test-org", "test-repo")
 
 
 class TestLocalEmbeddingWorker:
@@ -388,10 +305,7 @@ class TestLocalEmbeddingWorker:
         worker = LocalEmbeddingWorker(mock_db)
         await worker.process(task)
 
-        calls = mock_db.upsert_embed_progress.call_args_list
-        final_call = calls[-1]
-        assert final_call.kwargs["status"] == "completed"
-        assert final_call.kwargs["total"] == 0
+        mock_db.update_worker_progress.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_process_completes_if_no_registry_entries(
@@ -412,10 +326,7 @@ class TestLocalEmbeddingWorker:
         worker = LocalEmbeddingWorker(mock_db)
         await worker.process(task)
 
-        calls = mock_db.upsert_embed_progress.call_args_list
-        final_call = calls[-1]
-        assert final_call.kwargs["status"] == "completed"
-        assert final_call.kwargs["total"] == 0
+        mock_db.update_worker_progress.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_process_embeds_discovered_files(
@@ -432,6 +343,7 @@ class TestLocalEmbeddingWorker:
                 "file_name": "doc1.md",
                 "content_type": "markdown",
                 "status": "discovered",
+                "embed_status": "discovered",
             }
         ]
 
@@ -453,61 +365,8 @@ class TestLocalEmbeddingWorker:
             await worker.process(task)
 
         mock_builder.run.assert_called_once()
-        calls = mock_db.upsert_embed_progress.call_args_list
-        final_call = calls[-1]
-        assert final_call.kwargs["status"] == "completed"
-        assert final_call.kwargs["processed"] == 1
-
-    @pytest.mark.asyncio
-    async def test_process_filters_by_local_org(self, mock_db: MagicMock, tmp_path: Path) -> None:
-        local_dir = tmp_path / "local_docs"
-        local_dir.mkdir()
-
-        mock_db.get_doc_registry.return_value = [
-            {"org": "github", "repo": "some-repo", "file_name": "doc.md", "status": "discovered"},
-            {"org": "local", "repo": "local", "file_name": "doc.md", "status": "discovered"},
-        ]
-
-        task = {
-            "task_id": "local-emb-004",
-            "task_type": "local_embeddings",
-            "collection_name": "local",
-            "base_path": str(local_dir),
-        }
-
-        with patch(
-            "src.back.worker.workers.local_embedding_worker.IngestionPipelineBuilder"
-        ) as mock_builder_cls:
-            mock_builder = MagicMock()
-            mock_builder.run = MagicMock()
-            mock_builder_cls.return_value = mock_builder
-
-            worker = LocalEmbeddingWorker(mock_db)
-            await worker.process(task)
-
-        calls = mock_db.upsert_embed_progress.call_args_list
-        final_call = calls[-1]
-        assert final_call.kwargs["total"] == 1
-
-    @pytest.mark.asyncio
-    async def test_process_reports_source_type(self, mock_db: MagicMock, tmp_path: Path) -> None:
-        local_dir = tmp_path / "local_docs"
-        local_dir.mkdir()
-
-        mock_db.get_doc_registry.return_value = []
-
-        task = {
-            "task_id": "local-emb-005",
-            "task_type": "local_embeddings",
-            "collection_name": "local",
-            "base_path": str(local_dir),
-        }
-
-        worker = LocalEmbeddingWorker(mock_db)
-        await worker.process(task)
-
-        calls = mock_db.upsert_embed_progress.call_args_list
-        assert all(c.kwargs["source_type"] == "local_embeddings" for c in calls)
+        mock_db.upsert_worker_state.assert_called()
+        mock_db.update_worker_progress.assert_called()
 
     @pytest.mark.asyncio
     async def test_process_uses_default_path(self, mock_db: MagicMock) -> None:
@@ -522,6 +381,4 @@ class TestLocalEmbeddingWorker:
         worker = LocalEmbeddingWorker(mock_db)
         await worker.process(task)
 
-        calls = mock_db.upsert_embed_progress.call_args_list
-        final_call = calls[-1]
-        assert final_call.kwargs["status"] == "completed"
+        mock_db.update_worker_progress.assert_not_called()

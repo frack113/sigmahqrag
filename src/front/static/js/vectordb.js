@@ -90,6 +90,11 @@ async function recreateCollection(name) {
 async function startSigmaRefEmbedding() {
     if (window.isProcessing) return;
 
+    const githubProgressSection = document.getElementById('github-progress-section');
+    const githubProgressFill = document.getElementById('github-progress-fill');
+    const githubProgressText = document.getElementById('github-progress-text');
+    const githubMessageEl = document.getElementById('github-message');
+    
     const progressSection = document.getElementById('sigmaref-progress-section');
     const progressFill = document.getElementById('sigmaref-progress-fill');
     const progressText = document.getElementById('sigmaref-progress-text');
@@ -97,111 +102,121 @@ async function startSigmaRefEmbedding() {
     const btnIndexDocs = document.getElementById('btn-index-docs');
 
     if (btnIndexDocs) btnIndexDocs.disabled = true;
+    if (githubMessageEl) githubMessageEl.style.display = 'none';
     if (messageEl) messageEl.style.display = 'none';
-    if (progressFill) {
-        progressFill.style.width = '0%';
-        progressFill.style.background = 'linear-gradient(to right, rgb(0, 0, 1), rgb(0, 0, 255))';
-    }
-    if (progressText) progressText.textContent = '0%';
+    
+    [githubProgressFill, progressFill].forEach(fill => {
+        if (fill) {
+            fill.style.width = '0%';
+            fill.style.background = 'linear-gradient(to right, rgb(0, 0, 1), rgb(0, 0, 255))';
+        }
+    });
+    [githubProgressText, progressText].forEach(text => {
+        if (text) text.textContent = '0%';
+    });
 
     try {
-        const response = await fetch('/api/v1/qdrant', {
+        const response = await fetch('/api/v1/files/embed', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                action: 'embed_sigmaref',
-                payload: {
-                    action: 'embed_sigmaref',
-                    registry_path: 'data/documents/sigmaref/registry.json',
-                    collection_name: 'sigma_doc'
-                }
-            })
+            headers: { 'Content-Type': 'application/json' }
         });
         const result = await response.json();
 
-        if (result.status === 'success') {
-            const taskId = result.data.task_id;
-            localStorage.setItem('SIGMAREF_TASK_KEY', taskId);
-
-            const streamResp = await fetch(`/api/v1/qdrant/embed/${taskId}/stream`);
-            const reader = streamResp.body.getReader();
-            const decoder = new TextDecoder();
-            let buffer = '';
-
-            const timeout = setTimeout(() => {
-                reader.cancel();
-                done();
-            }, 10000);
-
-            function done() {
-                clearTimeout(timeout);
-                if (btnIndexDocs) btnIndexDocs.disabled = false;
+        if (result.success || result.data) {
+            const tasks = result.data?.triggered || [];
+            
+            if (tasks.includes('github_embeddings')) {
+                pollEmbedProgress('github_embeddings', githubProgressFill, githubProgressText, githubMessageEl, btnIndexDocs);
             }
-
-            while (true) {
-                const { done: streamDone, value } = await reader.read();
-                if (streamDone) break;
-
-                buffer += decoder.decode(value, { stream: true });
-                const lines = buffer.split('\n');
-                buffer = lines.pop() || '';
-
-                for (const line of lines) {
-                    if (!line.startsWith('data: ')) continue;
-                    const data = JSON.parse(line.slice(6));
-
-                    if (data.status === 'processing') {
-                        const pct = data.total > 0 ? Math.round((data.processed / data.total) * 100) : 0;
-                        if (progressFill) progressFill.style.width = pct + '%';
-                        if (progressText) progressText.textContent = pct + '%';
-                    } else if (data.status === 'completed') {
-                        if (progressFill) {
-                            progressFill.style.width = '100%';
-                            progressFill.style.background = '#4caf50';
-                        }
-                        if (progressText) progressText.textContent = '100%';
-                        if (messageEl) {
-                            messageEl.textContent = data.message || 'Completed';
-                            messageEl.style.display = 'block';
-                        }
-                        done();
-                        return;
-                    } else if (data.status === 'failed') {
-                        if (progressFill) {
-                            progressFill.style.background = '#f44336';
-                        }
-                        if (messageEl) {
-                            messageEl.textContent = 'Error: ' + (data.error || 'Task failed');
-                            messageEl.style.display = 'block';
-                        }
-                        done();
-                        return;
-                    } else if (data.status === 'timeout' || data.status === 'not_found') {
-                        if (progressFill) progressFill.style.background = '#ff9800';
-                        if (messageEl) {
-                            messageEl.textContent = data.status === 'timeout' ? 'Connection timed out' : 'Task not found';
-                            messageEl.style.display = 'block';
-                        }
-                        done();
-                        return;
-                    }
+            
+            if (tasks.includes('sigmaref_embeddings')) {
+                pollEmbedProgress('sigmaref_embeddings', progressFill, progressText, messageEl, btnIndexDocs);
+            }
+            
+            if (tasks.length === 0) {
+                if (result.error) {
+                    throw new Error(result.error);
                 }
             }
-            done();
         } else {
-            throw new Error(result.message || 'Unknown error');
+            throw new Error(result.error || result.message || 'Unknown error');
         }
     } catch (error) {
-        console.error('Failed to start SigmaRef embedding:', error);
+        console.error('Failed to start embedding:', error);
+        if (githubMessageEl) {
+            githubMessageEl.textContent = 'Error: ' + error.message;
+            githubMessageEl.style.display = 'block';
+        }
         if (messageEl) {
             messageEl.textContent = 'Error: ' + error.message;
             messageEl.style.display = 'block';
         }
-        if (progressFill) progressFill.style.width = '0%';
-        if (progressText) progressText.textContent = '0%';
-    } finally {
+        [githubProgressFill, progressFill].forEach(fill => {
+            if (fill) fill.style.width = '0%';
+        });
         if (btnIndexDocs) btnIndexDocs.disabled = false;
     }
+}
+
+async function pollEmbedProgress(source, progressFill, progressText, messageEl, btnIndexDocs) {
+    let pollCount = 0;
+    const maxPolls = 300;
+    const pollInterval = setInterval(async () => {
+        pollCount++;
+        if (pollCount > maxPolls) {
+            clearInterval(pollInterval);
+            checkAllComplete(btnIndexDocs);
+            return;
+        }
+        try {
+            const response = await fetch(`/api/v1/qdrant/embed-status/${source}`);
+            const statusData = await response.json();
+
+            if (!statusData || statusData.status === 'not_found') {
+                if (pollCount > 5) {
+                    clearInterval(pollInterval);
+                    checkAllComplete(btnIndexDocs);
+                }
+                return;
+            }
+
+            if (statusData.status === 'running') {
+                const pct = Math.round(statusData.progress_percent || 0);
+                if (progressFill) progressFill.style.width = pct + '%';
+                if (progressText) progressText.textContent = pct + '%';
+            } else if (statusData.status === 'completed' || statusData.status === 'idle') {
+                if (progressFill) {
+                    progressFill.style.width = '100%';
+                    progressFill.style.background = '#4caf50';
+                }
+                if (progressText) progressText.textContent = '100%';
+                if (messageEl) {
+                    messageEl.textContent = statusData.status === 'idle' ? 'Completed (no new documents)' : (statusData.message || 'Completed');
+                    messageEl.style.display = 'block';
+                }
+                clearInterval(pollInterval);
+                checkAllComplete(btnIndexDocs);
+            } else if (statusData.status === 'failed') {
+                if (progressFill) {
+                    progressFill.style.background = '#f44336';
+                }
+                if (messageEl) {
+                    messageEl.textContent = 'Error: ' + (statusData.error || 'Task failed');
+                    messageEl.style.display = 'block';
+                }
+                clearInterval(pollInterval);
+                checkAllComplete(btnIndexDocs);
+            }
+        } catch (e) {
+            console.error('Poll error:', e);
+            clearInterval(pollInterval);
+            checkAllComplete(btnIndexDocs);
+        }
+    }, 2000);
+}
+
+function checkAllComplete(btnIndexDocs) {
+    if (btnIndexDocs) btnIndexDocs.disabled = false;
 }
 
 // Initialize on load

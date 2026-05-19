@@ -47,7 +47,7 @@ async def _trigger_worker(worker_type: str, task: dict, dispatcher: TaskDispatch
         status="running",
         current_task_id=task_id,
     )
-    
+
     logger.info(f"Queuing task for {worker_type}")
     await dispatcher.queue_task(worker_type, task)
     logger.info(f"Task queued successfully for {worker_type}")
@@ -61,22 +61,30 @@ async def file_list(dispatcher: TaskDispatcher = Depends(_get_dispatcher)) -> Fi
     triggered = []
     busy = []
 
-    if await _trigger_worker("github_discovery", {"task_type": "github_discovery", "collection_name": "all"}, dispatcher):
+    if await _trigger_worker(
+        "github_discovery", {"task_type": "github_discovery", "collection_name": "all"}, dispatcher
+    ):
         triggered.append("github_discovery")
     else:
         busy.append("github_discovery")
 
-    if await _trigger_worker("local_discovery", {"task_type": "local_discovery", "collection_name": "local"}, dispatcher):
+    if await _trigger_worker(
+        "local_discovery", {"task_type": "local_discovery", "collection_name": "local"}, dispatcher
+    ):
         triggered.append("local_discovery")
     else:
         busy.append("local_discovery")
 
-    if await _trigger_worker("sigmaref_discovery", {
-        "task_type": "sigmaref_discovery",
-        "collection_name": "sigmaref",
-        "rules_dir": "data/github/sigmahq/sigma/rules",
-        "output_dir": "data/documents/sigmaref",
-    }, dispatcher):
+    if await _trigger_worker(
+        "sigmaref_discovery",
+        {
+            "task_type": "sigmaref_discovery",
+            "collection_name": "sigmaref",
+            "rules_dir": "data/github/sigmahq/sigma/rules",
+            "output_dir": "data/documents/sigmaref",
+        },
+        dispatcher,
+    ):
         triggered.append("sigmaref_discovery")
     else:
         busy.append("sigmaref_discovery")
@@ -96,22 +104,36 @@ async def file_list(dispatcher: TaskDispatcher = Depends(_get_dispatcher)) -> Fi
 
 
 @router.post("/embed", response_model=FileOperationResponse)
-async def file_embed(dispatcher: TaskDispatcher = Depends(_get_dispatcher)) -> FileOperationResponse:
+async def file_embed(
+    dispatcher: TaskDispatcher = Depends(_get_dispatcher),
+) -> FileOperationResponse:
     """Trigger file embedding across all sources (GitHub, Local, SigmaRef)."""
     triggered = []
     busy = []
 
-    if await _trigger_worker("github_embeddings", {"task_type": "github_embeddings", "collection_name": "all"}, dispatcher):
+    if await _trigger_worker(
+        "github_embeddings",
+        {"task_type": "github_embeddings", "collection_name": "all"},
+        dispatcher,
+    ):
         triggered.append("github_embeddings")
     else:
         busy.append("github_embeddings")
 
-    if await _trigger_worker("local_embeddings", {"task_type": "local_embeddings", "collection_name": "local"}, dispatcher):
+    if await _trigger_worker(
+        "local_embeddings",
+        {"task_type": "local_embeddings", "collection_name": "local"},
+        dispatcher,
+    ):
         triggered.append("local_embeddings")
     else:
         busy.append("local_embeddings")
 
-    if await _trigger_worker("sigmaref_embeddings", {"task_type": "sigmaref_embeddings", "collection_name": "sigmaref"}, dispatcher):
+    if await _trigger_worker(
+        "sigmaref_embeddings",
+        {"task_type": "sigmaref_embeddings", "collection_name": "sigmaref"},
+        dispatcher,
+    ):
         triggered.append("sigmaref_embeddings")
     else:
         busy.append("sigmaref_embeddings")

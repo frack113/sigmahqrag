@@ -55,9 +55,17 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <tr>
+                    <tr id="github-progress-row">
                         <td>Github repo</td>
-                        <td><span class="badge bg-secondary">WIP</span></td>
+                        <td>
+                            <div id="github-progress-section" class="progress-bar-container">
+                                <div class="progress-blue-gradient">
+                                    <div class="progress-blue-gradient-fill" id="github-progress-fill"></div>
+                                </div>
+                                <span class="progress-text" id="github-progress-text">0%</span>
+                            </div>
+                            <div id="github-message" class="vectordb-message" style="display:none;"></div>
+                        </td>
                     </tr>
                     <tr id="sigmaref-progress-row">
                         <td>Sigma Reference</td>

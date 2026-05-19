@@ -28,14 +28,13 @@ def db() -> DatabaseService:
 def mock_db() -> MagicMock:
     """Mock DatabaseService for worker tests that don't need real DB."""
     db = MagicMock()
-    db.upsert_embed_progress = MagicMock()
     db.upsert_worker_state = MagicMock()
+    db.update_worker_progress = MagicMock()
+    db.get_worker_progress = MagicMock(return_value=None)
     db.upsert_doc_registry = MagicMock()
     db.upsert_doc_sigma_ref = MagicMock()
     db.claim_task = MagicMock(return_value=True)
     db.is_worker_busy = MagicMock(return_value=False)
-    db.get_active_embed_tasks = MagicMock(return_value=[])
-    db.reset_stale_embed_tasks = MagicMock()
     db.reset_stale_workers = MagicMock()
     db.get_pending_sigma_ref = MagicMock(return_value=[])
     db.update_sigma_ref_embed_status = MagicMock()

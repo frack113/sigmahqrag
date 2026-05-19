@@ -49,7 +49,9 @@ class LocalDiscoveryWorker(BaseWorker):
                     file_size = 0
 
                 content_type = identify(file_path).value
-                url_hash = hashlib.sha256(f"local/{collection_name}/{file_rel_path}".encode()).hexdigest()
+                url_hash = hashlib.sha256(
+                    f"local/{collection_name}/{file_rel_path}".encode()
+                ).hexdigest()
                 title = file_path.stem
 
                 self.db.upsert_doc_registry(

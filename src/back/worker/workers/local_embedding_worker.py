@@ -21,6 +21,7 @@ class LocalEmbeddingWorker(BaseWorker):
 
     async def process(self, task: dict) -> None:
         collection_name = task.get("collection_name", "local")
+        task_id = task.get("task_id", "")
         base_path = Path(task.get("base_path", "data/documents/local"))
 
         logger.info(f"[LocalEmbeddingWorker] Embedding local docs from {base_path} (WIP)")
@@ -37,6 +38,13 @@ class LocalEmbeddingWorker(BaseWorker):
         total = len(registry_entries)
         errors = []
         skipped = []
+
+        self.db.upsert_worker_state(
+            worker_type="local_embeddings",
+            status="running",
+            current_task_id=task_id,
+            progress_percent=0.0,
+        )
 
         builder = IngestionPipelineBuilder(collection_name=collection_name)
 
@@ -70,9 +78,21 @@ class LocalEmbeddingWorker(BaseWorker):
                 logger.error(f"[LocalEmbeddingWorker] Error embedding {file_name}: {e}")
                 errors.append({"file": file_name, "error": str(e)})
 
+            processed = idx + 1 - len(errors) - len(skipped)
+            progress = (processed / total) * 100 if total > 0 else 0
+            self.db.update_worker_progress(
+                worker_type="local_embeddings",
+                progress_percent=round(progress, 2),
+                current_file=file_name,
+            )
+
             await asyncio.sleep(0)
 
         processed = total - len(errors) - len(skipped)
+        self.db.update_worker_progress(
+            worker_type="local_embeddings",
+            progress_percent=100.0,
+        )
 
         logger.info(
             f"[LocalEmbeddingWorker] Complete: {processed}/{total} embedded, "

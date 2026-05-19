@@ -15,13 +15,16 @@ class SigmaRefEmbeddingWorker(BaseWorker):
 
     async def process(self, task: dict) -> None:
         collection_name = task.get("collection_name", "sigmaref")
+        task_id = task.get("task_id", "")
         registry_path = Path(task.get("registry_path", "data/documents/sigmaref"))
 
         logger.info(f"[SigmaRefEmbeddingWorker] Embedding SigmaRef docs into {collection_name}")
 
         raw_entries = self.db.get_pending_sigma_ref()
         if not raw_entries:
-            logger.info("[SigmaRefEmbeddingWorker] No pending entries in doc_sigma_ref, nothing to embed")
+            logger.info(
+                "[SigmaRefEmbeddingWorker] No pending entries in doc_sigma_ref, nothing to embed"
+            )
             return
 
         registry_entries = []
@@ -38,6 +41,13 @@ class SigmaRefEmbeddingWorker(BaseWorker):
         total = len(registry_entries)
         errors = []
         skipped = []
+
+        self.db.upsert_worker_state(
+            worker_type="sigmaref_embeddings",
+            status="running",
+            current_task_id=task_id,
+            progress_percent=0.0,
+        )
 
         builder = IngestionPipelineBuilder(collection_name=collection_name)
 
@@ -84,9 +94,21 @@ class SigmaRefEmbeddingWorker(BaseWorker):
                 errors.append({"file": current_file, "error": str(e)})
                 self.db.update_sigma_ref_embed_status(file_hash, "error")
 
+            processed = idx + 1 - len(errors) - len(skipped)
+            progress = (processed / total) * 100 if total > 0 else 0
+            self.db.update_worker_progress(
+                worker_type="sigmaref_embeddings",
+                progress_percent=round(progress, 2),
+                current_file=current_file,
+            )
+
             await asyncio.sleep(0)
 
         processed = total - len(errors) - len(skipped)
+        self.db.update_worker_progress(
+            worker_type="sigmaref_embeddings",
+            progress_percent=100.0,
+        )
 
         logger.info(
             f"[SigmaRefEmbeddingWorker] Complete: {processed}/{total} embedded, "

@@ -34,22 +34,22 @@ router = APIRouter(prefix="/api/v1/qdrant", tags=["v1-qdrant"])
 SERVICE_NAME = "qdrant"
 
 
-async def _embed_progress_generator(task_id: str) -> AsyncGenerator[str, None]:
+async def _embed_progress_generator(worker_type: str) -> AsyncGenerator[str, None]:
     """Generate SSE progress updates by polling the database."""
     db = DatabaseService.get_instance()
     while True:
         try:
-            status_data = db.get_embed_status(task_id)
+            status_data = db.get_worker_progress(worker_type)
             if not status_data:
                 yield f"data: {json.dumps({'status': 'not_found'})}\n\n"
                 break
 
             yield f"data: {json.dumps(status_data)}\n\n"
 
-            if status_data.get("status") in ("completed", "failed"):
+            if status_data.get("status") in ("completed", "failed", "idle"):
                 break
         except Exception as e:
-            logger.error(f"SSE error for {task_id}: {e}")
+            logger.error(f"SSE error for {worker_type}: {e}")
             yield f"data: {json.dumps({'status': 'error', 'message': str(e)})}\n\n"
             break
 
@@ -122,36 +122,49 @@ async def qdrant_progress(download_id: str):
         return JSONResponse(status_code=500, content={"error": str(e)})
 
 
-@router.get("/embed/{task_id}")
-async def embed_progress(task_id: str):
-    """Get the status of an embed_sigmaref task."""
+@router.get("/embed/{worker_type}")
+async def embed_progress(worker_type: str):
+    """Get the status of an embedding worker."""
     db = DatabaseService.get_instance()
-    status_data = db.get_embed_status(task_id)
+    status_data = db.get_worker_progress(worker_type)
     if not status_data:
         return JSONResponse(
             status_code=404,
-            content={"status": "not_found", "message": "Task not found"},
+            content={"status": "not_found", "message": "Worker not found"},
         )
     return JSONResponse(
         content={
             "status": status_data.get("status", "unknown"),
-            "task_id": task_id,
+            "worker_type": worker_type,
             "details": status_data,
         }
     )
 
 
-@router.get("/embed/{task_id}/stream")
-async def embed_progress_stream(task_id: str):
-    """Stream SSE progress for an embed_sigmaref task."""
+@router.get("/embed/{worker_type}/stream")
+async def embed_progress_stream(worker_type: str):
+    """Stream SSE progress for an embedding worker."""
     try:
         return StreamingResponse(
-            _embed_progress_generator(task_id),
+            _embed_progress_generator(worker_type),
             media_type="text/event-stream",
         )
     except Exception as e:
         logger.error(f"embed progress error: {e}")
         return JSONResponse(status_code=500, content={"error": str(e)})
+
+
+@router.get("/embed-status/{worker_type}")
+async def worker_embed_status(worker_type: str):
+    """Get embedding progress for a worker type."""
+    db = DatabaseService.get_instance()
+    progress = db.get_worker_progress(worker_type)
+    if not progress:
+        return JSONResponse(
+            status_code=404,
+            content={"status": "not_found", "message": "Worker not found"},
+        )
+    return JSONResponse(content=progress)
 
 
 @router.post("")
@@ -334,12 +347,16 @@ async def qdrant_action(request: QdrantActionRequest) -> QdrantActionResponse:
 
             # Trigger via dispatcher if available, otherwise use background task
             from src.main import app
+
             if app and hasattr(app, "state") and hasattr(app.state, "dispatcher"):
                 await app.state.dispatcher.queue_task("sigmaref_embeddings", task)
             else:
                 # Fallback for direct calls or tests
                 import asyncio
-                from src.back.worker.workers.sigmaref_embedding_worker import SigmaRefEmbeddingWorker
+                from src.back.worker.workers.sigmaref_embedding_worker import (
+                    SigmaRefEmbeddingWorker,
+                )
+
                 asyncio.create_task(SigmaRefEmbeddingWorker(db).process(task))
 
             return QdrantActionResponse(
