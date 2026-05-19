@@ -24,6 +24,7 @@ from src.api.v1.embedding_config import router as embedding_config_v1_router
 from src.api.v1.embeddings import router as embeddings_v1_router
 from src.api.v1.explain import router as explain_v1_router
 from src.api.v1.feedback import router as feedback_v1_router
+from src.api.v1.files import router as files_v1_router
 from src.api.v1.github import router as github_v1_router
 from src.api.v1.llamacpp import router as llama_router
 from src.api.v1.logs import router as logs_v1_router
@@ -105,7 +106,7 @@ async def lifespan(app: FastAPI) -> None:
             len(old_files),
         )
 
-    db.reset_stale_embed_tasks()
+    db.reset_stale_workers()
 
     # Initialize worker states so the frontend always sees all workers
     db.init_worker_states(list(TaskDispatcher._WORKER_TYPES.keys()))
@@ -184,6 +185,7 @@ def create_app() -> FastAPI:
     app.include_router(config_v1_router)
     app.include_router(coverage_v1_router)
     app.include_router(explain_v1_router)
+    app.include_router(files_v1_router)
     app.include_router(github_v1_router)
     app.include_router(llama_router)
     app.include_router(logs_v1_router)

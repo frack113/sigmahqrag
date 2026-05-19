@@ -31,66 +31,50 @@ class TaskDispatcher:
         self.db = DatabaseService.get_instance()
         self._running = False
         self._workers = dict(self._WORKER_TYPES)
+        self._pending_tasks: Dict[str, dict] = {}
 
     async def run(self):
         """Main loop to monitor and dispatch tasks."""
         self._running = True
-        self.db.reset_stale_embed_tasks()
         self.db.reset_stale_workers()
         logger.info("Task Dispatcher started with %d workers.", len(self._workers))
 
         while self._running:
             try:
-                tasks = self.db.get_active_embed_tasks()
-
-                for task in tasks:
-                    if task["status"] == "pending":
-                        await self._dispatch(task)
-                    elif task["status"] == "running":
+                for worker_type, task in list(self._pending_tasks.items()):
+                    if self.db.is_worker_busy(worker_type):
                         continue
+                    
+                    await self._dispatch(worker_type, task)
 
             except Exception as e:
                 logger.error(f"Dispatcher loop error: {e}", exc_info=True)
 
             await asyncio.sleep(self.poll_interval)
 
-    async def _dispatch(self, task: dict):
-        """Dispatches a single task to the appropriate worker using atomic claim."""
-        task_id = task["task_id"]
-        task_type = task.get("task_type", "embeddings")
-        collection_name = task.get("collection_name", "")
+    async def queue_task(self, worker_type: str, task: dict):
+        """Queue a task for execution."""
+        self._pending_tasks[worker_type] = task
+        logger.info(f"Queued task for {worker_type}")
 
-        if not self.db.claim_task(task_id):
-            logger.info(f"Task {task_id} already claimed by another dispatcher, skipping")
-            return
+    async def _dispatch(self, worker_type: str, task: dict):
+        """Dispatches a single task to the appropriate worker."""
+        task_id = task.get("task_id", "")
 
-        logger.info(f"Dispatching task {task_id} (type: {task_type})")
+        logger.info(f"Dispatching task {task_id} (type: {worker_type})")
 
         self.db.upsert_worker_state(
-            worker_type=task_type,
+            worker_type=worker_type,
             status="running",
             current_task_id=task_id,
         )
 
-        self.db.upsert_embed_progress(
-            task_id=task_id,
-            task_type=task_type,
-            status="running",
-            collection_name=collection_name,
-        )
-
-        worker_cls = self._workers.get(task_type)
+        worker_cls = self._workers.get(worker_type)
         if not worker_cls:
-            error_msg = f"No worker registered for task type: {task_type}"
+            error_msg = f"No worker registered for task type: {worker_type}"
             logger.error(f"Task {task_id} failed: {error_msg}")
-            self.db.upsert_embed_progress(
-                task_id=task_id,
-                status="failed",
-                errors=error_msg,
-                collection_name=collection_name,
-            )
             self.db.upsert_worker_state(
-                worker_type=task_type,
+                worker_type=worker_type,
                 status="idle",
                 current_task_id="",
                 error=error_msg,
@@ -100,26 +84,23 @@ class TaskDispatcher:
         worker = worker_cls(self.db)
         try:
             await worker.process(task)
-            self.db.upsert_embed_progress(
-                task_id=task_id,
-                status="completed",
-                collection_name=collection_name,
-            )
+            logger.info(f"Task {task_id} completed successfully")
         except Exception as e:
             logger.error(f"Worker execution failed for task {task_id}: {e}", exc_info=True)
-            self.db.upsert_embed_progress(
-                task_id=task_id,
-                status="failed",
-                errors=str(e),
-                collection_name=collection_name,
+            self.db.upsert_worker_state(
+                worker_type=worker_type,
+                status="idle",
+                current_task_id="",
+                error=str(e),
             )
         finally:
             self.db.upsert_worker_state(
-                worker_type=task_type,
+                worker_type=worker_type,
                 status="idle",
                 current_task_id="",
                 error="",
             )
+            self._pending_tasks.pop(worker_type, None)
 
     def stop(self):
         self._running = False

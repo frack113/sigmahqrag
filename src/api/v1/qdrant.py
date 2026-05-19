@@ -320,14 +320,27 @@ async def qdrant_action(request: QdrantActionRequest) -> QdrantActionResponse:
                 )
 
             task_id = str(uuid.uuid4())
+            task = {
+                "task_id": task_id,
+                "task_type": "sigmaref_embeddings",
+                "collection_name": payload.collection_name,
+            }
 
-            db.upsert_embed_progress(
-                task_id=task_id,
-                task_type="sigmaref_embeddings",
-                source_type="sigmaref",
-                status="pending",
-                collection_name=payload.collection_name,
+            db.upsert_worker_state(
+                worker_type="sigmaref_embeddings",
+                status="running",
+                current_task_id=task_id,
             )
+
+            # Trigger via dispatcher if available, otherwise use background task
+            from src.main import app
+            if app and hasattr(app, "state") and hasattr(app.state, "dispatcher"):
+                await app.state.dispatcher.queue_task("sigmaref_embeddings", task)
+            else:
+                # Fallback for direct calls or tests
+                import asyncio
+                from src.back.worker.workers.sigmaref_embedding_worker import SigmaRefEmbeddingWorker
+                asyncio.create_task(SigmaRefEmbeddingWorker(db).process(task))
 
             return QdrantActionResponse(
                 status="success",

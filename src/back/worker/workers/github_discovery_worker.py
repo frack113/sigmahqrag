@@ -9,77 +9,54 @@ logger = logging.getLogger(__name__)
 
 
 class GithubDiscoveryWorker(BaseWorker):
-    """Scans cloned GitHub repositories for supported documents."""
+    """Scans all cloned GitHub repositories with selected directories for supported documents."""
+
+    github_base_dir: str = "data/github"
 
     async def process(self, task: dict) -> None:
-        task_id = task["task_id"]
-        collection_name = task.get("collection_name", "")
-        org = task.get("org", "")
-        repo = task.get("repo", "")
+        repo_keys = self.db.get_repos_with_selected_dirs()
+        if not repo_keys:
+            logger.info("[GithubDiscoveryWorker] No repos with selected dirs, nothing to scan")
+            return
 
-        if not collection_name:
-            raise ValueError("collection_name is required for github discovery")
+        all_files = []
+        for repo_key in repo_keys:
+            parts = repo_key.split("/")
+            if len(parts) != 2:
+                logger.warning(f"[GithubDiscoveryWorker] Invalid repo key: {repo_key}")
+                continue
 
-        parts = collection_name.split("/")
-        if len(parts) != 2:
-            raise ValueError(f"Invalid collection name for github discovery: {collection_name}")
+            org, repo = parts
+            base_path = Path(self.github_base_dir) / org / repo
+            if not base_path.exists():
+                logger.warning(f"[GithubDiscoveryWorker] Repo not found: {base_path}")
+                continue
 
-        org = parts[0]
-        repo = parts[1]
-        base_path = Path("data/github") / org / repo
+            selected_dirs = []
+            try:
+                selected_dirs = self.db.get_selected_dirs(repo_key)
+            except Exception as e:
+                logger.error(f"[GithubDiscoveryWorker] Error fetching selected dirs for {repo_key}: {e}")
 
-        if not base_path.exists():
-            raise FileNotFoundError(f"Repository path does not exist: {base_path}")
+            for ext in SUPPORTED_DOC_EXTENSION_MAP.keys():
+                pattern = f"**/*{ext}"
+                for found_file in base_path.glob(pattern):
+                    if selected_dirs:
+                        rel_to_repo = found_file.relative_to(base_path).as_posix()
+                        if not any(rel_to_repo.startswith(sd.lstrip("./")) for sd in selected_dirs):
+                            continue
+                    all_files.append((found_file, base_path, org, repo))
 
-        logger.info(f"[GithubDiscoveryWorker] Scanning {collection_name} in {base_path}")
-
-        self.db.upsert_embed_progress(
-            task_id=task_id,
-            status="running",
-            source_type="github_discovery",
-            collection_name=collection_name,
-            current_file="scanning repository...",
-        )
-
-        selected_dirs = []
-        try:
-            selected_dirs = self.db.get_selected_dirs(collection_name)
-            logger.info(
-                f"[GithubDiscoveryWorker] {collection_name} has {len(selected_dirs)} selected directories."
-            )
-        except Exception as e:
-            logger.error(f"[GithubDiscoveryWorker] Error fetching selected dirs: {e}")
-
-        files_to_process = []
-        for ext in SUPPORTED_DOC_EXTENSION_MAP.keys():
-            pattern = f"**/*.{ext}"
-            for found_file in base_path.glob(pattern):
-                if selected_dirs:
-                    rel_to_repo = found_file.relative_to(base_path).as_posix()
-                    if any(rel_to_repo.startswith(sd.lstrip("./")) for sd in selected_dirs):
-                        files_to_process.append(found_file)
-                else:
-                    files_to_process.append(found_file)
-
-        total_files = len(files_to_process)
+        total_files = len(all_files)
         processed_count = 0
         skipped_count = 0
 
-        self.db.upsert_embed_progress(
-            task_id=task_id,
-            status="running",
-            source_type="github_discovery",
-            total=total_files,
-            processed=0,
-            collection_name=collection_name,
-            current_file=f"found {total_files} files",
-        )
+        logger.info(f"[GithubDiscoveryWorker] Found {total_files} files across {len(repo_keys)} repos")
 
-        for file_path in files_to_process:
+        for file_path, base_path, org, repo in all_files:
             try:
                 file_rel_path = file_path.relative_to(base_path).as_posix()
                 processed_count += 1
-                percent = (processed_count / total_files) * 100 if total_files > 0 else 100
 
                 try:
                     file_bytes = file_path.read_bytes()
@@ -106,35 +83,12 @@ class GithubDiscoveryWorker(BaseWorker):
                         "content_hash": content_hash,
                         "file_size": file_size,
                         "status": "discovered",
+                        "embed_status": "discovered",
                     }
-                )
-
-                self.db.upsert_embed_progress(
-                    task_id=task_id,
-                    status="running",
-                    source_type="github_discovery",
-                    total=total_files,
-                    processed=processed_count,
-                    skipped=skipped_count,
-                    current_file=file_rel_path,
-                    collection_name=collection_name,
-                    progress_percent=percent,
                 )
             except Exception as e:
                 logger.error(f"[GithubDiscoveryWorker] Error processing {file_path}: {e}")
                 skipped_count += 1
-
-        self.db.upsert_embed_progress(
-            task_id=task_id,
-            status="completed",
-            source_type="github_discovery",
-            total=total_files,
-            processed=processed_count,
-            skipped=skipped_count,
-            collection_name=collection_name,
-            progress_percent=100.0,
-            current_file=f"{processed_count} files discovered",
-        )
 
         logger.info(
             f"[GithubDiscoveryWorker] Complete: {processed_count} discovered, {skipped_count} skipped"

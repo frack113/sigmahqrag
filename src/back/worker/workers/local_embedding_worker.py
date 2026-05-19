@@ -20,7 +20,6 @@ class LocalEmbeddingWorker(BaseWorker):
     """
 
     async def process(self, task: dict) -> None:
-        task_id = task["task_id"]
         collection_name = task.get("collection_name", "local")
         base_path = Path(task.get("base_path", "data/documents/local"))
 
@@ -28,64 +27,22 @@ class LocalEmbeddingWorker(BaseWorker):
 
         if not base_path.exists():
             logger.warning(f"[LocalEmbeddingWorker] Path does not exist: {base_path}")
-            self.db.upsert_embed_progress(
-                task_id=task_id,
-                status="completed",
-                source_type="local_embeddings",
-                total=0,
-                processed=0,
-                collection_name=collection_name,
-                progress_percent=100.0,
-            )
             return
 
         registry_entries = self._get_registry_entries(collection_name)
         if not registry_entries:
             logger.info(f"[LocalEmbeddingWorker] No entries for {collection_name}")
-            self.db.upsert_embed_progress(
-                task_id=task_id,
-                status="completed",
-                source_type="local_embeddings",
-                total=0,
-                processed=0,
-                collection_name=collection_name,
-                progress_percent=100.0,
-            )
             return
 
         total = len(registry_entries)
         errors = []
         skipped = []
 
-        self.db.upsert_embed_progress(
-            task_id=task_id,
-            status="running",
-            source_type="local_embeddings",
-            total=total,
-            processed=0,
-            collection_name=collection_name,
-            progress_percent=0.0,
-        )
-
         builder = IngestionPipelineBuilder(collection_name=collection_name)
 
         for idx, entry in enumerate(registry_entries):
             file_name = entry.get("file_name", "")
             file_path = base_path / file_name
-
-            processed = idx + 1
-            percent = (processed / total) * 100
-
-            self.db.upsert_embed_progress(
-                task_id=task_id,
-                status="running",
-                source_type="local_embeddings",
-                total=total,
-                processed=processed,
-                current_file=file_name,
-                collection_name=collection_name,
-                progress_percent=percent,
-            )
 
             if not file_path.exists():
                 logger.warning(f"[LocalEmbeddingWorker] File not found: {file_path}")
@@ -116,19 +73,6 @@ class LocalEmbeddingWorker(BaseWorker):
             await asyncio.sleep(0)
 
         processed = total - len(errors) - len(skipped)
-        error_summary = f"{len(errors)} errors, {len(skipped)} skipped" if errors or skipped else ""
-
-        self.db.upsert_embed_progress(
-            task_id=task_id,
-            status="completed",
-            source_type="local_embeddings",
-            total=total,
-            processed=processed,
-            skipped=len(skipped),
-            errors=error_summary,
-            collection_name=collection_name,
-            progress_percent=100.0,
-        )
 
         logger.info(
             f"[LocalEmbeddingWorker] Complete: {processed}/{total} embedded, "

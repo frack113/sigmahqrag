@@ -22,7 +22,6 @@ _VALID_TABLES = frozenset(
         "system_prompts",
         "models",
         "doc_sigma_ref",
-        "embed_progress",
         "worker_state",
         "doc_registry",
         "git_metadata",
@@ -61,23 +60,6 @@ class DatabaseService:
         self._conn.commit()
 
         # Schema migrations for existing databases
-        # Add missing columns to embed_progress table
-        for col_def in [
-            ("task_type", "TEXT DEFAULT 'embeddings'"),
-            ("source_type", "TEXT DEFAULT ''"),
-            ("total", "INTEGER DEFAULT 0"),
-            ("processed", "INTEGER DEFAULT 0"),
-            ("skipped", "INTEGER DEFAULT 0"),
-        ]:
-            col_name, col_type = col_def
-            try:
-                self._conn.execute(
-                    f"ALTER TABLE embed_progress ADD COLUMN IF NOT EXISTS {col_name} {col_type}"
-                )
-            except Exception:
-                pass
-        self._conn.commit()
-
         # Add UNIQUE constraint to doc_registry if missing
         try:
             self._conn.execute(
@@ -89,7 +71,6 @@ class DatabaseService:
 
         # Add embed_status column to doc_sigma_ref if missing
         try:
-            # Check if column exists
             result = self._conn.execute(
                 "SELECT column_name FROM information_schema.columns WHERE table_name = 'doc_sigma_ref' AND column_name = 'embed_status'"
             ).fetchone()
@@ -101,6 +82,20 @@ class DatabaseService:
                 logger.info("Added embed_status column to doc_sigma_ref")
         except Exception as e:
             logger.warning(f"Failed to add embed_status column: {e}")
+
+        # Add embed_status column to doc_registry if missing
+        try:
+            result = self._conn.execute(
+                "SELECT column_name FROM information_schema.columns WHERE table_name = 'doc_registry' AND column_name = 'embed_status'"
+            ).fetchone()
+            if not result:
+                self._conn.execute(
+                    "ALTER TABLE doc_registry ADD COLUMN embed_status TEXT DEFAULT 'pending'"
+                )
+                self._conn.commit()
+                logger.info("Added embed_status column to doc_registry")
+        except Exception as e:
+            logger.warning(f"Failed to add embed_status column to doc_registry: {e}")
 
         logger.info("Schema initialized successfully")
 
@@ -382,152 +377,6 @@ class DatabaseService:
         return result is not None
 
     # =========================================================================
-    # EMBED_PROGRESS TABLE
-    # =========================================================================
-
-    def upsert_embed_progress(
-        self,
-        task_id: str,
-        task_type: str = "embeddings",
-        source_type: str = "",
-        status: str = "pending",
-        total: int = 0,
-        processed: int = 0,
-        errors: str = "",
-        skipped: int = 0,
-        current_file: str = "",
-        collection_name: str = "",
-        progress_percent: float = 0.0,
-    ) -> None:
-        """Upsert embedding progress record."""
-        with self._lock:
-            self._conn.execute(
-                """INSERT INTO embed_progress (task_id, task_type, source_type, status, total, processed, errors, skipped, current_file, collection_name, progress_percent, updated_at)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                 ON CONFLICT (task_id) DO UPDATE SET
-                     task_type = EXCLUDED.task_type,
-                     source_type = EXCLUDED.source_type,
-                     status = EXCLUDED.status,
-                     total = EXCLUDED.total,
-                     processed = EXCLUDED.processed,
-                     errors = EXCLUDED.errors,
-                     skipped = EXCLUDED.skipped,
-                     current_file = EXCLUDED.current_file,
-                     collection_name = EXCLUDED.collection_name,
-                     progress_percent = EXCLUDED.progress_percent,
-                     updated_at = EXCLUDED.updated_at""",
-                (
-                    task_id,
-                    task_type,
-                    source_type,
-                    status,
-                    total,
-                    processed,
-                    errors,
-                    skipped,
-                    current_file,
-                    collection_name,
-                    progress_percent,
-                    _iso_now(),
-                ),
-            )
-            self._conn.commit()
-
-    def get_embed_status(self, task_id: str) -> dict | None:
-        """Get progress status for a task."""
-        with self._lock:
-            result = self._conn.execute(
-                "SELECT task_id, task_type, source_type, status, total, processed, errors, skipped, current_file, collection_name, progress_percent, updated_at FROM embed_progress WHERE task_id = ?",
-                (task_id,),
-            ).fetchone()
-        if not result:
-            return None
-        return {
-            "task_id": result[0],
-            "task_type": result[1],
-            "source_type": result[2],
-            "status": result[3],
-            "total": result[4],
-            "processed": result[5],
-            "errors": result[6],
-            "skipped": result[7],
-            "current_file": result[8],
-            "collection_name": result[9],
-            "progress_percent": result[10],
-            "updated_at": result[11],
-        }
-
-    def reset_stale_embed_tasks(self) -> None:
-        """Mark running tasks older than 1 hour as failed."""
-        from datetime import timedelta
-
-        cutoff = (datetime.now(timezone.utc) - timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
-        with self._lock:
-            self._conn.execute(
-                """UPDATE embed_progress SET status = 'failed', errors = 'Stale task detected (older than 1h)', updated_at = ? WHERE status = 'running' AND updated_at < ?""",
-                (_iso_now(), cutoff),
-            )
-            self._conn.commit()
-
-    def claim_task(self, task_id: str) -> bool:
-        """Atomically claim a pending task as running. Returns True if claimed."""
-        with self._lock:
-            result = self._conn.execute(
-                """UPDATE embed_progress SET status = 'running', updated_at = ? WHERE task_id = ? AND status = 'pending'""",
-                (_iso_now(), task_id),
-            )
-            self._conn.commit()
-            return result.rowcount > 0
-
-    def get_active_embed_tasks(self) -> list[dict]:
-        """Get all pending and running tasks."""
-        with self._lock:
-            results = self._conn.execute(
-                "SELECT task_id, task_type, source_type, status, total, processed, errors, skipped, current_file, collection_name, progress_percent, updated_at FROM embed_progress WHERE status IN ('pending', 'running')"
-            ).fetchall()
-        return [
-            {
-                "task_id": row[0],
-                "task_type": row[1],
-                "source_type": row[2],
-                "status": row[3],
-                "total": row[4],
-                "processed": row[5],
-                "errors": row[6],
-                "skipped": row[7],
-                "current_file": row[8],
-                "collection_name": row[9],
-                "progress_percent": row[10],
-                "updated_at": row[11],
-            }
-            for row in results
-        ]
-
-    def get_running_embed_tasks(self) -> list[dict]:
-        """Get all running tasks."""
-        with self._lock:
-            results = self._conn.execute(
-                "SELECT task_id, task_type, source_type, status, total, processed, errors, skipped, current_file, collection_name, progress_percent, updated_at FROM embed_progress WHERE status = 'running'"
-            ).fetchall()
-        return [
-            {
-                "task_id": row[0],
-                "task_type": row[1],
-                "source_type": row[2],
-                "status": row[3],
-                "total": row[4],
-                "processed": row[5],
-                "errors": row[6],
-                "skipped": row[7],
-                "current_file": row[8],
-                "collection_name": row[9],
-                "progress_percent": row[10],
-                "updated_at": row[11],
-            }
-            for row in results
-        ]
-
-    # =========================================================================
     # WORKER_STATE TABLE
     # =========================================================================
 
@@ -617,17 +466,6 @@ class DatabaseService:
             )
             self._conn.commit()
 
-    def init_worker_states(self, worker_types: list[str]) -> None:
-        """Ensure all worker types exist in worker_state with idle status."""
-        with self._lock:
-            for wt in worker_types:
-                self._conn.execute(
-                    "INSERT INTO worker_state (worker_type, status, last_heartbeat, current_task_id, started_at, error) "
-                    "VALUES (?, 'idle', ?, '', NULL, '') ON CONFLICT (worker_type) DO NOTHING",
-                    (wt, _iso_now()),
-                )
-            self._conn.commit()
-
     # =========================================================================
     # DOC_REGISTRY TABLE (File Discovery Results)
     # =========================================================================
@@ -636,14 +474,15 @@ class DatabaseService:
         """Upsert a file record into doc_registry."""
         with self._lock:
             self._conn.execute(
-                """INSERT INTO doc_registry (org, repo, content_type, file_name, content_hash, file_size, last_seen, status)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """INSERT INTO doc_registry (org, repo, content_type, file_name, content_hash, file_size, last_seen, status, embed_status)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                  ON CONFLICT (org, repo, content_hash) DO UPDATE SET
                      content_type = EXCLUDED.content_type,
                      file_name = EXCLUDED.file_name,
                      file_size = EXCLUDED.file_size,
                      last_seen = EXCLUDED.last_seen,
-                     status = EXCLUDED.status""",
+                     status = EXCLUDED.status,
+                     embed_status = EXCLUDED.embed_status""",
                 (
                     data.get("org"),
                     data.get("repo"),
@@ -653,6 +492,7 @@ class DatabaseService:
                     data.get("file_size"),
                     _iso_now(),
                     data.get("status", "discovered"),
+                    data.get("embed_status", "discovered"),
                 ),
             )
             self._conn.commit()
@@ -661,11 +501,38 @@ class DatabaseService:
         """Fetch paginated registry records."""
         with self._lock:
             results = self._conn.execute(
-                "SELECT org, repo, content_type, file_name, content_hash, file_size, last_seen, status FROM doc_registry LIMIT ? OFFSET ?",
+                "SELECT id, org, repo, content_type, file_name, content_hash, file_size, last_seen, status, embed_status FROM doc_registry LIMIT ? OFFSET ?",
                 [limit, offset],
             ).fetchall()
             col_names = [desc[0] for desc in self._conn.description]
         return [dict(zip(col_names, row)) for row in results]
+
+    def get_pending_doc_registry(self, org: str, repo: str) -> list[dict]:
+        """Fetch registry entries pending embedding for a specific repo."""
+        with self._lock:
+            results = self._conn.execute(
+                "SELECT id, org, repo, content_type, file_name, content_hash, file_size, last_seen, status, embed_status FROM doc_registry WHERE org = ? AND repo = ? AND embed_status = 'discovered' ORDER BY id",
+                (org, repo),
+            ).fetchall()
+            col_names = [desc[0] for desc in self._conn.description]
+        return [dict(zip(col_names, row)) for row in results]
+
+    def update_doc_registry_embed_status(self, entry_id: int, status: str) -> None:
+        """Update embedding status for a registry entry."""
+        with self._lock:
+            self._conn.execute(
+                "UPDATE doc_registry SET embed_status = ? WHERE id = ?",
+                (status, entry_id),
+            )
+            self._conn.commit()
+
+    def get_repos_with_selected_dirs(self) -> list[str]:
+        """Get distinct repo_keys that have selected directories configured."""
+        with self._lock:
+            results = self._conn.execute(
+                "SELECT DISTINCT repo_key FROM git_selected_dirs ORDER BY repo_key"
+            ).fetchall()
+        return [row[0] for row in results]
 
     def delete_doc_registry_by_repo(self, org: str, repo: str) -> None:
         """Clear registry records for a specific repository."""

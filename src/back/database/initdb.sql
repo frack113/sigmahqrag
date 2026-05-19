@@ -55,22 +55,6 @@ CREATE TABLE IF NOT EXISTS doc_sigma_ref (
     embed_status TEXT DEFAULT 'pending'
 );
 
--- embed_progress
-CREATE TABLE IF NOT EXISTS embed_progress (
-    task_id TEXT PRIMARY KEY,
-    task_type TEXT DEFAULT 'embeddings',
-    source_type TEXT DEFAULT '',
-    status TEXT NOT NULL DEFAULT 'none',
-    total INTEGER DEFAULT 0,
-    processed INTEGER DEFAULT 0,
-    errors TEXT,
-    skipped INTEGER DEFAULT 0,
-    current_file TEXT DEFAULT '',
-    collection_name TEXT DEFAULT '',
-    progress_percent REAL DEFAULT 0.0,
-    updated_at TEXT
-);
-
 -- doc_registry (for file discovery results)
 CREATE TABLE IF NOT EXISTS doc_registry (
     id INTEGER PRIMARY KEY,
@@ -82,6 +66,7 @@ CREATE TABLE IF NOT EXISTS doc_registry (
     file_size BIGINT,
     last_seen TEXT,
     status TEXT,
+    embed_status TEXT DEFAULT 'pending',
     UNIQUE(org, repo, content_hash)
 );
 
@@ -115,7 +100,7 @@ CREATE INDEX IF NOT EXISTS idx_prompts_name ON system_prompts(name);
 CREATE INDEX IF NOT EXISTS idx_doc_sigma_ref_rule ON doc_sigma_ref(rule_id);
 CREATE INDEX IF NOT EXISTS idx_doc_sigma_ref_timestamp ON doc_sigma_ref(timestamp);
 CREATE INDEX IF NOT EXISTS idx_doc_sigma_ref_embed ON doc_sigma_ref(embed_status);
-CREATE INDEX IF NOT EXISTS idx_embed_progress_status ON embed_progress(status);
+CREATE INDEX IF NOT EXISTS idx_doc_registry_embed ON doc_registry(embed_status);
 
 -- =========================================================================
 -- SEED DATA

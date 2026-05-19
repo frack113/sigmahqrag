@@ -14,7 +14,6 @@ class SigmaRefEmbeddingWorker(BaseWorker):
     """Embeds Sigma Reference documents from doc_sigma_ref into Qdrant."""
 
     async def process(self, task: dict) -> None:
-        task_id = task["task_id"]
         collection_name = task.get("collection_name", "sigmaref")
         registry_path = Path(task.get("registry_path", "data/documents/sigmaref"))
 
@@ -23,15 +22,6 @@ class SigmaRefEmbeddingWorker(BaseWorker):
         raw_entries = self.db.get_pending_sigma_ref()
         if not raw_entries:
             logger.info("[SigmaRefEmbeddingWorker] No pending entries in doc_sigma_ref, nothing to embed")
-            self.db.upsert_embed_progress(
-                task_id=task_id,
-                status="completed",
-                source_type="sigmaref_embeddings",
-                total=0,
-                processed=0,
-                collection_name=collection_name,
-                progress_percent=100.0,
-            )
             return
 
         registry_entries = []
@@ -49,16 +39,6 @@ class SigmaRefEmbeddingWorker(BaseWorker):
         errors = []
         skipped = []
 
-        self.db.upsert_embed_progress(
-            task_id=task_id,
-            status="running",
-            source_type="sigmaref_embeddings",
-            total=total,
-            processed=0,
-            collection_name=collection_name,
-            progress_percent=0.0,
-        )
-
         builder = IngestionPipelineBuilder(collection_name=collection_name)
 
         for idx, entry in enumerate(registry_entries):
@@ -74,20 +54,7 @@ class SigmaRefEmbeddingWorker(BaseWorker):
                 matches = sorted(registry_path.glob(f"{file_hash}.*"))
                 file_path = matches[0] if matches else registry_path / f"{file_hash}.md"
 
-            processed = idx + 1
             current_file = file_name or file_hash
-            percent = (processed / total) * 100
-
-            self.db.upsert_embed_progress(
-                task_id=task_id,
-                status="running",
-                source_type="sigmaref_embeddings",
-                total=total,
-                processed=processed,
-                current_file=current_file,
-                collection_name=collection_name,
-                progress_percent=percent,
-            )
 
             doc_text = ""
             try:
@@ -120,19 +87,6 @@ class SigmaRefEmbeddingWorker(BaseWorker):
             await asyncio.sleep(0)
 
         processed = total - len(errors) - len(skipped)
-        error_summary = f"{len(errors)} errors, {len(skipped)} skipped" if errors or skipped else ""
-
-        self.db.upsert_embed_progress(
-            task_id=task_id,
-            status="completed",
-            source_type="sigmaref_embeddings",
-            total=total,
-            processed=processed,
-            skipped=len(skipped),
-            errors=error_summary,
-            collection_name=collection_name,
-            progress_percent=100.0,
-        )
 
         logger.info(
             f"[SigmaRefEmbeddingWorker] Complete: {processed}/{total} embedded, "
