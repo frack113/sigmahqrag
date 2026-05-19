@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 class TaskDispatcher:
-    """Main engine that dispatches tasks to specialized workers."""
+    """Main engine that dispatches tasks to specialized workers, one at a time."""
 
     _WORKER_TYPES: Dict[str, Type[BaseWorker]] = {
         "sigmaref_discovery": SigmaRefDiscoveryWorker,
@@ -31,36 +31,30 @@ class TaskDispatcher:
         self.db = DatabaseService.get_instance()
         self._running = False
         self._workers = dict(self._WORKER_TYPES)
-        self._pending_tasks: Dict[str, dict] = {}
+        self._task_queue: asyncio.Queue[tuple[str, dict]] = asyncio.Queue()
 
     async def run(self):
-        """Main loop to monitor and dispatch tasks."""
+        """Main loop to monitor and dispatch tasks sequentially."""
         self._running = True
         self.db.reset_stale_workers()
         logger.info("Task Dispatcher started with %d workers.", len(self._workers))
 
         while self._running:
             try:
-                for worker_type, task in list(self._pending_tasks.items()):
-                    if self.db.is_worker_busy(worker_type):
-                        continue
-                    
-                    await self._dispatch(worker_type, task)
-
+                worker_type, task = await self._task_queue.get()
+                await self._dispatch(worker_type, task)
+                self._task_queue.task_done()
             except Exception as e:
                 logger.error(f"Dispatcher loop error: {e}", exc_info=True)
 
-            await asyncio.sleep(self.poll_interval)
-
     async def queue_task(self, worker_type: str, task: dict):
         """Queue a task for execution."""
-        self._pending_tasks[worker_type] = task
+        await self._task_queue.put((worker_type, task))
         logger.info(f"Queued task for {worker_type}")
 
     async def _dispatch(self, worker_type: str, task: dict):
         """Dispatches a single task to the appropriate worker."""
         task_id = task.get("task_id", "")
-
         logger.info(f"Dispatching task {task_id} (type: {worker_type})")
 
         self.db.upsert_worker_state(
@@ -100,7 +94,6 @@ class TaskDispatcher:
                 current_task_id="",
                 error="",
             )
-            self._pending_tasks.pop(worker_type, None)
 
     def stop(self):
         self._running = False

@@ -30,7 +30,6 @@ def _ensure_duckdb_tables() -> None:
             "system_prompts",
             "models",
             "doc_sigma_ref",
-            "embed_progress",
             "worker_state",
             "doc_registry",
             "git_metadata",

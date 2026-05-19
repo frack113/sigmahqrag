@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from typing import Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 
 from src.back.database.service import DatabaseService
@@ -23,10 +23,9 @@ class FileOperationResponse(BaseModel):
     error: str | None = None
 
 
-def _get_dispatcher() -> TaskDispatcher:
+def _get_dispatcher(request: Request) -> TaskDispatcher:
     """Get the TaskDispatcher instance from app state."""
-    from src.main import app
-    return app.state.dispatcher
+    return request.app.state.dispatcher
 
 
 async def _trigger_worker(worker_type: str, task: dict, dispatcher: TaskDispatcher) -> bool:
@@ -63,7 +62,12 @@ async def file_list(dispatcher: TaskDispatcher = Depends(_get_dispatcher)) -> Fi
     else:
         busy.append("local_discovery")
 
-    if await _trigger_worker("sigmaref_discovery", {"task_type": "sigmaref_discovery", "collection_name": "sigmaref"}, dispatcher):
+    if await _trigger_worker("sigmaref_discovery", {
+        "task_type": "sigmaref_discovery",
+        "collection_name": "sigmaref",
+        "rules_dir": "data/github/sigmahq/sigma/rules",
+        "output_dir": "data/documents/sigmaref",
+    }, dispatcher):
         triggered.append("sigmaref_discovery")
     else:
         busy.append("sigmaref_discovery")

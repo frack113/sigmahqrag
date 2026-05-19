@@ -7,67 +7,12 @@
 <p>Manage GitHub repositories for Sigma rule indexing.</p>
 
 <div class="card">
-<div class="github-actions">
+    <div class="github-actions">
         <button id="add-repo-btn" class="btn btn-primary">Add Repository</button>
         <button id="refresh-btn" class="btn btn-primary" onclick="loadRepos()">Refresh list</button>
         <button id="download-ref-btn" class="btn btn-primary" onclick="downloadRefs()">Download ref</button>
         <button id="list-files-btn" class="btn btn-primary" onclick="listFiles()">List Files</button>
     </div>
-
-    <div id="repos-list" class="repos-grid"></div>
-
-    <div id="select-repo-prompt" class="select-repo-prompt" style="display: none;">
-        <p>Click "Browse" on a repository to view and select directories for indexing.</p>
-    </div>
-</div>
-
-<div id="repo-detail" class="repo-detail-section" style="display: none;">
-    <div class="repo-detail-header">
-        <h2 id="selected-repo-name">Repository</h2>
-        <button id="close-detail-btn" class="btn" onclick="closeRepoDetail()">Close</button>
-    </div>
-
-    <div class="directory-browser">
-        <div class="directory-header">
-            <h3>Select Directories to Index</h3>
-            <div class="directory-actions">
-                <button id="expand-all-btn" class="btn btn-sm" onclick="expandAll()">Expand All</button>
-                <button id="collapse-all-btn" class="btn btn-sm" onclick="collapseAll()">Collapse All</int>
-            </div>
-        </div>
-        <div id="directory-tree" class="directory-tree"></div>
-        <div id="selected-count" class="selected-count"></div>
-    </div>
-</div>
-
-<div id="add-repo-modal" class="modal" style="display: none;">
-    <div class="modal-content">
-        <h2>Add GitHub Repository</h2>
-        <form id="add-repo-form">
-            <div class="form-group">
-                <label for="repo-url">Repository (owner/repo)</label>
-                <input type="text" id="repo-url" name="url" placeholder="SigmaHQ/sigma" required>
-            </div>
-            <div class="form-group">
-                <label for="repo-branch">Branch</label>
-                <input type="text" id="repo-branch" name="branch" placeholder="main" value="main">
-            </div>
-            <div class="form-actions">
-                <button type="submit" class="btn btn-primary">Add</button>
-                <button type="button" class="btn" onclick="closeModal()">Cancel</button>
-            </div>
-        </form>
-    </div>
-</div>
-
-
-    <div id="repos-list" class="repos-grid"></div>
-
-    <div id="select-repo-prompt" class="select-repo-prompt" style="display: none;">
-        <p>Click "Browse" on a repository to view and select directories for indexing.</p>
-    </div>
-</div>
-
 
     <div id="repos-list" class="repos-grid"></div>
 
@@ -95,12 +40,6 @@
     </div>
 </div>
 
-        </div>
-        <div id="directory-tree" class="directory-tree"></div>
-        <div id="selected-count" class="selected-count"></div>
-    </div>
-</div>
-
 <div id="add-repo-modal" class="modal" style="display: none;">
     <div class="modal-content">
         <h2>Add GitHub Repository</h2>
@@ -120,7 +59,6 @@
         </form>
     </div>
 </div>
-
 {% endblock %}
 
 {% block scripts %}
@@ -330,21 +268,17 @@ async function deleteRepo(org, name) {
 async function downloadRefs() {
     const btn = document.getElementById('download-ref-btn');
     btn.disabled = true;
-    btn.textContent = 'Starting...';
+    btn.textContent = 'Downloading...';
     try {
-        const response = await fetch(API_BASE + '/download-ref', { method: 'POST' });
-        const result = await response.json();
-        if (result.success) {
-            alert(result.message || 'Download started in background');
+        const response = await fetch('/api/v1/files/list', { method: 'POST' });
+        const data = await response.json();
+        if (data.success) {
+            alert('Discovery started: ' + data.message);
         } else {
-            if (result.error && result.error.includes('busy')) {
-                alert('A reference download is already in progress. Please wait for it to complete.');
-            } else {
-                alert(result.error || 'Download failed');
-            }
+            alert('Failed: ' + data.error);
         }
-    } catch (error) {
-        alert('Failed to download references');
+    } catch (e) {
+        alert('Error: ' + e.message);
     } finally {
         btn.disabled = false;
         btn.textContent = 'Download ref';
@@ -356,17 +290,13 @@ async function listFiles() {
     btn.disabled = true;
     btn.textContent = 'Scanning...';
     try {
-        const response = await fetch(API_BASE + '/scan-all', { method: 'POST' });
+        const response = await fetch('/api/v1/files/list', { method: 'POST' });
         const result = await response.json();
         if (result.success) {
-            alert(result.message || 'Scan started in background');
+            alert(result.message || 'Scan started');
             loadRepos();
         } else {
-            if (result.error && result.error.includes('busy')) {
-                alert('A file scan is already in progress. Please wait for it to complete.');
-            } else {
-                alert(result.error || 'Scan failed');
-            }
+            alert(result.error || 'Scan failed');
         }
     } catch (error) {
         alert('Failed to initiate scan');
@@ -375,7 +305,6 @@ async function listFiles() {
         btn.textContent = 'List Files';
     }
 }
-
 
 document.getElementById('add-repo-form').onsubmit = async (e) => {
     e.preventDefault();

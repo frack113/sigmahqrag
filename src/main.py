@@ -89,68 +89,106 @@ def _check_old_data_files() -> list[str]:
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> None:
     """Application lifespan handler."""
-    _setup_logging()
-    from src.shared import Config
+    dispatcher = None
+    dispatcher_task = None
+    db = None
+    try:
+        _setup_logging()
+        logger.info("=== Lifespan starting ===")
+        from src.shared import Config
 
-    Config.init_app()
+        Config.init_app()
+        logger.info("Config initialized.")
 
-    db = DatabaseService()
-    db.initialize()
-    app.state.db = db
+        db = DatabaseService()
+        db.initialize()
+        app.state.db = db
+        logger.info("Database initialized.")
 
-    old_files = _check_old_data_files()
-    if old_files and _is_db_empty(db):
-        logger.warning(
-            "DuckDB is empty but old data files exist (%d found). "
-            "Run 'uv run python scripts/migrate_to_duckdb.py' to migrate data.",
-            len(old_files),
-        )
-
-    db.reset_stale_workers()
-
-    # Initialize worker states so the frontend always sees all workers
-    db.init_worker_states(list(TaskDispatcher._WORKER_TYPES.keys()))
-
-    # Sync filesystem repos into git_metadata if missing
-    from src.back.github.git import list_repos, get_metadata, save_metadata
-
-    for repo in list_repos():
-        repo_key = f"{repo['org']}/{repo['name']}"
-        if get_metadata(repo["org"], repo["name"]) is None:
-            logger.info("Syncing filesystem repo %s into git_metadata", repo_key)
-            save_metadata(
-                repo["org"],
-                repo["name"],
-                {
-                    "org": repo["org"],
-                    "name": repo["name"],
-                    "url": repo.get("remote_url", ""),
-                    "branch": repo.get("branch", "main"),
-                    "status": "synced",
-                },
+        old_files = _check_old_data_files()
+        if old_files and _is_db_empty(db):
+            logger.warning(
+                "DuckDB is empty but old data files exist (%d found). "
+                "Run 'uv run python scripts/migrate_to_duckdb.py' to migrate data.",
+                len(old_files),
             )
+        logger.info("Old files check done.")
 
-    # Sync filesystem models into DuckDB models table
-    from src.api.dependencies import get_unified_registry
-    from src.shared import LLM_DIR, EMBEDDINGS_DIR
+        db.reset_stale_workers()
+        logger.info("Stale workers reset.")
 
-    reg = get_unified_registry()
-    reg.sync_llm_folder(LLM_DIR)
-    reg.sync_embeddings_folder(EMBEDDINGS_DIR)
+        # Initialize worker states so the frontend always sees all workers
+        db.init_worker_states(list(TaskDispatcher._WORKER_TYPES.keys()))
+        logger.info("Worker states initialized.")
 
-    # Start the background task dispatcher
-    dispatcher = TaskDispatcher(poll_interval=5)
-    app.state.dispatcher = dispatcher
-    dispatcher_task = asyncio.create_task(dispatcher.run())
+        # Sync filesystem repos into git_metadata if missing
+        from src.back.github.git import list_repos, get_metadata, save_metadata
 
-    _validate_services()
-    await start_qdrant()
+        logger.info("Starting repo sync...")
+        for repo in list_repos():
+            repo_key = f"{repo['org']}/{repo['name']}"
+            if get_metadata(repo["org"], repo["name"]) is None:
+                logger.info("Syncing filesystem repo %s into git_metadata", repo_key)
+                save_metadata(
+                    repo["org"],
+                    repo["name"],
+                    {
+                        "org": repo["org"],
+                        "name": repo["name"],
+                        "url": repo.get("remote_url", ""),
+                        "branch": repo.get("branch", "main"),
+                        "status": "synced",
+                    },
+                )
+        logger.info("Repo sync done.")
+
+        # Sync filesystem models into DuckDB models table
+        from src.api.dependencies import get_unified_registry
+        from src.shared import LLM_DIR, EMBEDDINGS_DIR
+
+        logger.info("Starting model sync... LLM_DIR=%s EMBEDDINGS_DIR=%s", LLM_DIR, EMBEDDINGS_DIR)
+        try:
+            reg = get_unified_registry()
+            logger.info("Registry loaded.")
+        except Exception as e:
+            logger.error(f"Failed to load registry: {e}", exc_info=True)
+            reg = None
+        if reg:
+            try:
+                reg.sync_llm_folder(LLM_DIR)
+                logger.info("LLM folder synced.")
+            except Exception as e:
+                logger.error(f"Failed to sync LLM folder: {e}", exc_info=True)
+            try:
+                reg.sync_embeddings_folder(EMBEDDINGS_DIR)
+                logger.info("Embeddings folder synced.")
+            except Exception as e:
+                logger.error(f"Failed to sync embeddings folder: {e}", exc_info=True)
+        logger.info("Model sync done.")
+
+        # Start the background task dispatcher
+        dispatcher = TaskDispatcher(poll_interval=5)
+        app.state.dispatcher = dispatcher
+        dispatcher_task = asyncio.create_task(dispatcher.run())
+        logger.info("Dispatcher started.")
+
+        _validate_services()
+        logger.info("Services validated.")
+        await start_qdrant()
+        logger.info("Qdrant started.")
+        logger.info("=== Application startup complete ===")
+    except BaseException as e:
+        logger.error(f"Startup failed: {e}", exc_info=True)
+        raise
     yield
-    dispatcher.stop()
-    dispatcher_task.cancel()
+    if dispatcher:
+        dispatcher.stop()
+    if dispatcher_task:
+        dispatcher_task.cancel()
     await shutdown_all_services()
     await stop_qdrant()
-    db.close()
+    if db:
+        db.close()
 
 
 def _validate_services() -> None:
@@ -159,11 +197,9 @@ def _validate_services() -> None:
 
     config = get_config()
     if not config.llama_base_url:
-        logger.critical("LLM service not configured")
-        raise SystemExit(1)
+        logger.warning("LLM service not configured (llama_base_url missing)")
     if not config.qdrant_collection_name:
-        logger.critical("Qdrant service not configured")
-        raise SystemExit(1)
+        logger.warning("Qdrant service not configured (qdrant_collection_name missing)")
 
 
 def create_app() -> FastAPI:

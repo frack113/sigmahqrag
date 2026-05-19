@@ -452,6 +452,17 @@ class DatabaseService:
         )
         return result is not None
 
+    def init_worker_states(self, worker_types: list[str]) -> None:
+        """Ensure all worker types exist in worker_state with idle status."""
+        with self._lock:
+            for wt in worker_types:
+                self._conn.execute(
+                    "INSERT INTO worker_state (worker_type, status, last_heartbeat, current_task_id, started_at, error) "
+                    "VALUES (?, 'idle', ?, '', NULL, '') ON CONFLICT (worker_type) DO NOTHING",
+                    (wt, _iso_now()),
+                )
+            self._conn.commit()
+
     def reset_stale_workers(self, stale_seconds: int = 3600) -> None:
         """Mark workers with stale heartbeats as idle."""
         from datetime import timedelta

@@ -176,6 +176,21 @@ async def download_llm_model(
     )
 
 
+@router.delete("/llm/{repo_id}")
+async def delete_llm_model(repo_id: str) -> JSONResponse:
+    """Delete a LLM model entry."""
+    try:
+        reg = get_unified_registry()
+        record = reg.get_llm(repo_id)
+        if not record:
+            return JSONResponse(status_code=404, content={"error": f"Model {repo_id} not found"})
+        reg.remove_llm(repo_id)
+        return JSONResponse(content={"success": True, "repo_id": repo_id})
+    except Exception as e:
+        logger.error(f"Delete failed: {e}")
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+
 @router.delete("/llm/{repo_id}/file/{filename}")
 async def delete_llm_model_file(repo_id: str, filename: str) -> JSONResponse:
     """Delete a LLM model file."""
