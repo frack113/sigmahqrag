@@ -1,11 +1,16 @@
 import hashlib
 import logging
+from datetime import datetime, timezone
 from pathlib import Path
 
 from src.back.worker.base import BaseWorker
-from src.back.utils.identify_file_type import SUPPORTED_DOC_EXTENSION_MAP
+from src.back.utils.identify_file_type import SUPPORTED_DOC_EXTENSION_MAP, identify
 
 logger = logging.getLogger(__name__)
+
+
+def _iso_now() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 class LocalDiscoveryWorker(BaseWorker):
@@ -43,17 +48,27 @@ class LocalDiscoveryWorker(BaseWorker):
                     content_hash = ""
                     file_size = 0
 
-                content_type = file_path.suffix.lower().lstrip(".")
+                content_type = identify(file_path).value
+                url_hash = hashlib.sha256(f"local/{collection_name}/{file_rel_path}".encode()).hexdigest()
+                title = file_path.stem
 
                 self.db.upsert_doc_registry(
                     {
+                        "url_hash": url_hash,
                         "org": "local",
                         "repo": collection_name,
                         "content_type": content_type,
                         "file_name": file_rel_path,
-                        "content_hash": content_hash,
+                        "content_sha256": content_hash,
                         "file_size": file_size,
+                        "original_url": f"file://{base_path}/{file_rel_path}",
+                        "normalized_url": f"file://{base_path}/{file_rel_path}",
+                        "rule_id": "00000000-0000-0000-0000-000000000000",
+                        "title": title,
+                        "timestamp": _iso_now(),
+                        "last_seen": _iso_now(),
                         "status": "discovered",
+                        "embed_status": "discovered",
                     }
                 )
             except Exception as e:

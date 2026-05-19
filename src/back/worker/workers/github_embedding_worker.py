@@ -73,11 +73,11 @@ class GithubEmbeddingWorker(BaseWorker):
             doc = Document(text=doc_text, metadata=metadata)
             try:
                 builder.run(documents=[doc])
-                self.db.update_doc_registry_embed_status(entry.get("id"), "embedded")
+                self.db.update_doc_registry_embed_status(entry.get("url_hash"), "embedded")
             except Exception as e:
                 logger.error(f"[GithubEmbeddingWorker] Error embedding {file_name}: {e}")
                 errors.append({"file": file_name, "error": str(e)})
-                self.db.update_doc_registry_embed_status(entry.get("id"), "error")
+                self.db.update_doc_registry_embed_status(entry.get("url_hash"), "error")
 
             await asyncio.sleep(0)
 

@@ -485,23 +485,40 @@ class DatabaseService:
         """Upsert a file record into doc_registry."""
         with self._lock:
             self._conn.execute(
-                """INSERT INTO doc_registry (org, repo, content_type, file_name, content_hash, file_size, last_seen, status, embed_status)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                 ON CONFLICT (org, repo, content_hash) DO UPDATE SET
-                     content_type = EXCLUDED.content_type,
-                     file_name = EXCLUDED.file_name,
-                     file_size = EXCLUDED.file_size,
-                     last_seen = EXCLUDED.last_seen,
-                     status = EXCLUDED.status,
-                     embed_status = EXCLUDED.embed_status""",
+                """INSERT INTO doc_registry (
+                    url_hash, org, repo, content_type, file_name, content_sha256,
+                    file_size, original_url, normalized_url, rule_id, title,
+                    timestamp, last_seen, status, embed_status
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (url_hash) DO UPDATE SET
+                    org = EXCLUDED.org,
+                    repo = EXCLUDED.repo,
+                    content_type = EXCLUDED.content_type,
+                    file_name = EXCLUDED.file_name,
+                    content_sha256 = EXCLUDED.content_sha256,
+                    file_size = EXCLUDED.file_size,
+                    original_url = EXCLUDED.original_url,
+                    normalized_url = EXCLUDED.normalized_url,
+                    rule_id = EXCLUDED.rule_id,
+                    title = EXCLUDED.title,
+                    timestamp = EXCLUDED.timestamp,
+                    last_seen = EXCLUDED.last_seen,
+                    status = EXCLUDED.status,
+                    embed_status = EXCLUDED.embed_status""",
                 (
+                    data.get("url_hash"),
                     data.get("org"),
                     data.get("repo"),
                     data.get("content_type"),
                     data.get("file_name"),
-                    data.get("content_hash"),
+                    data.get("content_sha256"),
                     data.get("file_size"),
-                    _iso_now(),
+                    data.get("original_url"),
+                    data.get("normalized_url"),
+                    data.get("rule_id", "00000000-0000-0000-0000-000000000000"),
+                    data.get("title"),
+                    data.get("timestamp"),
+                    data.get("last_seen"),
                     data.get("status", "discovered"),
                     data.get("embed_status", "discovered"),
                 ),
@@ -512,7 +529,7 @@ class DatabaseService:
         """Fetch paginated registry records."""
         with self._lock:
             results = self._conn.execute(
-                "SELECT id, org, repo, content_type, file_name, content_hash, file_size, last_seen, status, embed_status FROM doc_registry LIMIT ? OFFSET ?",
+                "SELECT url_hash, org, repo, content_type, file_name, content_sha256, file_size, original_url, normalized_url, rule_id, title, timestamp, last_seen, status, embed_status FROM doc_registry LIMIT ? OFFSET ?",
                 [limit, offset],
             ).fetchall()
             col_names = [desc[0] for desc in self._conn.description]
@@ -522,18 +539,18 @@ class DatabaseService:
         """Fetch registry entries pending embedding for a specific repo."""
         with self._lock:
             results = self._conn.execute(
-                "SELECT id, org, repo, content_type, file_name, content_hash, file_size, last_seen, status, embed_status FROM doc_registry WHERE org = ? AND repo = ? AND embed_status = 'discovered' ORDER BY id",
+                "SELECT url_hash, org, repo, content_type, file_name, content_sha256, file_size, original_url, normalized_url, rule_id, title, timestamp, last_seen, status, embed_status FROM doc_registry WHERE org = ? AND repo = ? AND embed_status = 'discovered' ORDER BY url_hash",
                 (org, repo),
             ).fetchall()
             col_names = [desc[0] for desc in self._conn.description]
         return [dict(zip(col_names, row)) for row in results]
 
-    def update_doc_registry_embed_status(self, entry_id: int, status: str) -> None:
+    def update_doc_registry_embed_status(self, url_hash: str, status: str) -> None:
         """Update embedding status for a registry entry."""
         with self._lock:
             self._conn.execute(
-                "UPDATE doc_registry SET embed_status = ? WHERE id = ?",
-                (status, entry_id),
+                "UPDATE doc_registry SET embed_status = ? WHERE url_hash = ?",
+                (status, url_hash),
             )
             self._conn.commit()
 

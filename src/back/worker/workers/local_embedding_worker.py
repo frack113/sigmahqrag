@@ -87,5 +87,5 @@ class LocalEmbeddingWorker(BaseWorker):
             for e in all_entries
             if e.get("org") == "local"
             and e.get("repo") == collection_name
-            and e.get("status") == "discovered"
+            and e.get("embed_status") == "discovered"
         ]

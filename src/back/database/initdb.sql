@@ -57,17 +57,21 @@ CREATE TABLE IF NOT EXISTS doc_sigma_ref (
 
 -- doc_registry (for file discovery results)
 CREATE TABLE IF NOT EXISTS doc_registry (
-    id INTEGER PRIMARY KEY,
+    url_hash TEXT PRIMARY KEY,
     org TEXT,
     repo TEXT,
     content_type TEXT,
     file_name TEXT,
-    content_hash TEXT,
+    content_sha256 TEXT,
     file_size BIGINT,
+    original_url TEXT,
+    normalized_url TEXT,
+    rule_id TEXT DEFAULT '00000000-0000-0000-0000-000000000000',
+    title TEXT,
+    timestamp TEXT,
     last_seen TEXT,
     status TEXT,
-    embed_status TEXT DEFAULT 'pending',
-    UNIQUE(org, repo, content_hash)
+    embed_status TEXT DEFAULT 'pending'
 );
 
 -- git_metadata
