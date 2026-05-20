@@ -1,16 +1,12 @@
 import hashlib
 import logging
-from datetime import datetime, timezone
 from pathlib import Path
 
-from src.back.worker.base import BaseWorker
+from src.worker.base import BaseWorker
+from src.worker.utils import iso_now
 from src.back.utils.identify_file_type import SUPPORTED_DOC_EXTENSION_MAP, identify
 
 logger = logging.getLogger(__name__)
-
-
-def _iso_now() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 class LocalDiscoveryWorker(BaseWorker):
@@ -28,7 +24,7 @@ class LocalDiscoveryWorker(BaseWorker):
 
         files_to_process = []
         for ext in SUPPORTED_DOC_EXTENSION_MAP.keys():
-            pattern = f"**/*.{ext}"
+            pattern = f"**/*{ext}"
             for found_file in base_path.glob(pattern):
                 files_to_process.append(found_file)
 
@@ -67,8 +63,8 @@ class LocalDiscoveryWorker(BaseWorker):
                         "normalized_url": f"file://{base_path}/{file_rel_path}",
                         "rule_id": "00000000-0000-0000-0000-000000000000",
                         "title": title,
-                        "timestamp": _iso_now(),
-                        "last_seen": _iso_now(),
+"timestamp": iso_now(),
+                "last_seen": iso_now(),
                         "embed_status": "discovered",
                     }
                 )

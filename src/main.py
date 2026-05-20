@@ -1,6 +1,5 @@
 """Main application entry point."""
 
-import asyncio
 import logging
 from contextlib import asynccontextmanager
 from logging.handlers import RotatingFileHandler
@@ -35,7 +34,7 @@ from src.api.v1.system_prompt import router as prompts_v1_router
 from src.back.database import DatabaseService
 from src.back.qdrant.auto_start import start_qdrant, stop_qdrant
 from src.back.service_manager import shutdown_all_services
-from src.back.worker.processor import TaskDispatcher
+from src.worker.processor import TaskDispatcher
 from src.shared.exceptions import SigmaError
 
 logger = logging.getLogger(__name__)
@@ -90,7 +89,6 @@ def _check_old_data_files() -> list[str]:
 async def lifespan(app: FastAPI) -> None:
     """Application lifespan handler."""
     dispatcher = None
-    dispatcher_task = None
     db = None
     try:
         _setup_logging()
@@ -142,35 +140,22 @@ async def lifespan(app: FastAPI) -> None:
                 )
         logger.info("Repo sync done.")
 
-        # Sync filesystem models into DuckDB models table
-        from src.api.dependencies import get_unified_registry
-        from src.shared import LLM_DIR, EMBEDDINGS_DIR
-
-        logger.info("Starting model sync... LLM_DIR=%s EMBEDDINGS_DIR=%s", LLM_DIR, EMBEDDINGS_DIR)
-        try:
-            reg = get_unified_registry()
-            logger.info("Registry loaded.")
-        except Exception as e:
-            logger.error(f"Failed to load registry: {e}", exc_info=True)
-            reg = None
-        if reg:
-            try:
-                reg.sync_llm_folder(LLM_DIR)
-                logger.info("LLM folder synced.")
-            except Exception as e:
-                logger.error(f"Failed to sync LLM folder: {e}", exc_info=True)
-            try:
-                reg.sync_embeddings_folder(EMBEDDINGS_DIR)
-                logger.info("Embeddings folder synced.")
-            except Exception as e:
-                logger.error(f"Failed to sync embeddings folder: {e}", exc_info=True)
-        logger.info("Model sync done.")
-
-        # Start the background task dispatcher
+        # Start the background task dispatcher in its own thread
         dispatcher = TaskDispatcher(poll_interval=5)
         app.state.dispatcher = dispatcher
-        dispatcher_task = asyncio.create_task(dispatcher.run())
-        logger.info("Dispatcher started.")
+        dispatcher.start()
+        logger.info("Dispatcher started in background thread.")
+
+        # Queue model sync as a background worker task
+        from src.shared import LLM_DIR, EMBEDDINGS_DIR
+
+        logger.info("Queuing model sync as background worker...")
+        await dispatcher.queue_task("model_sync", {
+            "task_id": "model-sync-startup",
+            "llm_dir": str(LLM_DIR),
+            "embeddings_dir": str(EMBEDDINGS_DIR),
+        })
+        logger.info("Model sync queued.")
 
         _validate_services()
         logger.info("Services validated.")
@@ -183,8 +168,7 @@ async def lifespan(app: FastAPI) -> None:
     yield
     if dispatcher:
         dispatcher.stop()
-    if dispatcher_task:
-        dispatcher_task.cancel()
+        logger.info("Dispatcher stopped.")
     await shutdown_all_services()
     await stop_qdrant()
     if db:

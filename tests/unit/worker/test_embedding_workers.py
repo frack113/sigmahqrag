@@ -7,9 +7,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.back.worker.workers.github_embedding_worker import GithubEmbeddingWorker
-from src.back.worker.workers.local_embedding_worker import LocalEmbeddingWorker
-from src.back.worker.workers.sigmaref_embedding_worker import SigmaRefEmbeddingWorker
+from src.worker.workers.github_embedding_worker import GithubEmbeddingWorker
+from src.worker.workers.local_embedding_worker import LocalEmbeddingWorker
+from src.worker.workers.sigmaref_embedding_worker import SigmaRefEmbeddingWorker
 
 
 class TestSigmaRefEmbeddingWorker:
@@ -55,7 +55,7 @@ class TestSigmaRefEmbeddingWorker:
         }
 
         with patch(
-            "src.back.worker.workers.sigmaref_embedding_worker.IngestionPipelineBuilder"
+            "src.worker.workers.embedding_base.IngestionPipelineBuilder"
         ) as mock_builder_cls:
             mock_builder = MagicMock()
             mock_builder.run = MagicMock()
@@ -92,7 +92,7 @@ class TestSigmaRefEmbeddingWorker:
         }
 
         with patch(
-            "src.back.worker.workers.sigmaref_embedding_worker.IngestionPipelineBuilder"
+            "src.worker.workers.embedding_base.IngestionPipelineBuilder"
         ) as mock_builder_cls:
             mock_builder = MagicMock()
             mock_builder.run = MagicMock()
@@ -126,7 +126,7 @@ class TestSigmaRefEmbeddingWorker:
         }
 
         with patch(
-            "src.back.worker.workers.sigmaref_embedding_worker.IngestionPipelineBuilder"
+            "src.worker.workers.embedding_base.IngestionPipelineBuilder"
         ) as mock_builder_cls:
             mock_builder = MagicMock()
             mock_builder.run = MagicMock()
@@ -154,7 +154,7 @@ class TestGithubEmbeddingWorker:
                 return tmp_path
             return tmp_path / "/".join(args)
 
-        with patch("src.back.worker.workers.github_embedding_worker.Path", side_effect=mock_path):
+        with patch("src.worker.workers.github_embedding_worker.Path", side_effect=mock_path):
             worker = GithubEmbeddingWorker(mock_db)
             with pytest.raises(FileNotFoundError, match="Repository path does not exist"):
                 await worker.process(task)
@@ -191,9 +191,9 @@ class TestGithubEmbeddingWorker:
                 return tmp_path
             return tmp_path / "/".join(args)
 
-        with patch("src.back.worker.workers.github_embedding_worker.Path", side_effect=mock_path):
+        with patch("src.worker.workers.embedding_base.Path", side_effect=mock_path):
             with patch(
-                "src.back.worker.workers.github_embedding_worker.IngestionPipelineBuilder"
+                "src.worker.workers.embedding_base.IngestionPipelineBuilder"
             ) as mock_builder_cls:
                 mock_builder = MagicMock()
                 mock_builder.run = MagicMock()
@@ -220,7 +220,7 @@ class TestGithubEmbeddingWorker:
                 "file_name": "rules/rule1.md",
                 "content_type": "rules",
                 "status": "discovered",
-                "embed_status": "discovery",
+                "embed_status": "discovered",
             }
         ]
 
@@ -235,9 +235,9 @@ class TestGithubEmbeddingWorker:
                 return tmp_path
             return tmp_path / "/".join(args)
 
-        with patch("src.back.worker.workers.github_embedding_worker.Path", side_effect=mock_path):
+        with patch("src.worker.workers.embedding_base.Path", side_effect=mock_path):
             with patch(
-                "src.back.worker.workers.github_embedding_worker.IngestionPipelineBuilder"
+                "src.worker.workers.embedding_base.IngestionPipelineBuilder"
             ) as mock_builder_cls:
                 mock_builder = MagicMock()
                 mock_builder.run = MagicMock()
@@ -263,7 +263,7 @@ class TestGithubEmbeddingWorker:
                 "repo": "test-repo",
                 "file_name": "doc.md",
                 "status": "discovered",
-                "embed_status": "discovery",
+                "embed_status": "discovered",
             },
         ]
 
@@ -278,9 +278,9 @@ class TestGithubEmbeddingWorker:
                 return tmp_path
             return tmp_path / "/".join(args)
 
-        with patch("src.back.worker.workers.github_embedding_worker.Path", side_effect=mock_path):
+        with patch("src.worker.workers.embedding_base.Path", side_effect=mock_path):
             with patch(
-                "src.back.worker.workers.github_embedding_worker.IngestionPipelineBuilder"
+                "src.worker.workers.embedding_base.IngestionPipelineBuilder"
             ) as mock_builder_cls:
                 mock_builder = MagicMock()
                 mock_builder.run = MagicMock()
@@ -343,7 +343,7 @@ class TestLocalEmbeddingWorker:
                 "file_name": "doc1.md",
                 "content_type": "markdown",
                 "status": "discovered",
-                "embed_status": "discovery",
+                "embed_status": "discovered",
             }
         ]
 
@@ -355,7 +355,7 @@ class TestLocalEmbeddingWorker:
         }
 
         with patch(
-            "src.back.worker.workers.local_embedding_worker.IngestionPipelineBuilder"
+            "src.worker.workers.embedding_base.IngestionPipelineBuilder"
         ) as mock_builder_cls:
             mock_builder = MagicMock()
             mock_builder.run = MagicMock()

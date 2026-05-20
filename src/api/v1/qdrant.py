@@ -345,19 +345,13 @@ async def qdrant_action(request: QdrantActionRequest) -> QdrantActionResponse:
                 current_task_id=task_id,
             )
 
-            # Trigger via dispatcher if available, otherwise use background task
+            # Trigger via dispatcher
             from src.main import app
 
-            if app and hasattr(app, "state") and hasattr(app.state, "dispatcher"):
-                await app.state.dispatcher.queue_task("sigmaref_embeddings", task)
-            else:
-                # Fallback for direct calls or tests
-                import asyncio
-                from src.back.worker.workers.sigmaref_embedding_worker import (
-                    SigmaRefEmbeddingWorker,
-                )
+            if not app or not hasattr(app.state, "dispatcher"):
+                raise RuntimeError("TaskDispatcher not available — is the server running?")
 
-                asyncio.create_task(SigmaRefEmbeddingWorker(db).process(task))
+            await app.state.dispatcher.queue_task("sigmaref_embeddings", task)
 
             return QdrantActionResponse(
                 status="success",

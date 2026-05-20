@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 
 from src.back.database.service import DatabaseService
-from src.back.worker.processor import TaskDispatcher
+from src.worker.processor import TaskDispatcher
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +32,11 @@ def _get_dispatcher(request: Request) -> TaskDispatcher:
 
 
 async def _trigger_worker(worker_type: str, task: dict, dispatcher: TaskDispatcher) -> bool:
-    """Helper to trigger a worker via the dispatcher."""
+    """Helper to trigger a worker via the dispatcher.
+
+    The API only checks if the worker is busy and queues the task.
+    The TaskDispatcher manages state transitions: idle -> running -> idle.
+    """
     db = DatabaseService.get_instance()
     db.reset_stale_workers(stale_seconds=30)
     state = db.get_worker_state(worker_type)
@@ -52,12 +56,6 @@ async def _trigger_worker(worker_type: str, task: dict, dispatcher: TaskDispatch
 
     task_id = str(uuid.uuid4())
     task["task_id"] = task_id
-    logger.info(f"Setting worker {worker_type} to running with task {task_id}")
-    db.upsert_worker_state(
-        worker_type=worker_type,
-        status="running",
-        current_task_id=task_id,
-    )
 
     logger.info(f"Queuing task for {worker_type}")
     await dispatcher.queue_task(worker_type, task)

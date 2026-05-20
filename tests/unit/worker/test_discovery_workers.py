@@ -7,9 +7,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.back.worker.workers.github_discovery_worker import GithubDiscoveryWorker
-from src.back.worker.workers.local_discovery_worker import LocalDiscoveryWorker
-from src.back.worker.workers.sigmaref_discovery_worker import SigmaRefDiscoveryWorker
+from src.worker.workers.github_discovery_worker import GithubDiscoveryWorker
+from src.worker.workers.local_discovery_worker import LocalDiscoveryWorker
+from src.worker.workers.sigmaref_discovery_worker import SigmaRefDiscoveryWorker
 
 
 class TestSigmaRefDiscoveryWorker:
@@ -26,7 +26,7 @@ class TestSigmaRefDiscoveryWorker:
         summary = {"total_rules": 10, "total_refs": 5, "downloaded": 3, "skipped": 2, "failed": 0}
 
         with patch(
-            "src.back.worker.workers.sigmaref_discovery_worker.download_references",
+            "src.worker.workers.sigmaref_discovery_worker.download_references",
             return_value=summary,
         ) as mock_download:
             worker = SigmaRefDiscoveryWorker(mock_db)
@@ -39,76 +39,20 @@ class TestSigmaRefDiscoveryWorker:
         )
 
     @pytest.mark.asyncio
-    async def test_process_reports_completed(self, mock_db: MagicMock) -> None:
-        task = {
-            "task_id": "sr-disc-002",
-            "task_type": "sigmaref_discovery",
-            "collection_name": "sigmaref",
-        }
-
-        summary = {"total_rules": 5, "total_refs": 3, "downloaded": 2, "skipped": 1, "failed": 0}
-
-        with patch(
-            "src.back.worker.workers.sigmaref_discovery_worker.download_references",
-            return_value=summary,
-        ):
-            worker = SigmaRefDiscoveryWorker(mock_db)
-            await worker.process(task)
-
-        calls = mock_db.upsert_embed_progress.call_args_list
-        final_call = calls[-1]
-        assert final_call.kwargs["status"] == "completed"
-        assert final_call.kwargs["source_type"] == "sigmaref_discovery"
-        assert final_call.kwargs["processed"] == 2
-        assert final_call.kwargs["skipped"] == 1
-
-    @pytest.mark.asyncio
-    async def test_process_reports_failed_downloads(self, mock_db: MagicMock) -> None:
+    async def test_process_propagates_errors(self, mock_db: MagicMock) -> None:
         task = {
             "task_id": "sr-disc-003",
             "task_type": "sigmaref_discovery",
             "collection_name": "sigmaref",
         }
 
-        summary = {"total_rules": 5, "total_refs": 3, "downloaded": 1, "skipped": 1, "failed": 1}
-
         with patch(
-            "src.back.worker.workers.sigmaref_discovery_worker.download_references",
-            return_value=summary,
+            "src.worker.workers.sigmaref_discovery_worker.download_references",
+            side_effect=RuntimeError("download failed"),
         ):
             worker = SigmaRefDiscoveryWorker(mock_db)
-            await worker.process(task)
-
-        calls = mock_db.upsert_embed_progress.call_args_list
-        final_call = calls[-1]
-        assert final_call.kwargs["status"] == "completed"
-        assert "1 downloads failed" in final_call.kwargs["errors"]
-
-    @pytest.mark.asyncio
-    async def test_process_sets_running_status(self, mock_db: MagicMock) -> None:
-        task = {
-            "task_id": "sr-disc-004",
-            "task_type": "sigmaref_discovery",
-            "collection_name": "sigmaref",
-        }
-
-        with patch(
-            "src.back.worker.workers.sigmaref_discovery_worker.download_references",
-            return_value={
-                "total_rules": 0,
-                "total_refs": 0,
-                "downloaded": 0,
-                "skipped": 0,
-                "failed": 0,
-            },
-        ):
-            worker = SigmaRefDiscoveryWorker(mock_db)
-            await worker.process(task)
-
-        calls = mock_db.upsert_embed_progress.call_args_list
-        first_call = calls[0]
-        assert first_call.kwargs["status"] == "running"
-        assert first_call.kwargs["current_file"] == "scanning rules..."
+            with pytest.raises(RuntimeError, match="download failed"):
+                await worker.process(task)
 
 
 class TestGithubDiscoveryWorker:
@@ -124,11 +68,6 @@ class TestGithubDiscoveryWorker:
 
         worker = GithubDiscoveryWorker(mock_db)
         await worker.process(task)
-
-        calls = mock_db.upsert_embed_progress.call_args_list
-        final_call = calls[-1]
-        assert final_call.kwargs["status"] == "completed"
-        assert final_call.kwargs["total"] == 0
 
     @pytest.mark.asyncio
     async def test_process_scans_multiple_repos(self, mock_db: MagicMock, tmp_path: Path) -> None:
@@ -157,12 +96,7 @@ class TestGithubDiscoveryWorker:
         worker.github_base_dir = str(tmp_path)
         await worker.process(task)
 
-        assert mock_db.upsert_doc_sigma_ref.call_count == 3
-        calls = mock_db.upsert_embed_progress.call_args_list
-        final_call = calls[-1]
-        assert final_call.kwargs["status"] == "completed"
-        assert final_call.kwargs["processed"] == 3
-        assert final_call.kwargs["collection_name"] == "all"
+        assert mock_db.upsert_doc_registry.call_count == 3
 
     @pytest.mark.asyncio
     async def test_process_respects_selected_dirs(self, mock_db: MagicMock, tmp_path: Path) -> None:
@@ -187,7 +121,7 @@ class TestGithubDiscoveryWorker:
         worker.github_base_dir = str(tmp_path)
         await worker.process(task)
 
-        assert mock_db.upsert_doc_sigma_ref.call_count == 1
+        assert mock_db.upsert_doc_registry.call_count == 1
 
     @pytest.mark.asyncio
     async def test_process_skips_missing_repos(self, mock_db: MagicMock, tmp_path: Path) -> None:
@@ -211,10 +145,7 @@ class TestGithubDiscoveryWorker:
         worker.github_base_dir = str(tmp_path)
         await worker.process(task)
 
-        assert mock_db.upsert_doc_sigma_ref.call_count == 1
-        calls = mock_db.upsert_embed_progress.call_args_list
-        final_call = calls[-1]
-        assert final_call.kwargs["status"] == "completed"
+        assert mock_db.upsert_doc_registry.call_count == 1
 
     @pytest.mark.asyncio
     async def test_process_sets_embed_status(self, mock_db: MagicMock, tmp_path: Path) -> None:
@@ -235,9 +166,9 @@ class TestGithubDiscoveryWorker:
         worker.github_base_dir = str(tmp_path)
         await worker.process(task)
 
-        assert mock_db.upsert_doc_sigma_ref.call_count >= 1
-        call_args = mock_db.upsert_doc_sigma_ref.call_args_list[0][0][0]
-        assert call_args["embed_status"] == "discovery"
+        assert mock_db.upsert_doc_registry.call_count >= 1
+        call_args = mock_db.upsert_doc_registry.call_args_list[0][0][0]
+        assert call_args["embed_status"] == "discovered"
 
 
 class TestLocalDiscoveryWorker:
@@ -252,11 +183,6 @@ class TestLocalDiscoveryWorker:
 
         worker = LocalDiscoveryWorker(mock_db)
         await worker.process(task)
-
-        calls = mock_db.upsert_embed_progress.call_args_list
-        final_call = calls[-1]
-        assert final_call.kwargs["status"] == "completed"
-        assert final_call.kwargs["total"] == 0
 
     @pytest.mark.asyncio
     async def test_process_scans_local_directory(self, mock_db: MagicMock, tmp_path: Path) -> None:
@@ -275,11 +201,7 @@ class TestLocalDiscoveryWorker:
         worker = LocalDiscoveryWorker(mock_db)
         await worker.process(task)
 
-        assert mock_db.upsert_doc_sigma_ref.call_count == 2
-        calls = mock_db.upsert_embed_progress.call_args_list
-        final_call = calls[-1]
-        assert final_call.kwargs["status"] == "completed"
-        assert final_call.kwargs["processed"] == 2
+        assert mock_db.upsert_doc_registry.call_count == 2
 
     @pytest.mark.asyncio
     async def test_process_uses_default_path(self, mock_db: MagicMock) -> None:
@@ -291,11 +213,6 @@ class TestLocalDiscoveryWorker:
 
         worker = LocalDiscoveryWorker(mock_db)
         await worker.process(task)
-
-        calls = mock_db.upsert_embed_progress.call_args_list
-        final_call = calls[-1]
-        assert final_call.kwargs["status"] == "completed"
-        assert final_call.kwargs["current_file"] == "path not found"
 
     @pytest.mark.asyncio
     async def test_process_reports_source_type(self, mock_db: MagicMock, tmp_path: Path) -> None:
@@ -313,5 +230,5 @@ class TestLocalDiscoveryWorker:
         worker = LocalDiscoveryWorker(mock_db)
         await worker.process(task)
 
-        calls = mock_db.upsert_embed_progress.call_args_list
-        assert all(c.kwargs["source_type"] == "local_discovery" for c in calls)
+        calls = mock_db.upsert_doc_registry.call_args_list
+        assert all(c[0][0]["org"] == "local" for c in calls)

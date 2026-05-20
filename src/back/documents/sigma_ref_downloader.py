@@ -419,4 +419,4 @@ def _iso_now() -> str:
     """Return current UTC timestamp in ISO 8601 format."""
     from datetime import datetime, timezone
 
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")  # noqa: UP017
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
