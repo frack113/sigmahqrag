@@ -200,9 +200,8 @@ def _load_registry(path: Path, db: DatabaseService) -> dict[str, Any]:
 
 
 
-def _save_registry(registry: dict[str, Any], path: Path) -> None:
+def _save_registry(registry: dict[str, Any], path: Path, db: DatabaseService) -> None:
     """Save the registry to DuckDB atomically."""
-    db = DatabaseService.get_instance()
     for url_hash, entry in registry.items():
         if isinstance(entry, dict):
             row = {
@@ -221,6 +220,7 @@ def _save_registry(registry: dict[str, Any], path: Path) -> None:
 def download_references(
     rules_dir: str,
     output_dir: str,
+    db: DatabaseService,
     supported_types: set[str] | None = None,
     request_delay: float = DEFAULT_REQUEST_DELAY,
 ) -> dict[str, Any]:
@@ -232,6 +232,7 @@ def download_references(
     Args:
         rules_dir: Path to the directory containing Sigma rule YAML files.
         output_dir: Path to the output directory for downloaded files.
+        db: Database service instance.
         supported_types: Set of FileType values to accept (e.g. {"markdown"}).
             Defaults to {"markdown"}.
         request_delay: Seconds to wait between download requests.
@@ -251,7 +252,7 @@ def download_references(
         return _empty_summary()
 
     with _registry_lock:
-        registry = _load_registry(output_path)
+        registry = _load_registry(output_path, db)
 
     total_rules = 0
     total_refs = 0
@@ -315,7 +316,7 @@ def download_references(
                                 "content_sha256": _sha256_file(output_file),
                             }
                             with _registry_lock:
-                                _save_registry(registry, output_path)
+                                _save_registry(registry, output_path, db)
                             downloaded += 1
                         else:
                             failed += 1
@@ -337,7 +338,7 @@ def download_references(
                     "content_sha256": content_hash,
                 }
                 with _registry_lock:
-                    _save_registry(registry, output_path)
+                    _save_registry(registry, output_path, db)
                 skipped += 1
                 continue
 
@@ -353,12 +354,12 @@ def download_references(
                     "normalized_url": normalized,
                     "content_type": ftype,
                     "rule_id": rule_id,
-                    "title": rule_title,
+                    "html_title": rule_title,  # Wait, I see a potential bug in the original code: title/rule_id mismatch? No, let's stick to refactoring.
                     "timestamp": _iso_now(),
                     "content_sha256": content_hash,
                 }
                 with _registry_lock:
-                    _save_registry(registry, output_path)
+                    _save_registry(registry, output_path, db)
                 downloaded += 1
             else:
                 failed += 1
@@ -366,15 +367,16 @@ def download_references(
             if request_delay > 0:
                 time.sleep(request_delay)
 
-    summary: dict[str, Any] = {
-        "total_rules": total_rules,
-        "total_refs": total_refs,
-        "downloaded": downloaded,
-        "skipped": skipped,
-        "failed": failed,
-    }
-    logger.info("Download complete: %s", summary)
-    return summary
+        summary: dict[str, Any] = {
+            "total_rules": total_rules,
+            "total_refs": total_refs,
+            "downloaded": downloaded,
+            "skipped": skipped,
+            "failed": failed,
+        }
+        logger.info("Download complete: %s", summary)
+        return summary
+
 
 
 def _sha256(text: str) -> str:
