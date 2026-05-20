@@ -16,7 +16,7 @@ SIMILARITY_THRESHOLD = 0.7
 
 async def search(
     query: str,
-    collection_name: str = "sigma_rules",
+        collection_name: str = "sigma_doc",
     top_k: int = DEFAULT_TOP_K,
     similarity_threshold: float = SIMILARITY_THRESHOLD,
 ) -> list[dict[str, Any]]:
@@ -104,7 +104,7 @@ class SearchEngine:
 
     def __init__(
         self,
-        collection_name: str = "sigma_rules",
+    collection_name: str = "sigma_doc",
         top_k: int = DEFAULT_TOP_K,
         similarity_threshold: float = SIMILARITY_THRESHOLD,
     ) -> None:

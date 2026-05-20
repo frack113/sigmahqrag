@@ -35,7 +35,7 @@ class GithubEmbeddingWorker(BaseWorker):
 
         registry_entries = self._get_registry_entries(org, repo)
         if not registry_entries:
-            logger.info(f"[GithubEmbeddingWorker] No entries in doc_registry for {collection_name}")
+            logger.info(f"[GithubEmbeddingWorker] No entries in doc_sigma_ref for {collection_name}")
             return
 
         total = len(registry_entries)
@@ -58,7 +58,7 @@ class GithubEmbeddingWorker(BaseWorker):
             if not file_path.exists():
                 logger.warning(f"[GithubEmbeddingWorker] File not found: {file_path}")
                 skipped.append(file_name)
-                self.db.update_doc_registry_embed_status(entry.get("id"), "error")
+                self.db.update_sigma_ref_embed_status(entry.get("id"), "error")
                 continue
 
             try:
@@ -66,7 +66,7 @@ class GithubEmbeddingWorker(BaseWorker):
             except Exception as e:
                 logger.warning(f"[GithubEmbeddingWorker] Error reading {file_path}: {e}")
                 errors.append({"file": file_name, "error": str(e)})
-                self.db.update_doc_registry_embed_status(entry.get("id"), "error")
+                self.db.update_sigma_ref_embed_status(entry.get("id"), "error")
                 continue
 
             metadata = {
@@ -81,11 +81,11 @@ class GithubEmbeddingWorker(BaseWorker):
             doc = Document(text=doc_text, metadata=metadata)
             try:
                 builder.run(documents=[doc])
-                self.db.update_doc_registry_embed_status(entry.get("url_hash"), "embedded")
+                self.db.update_sigma_ref_embed_status(entry.get("url_hash"), "embedded")
             except Exception as e:
                 logger.error(f"[GithubEmbeddingWorker] Error embedding {file_name}: {e}")
                 errors.append({"file": file_name, "error": str(e)})
-                self.db.update_doc_registry_embed_status(entry.get("url_hash"), "error")
+                self.db.update_sigma_ref_embed_status(entry.get("url_hash"), "error")
 
             processed = idx + 1 - len(errors) - len(skipped)
             progress = (processed / total) * 100 if total > 0 else 0
@@ -109,5 +109,5 @@ class GithubEmbeddingWorker(BaseWorker):
         )
 
     def _get_registry_entries(self, org: str, repo: str) -> list[dict]:
-        """Get doc_registry entries for a specific GitHub repo pending embedding."""
-        return self.db.get_pending_doc_registry(org, repo)
+        """Get doc_sigma_ref entries for a specific GitHub repo pending embedding."""
+        return self.db.get_pending_sigma_ref(org, repo)

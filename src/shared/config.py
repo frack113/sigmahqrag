@@ -43,7 +43,7 @@ class Config:
     qdrant_host: str = "127.0.0.1"
     qdrant_port: int = 6333
     qdrant_mode: str = "managed"
-    qdrant_collection_name: str = "sigma_rules"
+    qdrant_collection_name: str = "sigma_doc"
     qdrant_vector_size: int = 384
     qdrant_binary_path: str = "data/bin/qdrant"
     qdrant_storage_path: str = "data/qdrant_storage/database"

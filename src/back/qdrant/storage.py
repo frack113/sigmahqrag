@@ -18,7 +18,7 @@ async def store_embeddings(
     embeddings: list[list[float]],
     documents: list[str],
     metadata: list[dict[str, Any]] | None = None,
-    collection_name: str = "sigma_rules",
+    collection_name: str = "sigma_doc",
     vector_size: int = DEFAULT_VECTOR_SIZE,
 ) -> bool:
     """Store embeddings in Qdrant.
@@ -59,7 +59,7 @@ async def store_embeddings(
 
 async def search(
     query_embedding: list[float],
-    collection_name: str = "sigma_rules",
+    collection_name: str = "sigma_doc",
     top_k: int = 5,
 ) -> list[dict[str, Any]]:
     """Search for similar vectors in Qdrant.

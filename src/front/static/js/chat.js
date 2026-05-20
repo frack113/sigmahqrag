@@ -1,38 +1,44 @@
 (function () {
     "use strict";
 
-    const chatHistory = document.getElementById("chat-history");
-    const chatForm = document.getElementById("chat-form");
-    const messageInput = document.getElementById("message-input");
-    const uploadZone = document.getElementById("upload-zone");
-    const fileInput = document.getElementById("sigma-file-input");
-    const uploadedFilename = document.getElementById("uploaded-filename");
-    const clearBtn = document.getElementById("clear-btn");
-    const chatStatus = document.getElementById("chat-status");
+    function init() {
+        const chatHistory = document.getElementById("chat-history");
+        const chatForm = document.getElementById("chat-form");
+        const messageInput = document.getElementById("message-input");
+        const uploadZone = document.getElementById("upload-zone");
+        const fileInput = document.getElementById("sigma-file-input");
+        const uploadedFilename = document.getElementById("uploaded-filename");
+        const clearBtn = document.getElementById("clear-btn");
+        const chatStatus = document.getElementById("chat-status");
 
-    let chatMessages = [];
-    let uploadedFile = null;
-
-    function getTimestamp() {
-        return new Date().toLocaleTimeString();
-    }
-
-    function getCurrentMode() {
-        const checked = document.querySelector('input[name="mode"]:checked');
-        return checked ? checked.value : "search";
-    }
-
-    function addBubble(role, content) {
-        const bubble = document.createElement("div");
-        bubble.className = `chat-bubble ${role}`;
-        bubble.innerHTML = `${content}<span class="timestamp">${getTimestamp()}</span>`;
-        chatHistory.appendChild(bubble);
-        chatHistory.scrollTop = chatHistory.scrollHeight;
-        chatMessages.push({ role, content, timestamp: getTimestamp() });
-        if (chatMessages.length > 50) {
-            chatMessages = chatMessages.slice(-50);
+        if (!chatHistory || !chatForm || !messageInput || !uploadZone || !fileInput || !clearBtn || !chatStatus) {
+            return;
         }
-    }
+
+        let chatMessages = [];
+        let uploadedFile = null;
+
+        function getTimestamp() {
+            return new Date().toLocaleTimeString();
+        }
+
+        function getCurrentMode() {
+            const checked = document.querySelector('input[name="mode"]:checked');
+            return checked ? checked.value : "search";
+        }
+
+        function addBubble(role, content) {
+            const bubble = document.createElement("div");
+            bubble.className = `chat-bubble ${role}`;
+            bubble.innerHTML = `${content}<span class="timestamp">${getTimestamp()}</span>`;
+            chatHistory.appendChild(bubble);
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+            chatMessages.push({ role, content, timestamp: getTimestamp() });
+            if (chatMessages.length > 50) {
+                chatMessages = chatMessages.slice(-50);
+            }
+            return bubble;
+        }
 
     function setStatus(msg) {
         chatStatus.textContent = msg;
@@ -208,4 +214,7 @@
         uploadedFilename.textContent = "No file selected";
         setStatus("Chat cleared.");
     });
+    }
+
+    document.addEventListener("DOMContentLoaded", init);
 })();

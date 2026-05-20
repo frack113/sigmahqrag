@@ -95,7 +95,7 @@ class GithubDiscoveryWorker(BaseWorker):
                 url_hash = hashlib.sha256(normalized_url.encode()).hexdigest()
                 title = file_path.stem
 
-                self.db.upsert_doc_registry(
+                self.db.upsert_doc_sigma_ref(
                     {
                         "url_hash": url_hash,
                         "org": org,
@@ -111,7 +111,7 @@ class GithubDiscoveryWorker(BaseWorker):
                         "timestamp": _iso_now(),
                         "last_seen": _iso_now(),
                         "status": "discovered",
-                        "embed_status": "discovered",
+                        "embed_status": "discovery",
                     }
                 )
             except Exception as e:

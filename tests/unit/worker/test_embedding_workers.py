@@ -178,7 +178,7 @@ class TestGithubEmbeddingWorker:
         repo_dir = tmp_path / "test-org" / "test-repo"
         repo_dir.mkdir(parents=True)
 
-        mock_db.get_pending_doc_registry.return_value = []
+        mock_db.get_pending_sigma_ref.return_value = []
 
         task = {
             "task_id": "gh-emb-003",
@@ -202,7 +202,7 @@ class TestGithubEmbeddingWorker:
                 worker = GithubEmbeddingWorker(mock_db)
                 await worker.process(task)
 
-        mock_db.get_pending_doc_registry.assert_called()
+        mock_db.get_pending_sigma_ref.assert_called()
 
     @pytest.mark.asyncio
     async def test_process_embeds_discovered_files(
@@ -212,15 +212,15 @@ class TestGithubEmbeddingWorker:
         repo_dir.mkdir(parents=True)
         (repo_dir / "rule1.md").write_text("# Rule 1")
 
-        mock_db.get_pending_doc_registry.return_value = [
+        mock_db.get_pending_sigma_ref.return_value = [
             {
-                "id": 1,
+                "url_hash": "hash1",
                 "org": "test-org",
                 "repo": "test-repo",
                 "file_name": "rules/rule1.md",
                 "content_type": "rules",
                 "status": "discovered",
-                "embed_status": "discovered",
+                "embed_status": "discovery",
             }
         ]
 
@@ -247,7 +247,7 @@ class TestGithubEmbeddingWorker:
                 await worker.process(task)
 
         mock_builder.run.assert_called_once()
-        mock_db.update_doc_registry_embed_status.assert_called()
+        mock_db.update_sigma_ref_embed_status.assert_called()
 
     @pytest.mark.asyncio
     async def test_process_filters_by_org_and_repo(
@@ -256,14 +256,14 @@ class TestGithubEmbeddingWorker:
         repo_dir = tmp_path / "test-org" / "test-repo"
         repo_dir.mkdir(parents=True)
 
-        mock_db.get_pending_doc_registry.return_value = [
+        mock_db.get_pending_sigma_ref.return_value = [
             {
-                "id": 2,
+                "url_hash": "hash2",
                 "org": "test-org",
                 "repo": "test-repo",
                 "file_name": "doc.md",
                 "status": "discovered",
-                "embed_status": "discovered",
+                "embed_status": "discovery",
             },
         ]
 
@@ -289,7 +289,7 @@ class TestGithubEmbeddingWorker:
                 worker = GithubEmbeddingWorker(mock_db)
                 await worker.process(task)
 
-        mock_db.get_pending_doc_registry.assert_called_with("test-org", "test-repo")
+        mock_db.get_pending_sigma_ref.assert_called_with("test-org", "test-repo")
 
 
 class TestLocalEmbeddingWorker:
@@ -314,7 +314,7 @@ class TestLocalEmbeddingWorker:
         local_dir = tmp_path / "local_docs"
         local_dir.mkdir()
 
-        mock_db.get_doc_registry.return_value = []
+        mock_db.get_doc_sigma_ref.return_value = []
 
         task = {
             "task_id": "local-emb-002",
@@ -336,14 +336,14 @@ class TestLocalEmbeddingWorker:
         local_dir.mkdir()
         (local_dir / "doc1.md").write_text("# Local Doc 1")
 
-        mock_db.get_doc_registry.return_value = [
+        mock_db.get_doc_sigma_ref.return_value = [
             {
                 "org": "local",
                 "repo": "local",
                 "file_name": "doc1.md",
                 "content_type": "markdown",
                 "status": "discovered",
-                "embed_status": "discovered",
+                "embed_status": "discovery",
             }
         ]
 
@@ -370,7 +370,7 @@ class TestLocalEmbeddingWorker:
 
     @pytest.mark.asyncio
     async def test_process_uses_default_path(self, mock_db: MagicMock) -> None:
-        mock_db.get_doc_registry.return_value = []
+        mock_db.get_doc_sigma_ref.return_value = []
 
         task = {
             "task_id": "local-emb-006",

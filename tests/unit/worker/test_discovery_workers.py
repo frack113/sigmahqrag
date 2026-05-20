@@ -157,7 +157,7 @@ class TestGithubDiscoveryWorker:
         worker.github_base_dir = str(tmp_path)
         await worker.process(task)
 
-        assert mock_db.upsert_doc_registry.call_count == 3
+        assert mock_db.upsert_doc_sigma_ref.call_count == 3
         calls = mock_db.upsert_embed_progress.call_args_list
         final_call = calls[-1]
         assert final_call.kwargs["status"] == "completed"
@@ -187,7 +187,7 @@ class TestGithubDiscoveryWorker:
         worker.github_base_dir = str(tmp_path)
         await worker.process(task)
 
-        assert mock_db.upsert_doc_registry.call_count == 1
+        assert mock_db.upsert_doc_sigma_ref.call_count == 1
 
     @pytest.mark.asyncio
     async def test_process_skips_missing_repos(self, mock_db: MagicMock, tmp_path: Path) -> None:
@@ -211,7 +211,7 @@ class TestGithubDiscoveryWorker:
         worker.github_base_dir = str(tmp_path)
         await worker.process(task)
 
-        assert mock_db.upsert_doc_registry.call_count == 1
+        assert mock_db.upsert_doc_sigma_ref.call_count == 1
         calls = mock_db.upsert_embed_progress.call_args_list
         final_call = calls[-1]
         assert final_call.kwargs["status"] == "completed"
@@ -235,9 +235,9 @@ class TestGithubDiscoveryWorker:
         worker.github_base_dir = str(tmp_path)
         await worker.process(task)
 
-        assert mock_db.upsert_doc_registry.call_count >= 1
-        call_args = mock_db.upsert_doc_registry.call_args_list[0][0][0]
-        assert call_args["embed_status"] == "discovered"
+        assert mock_db.upsert_doc_sigma_ref.call_count >= 1
+        call_args = mock_db.upsert_doc_sigma_ref.call_args_list[0][0][0]
+        assert call_args["embed_status"] == "discovery"
 
 
 class TestLocalDiscoveryWorker:
@@ -275,7 +275,7 @@ class TestLocalDiscoveryWorker:
         worker = LocalDiscoveryWorker(mock_db)
         await worker.process(task)
 
-        assert mock_db.upsert_doc_registry.call_count == 2
+        assert mock_db.upsert_doc_sigma_ref.call_count == 2
         calls = mock_db.upsert_embed_progress.call_args_list
         final_call = calls[-1]
         assert final_call.kwargs["status"] == "completed"

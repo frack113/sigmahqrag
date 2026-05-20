@@ -79,7 +79,7 @@ async def file_list(dispatcher: TaskDispatcher = Depends(_get_dispatcher)) -> Fi
         "sigmaref_discovery",
         {
             "task_type": "sigmaref_discovery",
-            "collection_name": "sigmaref",
+            "collection_name": "sigma_doc",
             "rules_dir": "data/github/sigmahq/sigma/rules",
             "output_dir": "data/documents/sigmaref",
         },
@@ -131,7 +131,7 @@ async def file_embed(
 
     if await _trigger_worker(
         "sigmaref_embeddings",
-        {"task_type": "sigmaref_embeddings", "collection_name": "sigmaref"},
+        {"task_type": "sigmaref_embeddings", "collection_name": "sigma_doc"},
         dispatcher,
     ):
         triggered.append("sigmaref_embeddings")

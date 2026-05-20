@@ -42,21 +42,8 @@ CREATE TABLE IF NOT EXISTS models (
     updated_at TEXT
 );
 
--- doc_sigma_ref
+-- doc_sigma_ref (unified document registry for all sources)
 CREATE TABLE IF NOT EXISTS doc_sigma_ref (
-    url_hash TEXT PRIMARY KEY,
-    original_url TEXT NOT NULL,
-    normalized_url TEXT,
-    content_type TEXT,
-    rule_id TEXT,
-    title TEXT,
-    timestamp TEXT,
-    content_sha256 TEXT,
-    embed_status TEXT DEFAULT 'pending'
-);
-
--- doc_registry (for file discovery results)
-CREATE TABLE IF NOT EXISTS doc_registry (
     url_hash TEXT PRIMARY KEY,
     org TEXT,
     repo TEXT,
@@ -64,14 +51,14 @@ CREATE TABLE IF NOT EXISTS doc_registry (
     file_name TEXT,
     content_sha256 TEXT,
     file_size BIGINT,
-    original_url TEXT,
+    original_url TEXT NOT NULL,
     normalized_url TEXT,
     rule_id TEXT DEFAULT '00000000-0000-0000-0000-000000000000',
     title TEXT,
     timestamp TEXT,
     last_seen TEXT,
     status TEXT,
-    embed_status TEXT DEFAULT 'pending'
+    embed_status TEXT DEFAULT 'discovery'
 );
 
 -- git_metadata
@@ -106,7 +93,7 @@ CREATE INDEX IF NOT EXISTS idx_prompts_name ON system_prompts(name);
 CREATE INDEX IF NOT EXISTS idx_doc_sigma_ref_rule ON doc_sigma_ref(rule_id);
 CREATE INDEX IF NOT EXISTS idx_doc_sigma_ref_timestamp ON doc_sigma_ref(timestamp);
 CREATE INDEX IF NOT EXISTS idx_doc_sigma_ref_embed ON doc_sigma_ref(embed_status);
-CREATE INDEX IF NOT EXISTS idx_doc_registry_embed ON doc_registry(embed_status);
+CREATE INDEX IF NOT EXISTS idx_doc_sigma_ref_org_repo ON doc_sigma_ref(org, repo);
 
 -- =========================================================================
 -- SEED DATA

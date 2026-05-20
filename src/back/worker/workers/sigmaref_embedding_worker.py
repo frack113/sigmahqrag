@@ -14,7 +14,7 @@ class SigmaRefEmbeddingWorker(BaseWorker):
     """Embeds Sigma Reference documents from doc_sigma_ref into Qdrant."""
 
     async def process(self, task: dict) -> None:
-        collection_name = task.get("collection_name", "sigmaref")
+        collection_name = task.get("collection_name", "sigma_doc")
         task_id = task.get("task_id", "")
         registry_path = Path(task.get("registry_path", "data/documents/sigmaref"))
 

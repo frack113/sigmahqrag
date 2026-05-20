@@ -31,7 +31,6 @@ def _ensure_duckdb_tables() -> None:
             "models",
             "doc_sigma_ref",
             "worker_state",
-            "doc_registry",
             "git_metadata",
             "git_selected_dirs",
         }
@@ -65,7 +64,12 @@ def _ensure_duckdb_tables() -> None:
 
 
 if __name__ == "__main__":
+    import asyncio
+    import sys
     import uvicorn
+
+    if sys.platform == "win32":
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
     _ensure_data_folders()
     _ensure_duckdb_tables()

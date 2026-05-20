@@ -100,12 +100,12 @@ class LocalEmbeddingWorker(BaseWorker):
         )
 
     def _get_registry_entries(self, collection_name: str) -> list[dict]:
-        """Get doc_registry entries for local documents."""
-        all_entries = self.db.get_doc_registry(limit=10000)
+        """Get doc_sigma_ref entries for local documents."""
+        all_entries = self.db.get_doc_sigma_ref(limit=10000)
         return [
             e
             for e in all_entries
             if e.get("org") == "local"
             and e.get("repo") == collection_name
-            and e.get("embed_status") == "discovered"
+            and e.get("embed_status") == "discovery"
         ]

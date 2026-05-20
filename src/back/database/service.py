@@ -23,7 +23,6 @@ _VALID_TABLES = frozenset(
         "models",
         "doc_sigma_ref",
         "worker_state",
-        "doc_registry",
         "git_metadata",
         "git_selected_dirs",
     }
@@ -55,73 +54,9 @@ class DatabaseService:
         return cls._instance
 
     def initialize(self) -> None:
-        """Execute initdb.sql (schema + seed data) and apply schema migrations."""
+        """Execute initdb.sql (schema + seed data)."""
         self._conn.execute(open("src/back/database/initdb.sql").read())
         self._conn.commit()
-
-        # Schema migrations for existing databases
-        # Add UNIQUE constraint to doc_registry if missing
-        try:
-            self._conn.execute(
-                "ALTER TABLE doc_registry ADD CONSTRAINT uc_doc_registry UNIQUE (org, repo, content_hash)"
-            )
-            self._conn.commit()
-        except Exception:
-            pass
-
-        # Add embed_status column to doc_sigma_ref if missing
-        try:
-            result = self._conn.execute(
-                "SELECT column_name FROM information_schema.columns WHERE table_name = 'doc_sigma_ref' AND column_name = 'embed_status'"
-            ).fetchone()
-            if not result:
-                self._conn.execute(
-                    "ALTER TABLE doc_sigma_ref ADD COLUMN embed_status TEXT DEFAULT 'pending'"
-                )
-                self._conn.commit()
-                logger.info("Added embed_status column to doc_sigma_ref")
-        except Exception as e:
-            logger.warning(f"Failed to add embed_status column: {e}")
-
-        # Add embed_status column to doc_registry if missing
-        try:
-            result = self._conn.execute(
-                "SELECT column_name FROM information_schema.columns WHERE table_name = 'doc_registry' AND column_name = 'embed_status'"
-            ).fetchone()
-            if not result:
-                self._conn.execute(
-                    "ALTER TABLE doc_registry ADD COLUMN embed_status TEXT DEFAULT 'pending'"
-                )
-                self._conn.commit()
-                logger.info("Added embed_status column to doc_registry")
-        except Exception as e:
-            logger.warning(f"Failed to add embed_status column to doc_registry: {e}")
-
-        # Add progress_percent and current_file columns to worker_state if missing
-        try:
-            result = self._conn.execute(
-                "SELECT column_name FROM information_schema.columns WHERE table_name = 'worker_state' AND column_name = 'progress_percent'"
-            ).fetchone()
-            if not result:
-                self._conn.execute(
-                    "ALTER TABLE worker_state ADD COLUMN progress_percent REAL DEFAULT 0"
-                )
-                self._conn.commit()
-                logger.info("Added progress_percent column to worker_state")
-        except Exception as e:
-            logger.warning(f"Failed to add progress_percent column: {e}")
-
-        try:
-            result = self._conn.execute(
-                "SELECT column_name FROM information_schema.columns WHERE table_name = 'worker_state' AND column_name = 'current_file'"
-            ).fetchone()
-            if not result:
-                self._conn.execute("ALTER TABLE worker_state ADD COLUMN current_file TEXT")
-                self._conn.commit()
-                logger.info("Added current_file column to worker_state")
-        except Exception as e:
-            logger.warning(f"Failed to add current_file column: {e}")
-
         logger.info("Schema initialized successfully")
 
     def close(self) -> None:
@@ -313,50 +248,39 @@ class DatabaseService:
             self._conn.commit()
 
     # =========================================================================
-    # DOC_SIGMA_REF TABLE
+    # DOC_SIGMA_REF TABLE (unified document registry)
     # =========================================================================
 
-    def get_doc_sigma_ref(self) -> list[dict]:
-        """Fetch all document references."""
+    def get_doc_sigma_ref(self, limit: int = 100, offset: int = 0) -> list[dict]:
+        """Fetch paginated document references."""
         with self._lock:
             results = self._conn.execute(
-                "SELECT url_hash, original_url, normalized_url, content_type, rule_id, title, timestamp, content_sha256, embed_status FROM doc_sigma_ref ORDER BY url_hash"
+                "SELECT url_hash, org, repo, content_type, file_name, content_sha256, file_size, "
+                "original_url, normalized_url, rule_id, title, timestamp, last_seen, status, embed_status "
+                "FROM doc_sigma_ref ORDER BY url_hash LIMIT ? OFFSET ?",
+                [limit, offset],
             ).fetchall()
-        return [
-            {
-                "url_hash": row[0],
-                "original_url": row[1],
-                "normalized_url": row[2],
-                "content_type": row[3],
-                "rule_id": row[4],
-                "title": row[5],
-                "timestamp": row[6],
-                "content_sha256": row[7],
-                "embed_status": row[8],
-            }
-            for row in results
-        ]
+            col_names = [desc[0] for desc in self._conn.description]
+        return [dict(zip(col_names, row)) for row in results]
 
-    def get_pending_sigma_ref(self) -> list[dict]:
-        """Fetch document references pending embedding (embed_status='discovered')."""
+    def get_pending_sigma_ref(self, org: str | None = None, repo: str | None = None) -> list[dict]:
+        """Fetch document references pending embedding, optionally filtered by org/repo."""
         with self._lock:
-            results = self._conn.execute(
-                "SELECT url_hash, original_url, normalized_url, content_type, rule_id, title, timestamp, content_sha256, embed_status FROM doc_sigma_ref WHERE embed_status = 'discovered' ORDER BY url_hash"
-            ).fetchall()
-        return [
-            {
-                "url_hash": row[0],
-                "original_url": row[1],
-                "normalized_url": row[2],
-                "content_type": row[3],
-                "rule_id": row[4],
-                "title": row[5],
-                "timestamp": row[6],
-                "content_sha256": row[7],
-                "embed_status": row[8],
-            }
-            for row in results
-        ]
+            if org and repo:
+                results = self._conn.execute(
+                    "SELECT url_hash, org, repo, content_type, file_name, content_sha256, file_size, "
+                    "original_url, normalized_url, rule_id, title, timestamp, last_seen, status, embed_status "
+                    "FROM doc_sigma_ref WHERE org = ? AND repo = ? AND embed_status = 'discovery' ORDER BY url_hash",
+                    (org, repo),
+                ).fetchall()
+            else:
+                results = self._conn.execute(
+                    "SELECT url_hash, org, repo, content_type, file_name, content_sha256, file_size, "
+                    "original_url, normalized_url, rule_id, title, timestamp, last_seen, status, embed_status "
+                    "FROM doc_sigma_ref WHERE embed_status = 'discovery' ORDER BY url_hash",
+                ).fetchall()
+            col_names = [desc[0] for desc in self._conn.description]
+        return [dict(zip(col_names, row)) for row in results]
 
     def update_sigma_ref_embed_status(self, url_hash: str, status: str) -> None:
         """Update embedding status for a document reference."""
@@ -371,27 +295,41 @@ class DatabaseService:
         """Upsert a document reference."""
         with self._lock:
             self._conn.execute(
-                """INSERT INTO doc_sigma_ref (url_hash, original_url, normalized_url, content_type, rule_id, title, timestamp, content_sha256, embed_status)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                 ON CONFLICT (url_hash) DO UPDATE SET
-                     original_url = EXCLUDED.original_url,
-                     normalized_url = EXCLUDED.normalized_url,
-                     content_type = EXCLUDED.content_type,
-                     rule_id = EXCLUDED.rule_id,
-                     title = EXCLUDED.title,
-                     timestamp = EXCLUDED.timestamp,
-                     content_sha256 = EXCLUDED.content_sha256,
-                     embed_status = EXCLUDED.embed_status""",
+                """INSERT INTO doc_sigma_ref (
+                    url_hash, org, repo, content_type, file_name, content_sha256, file_size,
+                    original_url, normalized_url, rule_id, title, timestamp, last_seen, status, embed_status
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (url_hash) DO UPDATE SET
+                    org = EXCLUDED.org,
+                    repo = EXCLUDED.repo,
+                    content_type = EXCLUDED.content_type,
+                    file_name = EXCLUDED.file_name,
+                    content_sha256 = EXCLUDED.content_sha256,
+                    file_size = EXCLUDED.file_size,
+                    original_url = EXCLUDED.original_url,
+                    normalized_url = EXCLUDED.normalized_url,
+                    rule_id = EXCLUDED.rule_id,
+                    title = EXCLUDED.title,
+                    timestamp = EXCLUDED.timestamp,
+                    last_seen = EXCLUDED.last_seen,
+                    status = EXCLUDED.status,
+                    embed_status = EXCLUDED.embed_status""",
                 (
                     data.get("url_hash"),
+                    data.get("org"),
+                    data.get("repo"),
+                    data.get("content_type"),
+                    data.get("file_name"),
+                    data.get("content_sha256"),
+                    data.get("file_size"),
                     data.get("original_url"),
                     data.get("normalized_url"),
-                    data.get("content_type"),
-                    data.get("rule_id"),
+                    data.get("rule_id", "00000000-0000-0000-0000-000000000000"),
                     data.get("title"),
                     data.get("timestamp"),
-                    data.get("content_sha256"),
-                    data.get("embed_status", "discovered"),
+                    data.get("last_seen"),
+                    data.get("status", "discovered"),
+                    data.get("embed_status", "discovery"),
                 ),
             )
             self._conn.commit()
@@ -400,6 +338,14 @@ class DatabaseService:
         """Check if a document reference exists."""
         result = self._safe_query("SELECT 1 FROM doc_sigma_ref WHERE url_hash = ?", (url_hash,))
         return result is not None
+
+    def delete_doc_sigma_ref_by_repo(self, org: str, repo: str) -> None:
+        """Clear document references for a specific repository."""
+        with self._lock:
+            self._conn.execute(
+                "DELETE FROM doc_sigma_ref WHERE org = ? AND repo = ?", (org, repo)
+            )
+            self._conn.commit()
 
     # =========================================================================
     # WORKER_STATE TABLE
@@ -411,7 +357,7 @@ class DatabaseService:
         status: str = "idle",
         current_task_id: str = "",
         error: str = "",
-        progress_percent: float = 0.0,
+        progress_percent: float | None = None,
         current_file: str | None = None,
     ) -> None:
         """Upsert worker state record."""
@@ -425,8 +371,8 @@ class DatabaseService:
                      current_task_id = EXCLUDED.current_task_id,
                      started_at = CASE WHEN EXCLUDED.started_at IS NOT NULL AND EXCLUDED.started_at != '' THEN EXCLUDED.started_at ELSE worker_state.started_at END,
                      error = EXCLUDED.error,
-                     progress_percent = EXCLUDED.progress_percent,
-                     current_file = EXCLUDED.current_file""",
+                     progress_percent = CASE WHEN EXCLUDED.progress_percent IS NULL THEN worker_state.progress_percent ELSE EXCLUDED.progress_percent END,
+                     current_file = CASE WHEN EXCLUDED.current_file IS NULL THEN worker_state.current_file ELSE EXCLUDED.current_file END""",
                 (
                     worker_type,
                     status,
@@ -500,8 +446,6 @@ class DatabaseService:
 
     def reset_stale_workers(self, stale_seconds: int = 3600) -> None:
         """Mark workers with stale heartbeats as idle."""
-        from datetime import timedelta
-
         cutoff = (datetime.now(timezone.utc) - timedelta(seconds=stale_seconds)).strftime(
             "%Y-%m-%dT%H:%M:%SZ"
         )
@@ -510,97 +454,6 @@ class DatabaseService:
                 """UPDATE worker_state SET status = 'idle', current_task_id = '', error = 'Heartbeat timeout', last_heartbeat = ? WHERE last_heartbeat < ? AND status IN ('running', 'busy')""",
                 (_iso_now(), cutoff),
             )
-            self._conn.commit()
-
-    # =========================================================================
-    # DOC_REGISTRY TABLE (File Discovery Results)
-    # =========================================================================
-
-    def upsert_doc_registry(self, data: dict) -> None:
-        """Upsert a file record into doc_registry."""
-        with self._lock:
-            self._conn.execute(
-                """INSERT INTO doc_registry (
-                    url_hash, org, repo, content_type, file_name, content_sha256,
-                    file_size, original_url, normalized_url, rule_id, title,
-                    timestamp, last_seen, status, embed_status
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT (url_hash) DO UPDATE SET
-                    org = EXCLUDED.org,
-                    repo = EXCLUDED.repo,
-                    content_type = EXCLUDED.content_type,
-                    file_name = EXCLUDED.file_name,
-                    content_sha256 = EXCLUDED.content_sha256,
-                    file_size = EXCLUDED.file_size,
-                    original_url = EXCLUDED.original_url,
-                    normalized_url = EXCLUDED.normalized_url,
-                    rule_id = EXCLUDED.rule_id,
-                    title = EXCLUDED.title,
-                    timestamp = EXCLUDED.timestamp,
-                    last_seen = EXCLUDED.last_seen,
-                    status = EXCLUDED.status,
-                    embed_status = EXCLUDED.embed_status""",
-                (
-                    data.get("url_hash"),
-                    data.get("org"),
-                    data.get("repo"),
-                    data.get("content_type"),
-                    data.get("file_name"),
-                    data.get("content_sha256"),
-                    data.get("file_size"),
-                    data.get("original_url"),
-                    data.get("normalized_url"),
-                    data.get("rule_id", "00000000-0000-0000-0000-000000000000"),
-                    data.get("title"),
-                    data.get("timestamp"),
-                    data.get("last_seen"),
-                    data.get("status", "discovered"),
-                    data.get("embed_status", "discovered"),
-                ),
-            )
-            self._conn.commit()
-
-    def get_doc_registry(self, limit: int = 100, offset: int = 0) -> list[dict]:
-        """Fetch paginated registry records."""
-        with self._lock:
-            results = self._conn.execute(
-                "SELECT url_hash, org, repo, content_type, file_name, content_sha256, file_size, original_url, normalized_url, rule_id, title, timestamp, last_seen, status, embed_status FROM doc_registry LIMIT ? OFFSET ?",
-                [limit, offset],
-            ).fetchall()
-            col_names = [desc[0] for desc in self._conn.description]
-        return [dict(zip(col_names, row)) for row in results]
-
-    def get_pending_doc_registry(self, org: str, repo: str) -> list[dict]:
-        """Fetch registry entries pending embedding for a specific repo."""
-        with self._lock:
-            results = self._conn.execute(
-                "SELECT url_hash, org, repo, content_type, file_name, content_sha256, file_size, original_url, normalized_url, rule_id, title, timestamp, last_seen, status, embed_status FROM doc_registry WHERE org = ? AND repo = ? AND embed_status = 'discovered' ORDER BY url_hash",
-                (org, repo),
-            ).fetchall()
-            col_names = [desc[0] for desc in self._conn.description]
-        return [dict(zip(col_names, row)) for row in results]
-
-    def update_doc_registry_embed_status(self, url_hash: str, status: str) -> None:
-        """Update embedding status for a registry entry."""
-        with self._lock:
-            self._conn.execute(
-                "UPDATE doc_registry SET embed_status = ? WHERE url_hash = ?",
-                (status, url_hash),
-            )
-            self._conn.commit()
-
-    def get_repos_with_selected_dirs(self) -> list[str]:
-        """Get distinct repo_keys that have selected directories configured."""
-        with self._lock:
-            results = self._conn.execute(
-                "SELECT DISTINCT repo_key FROM git_selected_dirs ORDER BY repo_key"
-            ).fetchall()
-        return [row[0] for row in results]
-
-    def delete_doc_registry_by_repo(self, org: str, repo: str) -> None:
-        """Clear registry records for a specific repository."""
-        with self._lock:
-            self._conn.execute("DELETE FROM doc_registry WHERE org = ? AND repo = ?", (org, repo))
             self._conn.commit()
 
     # =========================================================================
@@ -651,6 +504,14 @@ class DatabaseService:
             results = self._conn.execute(
                 "SELECT dir_path FROM git_selected_dirs WHERE repo_key = ? ORDER BY dir_path",
                 (repo_key,),
+            ).fetchall()
+        return [row[0] for row in results]
+
+    def get_repos_with_selected_dirs(self) -> list[str]:
+        """Get distinct repo_keys that have selected directories configured."""
+        with self._lock:
+            results = self._conn.execute(
+                "SELECT DISTINCT repo_key FROM git_selected_dirs ORDER BY repo_key"
             ).fetchall()
         return [row[0] for row in results]
 

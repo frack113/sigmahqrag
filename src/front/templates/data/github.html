@@ -10,8 +10,7 @@
     <div class="github-actions">
         <button id="add-repo-btn" class="btn btn-primary">Add Repository</button>
         <button id="refresh-btn" class="btn btn-primary" onclick="loadRepos()">Refresh list</button>
-        <button id="download-ref-btn" class="btn btn-primary" onclick="downloadRefs()">Download ref</button>
-        <button id="list-files-btn" class="btn btn-primary" onclick="listFiles()">List Files</button>
+        <button id="list-document-btn" class="btn btn-primary" onclick="listDocuments()">List document</button>
     </div>
 
     <div id="repos-list" class="repos-grid"></div>
@@ -265,28 +264,8 @@ async function deleteRepo(org, name) {
     }
 }
 
-async function downloadRefs() {
-    const btn = document.getElementById('download-ref-btn');
-    btn.disabled = true;
-    btn.textContent = 'Downloading...';
-    try {
-        const response = await fetch('/api/v1/files/list', { method: 'POST' });
-        const data = await response.json();
-        if (data.success) {
-            alert('Discovery started: ' + data.message);
-        } else {
-            alert('Failed: ' + data.error);
-        }
-    } catch (e) {
-        alert('Error: ' + e.message);
-    } finally {
-        btn.disabled = false;
-        btn.textContent = 'Download ref';
-    }
-}
-
-async function listFiles() {
-    const btn = document.getElementById('list-files-btn');
+async function listDocuments() {
+    const btn = document.getElementById('list-document-btn');
     btn.disabled = true;
     btn.textContent = 'Scanning...';
     try {
@@ -302,7 +281,7 @@ async function listFiles() {
         alert('Failed to initiate scan');
     } finally {
         btn.disabled = false;
-        btn.textContent = 'List Files';
+        btn.textContent = 'List document';
     }
 }
 
