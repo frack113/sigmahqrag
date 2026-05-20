@@ -5,7 +5,7 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from src.core.services.chat_service import ChatService
+from src.back.backend.services.chat_service import ChatService
 
 
 @pytest.fixture

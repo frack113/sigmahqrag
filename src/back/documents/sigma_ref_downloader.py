@@ -178,12 +178,11 @@ def _get_retry_after(response: httpx.Response) -> int | None:
         return None
 
 
-def _load_registry(path: Path) -> dict[str, Any]:
+def _load_registry(path: Path, db: DatabaseService) -> dict[str, Any]:
     """Load the registry from DuckDB.
 
     Returns an empty dict if DB not available.
     """
-    db = DatabaseService.get_instance()
     entries = db.get_doc_sigma_ref()
     registry = {}
     for entry in entries:
@@ -192,12 +191,13 @@ def _load_registry(path: Path) -> dict[str, Any]:
             "original_url": entry.get("original_url", ""),
             "normalized_url": entry.get("normalized_url"),
             "content_type": entry.get("content_type"),
-            "rule_id": entry.get("rule_id"),
+            "rule_id": entry.get("rel_id"),
             "title": entry.get("title"),
             "timestamp": entry.get("timestamp"),
             "content_sha256": entry.get("content_sha256"),
         }
     return registry
+
 
 
 def _save_registry(registry: dict[str, Any], path: Path) -> None:

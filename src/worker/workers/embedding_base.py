@@ -24,7 +24,7 @@ class EmbeddingWorker(BaseWorker):
 
         entries = self._get_entries(task)
         if not entries:
-            logger.info(f"[{self.__class__.__name__}] No entries to embed")
+            logger.debug(f"[{self.__class__.__name__}] No entries to embed")
             return
 
         total = len(entries)

@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Depends
 from pydantic import BaseModel
 
+from src.api.dependencies import get_database_service
 from src.back.database import DatabaseService
 
 logger = logging.getLogger(__name__)
@@ -24,16 +25,8 @@ class TableDataResponse(BaseModel):
     offset: int
 
 
-def _get_db() -> DatabaseService:
-    try:
-        return DatabaseService.get_instance()
-    except RuntimeError:
-        raise HTTPException(status_code=503, detail="Database not initialized")
-
-
 @router.get("/tables", response_model=TableListResponse)
-async def list_tables():
-    db = _get_db()
+async def list_tables(db: DatabaseService = Depends(get_database_service)):
     return TableListResponse(tables=db.get_tables())
 
 
@@ -42,8 +35,8 @@ async def get_table_data(
     table_name: str,
     limit: int = Query(default=50, ge=1, le=1000),
     offset: int = Query(default=0, ge=0),
+    db: DatabaseService = Depends(get_database_service),
 ):
-    db = _get_db()
     try:
         data = db.get_table_data(table_name, limit=limit, offset=offset)
         total = db.get_table_count(table_name)

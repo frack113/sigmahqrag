@@ -10,6 +10,19 @@ from src.back.database import DatabaseService
 class UnifiedRegistry:
     """Unified registry for LLM and embedding models."""
 
+    _instance: UnifiedRegistry | None = None
+
+    @classmethod
+    def get_instance(cls) -> UnifiedRegistry:
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
+
+    @classmethod
+    def reset_instance(cls) -> None:
+        """Reset the singleton instance for testing purposes."""
+        cls._instance = None
+
     def __init__(self) -> None:
         self._registry: dict[str, dict[str, dict]] = {"llm": {}, "embeddings": {}}
         self._loaded = False
@@ -43,6 +56,11 @@ class UnifiedRegistry:
                 self._registry["llm"][repo_id] = entry
             elif model_type == "embeddings":
                 self._registry["embeddings"][repo_id] = entry
+
+    def reload(self) -> None:
+        """Force a reload of the registry from the database."""
+        self._loaded = False
+        self._ensure_loaded()
 
     def _load(self) -> None:
         self._ensure_loaded()
@@ -108,7 +126,7 @@ class UnifiedRegistry:
             return True
         return False
 
-    def sync_llm_folder(self, llm_dir: Path) -> None:
+    def sync_llm_folder(self, llm_dir: Path, save: bool = True) -> None:
         self._ensure_loaded()
         if not llm_dir.exists():
             return
@@ -152,9 +170,10 @@ class UnifiedRegistry:
                             "files": files,
                         }
 
-        self._save()
+        if save:
+            self._save()
 
-    def sync_embeddings_folder(self, embeddings_dir: Path) -> None:
+    def sync_embeddings_folder(self, embeddings_dir: Path, save: bool = True) -> None:
         self._ensure_loaded()
         if not embeddings_dir.exists():
             return
@@ -180,8 +199,8 @@ class UnifiedRegistry:
                             "local_path": str(sub_dir),
                         }
 
-        self._save()
+        if save:
+            self._save()
 
 
-def create_unified_registry() -> UnifiedRegistry:
-    return UnifiedRegistry()
+

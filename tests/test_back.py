@@ -20,7 +20,7 @@ def temp_dir(tmp_path):
 @pytest.fixture
 def registry():
     """Create registry."""
-    return UnifiedRegistry()
+    return UnifiedRegistry.get_instance()
 
 
 @pytest.fixture

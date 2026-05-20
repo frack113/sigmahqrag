@@ -4,6 +4,8 @@ import threading
 from typing import Dict, Type
 
 from src.back.database.service import DatabaseService
+from src.back.database import BufferedDatabaseService
+from pathlib import Path
 from src.worker.base import BaseWorker
 from src.worker.workers.github_discovery_worker import GithubDiscoveryWorker
 from src.worker.workers.github_embedding_worker import GithubEmbeddingWorker
@@ -48,17 +50,18 @@ class TaskDispatcher:
         self._loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self._loop)
 
-        db = DatabaseService.get_instance()
+        base_db = DatabaseService.get_instance()
+        journal_path = Path("data/worker_journal.log")
+        db = BufferedDatabaseService(base_db, journal_path)
+
         db.reset_stale_workers()
 
-        workers: Dict[str, BaseWorker] = {
-            name: cls(db) for name, cls in self._WORKER_TYPES.items()
-        }
+        workers: Dict[str, BaseWorker] = {name: cls(db) for name, cls in self._WORKER_TYPES.items()}
         logger.info("TaskDispatcher thread running with %d workers.", len(workers))
 
         async def dispatch(worker_type: str, task: dict):
             task_id = task.get("task_id", "")
-            logger.info(f"Dispatching task {task_id} (type: {worker_type})")
+            logger.debug(f"Dispatching task {task_id} (type: {worker_type})")
 
             worker = workers.get(worker_type)
             if not worker:
@@ -81,7 +84,7 @@ class TaskDispatcher:
             error_msg = ""
             try:
                 await worker.process(task)
-                logger.info(f"Task {task_id} completed successfully")
+                logger.debug(f"Task {task_id} completed successfully")
             except Exception as e:
                 error_msg = str(e)
                 logger.error(f"Worker execution failed for task {task_id}: {e}", exc_info=True)
@@ -100,6 +103,7 @@ class TaskDispatcher:
                     iteration += 1
                     if iteration % 60 == 0:
                         db.reset_stale_workers()
+                        db.flush()
 
                     try:
                         worker_type, task = self._task_queue.get_nowait()
@@ -119,13 +123,17 @@ class TaskDispatcher:
         except Exception as e:
             logger.error(f"Dispatcher thread crashed: {e}", exc_info=True)
         finally:
+            try:
+                db.flush()
+            except Exception as e:
+                logger.error("Failed to flush database during shutdown: %s", e)
             self._loop.close()
             logger.info("TaskDispatcher thread stopped.")
 
     async def queue_task(self, worker_type: str, task: dict):
         """Queue a task for execution (thread-safe)."""
         await self._task_queue.put((worker_type, task))
-        logger.info(f"Queued task for {worker_type}")
+        logger.debug(f"Queued task for {worker_type}")
 
     def stop(self):
         """Signal the dispatcher thread to stop."""

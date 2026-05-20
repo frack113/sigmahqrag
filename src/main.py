@@ -150,11 +150,14 @@ async def lifespan(app: FastAPI) -> None:
         from src.shared import LLM_DIR, EMBEDDINGS_DIR
 
         logger.info("Queuing model sync as background worker...")
-        await dispatcher.queue_task("model_sync", {
-            "task_id": "model-sync-startup",
-            "llm_dir": str(LLM_DIR),
-            "embeddings_dir": str(EMBEDDINGS_DIR),
-        })
+        await dispatcher.queue_task(
+            "model_sync",
+            {
+                "task_id": "model-sync-startup",
+                "llm_dir": str(LLM_DIR),
+                "embeddings_dir": str(EMBEDDINGS_DIR),
+            },
+        )
         logger.info("Model sync queued.")
 
         _validate_services()

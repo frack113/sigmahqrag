@@ -16,7 +16,7 @@ class LocalDiscoveryWorker(BaseWorker):
         base_path = Path(task.get("base_path", "data/documents/local"))
         collection_name = task.get("collection_name", "local")
 
-        logger.info(f"[LocalDiscoveryWorker] Scanning {base_path} (WIP)")
+        logger.debug(f"[LocalDiscoveryWorker] Scanning {base_path}")
 
         if not base_path.exists():
             logger.warning(f"[LocalDiscoveryWorker] Path does not exist: {base_path}")
@@ -63,8 +63,8 @@ class LocalDiscoveryWorker(BaseWorker):
                         "normalized_url": f"file://{base_path}/{file_rel_path}",
                         "rule_id": "00000000-0000-0000-0000-000000000000",
                         "title": title,
-"timestamp": iso_now(),
-                "last_seen": iso_now(),
+                        "timestamp": iso_now(),
+                        "last_seen": iso_now(),
                         "embed_status": "discovered",
                     }
                 )

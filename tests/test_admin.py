@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from fastapi.testclient import TestClient
 from src.api.routes.admin_service import _get_status_display
-from src.core.health import ServiceHealth, ServiceStatus
+from src.shared.health import ServiceHealth, ServiceStatus
 
 
 @pytest.fixture
@@ -125,7 +125,7 @@ class TestAdminHealthEndpoint:
         mock_qdrant_health: ServiceHealth,
     ) -> None:
         """Given services are running When GET /admin/health Then returns service statuses."""
-        with patch("src.core.health.create_health_checker") as mock_checker:
+        with patch("src.shared.health.create_health_checker") as mock_checker:
             mock_instance = AsyncMock()
             mock_instance.check_all.return_value = {
                 "llama": mock_llama_health,

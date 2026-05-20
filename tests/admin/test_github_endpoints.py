@@ -2,20 +2,8 @@
 
 from __future__ import annotations
 
-import json
 from unittest.mock import patch
-
-import pytest
-from fastapi.testclient import TestClient
 from src.api.v1.github import router
-from src.back.github.git import (
-    list_repos,
-    save_metadata,
-    get_metadata,
-    clone_repo,
-    delete_repo,
-    update_repo,
-)
 
 
 @pytest.fixture
