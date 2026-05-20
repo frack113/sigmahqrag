@@ -41,6 +41,7 @@ class TaskDispatcher:
 
         while self._running:
             try:
+                self.db.reset_stale_workers()
                 worker_type, task = await self._task_queue.get()
                 await self._dispatch(worker_type, task)
                 self._task_queue.task_done()
@@ -76,23 +77,19 @@ class TaskDispatcher:
             return
 
         worker = worker_cls(self.db)
+        error_msg = ""
         try:
             await worker.process(task)
             logger.info(f"Task {task_id} completed successfully")
         except Exception as e:
+            error_msg = str(e)
             logger.error(f"Worker execution failed for task {task_id}: {e}", exc_info=True)
-            self.db.upsert_worker_state(
-                worker_type=worker_type,
-                status="idle",
-                current_task_id="",
-                error=str(e),
-            )
         finally:
             self.db.upsert_worker_state(
                 worker_type=worker_type,
                 status="idle",
                 current_task_id="",
-                error="",
+                error=error_msg,
             )
 
     def stop(self):

@@ -34,6 +34,17 @@ def _get_dispatcher(request: Request) -> TaskDispatcher:
 async def _trigger_worker(worker_type: str, task: dict, dispatcher: TaskDispatcher) -> bool:
     """Helper to trigger a worker via the dispatcher."""
     db = DatabaseService.get_instance()
+    db.reset_stale_workers(stale_seconds=30)
+    state = db.get_worker_state(worker_type)
+    logger.info(f"Worker {worker_type} state: {state}")
+    if state and state["status"] in ("running", "busy"):
+        logger.warning(f"Worker {worker_type} stuck in {state['status']}, forcing idle")
+        db.upsert_worker_state(
+            worker_type=worker_type,
+            status="idle",
+            current_task_id="",
+            error="Stuck worker reset",
+        )
     busy = db.is_worker_busy(worker_type)
     logger.info(f"Checking worker {worker_type}: busy={busy}")
     if busy:

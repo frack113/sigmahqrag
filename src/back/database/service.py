@@ -23,6 +23,7 @@ _VALID_TABLES = frozenset(
         "models",
         "doc_sigma_ref",
         "worker_state",
+        "doc_registry",
         "git_metadata",
         "git_selected_dirs",
     }
@@ -256,7 +257,7 @@ class DatabaseService:
         with self._lock:
             results = self._conn.execute(
                 "SELECT url_hash, org, repo, content_type, file_name, content_sha256, file_size, "
-                "original_url, normalized_url, rule_id, title, timestamp, last_seen, status, embed_status "
+                "original_url, normalized_url, rule_id, title, timestamp, last_seen, embed_status "
                 "FROM doc_sigma_ref ORDER BY url_hash LIMIT ? OFFSET ?",
                 [limit, offset],
             ).fetchall()
@@ -269,14 +270,14 @@ class DatabaseService:
             if org and repo:
                 results = self._conn.execute(
                     "SELECT url_hash, org, repo, content_type, file_name, content_sha256, file_size, "
-                    "original_url, normalized_url, rule_id, title, timestamp, last_seen, status, embed_status "
+                    "original_url, normalized_url, rule_id, title, timestamp, last_seen, embed_status "
                     "FROM doc_sigma_ref WHERE org = ? AND repo = ? AND embed_status = 'discovery' ORDER BY url_hash",
                     (org, repo),
                 ).fetchall()
             else:
                 results = self._conn.execute(
                     "SELECT url_hash, org, repo, content_type, file_name, content_sha256, file_size, "
-                    "original_url, normalized_url, rule_id, title, timestamp, last_seen, status, embed_status "
+                    "original_url, normalized_url, rule_id, title, timestamp, last_seen, embed_status "
                     "FROM doc_sigma_ref WHERE embed_status = 'discovery' ORDER BY url_hash",
                 ).fetchall()
             col_names = [desc[0] for desc in self._conn.description]
@@ -297,8 +298,8 @@ class DatabaseService:
             self._conn.execute(
                 """INSERT INTO doc_sigma_ref (
                     url_hash, org, repo, content_type, file_name, content_sha256, file_size,
-                    original_url, normalized_url, rule_id, title, timestamp, last_seen, status, embed_status
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    original_url, normalized_url, rule_id, title, timestamp, last_seen, embed_status
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT (url_hash) DO UPDATE SET
                     org = EXCLUDED.org,
                     repo = EXCLUDED.repo,
@@ -312,7 +313,6 @@ class DatabaseService:
                     title = EXCLUDED.title,
                     timestamp = EXCLUDED.timestamp,
                     last_seen = EXCLUDED.last_seen,
-                    status = EXCLUDED.status,
                     embed_status = EXCLUDED.embed_status""",
                 (
                     data.get("url_hash"),
@@ -328,7 +328,6 @@ class DatabaseService:
                     data.get("title"),
                     data.get("timestamp"),
                     data.get("last_seen"),
-                    data.get("status", "discovered"),
                     data.get("embed_status", "discovery"),
                 ),
             )
@@ -344,6 +343,92 @@ class DatabaseService:
         with self._lock:
             self._conn.execute(
                 "DELETE FROM doc_sigma_ref WHERE org = ? AND repo = ?", (org, repo)
+            )
+            self._conn.commit()
+
+    # =========================================================================
+    # DOC_REGISTRY TABLE (file discovery results from GitHub/local sources)
+    # =========================================================================
+
+    def upsert_doc_registry(self, data: dict) -> None:
+        """Upsert a file record into doc_registry."""
+        with self._lock:
+            self._conn.execute(
+                """INSERT INTO doc_registry (
+                    url_hash, org, repo, content_type, file_name, content_sha256, file_size,
+                    original_url, normalized_url, rule_id, title, timestamp, last_seen, embed_status
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (url_hash) DO UPDATE SET
+                    org = EXCLUDED.org,
+                    repo = EXCLUDED.repo,
+                    content_type = EXCLUDED.content_type,
+                    file_name = EXCLUDED.file_name,
+                    content_sha256 = EXCLUDED.content_sha256,
+                    file_size = EXCLUDED.file_size,
+                    original_url = EXCLUDED.original_url,
+                    normalized_url = EXCLUDED.normalized_url,
+                    rule_id = EXCLUDED.rule_id,
+                    title = EXCLUDED.title,
+                    timestamp = EXCLUDED.timestamp,
+                    last_seen = EXCLUDED.last_seen,
+                    embed_status = EXCLUDED.embed_status""",
+                (
+                    data.get("url_hash"),
+                    data.get("org"),
+                    data.get("repo"),
+                    data.get("content_type"),
+                    data.get("file_name"),
+                    data.get("content_sha256"),
+                    data.get("file_size"),
+                    data.get("original_url"),
+                    data.get("normalized_url"),
+                    data.get("rule_id", "00000000-0000-0000-0000-000000000000"),
+                    data.get("title"),
+                    data.get("timestamp"),
+                    data.get("last_seen"),
+                    data.get("embed_status", "discovery"),
+                ),
+            )
+            self._conn.commit()
+
+    def get_doc_registry(self, limit: int = 100, offset: int = 0) -> list[dict]:
+        """Fetch paginated registry records."""
+        with self._lock:
+            results = self._conn.execute(
+                "SELECT url_hash, org, repo, content_type, file_name, content_sha256, file_size, "
+                "original_url, normalized_url, rule_id, title, timestamp, last_seen, embed_status "
+                "FROM doc_registry LIMIT ? OFFSET ?",
+                [limit, offset],
+            ).fetchall()
+            col_names = [desc[0] for desc in self._conn.description]
+        return [dict(zip(col_names, row)) for row in results]
+
+    def get_pending_doc_registry(self, org: str, repo: str) -> list[dict]:
+        """Fetch registry entries pending embedding for a specific repo."""
+        with self._lock:
+            results = self._conn.execute(
+                "SELECT url_hash, org, repo, content_type, file_name, content_sha256, file_size, "
+                "original_url, normalized_url, rule_id, title, timestamp, last_seen, embed_status "
+                "FROM doc_registry WHERE org = ? AND repo = ? AND embed_status = 'discovery' ORDER BY url_hash",
+                (org, repo),
+            ).fetchall()
+            col_names = [desc[0] for desc in self._conn.description]
+        return [dict(zip(col_names, row)) for row in results]
+
+    def update_doc_registry_embed_status(self, url_hash: str, status: str) -> None:
+        """Update embedding status for a registry entry."""
+        with self._lock:
+            self._conn.execute(
+                "UPDATE doc_registry SET embed_status = ? WHERE url_hash = ?",
+                (status, url_hash),
+            )
+            self._conn.commit()
+
+    def delete_doc_registry_by_repo(self, org: str, repo: str) -> None:
+        """Clear registry records for a specific repository."""
+        with self._lock:
+            self._conn.execute(
+                "DELETE FROM doc_registry WHERE org = ? AND repo = ?", (org, repo)
             )
             self._conn.commit()
 
@@ -439,7 +524,7 @@ class DatabaseService:
             for wt in worker_types:
                 self._conn.execute(
                     "INSERT INTO worker_state (worker_type, status, last_heartbeat, current_task_id, started_at, error) "
-                    "VALUES (?, 'idle', ?, '', NULL, '') ON CONFLICT (worker_type) DO NOTHING",
+                    "VALUES (?, 'idle', ?, '', NULL, '') ON CONFLICT (worker_type) DO UPDATE SET status = 'idle', current_task_id = '', error = ''",
                     (wt, _iso_now()),
                 )
             self._conn.commit()

@@ -54,7 +54,7 @@ class LocalDiscoveryWorker(BaseWorker):
                 ).hexdigest()
                 title = file_path.stem
 
-                self.db.upsert_doc_sigma_ref(
+                self.db.upsert_doc_registry(
                     {
                         "url_hash": url_hash,
                         "org": "local",
@@ -69,8 +69,7 @@ class LocalDiscoveryWorker(BaseWorker):
                         "title": title,
                         "timestamp": _iso_now(),
                         "last_seen": _iso_now(),
-                        "status": "discovered",
-                        "embed_status": "discovery",
+                        "embed_status": "discovered",
                     }
                 )
             except Exception as e:

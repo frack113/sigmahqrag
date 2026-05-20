@@ -39,6 +39,24 @@
     color: #95a5a6;
 }
 
+.auto-refresh-bar {
+    margin-top: 12px;
+}
+
+.auto-refresh-bar .btn {
+    padding: 4px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: white;
+    cursor: pointer;
+    font-size: 12px;
+    color: #666;
+}
+
+.auto-refresh-bar .btn:hover {
+    background: #f0f0f0;
+}
+
 .table-container {
     overflow-x: auto;
 }

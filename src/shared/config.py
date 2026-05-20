@@ -182,6 +182,7 @@ class Config:
         }
 
     def save(self) -> bool:
+        global _config
         try:
             db = DatabaseService.get_instance()
             db.set_config("backend.os", self.os)
@@ -189,6 +190,7 @@ class Config:
             db.set_config("llamacpp_version", self.llamacpp_version)
             db.set_config("qdrant_version", self.qdrant_version)
             db.set_config("qdrant_webui_version", self.qdrant_webui_version)
+            _config = self
             return True
         except Exception as e:
             logger.error(f"Failed to save config to DB: {e}")
@@ -295,7 +297,12 @@ class Config:
     def init_app() -> Config:
         Config.ensure_config_file()
         Config.ensure_qdrant_config()
-        return Config()
+        cfg = Config()
+        try:
+            cfg.apply_db_overrides()
+        except Exception:
+            pass
+        return cfg
 
 
 _config: Config | None = None

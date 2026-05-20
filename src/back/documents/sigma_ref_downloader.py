@@ -295,10 +295,11 @@ def download_references(
             normalized = normalize_url(ref)
 
             url_hash = _sha256(normalized)
+            ext = _url_ext(normalized) or ".md"
+            output_file = output_path / f"{url_hash}{ext}"
+
             if url_hash in registry:
                 existing = registry[url_hash]
-                ext = _url_ext(normalized) or ".md"
-                output_file = output_path / f"{url_hash}{ext}"
                 if output_file.exists():
                     existing_sha = existing.get("content_sha256")
                     if existing_sha is not None and _sha256_file(output_file) != existing_sha:
@@ -324,13 +325,26 @@ def download_references(
                 skipped += 1
                 continue
 
+            if output_file.exists():
+                content_hash = _sha256_file(output_file)
+                registry[url_hash] = {
+                    "original_url": ref,
+                    "normalized_url": normalized,
+                    "content_type": _detect_url_type(normalized) or "markdown",
+                    "rule_id": rule_id,
+                    "title": rule_title,
+                    "timestamp": _iso_now(),
+                    "content_sha256": content_hash,
+                }
+                with _registry_lock:
+                    _save_registry(registry, output_path)
+                skipped += 1
+                continue
+
             ftype = _detect_url_type(normalized)
             if ftype is None or ftype not in supported_types:
                 skipped += 1
                 continue
-
-            ext = _url_ext(normalized) or ".md"
-            output_file = output_path / f"{url_hash}{ext}"
 
             if _download_file(normalized, output_file):
                 content_hash = _sha256_file(output_file) if output_file.exists() else ""

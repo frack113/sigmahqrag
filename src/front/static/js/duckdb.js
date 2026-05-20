@@ -2,11 +2,41 @@ let currentTable = null;
 let currentOffset = 0;
 let currentTotal = 0;
 const PAGE_SIZE = 50;
+let autoRefreshInterval = null;
 
 document.addEventListener('DOMContentLoaded', () => {
     loadTableList();
     loadTableListCount();
+    startAutoRefresh();
 });
+
+let autoRefreshEnabled = true;
+
+function startAutoRefresh() {
+    if (autoRefreshInterval) clearInterval(autoRefreshInterval);
+    autoRefreshInterval = setInterval(() => {
+        if (!autoRefreshEnabled) return;
+        if (currentTable) {
+            loadTableData();
+        }
+        loadTableList();
+    }, 5000);
+}
+
+function toggleAutoRefresh() {
+    autoRefreshEnabled = !autoRefreshEnabled;
+    const btn = document.getElementById('auto-refresh-btn');
+    if (btn) {
+        btn.textContent = autoRefreshEnabled ? 'Auto-refresh: ON (5s)' : 'Auto-refresh: OFF';
+    }
+}
+
+function stopAutoRefresh() {
+    if (autoRefreshInterval) {
+        clearInterval(autoRefreshInterval);
+        autoRefreshInterval = null;
+    }
+}
 
 async function loadTableList() {
     const container = document.getElementById('table-list');
