@@ -1,4 +1,3 @@
-import asyncio
 import hashlib
 import logging
 from pathlib import Path
@@ -83,7 +82,7 @@ class GithubDiscoveryWorker(BaseWorker):
             )
             return False
 
-    async def process(self, task: dict) -> None:
+    def process(self, task: dict) -> None:
         try:
             repo_keys = self.db.get_repos_with_selected_dirs()
             if not repo_keys:
@@ -130,15 +129,12 @@ class GithubDiscoveryWorker(BaseWorker):
                 f"[GithubDiscoveryWorker] Found {total_files} files across {len(repo_keys)} repos"
             )
 
-            await asyncio.sleep(0)
-
             for file_path, base_path, org, repo in all_files:
                 try:
                     if self._process_file(file_path, base_path, org, repo):
                         processed_count += 1
                     else:
                         skipped_count += 1
-                    await asyncio.sleep(0)
                 except Exception as e:
                     logger.error(
                         f"[GithubDiscoveryWorker] Unexpected error on {file_path}: {e}",

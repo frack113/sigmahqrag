@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 class LocalDiscoveryWorker(BaseWorker):
     """Scans a local directory for supported documents."""
 
-    async def process(self, task: dict) -> None:
+    def process(self, task: dict) -> None:
         base_path = Path(task.get("base_path", "data/documents/local"))
         collection_name = task.get("collection_name", "local")
 

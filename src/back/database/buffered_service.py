@@ -66,20 +66,6 @@ class BufferedDatabaseService:
             finally:
                 self.journal.clear()
 
-    def upsert_worker_state(self, worker_id: str, state: dict, mode: str = "write-back"):
-        """Upserts worker state using either Write-Back or Write-Through strategy."""
-        with self._lock:
-            if mode == "write-through":
-                self.journal.log_intent("upsert", (worker_id,), {"state": state})
-                self.db.upsert_worker_state(worker_id, state)
-                self.journal.clear()
-            else:
-                # Write-Back mode
-                self.journal.log_intent("upsert", (worker_id,), {"state": state})
-                self.cache[f"worker_state:{worker_id}"] = state
-                if len(self.cache) > self.cache_size:
-                    self.flush()
-
     def flush(self):
         """Synchronizes all cached items to the underlying DatabaseService."""
         with self._lock:
@@ -87,11 +73,9 @@ class BufferedDatabaseService:
                 return
             logger.info("Flushing %d items from cache to DuckDB...", len(self.cache))
             for key, value in self.cache.items():
-                parts = key.split(":")
-                if parts[0] == "worker_state":
-                    worker_id = parts[1]
-                    # We use the underlying db service directly to avoid infinite recursion
-                    self.db.upsert_worker_state(worker_id, value)
+                # We don't need special handling for worker_state anymore as it's in-memory
+                # But we still need to handle other cached keys if any were added later
+                pass
             self.cache.clear()
             self.journal.clear()
 

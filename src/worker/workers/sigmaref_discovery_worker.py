@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 class SigmaRefDiscoveryWorker(BaseWorker):
     """Scans Sigma rule YAML files, extracts reference URLs, and downloads them."""
 
-    async def process(self, task: dict) -> None:
+    def process(self, task: dict) -> None:
         rules_dir = task.get("rules_dir", "data/rules")
         output_dir = task.get("output_dir", "data/documents/sigmaref")
 
@@ -21,6 +21,7 @@ class SigmaRefDiscoveryWorker(BaseWorker):
             summary = download_references(
                 rules_dir=rules_dir,
                 output_dir=output_dir,
+                db=self.db,
                 supported_types={"markdown"},
             )
             logger.info(f"[SigmaRefDiscoveryWorker] Complete: {summary}")

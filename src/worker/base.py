@@ -1,14 +1,19 @@
 from abc import ABC, abstractmethod
-from src.back.database.service import DatabaseService
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from src.back.database.service import DatabaseService
+    from src.worker.processor import TaskDispatcher
 
 
 class BaseWorker(ABC):
     """Abstract base class for all specialized workers."""
 
-    def __init__(self, db: DatabaseService):
+    def __init__(self, db: "DatabaseService", dispatcher: "TaskDispatcher | None" = None):
         self.db = db
+        self.dispatcher = dispatcher
 
     @abstractmethod
-    async def process(self, task: dict) -> None:
+    def process(self, task: dict) -> None:
         """Execute the logic for a specific task."""
         pass

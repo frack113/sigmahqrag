@@ -22,7 +22,6 @@ _VALID_TABLES = frozenset(
         "system_prompts",
         "models",
         "doc_sigma_ref",
-        "worker_state",
         "doc_registry",
         "git_metadata",
         "git_selected_dirs",
@@ -447,114 +446,11 @@ class DatabaseService:
             self._writer_conn.commit()
 
     # =========================================================================
-    # WORKER_STATE TABLE
+    # GIT_METADATA TABLE
     # =========================================================================
 
-    def upsert_worker_state(
-        self,
-        worker_type: str,
-        status: str = "idle",
-        current_task_id: str = "",
-        error: str = "",
-        progress_percent: float | None = None,
-        current_file: str | None = None,
-    ) -> None:
-        """Upsert worker state record."""
-        with self._lock:
-            self._writer_conn.execute(
-                """INSERT INTO worker_state (worker_type, status, last_heartbeat, current_task_id, started_at, error, progress_percent, current_file)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                 ON CONFLICT (worker_type) DO UPDATE SET
-                     status = EXCLUDED.status,
-                     last_heartbeat = EXCLUDED.last_heartbeat,
-                     current_task_id = EXCLUDED.current_task_id,
-                     started_at = CASE WHEN EXCLUDED.started_at IS NOT NULL AND EXCLUDED.started_at != '' THEN EXCLUDED.started_at ELSE worker_state.started_at END,
-                     error = EXCLUDED.error,
-                     progress_percent = CASE WHEN EXCLUDED.progress_percent IS NULL THEN worker_state.progress_percent ELSE EXCLUDED.progress_percent END,
-                     current_file = CASE WHEN EXCLUDED.current_file IS NULL THEN worker_state.current_file ELSE EXCLUDED.current_file END""",
-                (
-                    worker_type,
-                    status,
-                    _iso_now(),
-                    current_task_id,
-                    _iso_now() if status in ("running", "busy") else None,
-                    error,
-                    progress_percent,
-                    current_file,
-                ),
-            )
-            self._writer_conn.commit()
-
-    def get_worker_state(self, worker_type: str) -> dict | None:
-        """Get state for a specific worker type."""
-        result = self._safe_query(
-            "SELECT worker_type, status, last_heartbeat, current_task_id, started_at, error, progress_percent, current_file FROM worker_state WHERE worker_type = ?",
-            (worker_type,),
-        )
-        if not result:
-            return None
-        return {
-            "worker_type": result[0],
-            "status": result[1],
-            "last_heartbeat": result[2],
-            "current_task_id": result[3],
-            "started_at": result[4],
-            "error": result[5],
-            "progress_percent": result[6],
-            "current_file": result[7],
-        }
-
-    def get_all_worker_states(self) -> list[dict]:
-        """Get state for all workers."""
-        with self._lock:
-            results = self._writer_conn.execute(
-                "SELECT worker_type, status, last_heartbeat, current_task_id, started_at, error, progress_percent, current_file FROM worker_state ORDER BY worker_type"
-            ).fetchall()
-        return [
-            {
-                "worker_type": row[0],
-                "status": row[1],
-                "last_heartbeat": row[2],
-                "current_task_id": row[3],
-                "started_at": row[4],
-                "error": row[5],
-                "progress_percent": row[6],
-                "current_file": row[7],
-            }
-            for row in results
-        ]
-
-    def is_worker_busy(self, worker_type: str) -> bool:
-        """Check if a worker is currently busy (running a task)."""
-        result = self._safe_query(
-            "SELECT 1 FROM worker_state WHERE worker_type = ? AND status IN ('running', 'busy')",
-            (worker_type,),
-        )
-        return result is not None
-
-    def init_worker_states(self, worker_types: list[str]) -> None:
-        """Ensure all worker types exist in worker_state with idle status."""
-        with self._lock:
-            for wt in worker_types:
-                self._writer_conn.execute(
-                    "INSERT INTO worker_state (worker_type, status, last_heartbeat, current_task_id, started_at, error) "
-                    "VALUES (?, 'idle', ?, '', NULL, '') ON CONFLICT (worker_type) DO UPDATE SET status = 'idle', current_task_id = '', error = ''",
-                    (wt, _iso_now()),
-                )
-            self._writer_conn.commit()
-
-    def reset_stale_workers(self, stale_seconds: int = 3600) -> None:
-        """Mark workers with stale heartbeats as idle."""
-        cutoff = (datetime.now(timezone.utc) - timedelta(seconds=stale_seconds)).strftime(
-            "%Y-%m-%dT%H:%M:%SZ"
-        )
-        with self._lock:
-            self._writer_conn.execute(
-                """UPDATE worker_state SET status = 'idle', current_task_id = '', error = 'Heartbeat timeout', last_heartbeat = ? WHERE last_heartbeat < ? AND status IN ('running', 'busy')""",
-                (_iso_now(), cutoff),
-            )
-            self._writer_conn.commit()
-
+    # =========================================================================
+    # GIT_METADATA TABLE
     # =========================================================================
     # GIT_METADATA TABLE
     # =========================================================================
@@ -684,35 +580,6 @@ class DatabaseService:
             self._writer_conn.commit()
 
     # =========================================================================
-    # WORKER PROGRESS (uses worker_state table)
+    # EMBEDDING_CONFIG TABLE
     # =========================================================================
 
-    def update_worker_progress(
-        self,
-        worker_type: str,
-        progress_percent: float,
-        current_file: str | None = None,
-    ) -> None:
-        """Update progress for a running worker."""
-        with self._lock:
-            self._writer_conn.execute(
-                """UPDATE worker_state SET progress_percent = ?, current_file = ?, last_heartbeat = ? WHERE worker_type = ? AND status IN ('running', 'busy')""",
-                (progress_percent, current_file, _iso_now(), worker_type),
-            )
-            self._writer_conn.commit()
-
-    def get_worker_progress(self, worker_type: str) -> dict | None:
-        """Get progress for a specific worker."""
-        result = self._safe_query(
-            "SELECT status, progress_percent, current_file, current_task_id, error FROM worker_state WHERE worker_type = ?",
-            (worker_type,),
-        )
-        if not result:
-            return None
-        return {
-            "status": result[0],
-            "progress_percent": result[1],
-            "current_file": result[2],
-            "task_id": result[3],
-            "error": result[4],
-        }

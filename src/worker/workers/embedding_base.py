@@ -1,4 +1,3 @@
-import asyncio
 import logging
 from abc import abstractmethod
 from pathlib import Path
@@ -17,7 +16,7 @@ class EmbeddingWorker(BaseWorker):
     worker_type: str = ""
     collection_name: str = ""
 
-    async def process(self, task: dict) -> None:
+    def process(self, task: dict) -> None:
         task_id = task.get("task_id", "")
         self._collection_name = task.get("collection_name", self.collection_name)
         self._task = task
@@ -31,7 +30,7 @@ class EmbeddingWorker(BaseWorker):
         errors: list[dict] = []
         skipped: list[str] = []
 
-        self.db.upsert_worker_state(
+        self.dispatcher.update_worker_state(
             worker_type=self.worker_type,
             status="running",
             current_task_id=task_id,
@@ -71,16 +70,14 @@ class EmbeddingWorker(BaseWorker):
 
             processed = idx + 1 - len(errors) - len(skipped)
             progress = (processed / total) * 100 if total > 0 else 0
-            self.db.update_worker_progress(
+            self.dispatcher.update_worker_state(
                 worker_type=self.worker_type,
                 progress_percent=round(progress, 2),
                 current_file=current_file,
             )
 
-            await asyncio.sleep(0)
-
         processed = total - len(errors) - len(skipped)
-        self.db.update_worker_progress(
+        self.dispatcher.update_worker_state(
             worker_type=self.worker_type,
             progress_percent=100.0,
         )

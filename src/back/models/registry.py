@@ -199,34 +199,4 @@ class UnifiedRegistry:
             self._save(db)
 
 
-    def sync_embeddings_folder(self, embeddings_dir: Path, save: bool = True) -> None:
-        self._ensure_loaded()
-        if not embeddings_dir.exists():
-            return
-
-        for model_dir in embeddings_dir.iterdir():
-            if not model_dir.is_dir() or model_dir.name.startswith("."):
-                continue
-            if model_dir.name in ("cache", "temp"):
-                continue
-
-            for sub_dir in model_dir.iterdir():
-                if not sub_dir.is_dir() or sub_dir.name.startswith("."):
-                    continue
-                if sub_dir.name in ("cache", "temp"):
-                    continue
-
-                repo_id = f"{model_dir.name}/{sub_dir.name}"
-                if repo_id not in self._registry["embeddings"]:
-                    files = list(sub_dir.rglob("*"))
-                    file_count = sum(1 for f in files if f.is_file())
-                    if file_count > 0:
-                        self._registry["embeddings"][repo_id] = {
-                            "local_path": str(sub_dir),
-                        }
-
-        if save:
-            self._save()
-
-
 

@@ -92,18 +92,6 @@ CREATE TABLE IF NOT EXISTS git_selected_dirs (
     PRIMARY KEY (repo_key, dir_path)
 );
 
--- worker_state (worker lifecycle tracking)
-CREATE TABLE IF NOT EXISTS worker_state (
-    worker_type TEXT PRIMARY KEY,
-    status TEXT NOT NULL DEFAULT 'idle',
-    last_heartbeat TEXT,
-    current_task_id TEXT DEFAULT '',
-    started_at TEXT,
-    error TEXT DEFAULT '',
-    progress_percent REAL DEFAULT 0,
-    current_file TEXT
-);
-
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_models_type ON models(model_type);
 CREATE INDEX IF NOT EXISTS idx_prompts_name ON system_prompts(name);
