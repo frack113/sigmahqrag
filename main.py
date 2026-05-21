@@ -22,7 +22,7 @@ def _ensure_data_folders() -> None:
 
 
 def _ensure_duckdb_tables() -> None:
-    """Initialize DuckDB schema + seed data and verify tables. Exit on failure."""
+    """Initialize in-memory DuckDB schema + seed data and verify tables. Exit on failure."""
     expected = frozenset(
         {
             "config",
@@ -35,7 +35,6 @@ def _ensure_duckdb_tables() -> None:
             "git_selected_dirs",
         }
     )
-    db_path = Path("data/duckdb/sigmahq.duckdb")
     try:
         db = DatabaseService()
         db.initialize()
@@ -55,10 +54,6 @@ def _ensure_duckdb_tables() -> None:
     except SystemExit:
         raise
     except Exception as e:
-        err = str(e).lower()
-        if db_path.exists() and ("another process" in err or "lock" in err or "utilis" in err):
-            print("DuckDB already in use by another process, skipping table check")
-            return
         print(f"ERROR: Failed to initialize DuckDB: {e}", file=sys.stderr)
         sys.exit(1)
 

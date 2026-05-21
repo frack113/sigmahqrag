@@ -1,4 +1,4 @@
-"""Central configuration module using data/sigmahqrag.toml."""
+"""Central configuration module — TOML (models, services, paths, logging) + DuckDB (backend)."""
 
 from __future__ import annotations
 
@@ -75,19 +75,6 @@ class Config:
 
     def _apply_nested_config(self, nested: dict[str, Any]) -> None:
         """Apply nested config dict to dataclass fields."""
-        if "backend" in nested:
-            backend = nested["backend"]
-            if "gpu_type" in backend:
-                self.gpu_type = backend["gpu_type"]
-            if "os" in backend:
-                self.os = backend["os"]
-            if "llamacpp_version" in backend:
-                self.llamacpp_version = backend["llamacpp_version"]
-            if "qdrant_version" in backend:
-                self.qdrant_version = backend["qdrant_version"]
-            if "qdrant_webui_version" in backend:
-                self.qdrant_webui_version = backend["qdrant_webui_version"]
-
         if "models" in nested:
             models = nested["models"]
             if "llm_dir" in models:
@@ -221,9 +208,16 @@ class Config:
                     setattr(self, attr, val)
 
     @classmethod
-    def reload(cls) -> Config:
+    def init_app(cls) -> Config:
+        global _config
+        cls.ensure_config_file()
+        cls.ensure_qdrant_config()
         cfg = cls()
-        cfg.apply_db_overrides()
+        try:
+            cfg.apply_db_overrides()
+        except Exception:
+            pass
+        _config = cfg
         return cfg
 
     def resolve_llamacpp_bin_path(self) -> Path:
@@ -260,10 +254,6 @@ class Config:
                 logger.info(f"Created default config at {CONFIG_FILE}")
             except Exception as e:
                 logger.error(f"Failed to create config: {e}")
-        else:
-            config = Config()
-            config.save()
-            logger.info(f"Updated config at {CONFIG_FILE}")
 
     @staticmethod
     def ensure_qdrant_config() -> None:
@@ -292,18 +282,6 @@ class Config:
                 logger.info(f"Generated Qdrant config at {config_file}")
         except Exception as e:
             logger.warning(f"Could not generate Qdrant config: {e}")
-
-    @staticmethod
-    def init_app() -> Config:
-        Config.ensure_config_file()
-        Config.ensure_qdrant_config()
-        cfg = Config()
-        try:
-            cfg.apply_db_overrides()
-        except Exception:
-            pass
-        return cfg
-
 
 _config: Config | None = None
 

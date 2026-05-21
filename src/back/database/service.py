@@ -1,11 +1,11 @@
-"""DuckDB storage service."""
+"""DuckDB storage service — in-memory with explicit persist to disk."""
 
 from __future__ import annotations
 
 import json
 import logging
 import threading
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -25,6 +25,7 @@ _VALID_TABLES = frozenset(
         "doc_registry",
         "git_metadata",
         "git_selected_dirs",
+        "worker_state",
     }
 )
 
@@ -34,19 +35,27 @@ def _iso_now() -> str:
 
 
 class DatabaseService:
-    """Thread-safe DuckDB database service with singleton pattern."""
+    """Thread-safe DuckDB database service (in-memory) with singleton pattern.
+
+    All operations happen in-memory for zero I/O latency. Call :meth:`persist`
+    to flush the current state to disk.
+    """
 
     _instance: DatabaseService | None = None
     _lock: threading.Lock = threading.Lock()
 
     def __init__(self, db_path: str | None = None) -> None:
         self.db_path = Path(db_path or DEFAULT_DB_PATH)
-        # Writer connection: persistent and used for all mutations
-        self._writer_conn = duckdb.connect(str(self.db_path))
-        # Reader local storage to allow thread-safe, concurrent read connections
-        self._reader_local = threading.local()
+        # Close previous singleton if re-created (e.g. hot-reload, tests)
+        prev = DatabaseService._instance
+        if prev is not None:
+            prev.close()
+        self._initialized = False
+        self._writer_conn = duckdb.connect(":memory:")
+        # Backward-compat alias for tests / internal access
+        self._conn = self._writer_conn
         DatabaseService._instance = self
-        logger.info("DatabaseService initialized at %s (Writer: %s)", self.db_path, "active")
+        logger.info("DatabaseService initialized in-memory (persist path: %s)", self.db_path)
 
     @classmethod
     def get_instance(cls) -> DatabaseService:
@@ -57,16 +66,62 @@ class DatabaseService:
         return cls._instance
 
     def initialize(self) -> None:
-        """Execute initdb.sql (schema + seed data)."""
+        """Apply schema + seed data, then load existing database from disk if present."""
+        if self._initialized:
+            logger.warning("initialize() called more than once — skipping")
+            return
         self._writer_conn.execute(open("src/back/database/initdb.sql").read())
         self._writer_conn.commit()
+        if self.db_path.exists():
+            self._load_from_file()
+        self._initialized = True
+        self._conn = self._writer_conn
         logger.info("Schema initialized successfully")
+
+    def _load_from_file(self) -> None:
+        """Import data from an existing DuckDB file into the in-memory tables."""
+        logger.info("Loading database from %s", self.db_path)
+        path = self.db_path.as_posix()
+        self._writer_conn.execute(f"ATTACH '{path}' AS file_db (READ_ONLY)")
+        for table in _VALID_TABLES:
+            try:
+                self._writer_conn.execute(f"INSERT OR IGNORE INTO {table} SELECT * FROM file_db.{table}")
+            except Exception:
+                logger.warning("Table %s not found in existing database — skipping", table)
+        self._writer_conn.execute("DETACH file_db")
+        logger.info("Loaded tables from disk")
+
+    def persist(self, path: str | None = None) -> None:
+        """Flush the in-memory database to a DuckDB file on disk (atomic write)."""
+        if not self._initialized:
+            logger.error("persist() called before initialize()")
+            return
+        target = Path(path or self.db_path)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        tmp = target.with_suffix(".duckdb.tmp")
+        try:
+            path_str = tmp.as_posix()
+            self._writer_conn.execute(f"ATTACH '{path_str}' AS file_db (TYPE DUCKDB)")
+            for table in _VALID_TABLES:
+                self._writer_conn.execute(
+                    f"CREATE TABLE file_db.{table} AS SELECT * FROM {table}"
+                )
+            self._writer_conn.execute("DETACH file_db")
+            if target.exists():
+                target.unlink()
+            tmp.rename(target)
+            logger.info("Database persisted to %s", target)
+        except Exception:
+            if tmp.exists():
+                tmp.unlink()
+            raise
 
     def close(self) -> None:
         """Close database connections and clear singleton."""
         if hasattr(self, "_writer_conn") and self._writer_conn:
             self._writer_conn.close()
-        # Note: Thread-local readers will be closed when their threads exit
+            self._writer_conn = None
+            self._conn = None
         DatabaseService._instance = None
         logger.info("DatabaseService closed")
 
@@ -74,19 +129,15 @@ class DatabaseService:
     # GENERIC TABLE OPERATIONS
     # =========================================================================
 
-    def _get_reader_connection(self) -> duckdb.DuckDBPyConnection:
-        """Get or create a thread-local read-only connection."""
-        if not hasattr(self._reader_local, "conn") or self._reader_local.conn is None:
-            logger.debug(
-                "Creating new thread-local reader connection for %s",
-                threading.current_thread().name,
-            )
-            self._reader_local.conn = duckdb.connect(str(self.db_path))
-        return self._reader_local.conn
+    def _get_reader_connection(self) -> duckdb.DuckDBPyConnection | None:
+        """Return the shared writer connection (in-memory — no separate readers needed)."""
+        return self._writer_conn
 
     def _safe_query(self, query: str, params: tuple = ()) -> Any:
         """Execute a read-only query with parameterized input."""
         conn = self._get_reader_connection()
+        if conn is None:
+            return None
         return conn.execute(query, params).fetchone()
 
     def get_tables(self) -> list[str]:

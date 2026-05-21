@@ -94,15 +94,16 @@ async def lifespan(app: FastAPI) -> None:
     try:
         _setup_logging()
         logger.info("=== Lifespan starting ===")
-        from src.shared import Config
-
-        Config.init_app()
-        logger.info("Config initialized.")
 
         db = DatabaseService()
         db.initialize()
         app.state.db = db
         logger.info("Database initialized.")
+
+        from src.shared import Config
+
+        Config.init_app()
+        logger.info("Config initialized.")
 
         old_files = _check_old_data_files()
         if old_files and _is_db_empty(db):

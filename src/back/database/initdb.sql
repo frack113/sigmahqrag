@@ -92,6 +92,16 @@ CREATE TABLE IF NOT EXISTS git_selected_dirs (
     PRIMARY KEY (repo_key, dir_path)
 );
 
+-- worker_state
+CREATE TABLE IF NOT EXISTS worker_state (
+    worker_type TEXT PRIMARY KEY,
+    status TEXT NOT NULL DEFAULT 'idle',
+    current_task_id TEXT,
+    progress_percent DOUBLE DEFAULT 0.0,
+    current_file TEXT,
+    last_heartbeat TEXT
+);
+
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_models_type ON models(model_type);
 CREATE INDEX IF NOT EXISTS idx_prompts_name ON system_prompts(name);
