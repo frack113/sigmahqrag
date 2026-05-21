@@ -8,6 +8,7 @@ import os
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
+from src.back.database.service import DatabaseService
 from src.back.documents.indexing import index_sigma_rules
 from src.back.documents.models import (
     IngestRequest,
@@ -99,6 +100,16 @@ async def ingest_sigma_rules(
         except Exception as e:
             logger.error(f"Failed to index rules: {e}")
 
+    return JSONResponse(
+        content={
+            "success": True,
+            "total": len(results),
+            "successful": len(successful_rules),
+            "failed": len(results) - len(successful_rules),
+            "results": [r.model_dump() for r in results],
+        }
+    )
+
 
 @router.post("/index-sigma-ref")
 async def index_sigma_ref(
@@ -110,8 +121,9 @@ async def index_sigma_ref(
     output_dir = "data/sigma_ref_docs"
 
     try:
+        db = DatabaseService.get_instance()
         summary = download_references(
-            rules_dir=rules_dir, output_dir=output_dir, supported_types={"markdown"}
+            rules_dir=rules_dir, output_dir=output_dir, db=db, supported_types={"markdown"}
         )
         return JSONResponse(content=summary)
     except Exception as e:

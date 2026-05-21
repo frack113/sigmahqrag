@@ -1,12 +1,11 @@
 import logging
-import queue
 import threading
+import time
+import uuid
 from concurrent.futures import ThreadPoolExecutor, Future
 from typing import Dict, Type
 
 from src.back.database.service import DatabaseService
-from src.back.database import BufferedDatabaseService
-from pathlib import Path
 from src.worker.base import BaseWorker
 from src.worker.workers.github_discovery_worker import GithubDiscoveryWorker
 from src.worker.workers.github_embedding_worker import GithubEmbeddingWorker
@@ -20,8 +19,13 @@ from src.worker.enums import WorkerStatus, WorkerName
 
 logger = logging.getLogger(__name__)
 
+
 class TaskDispatcher:
-    """Main engine that dispatches tasks to specialized workers using a ThreadPoolExecutor."""
+    """Main engine that dispatches tasks to specialized workers using a ThreadPoolExecutor.
+
+    The only public entry point for requesting work is ``ask_for_worker``.
+    The dispatcher alone controls when a WAITING worker transitions to RUNNING.
+    """
 
     _WORKER_TYPES: Dict[WorkerName, Type[BaseWorker]] = {
         WorkerName.SIGMAREF_DISCOVERY: SigmaRefDiscoveryWorker,
@@ -37,41 +41,86 @@ class TaskDispatcher:
         self.poll_interval = poll_interval
         self.max_workers = max_workers
         self._running = False
-        self._task_queue: queue.Queue[tuple[str, dict]] = queue.Queue()
+        self._lock = threading.Lock()
+        self._pending_tasks: Dict[WorkerName, dict] = {}
         self._executor: ThreadPoolExecutor | None = None
         self._thread: threading.Thread | None = None
-        self._db: BufferedDatabaseService | None = None
+        self._db: DatabaseService | None = None
         self._workers: Dict[WorkerName, BaseWorker] = {}
         self._worker_states: Dict[WorkerName, dict] = {}
 
-    def update_worker_state(self, worker_type: WorkerName, **kwargs):
-        """Update the in-memory state for a specific worker type."""
-        if worker_type not in self._worker_states:
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    def ask_for_worker(self, worker_type: WorkerName, **task_params) -> bool:
+        """Atomic check-and-set: if the worker is IDLE, mark it WAITING and store the task.
+
+        Returns ``True`` when the request was accepted, ``False`` when the worker
+        is already WAITING, RUNNING, or in ERROR state.
+        The dispatcher generates the task_id internally.
+        """
+        with self._lock:
+            state = self._worker_states.get(worker_type)
+            current_status = state["status"] if state else WorkerStatus.IDLE
+            if current_status != WorkerStatus.IDLE:
+                return False
+
+            task_id = str(uuid.uuid4())
             self._worker_states[worker_type] = {
-                "status": WorkerStatus.IDLE,
-                "current_task_id": "",
+                "status": WorkerStatus.WAITING,
+                "current_task_id": task_id,
                 "error": "",
                 "progress_percent": 0,
-                "current_file": ""
+                "current_file": "",
             }
-        self._worker_states[worker_type].update(kwargs)
+            self._pending_tasks[worker_type] = {"task_id": task_id, **task_params}
+            logger.debug(f"Worker {worker_type.value} accepted task {task_id} (→ WAITING)")
+            return True
 
     def get_all_worker_states(self) -> list[dict]:
         """Return all worker states as a list of dictionaries."""
-        return [{"worker_type": k, **v} for k, v in self._worker_states.items()]
+        with self._lock:
+            return [{"worker_type": k.value, **v} for k, v in self._worker_states.items()]
+
+    def update_worker_state(self, worker_type: WorkerName, **kwargs):
+        """Update the in-memory state for a specific worker type (called by workers)."""
+        with self._lock:
+            if worker_type not in self._worker_states:
+                self._worker_states[worker_type] = {
+                    "status": WorkerStatus.IDLE,
+                    "current_task_id": "",
+                    "error": "",
+                    "progress_percent": 0,
+                    "current_file": "",
+                }
+            self._worker_states[worker_type].update(kwargs)
+
+    def get_worker_progress(self, worker_type: str) -> dict | None:
+        """Return the current progress dict for a worker type, or None if unknown."""
+        with self._lock:
+            for wt, state in self._worker_states.items():
+                if wt.value == worker_type:
+                    return {k: v for k, v in state.items() if k != "current_task_id"}
+            return None
 
     def is_worker_busy(self, worker_type: WorkerName) -> bool:
-        """Check if a specific worker is currently busy/running."""
-        state = self._worker_states.get(worker_type, {})
-        return state.get("status") == WorkerStatus.RUNNING
+        """Return True if the worker is not IDLE."""
+        with self._lock:
+            state = self._worker_states.get(worker_type)
+            if state is None:
+                return False
+            return state.get("status") != WorkerStatus.IDLE
+
+    # ------------------------------------------------------------------
+    # Lifecycle
+    # ------------------------------------------------------------------
 
     def start(self):
         """Start the dispatcher in a background thread using a ThreadPoolExecutor."""
         self._running = True
 
-        base_db = DatabaseService.get_instance()
-        journal_path = Path("data/worker_journal.log")
-        self._db = BufferedDatabaseService(base_db, journal_path)
+        self._db = DatabaseService.get_instance()
 
         self._workers = {name: cls(self._db, self) for name, cls in self._WORKER_TYPES.items()}
         logger.info("TaskDispatcher initialized with %d workers.", len(self._workers))
@@ -85,76 +134,6 @@ class TaskDispatcher:
         self._thread.start()
         logger.info("TaskDispatcher started (max_workers=%d).", self.max_workers)
 
-    def _run_loop(self):
-        """Poll the task queue and submit work to the ThreadPoolExecutor."""
-        while self._running:
-            try:
-                worker_type, task = self._task_queue.get(timeout=self.poll_interval)
-            except queue.Empty:
-                continue
-            except Exception as e:
-                logger.error(f"Dispatcher loop error: {e}", exc_info=True)
-                continue
-
-            worker = self._workers.get(worker_type)
-            if not worker:
-                error_msg = f"No worker registered for task type: {worker_type.value}"
-                logger.error(error_msg)
-                self.update_worker_state(
-                    worker_type=worker_type,
-                    status=WorkerStatus.IDLE,
-                    current_task_id="",
-                    error=error_msg,
-                )
-                continue
-
-            logger.debug(f"Submitting task {task.get('task_id', '')} (type: {worker_type.value})")
-            future: Future = self._executor.submit(self._run_worker, worker_type, worker, task)
-
-            future.add_done_callback(self._on_task_done)
-
-    def _run_worker(self, worker_type: WorkerName, worker: BaseWorker, task: dict) -> None:
-        """Execute a worker's process method and manage state transitions."""
-        task_id = task.get("task_id", "")
-
-        self.update_worker_state(
-            worker_type=worker_type,
-            status=WorkerStatus.RUNNING,
-            current_task_id=task_id,
-        )
-
-        try:
-            worker.process(task)
-            logger.debug(f"Task {task_id} completed successfully")
-        except Exception as e:
-            logger.error(f"Worker execution failed for task {task_id}: {e}", exc_info=True)
-            self.update_worker_state(
-                worker_type=worker_type,
-                status=WorkerStatus.IDLE,
-                current_task_id="",
-                error=str(e),
-            )
-            raise
-
-    def _on_task_done(self, future: Future) -> None:
-        """Callback executed when a future completes. Ensures DB flush."""
-        try:
-            exc = future.exception()
-            if exc:
-                logger.error(f"Task raised an exception: {exc}")
-        except Exception as e:
-            logger.error(f"Error retrieving future result: {e}")
-        finally:
-            try:
-                self._db.flush()
-            except Exception as e:
-                logger.error(f"Failed to flush database after task: {e}")
-
-    def queue_task(self, worker_type: WorkerName, task: dict) -> None:
-        """Queue a task for execution (thread-safe, non-blocking)."""
-        self._task_queue.put((worker_type, task))
-        logger.debug(f"Queued task for {worker_type.value}")
-
     def stop(self, timeout: int = 30):
         """Signal the dispatcher to stop and shut down the executor."""
         self._running = False
@@ -162,9 +141,74 @@ class TaskDispatcher:
             self._executor.shutdown(wait=True, cancel_futures=True)
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=5)
-        if self._db:
-            try:
-                self._db.flush()
-            except Exception as e:
-                logger.error(f"Failed to flush database during shutdown: {e}")
         logger.info("TaskDispatcher stopped.")
+
+    # ------------------------------------------------------------------
+    # Internal loop
+    # ------------------------------------------------------------------
+
+    def _run_loop(self):
+        """Poll for WAITING workers and submit them to the thread pool."""
+        while self._running:
+            launched = False
+            with self._lock:
+                waiting_workers = [
+                    name
+                    for name, state in self._worker_states.items()
+                    if state.get("status") == WorkerStatus.WAITING
+                ]
+                for worker_type in waiting_workers:
+                    task = self._pending_tasks.pop(worker_type, None)
+                    if not task:
+                        self._worker_states[worker_type]["status"] = WorkerStatus.IDLE
+                        continue
+
+                    worker = self._workers.get(worker_type)
+                    if not worker:
+                        error_msg = f"No worker registered for type: {worker_type.value}"
+                        logger.error(error_msg)
+                        self._worker_states[worker_type] = {
+                            "status": WorkerStatus.IDLE,
+                            "current_task_id": "",
+                            "error": error_msg,
+                            "progress_percent": 0,
+                            "current_file": "",
+                        }
+                        continue
+
+                    self._worker_states[worker_type]["status"] = WorkerStatus.RUNNING
+                    logger.debug(
+                        f"Submitting task {task.get('task_id', '')} (type: {worker_type.value}) → RUNNING"
+                    )
+                    future: Future = self._executor.submit(
+                        self._run_worker, worker_type, worker, task
+                    )
+                    future.add_done_callback(self._on_task_done)
+                    launched = True
+
+            if not launched:
+                time.sleep(self.poll_interval)
+
+    def _run_worker(self, worker_type: WorkerName, worker: BaseWorker, task: dict) -> None:
+        """Execute a worker's process method and manage state transitions."""
+        task_id = task.get("task_id", "")
+
+        try:
+            worker.process(task)
+            logger.debug(f"Task {task_id} completed successfully")
+        except Exception as e:
+            logger.error(f"Worker execution failed for task {task_id}: {e}", exc_info=True)
+            with self._lock:
+                self._worker_states[worker_type]["status"] = WorkerStatus.IDLE
+                self._worker_states[worker_type]["current_task_id"] = ""
+                self._worker_states[worker_type]["error"] = str(e)
+            raise
+
+    def _on_task_done(self, future: Future) -> None:
+        """Callback executed when a future completes."""
+        try:
+            exc = future.exception()
+            if exc:
+                logger.error(f"Task raised an exception: {exc}")
+        except Exception as e:
+            logger.error(f"Error retrieving future result: {e}")

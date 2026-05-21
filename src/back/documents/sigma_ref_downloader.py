@@ -367,15 +367,15 @@ def download_references(
             if request_delay > 0:
                 time.sleep(request_delay)
 
-        summary: dict[str, Any] = {
-            "total_rules": total_rules,
-            "total_refs": total_refs,
-            "downloaded": downloaded,
-            "skipped": skipped,
-            "failed": failed,
-        }
-        logger.info("Download complete: %s", summary)
-        return summary
+    summary: dict[str, Any] = {
+        "total_rules": total_rules,
+        "total_refs": total_refs,
+        "downloaded": downloaded,
+        "skipped": skipped,
+        "failed": failed,
+    }
+    logger.info("Download complete: %s", summary)
+    return summary
 
 
 

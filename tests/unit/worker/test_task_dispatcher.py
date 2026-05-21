@@ -5,10 +5,8 @@ from __future__ import annotations
 import time
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from src.worker.processor import TaskDispatcher
-from src.worker.enums import WorkerName
+from src.worker.enums import WorkerName, WorkerStatus
 
 
 class TestTaskDispatcherInit:
@@ -22,22 +20,46 @@ class TestTaskDispatcherInit:
             dispatcher = TaskDispatcher(poll_interval=10)
             assert dispatcher.poll_interval == 10
 
-    def test_registers_six_workers(self, mock_db: MagicMock) -> None:
+    def test_initial_state(self, mock_db: MagicMock) -> None:
         with patch("src.worker.processor.DatabaseService.get_instance", return_value=mock_db):
             dispatcher = TaskDispatcher()
-            # Workers are created in the thread, not in __init__
             assert dispatcher._running is False
-            assert dispatcher._task_queue is not None
+            assert dispatcher._pending_tasks == {}
+            assert dispatcher._worker_states == {}
 
 
-class TestTaskDispatcherQueue:
-    def test_queue_task(self, mock_db: MagicMock) -> None:
+class TestAskForWorker:
+    def test_accepts_when_idle(self, mock_db: MagicMock) -> None:
         with patch("src.worker.processor.DatabaseService.get_instance", return_value=mock_db):
             dispatcher = TaskDispatcher()
-            dispatcher.queue_task(WorkerName.SIGMAREF_DISCOVERY, {"task_id": "test-1"})
+            result = dispatcher.ask_for_worker(WorkerName.SIGMAREF_DISCOVERY, foo="bar")
 
-        item = dispatcher._task_queue.get_nowait()
-        assert item == (WorkerName.SIGMAREF_DISCOVERY, {"task_id": "test-1"})
+        assert result is True
+        state = dispatcher._worker_states[WorkerName.SIGMAREF_DISCOVERY]
+        assert state["status"] == WorkerStatus.WAITING
+        assert state["current_task_id"]  # task_id generated internally
+        assert dispatcher._pending_tasks[WorkerName.SIGMAREF_DISCOVERY]["foo"] == "bar"
+
+    def test_rejects_when_waiting(self, mock_db: MagicMock) -> None:
+        with patch("src.worker.processor.DatabaseService.get_instance", return_value=mock_db):
+            dispatcher = TaskDispatcher()
+            dispatcher.ask_for_worker(WorkerName.SIGMAREF_DISCOVERY)
+            result = dispatcher.ask_for_worker(WorkerName.SIGMAREF_DISCOVERY)
+
+        assert result is False
+
+    def test_generates_unique_task_ids(self, mock_db: MagicMock) -> None:
+        with patch("src.worker.processor.DatabaseService.get_instance", return_value=mock_db):
+            dispatcher = TaskDispatcher()
+            dispatcher.ask_for_worker(WorkerName.SIGMAREF_DISCOVERY)
+            id1 = dispatcher._worker_states[WorkerName.SIGMAREF_DISCOVERY]["current_task_id"]
+
+            # Reset to idle to accept another
+            dispatcher._worker_states[WorkerName.SIGMAREF_DISCOVERY]["status"] = WorkerStatus.IDLE
+            dispatcher.ask_for_worker(WorkerName.SIGMAREF_DISCOVERY)
+            id2 = dispatcher._worker_states[WorkerName.SIGMAREF_DISCOVERY]["current_task_id"]
+
+        assert id1 != id2
 
 
 class TestTaskDispatcherThread:

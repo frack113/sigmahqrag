@@ -64,7 +64,7 @@ class UpdateService:
                 current_version=version or "unknown",
                 last_updated=datetime.now() if version else None,
             )
-            services_status[service.replace(".", "_")] = version_info.dict()
+            services_status[service.replace(".", "_")] = version_info.model_dump()
 
         return {
             "services": services_status,

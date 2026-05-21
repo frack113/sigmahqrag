@@ -3,6 +3,7 @@ from enum import Enum
 
 class WorkerStatus(Enum):
     IDLE = "idle"
+    WAITING = "waiting"
     RUNNING = "running"
     ERROR = "error"
 

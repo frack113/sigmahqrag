@@ -3,14 +3,13 @@
 from __future__ import annotations
 
 import logging
-import uuid
 from typing import Any
 
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 
 from src.worker.processor import TaskDispatcher
-from src.worker.enums import WorkerName, WorkerStatus
+from src.worker.enums import WorkerName
 
 logger = logging.getLogger(__name__)
 
@@ -31,23 +30,6 @@ def _get_dispatcher(request: Request) -> TaskDispatcher:
     return request.app.state.dispatcher
 
 
-def _trigger_worker(worker_type: WorkerName, task: dict, dispatcher: TaskDispatcher) -> bool:
-    """Helper to trigger a worker via the dispatcher."""
-    if dispatcher.is_worker_busy(worker_type):
-        return False
-
-    task_id = str(uuid.uuid4())
-    task["task_id"] = task_id
-    dispatcher.update_worker_state(
-        worker_type=worker_type,
-        status=WorkerStatus.RUNNING,
-        current_task_id=task_id,
-    )
-
-    dispatcher.queue_task(worker_type, task)
-    return True
-
-
 @router.post("/list", response_model=FileOperationResponse)
 async def file_list(
     dispatcher: TaskDispatcher = Depends(_get_dispatcher),
@@ -56,17 +38,17 @@ async def file_list(
     triggered = []
     busy = []
 
-    if _trigger_worker(WorkerName.GITHUB_DISCOVERY, {"task_type": WorkerName.GITHUB_DISCOVERY.value, "collection_name": "all"}, dispatcher):
+    if dispatcher.ask_for_worker(WorkerName.GITHUB_DISCOVERY, task_type=WorkerName.GITHUB_DISCOVERY.value, collection_name="all"):
         triggered.append(WorkerName.GITHUB_DISCOVERY.value)
     else:
         busy.append(WorkerName.GITHUB_DISCOVERY.value)
 
-    if _trigger_worker(WorkerName.LOCAL_DISCOVERY, {"task_type": WorkerName.LOCAL_DISCOVERY.value, "collection_name": "local"}, dispatcher):
+    if dispatcher.ask_for_worker(WorkerName.LOCAL_DISCOVERY, task_type=WorkerName.LOCAL_DISCOVERY.value, collection_name="local"):
         triggered.append(WorkerName.LOCAL_DISCOVERY.value)
     else:
         busy.append(WorkerName.LOCAL_DISCOVERY.value)
 
-    if _trigger_worker(WorkerName.SIGMAREF_DISCOVERY, {"task_type": WorkerName.SIGMAREF_DISCOVERY.value, "collection_name": "sigmaref"}, dispatcher):
+    if dispatcher.ask_for_worker(WorkerName.SIGMAREF_DISCOVERY, task_type=WorkerName.SIGMAREF_DISCOVERY.value, collection_name="sigmaref"):
         triggered.append(WorkerName.SIGMAREF_DISCOVERY.value)
     else:
         busy.append(WorkerName.SIGMAREF_DISCOVERY.value)
@@ -93,17 +75,17 @@ async def file_embed(
     triggered = []
     busy = []
 
-    if _trigger_worker(WorkerName.GITHUB_EMBEDDINGS, {"task_type": WorkerName.GITHUB_EMBEDDINGS.value, "collection_name": "all"}, dispatcher):
+    if dispatcher.ask_for_worker(WorkerName.GITHUB_EMBEDDINGS, task_type=WorkerName.GITHUB_EMBEDDINGS.value, collection_name="all"):
         triggered.append(WorkerName.GITHUB_EMBEDDINGS.value)
     else:
         busy.append(WorkerName.GITHUB_EMBEDDINGS.value)
 
-    if _trigger_worker(WorkerName.LOCAL_EMBEDDINGS, {"task_type": WorkerName.LOCAL_EMBEDDINGS.value, "collection_name": "local"}, dispatcher):
+    if dispatcher.ask_for_worker(WorkerName.LOCAL_EMBEDDINGS, task_type=WorkerName.LOCAL_EMBEDDINGS.value, collection_name="local"):
         triggered.append(WorkerName.LOCAL_EMBEDDINGS.value)
     else:
         busy.append(WorkerName.LOCAL_EMBEDDINGS.value)
 
-    if _trigger_worker(WorkerName.SIGMAREF_EMBEDDINGS, {"task_type": WorkerName.SIGMAREF_EMBEDDINGS.value, "collection_name": "sigmaref"}, dispatcher):
+    if dispatcher.ask_for_worker(WorkerName.SIGMAREF_EMBEDDINGS, task_type=WorkerName.SIGMAREF_EMBEDDINGS.value, collection_name="sigmaref"):
         triggered.append(WorkerName.SIGMAREF_EMBEDDINGS.value)
     else:
         busy.append(WorkerName.SIGMAREF_EMBEDDINGS.value)
