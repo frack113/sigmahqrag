@@ -18,9 +18,10 @@ def get_database_service() -> DatabaseService:
 
 
 def get_dispatcher(req: Request) -> TaskDispatcher:
-    if not hasattr(req.app.state, "dispatcher"):
+    dispatcher = getattr(req.app.state, "dispatcher", None)
+    if dispatcher is None:
         raise RuntimeError("TaskDispatcher not available")
-    return cast(TaskDispatcher, req.app.state.dispatcher)
+    return cast(TaskDispatcher, dispatcher)
 
 
 def get_embedding_manager() -> EmbeddingManager:

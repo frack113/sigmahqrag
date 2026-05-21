@@ -8,11 +8,17 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from src.api.v1.qdrant import router
-from src.worker.enums import WorkerName
 
 app = FastAPI()
 app.include_router(router)
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def _clean_app_state():
+    yield
+    if hasattr(app.state, "dispatcher"):
+        del app.state.dispatcher
 
 
 # ── _embed_progress_generator ────────────────────────────────────────────────
@@ -225,13 +231,7 @@ def test_embed_sigmaref_qdrant_down_exception():
 
 def test_embed_sigmaref_success():
     app.state.dispatcher = MagicMock()
-    app.state.dispatcher.ask_for_worker.return_value = True
-    app.state.dispatcher.get_all_worker_states.return_value = [
-        {
-            "worker_type": WorkerName.SIGMAREF_EMBEDDINGS.value,
-            "current_task_id": "generated-task-1",
-        },
-    ]
+    app.state.dispatcher.ask_for_worker.return_value = "generated-task-1"
 
     with patch("src.back.qdrant.check_health", new_callable=AsyncMock) as mock_health:
         mock_health.return_value = {"status": "active"}

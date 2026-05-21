@@ -144,12 +144,14 @@ async def lifespan(app: FastAPI) -> None:
         from src.shared import LLM_DIR, EMBEDDINGS_DIR
 
         logger.info("Queuing model sync as background worker...")
-        dispatcher.ask_for_worker(
+        if not dispatcher.ask_for_worker(
             WorkerName.MODEL_SYNC,
             llm_dir=str(LLM_DIR),
             embeddings_dir=str(EMBEDDINGS_DIR),
-        )
-        logger.info("Model sync queued.")
+        ):
+            logger.warning("Model sync not queued — worker is busy")
+        else:
+            logger.info("Model sync queued.")
 
         _validate_services()
         logger.info("Services validated.")

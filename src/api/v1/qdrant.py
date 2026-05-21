@@ -18,7 +18,7 @@ from src.shared.schemas.qdrant import (
     QdrantActionRequest,
     QdrantActionResponse,
 )
-from src.worker.enums import WorkerName
+from src.worker.enums import WorkerName, WorkerStatus
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +38,7 @@ async def _embed_progress_generator(worker_type: str, dispatcher) -> AsyncGenera
 
             yield f"data: {json.dumps(status_data)}\n\n"
 
-            if status_data.get("status") in ("completed", "failed", "idle"):
+            if status_data.get("status") in ("completed", "failed", WorkerStatus.IDLE.value, WorkerStatus.ERROR.value):
                 break
         except Exception as e:
             logger.error(f"SSE error for {worker_type}: {e}")
@@ -316,25 +316,18 @@ async def qdrant_action(request: QdrantActionRequest, req: Request) -> QdrantAct
             if not hasattr(req.app.state, "dispatcher"):
                 raise RuntimeError("TaskDispatcher not available — is the server running?")
 
-            accepted = req.app.state.dispatcher.ask_for_worker(
+            task_id = req.app.state.dispatcher.ask_for_worker(
                 WorkerName.SIGMAREF_EMBEDDINGS,
                 task_type=WorkerName.SIGMAREF_EMBEDDINGS.value,
                 collection_name=payload.collection_name,
             )
-            if not accepted:
+            if not task_id:
                 return QdrantActionResponse(
                     status="error",
                     action=action,
                     error_code="ALREADY_RUNNING",
                     message="Task already in progress",
                 )
-
-            # Retrieve the generated task_id from the worker state
-            states = req.app.state.dispatcher.get_all_worker_states()
-            task_id = next(
-                (s["current_task_id"] for s in states if s["worker_type"] == WorkerName.SIGMAREF_EMBEDDINGS.value),
-                "",
-            )
 
             return QdrantActionResponse(
                 status="success",

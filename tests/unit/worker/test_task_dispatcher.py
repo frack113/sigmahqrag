@@ -34,7 +34,7 @@ class TestAskForWorker:
             dispatcher = TaskDispatcher()
             result = dispatcher.ask_for_worker(WorkerName.SIGMAREF_DISCOVERY, foo="bar")
 
-        assert result is True
+        assert result is not None
         state = dispatcher._worker_states[WorkerName.SIGMAREF_DISCOVERY]
         assert state["status"] == WorkerStatus.WAITING
         assert state["current_task_id"]  # task_id generated internally
@@ -46,7 +46,7 @@ class TestAskForWorker:
             dispatcher.ask_for_worker(WorkerName.SIGMAREF_DISCOVERY)
             result = dispatcher.ask_for_worker(WorkerName.SIGMAREF_DISCOVERY)
 
-        assert result is False
+        assert result is None
 
     def test_generates_unique_task_ids(self, mock_db: MagicMock) -> None:
         with patch("src.worker.processor.DatabaseService.get_instance", return_value=mock_db):

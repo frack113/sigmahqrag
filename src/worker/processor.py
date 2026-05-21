@@ -53,18 +53,18 @@ class TaskDispatcher:
     # Public API
     # ------------------------------------------------------------------
 
-    def ask_for_worker(self, worker_type: WorkerName, **task_params) -> bool:
+    def ask_for_worker(self, worker_type: WorkerName, **task_params) -> str | None:
         """Atomic check-and-set: if the worker is IDLE, mark it WAITING and store the task.
 
-        Returns ``True`` when the request was accepted, ``False`` when the worker
-        is already WAITING, RUNNING, or in ERROR state.
+        Returns the generated ``task_id`` when the request was accepted, ``None`` when
+        the worker is already WAITING, RUNNING, or in ERROR state.
         The dispatcher generates the task_id internally.
         """
         with self._lock:
             state = self._worker_states.get(worker_type)
             current_status = state["status"] if state else WorkerStatus.IDLE
             if current_status != WorkerStatus.IDLE:
-                return False
+                return None
 
             task_id = str(uuid.uuid4())
             self._worker_states[worker_type] = {
@@ -76,7 +76,7 @@ class TaskDispatcher:
             }
             self._pending_tasks[worker_type] = {"task_id": task_id, **task_params}
             logger.debug(f"Worker {worker_type.value} accepted task {task_id} (→ WAITING)")
-            return True
+            return task_id
 
     def get_all_worker_states(self) -> list[dict]:
         """Return all worker states as a list of dictionaries."""
@@ -101,7 +101,11 @@ class TaskDispatcher:
         with self._lock:
             for wt, state in self._worker_states.items():
                 if wt.value == worker_type:
-                    return {k: v for k, v in state.items() if k != "current_task_id"}
+                    return {
+                        k: v.value if isinstance(v, WorkerStatus) else v
+                        for k, v in state.items()
+                        if k != "current_task_id"
+                    }
             return None
 
     def is_worker_busy(self, worker_type: WorkerName) -> bool:
@@ -180,9 +184,20 @@ class TaskDispatcher:
                     logger.debug(
                         f"Submitting task {task.get('task_id', '')} (type: {worker_type.value}) → RUNNING"
                     )
-                    future: Future = self._executor.submit(
-                        self._run_worker, worker_type, worker, task
-                    )
+                    try:
+                        future: Future = self._executor.submit(
+                            self._run_worker, worker_type, worker, task
+                        )
+                    except Exception as e:
+                        logger.error(f"Failed to submit task for {worker_type.value}: {e}")
+                        self._worker_states[worker_type] = {
+                            "status": WorkerStatus.IDLE,
+                            "current_task_id": "",
+                            "error": str(e),
+                            "progress_percent": 0,
+                            "current_file": "",
+                        }
+                        continue
                     future.add_done_callback(self._on_task_done)
                     launched = True
 
@@ -192,17 +207,21 @@ class TaskDispatcher:
     def _run_worker(self, worker_type: WorkerName, worker: BaseWorker, task: dict) -> None:
         """Execute a worker's process method and manage state transitions."""
         task_id = task.get("task_id", "")
+        error: str | None = None
 
         try:
             worker.process(task)
             logger.debug(f"Task {task_id} completed successfully")
         except Exception as e:
             logger.error(f"Worker execution failed for task {task_id}: {e}", exc_info=True)
+            error = str(e)
+            raise
+        finally:
             with self._lock:
                 self._worker_states[worker_type]["status"] = WorkerStatus.IDLE
                 self._worker_states[worker_type]["current_task_id"] = ""
-                self._worker_states[worker_type]["error"] = str(e)
-            raise
+                self._worker_states[worker_type]["error"] = error or ""
+                self._worker_states[worker_type]["progress_percent"] = 0
 
     def _on_task_done(self, future: Future) -> None:
         """Callback executed when a future completes."""
