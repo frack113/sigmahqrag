@@ -35,6 +35,7 @@ from src.back.database import DatabaseService
 from src.back.qdrant.auto_start import start_qdrant, stop_qdrant
 from src.back.service_manager import shutdown_all_services
 from src.worker.processor import TaskDispatcher
+from src.worker.enums import WorkerName
 from src.shared.exceptions import SigmaError
 
 logger = logging.getLogger(__name__)
@@ -112,13 +113,6 @@ async def lifespan(app: FastAPI) -> None:
             )
         logger.info("Old files check done.")
 
-        db.reset_stale_workers()
-        logger.info("Stale workers reset.")
-
-        # Initialize worker states so the frontend always sees all workers
-        db.init_worker_states(list(TaskDispatcher._WORKER_TYPES.keys()))
-        logger.info("Worker states initialized.")
-
         # Sync filesystem repos into git_metadata if missing
         from src.back.github.git import list_repos, get_metadata, save_metadata
 
@@ -150,8 +144,8 @@ async def lifespan(app: FastAPI) -> None:
         from src.shared import LLM_DIR, EMBEDDINGS_DIR
 
         logger.info("Queuing model sync as background worker...")
-        await dispatcher.queue_task(
-            "model_sync",
+        dispatcher.queue_task(
+            WorkerName.MODEL_SYNC,
             {
                 "task_id": "model-sync-startup",
                 "llm_dir": str(LLM_DIR),

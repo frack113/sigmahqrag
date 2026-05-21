@@ -15,6 +15,7 @@ from src.shared.schemas.qdrant import (
     QdrantActionRequest,
     QdrantActionResponse,
 )
+from src.worker.enums import WorkerName, WorkerStatus
 
 logger = logging.getLogger(__name__)
 
@@ -290,7 +291,7 @@ async def qdrant_action(request: QdrantActionRequest, db: DatabaseService = Depe
             return QdrantActionResponse(status="success", action=action, data=results)
 
         elif action == "embed_sigmaref":
-            if db.is_worker_busy("sigmaref_embeddings"):
+            if db.is_worker_busy(WorkerName.SIGMAREF_EMBEDDINGS.value):
                 return QdrantActionResponse(
                     status="error",
                     action=action,
@@ -319,15 +320,9 @@ async def qdrant_action(request: QdrantActionRequest, db: DatabaseService = Depe
             task_id = str(uuid.uuid4())
             task = {
                 "task_id": task_id,
-                "task_type": "sigmarefunc_embeddings",
+                "task_type": WorkerName.SIGMAREF_EMBEDDINGS.value,
                 "collection_name": payload.collection_name,
             }
-
-            db.upsert_worker_state(
-                worker_type="sigmaref_embeddings",
-                status="running",
-                current_task_id=task_id,
-            )
 
             # Trigger via dispatcher
             from src.main import app
@@ -335,186 +330,13 @@ async def qdrant_action(request: QdrantActionRequest, db: DatabaseService = Depe
             if not app or not hasattr(app.state, "dispatcher"):
                 raise RuntimeError("TaskDispatcher not available — is the server running?")
 
-            await app.state.dispatcher.queue_task("sigmaref_embeddings", task)
-
-            return QdrantActionResponse(
-                status="success",
-                action=action,
-                data={"task_id": task_id},
-                message="SigmaRef embedding queued (will start within 5s)",
-            )
-
-        else:
-            return QdrantActionResponse(
-                status="error",
-                action=action,
-                error_code="UNKNOWN_ACTION",
-                message=f"Action {action} not supported",
-            )
-
-    except Exception as e:
-        logger.error(f"Qdrant action error ({action}): {e}")
-        return QdrantActionResponse(
-            status="error",
-            action=action,
-            error_code="ACTION_FAILED",
-            message=str(e),
-        )
-
-
-            return QdrantActionResponse(
-                status="success",
-                action=action,
-                data={"download_id": download_id},
-                message=f"Download initiated for version {payload.version}",
-            )
-
-        elif action == "service_control":
-            service_manager = create_qdrant_service()
-            command = payload.command
-            if command == "start":
-                from src.shared import QDRANT_STORAGE_DIR
-
-                result = await service_manager.start(storage_path=str(QDRANT_STORAGE_DIR))
-            elif command == "stop":
-                result = await service_manager.stop()
-            elif command == "restart":
-                await service_manager.stop()
-                result = await service_manager.start()
-            else:
-                raise ValueError(f"Unknown command: {command}")
-            return QdrantActionResponse(status="success", action=action, data=result)
-
-        elif action == "progress":
-            return JSONResponse(
-                status_code=307,
-                headers={"Location": f"/api/v1/qdrant/progress/{payload.download_id}"},
-            )
-
-        elif action == "cancel":
-            manager = create_download_manager()
-            manager.cancel_download(payload.download_id)
-            return QdrantActionResponse(
-                status="success",
-                action=action,
-                message=f"Download {payload.download_id} cancelled",
-            )
-
-        elif action == "collection_management":
-            op = payload.operation
-            name = payload.collection_name
-            if op == "list":
-                data = await list_collections(host, port)
-                return QdrantActionResponse(status="success", action=action, data=data)
-            elif op == "create":
-                v_size = payload.config.get("vector_size", 384) if payload.config else 384
-                await create_collection(host, port, name, v_size)
-                return QdrantActionResponse(
-                    status="success",
-                    action=action,
-                    message=f"Collection {name} created",
-                )
-            elif op == "delete":
-                await delete_collection(host, port, name)
-                return QdrantActionResponse(
-                    status="success",
-                    action=action,
-                    message=f"Collection {name} deleted",
-                )
-            elif op == "get":
-                data = await get_collection(host, port, name)
-                return QdrantActionResponse(status="success", action=action, data=data)
-            else:
-                raise ValueError(f"Unknown operation: {op}")
-
-        elif action == "data_management":
-            op = payload.operation
-            name = payload.collection_name
-            if op == "add" or op == "update":
-                if not payload.vector or not payload.id:
-                    raise ValueError("id and vector are required for add/update")
-                success = await store_embeddings(
-                    embeddings=[payload.vector],
-                    documents=["placeholder"],
-                    metadata=[payload.payload or {}],
-                    collection_name=name,
-                )
-                if not success:
-                    raise ValueError("Failed to add/update data")
-                return QdrantActionResponse(
-                    status="success", action=action, message="Data processed"
-                )
-            elif op == "delete":
-                if not payload.id:
-                    raise ValueError("id is required for delete")
-                success = await delete_point(name, payload.id, host, port)
-                if not success:
-                    raise ValueError("Failed to delete data")
-                return QdrantActionResponse(
-                    status="success",
-                    action=action,
-                    message="Data deleted",
-                )
-            else:
-                raise ValueError(f"Unknown operation: {op}")
-
-        elif action == "vector_search":
-            results = await qdrant_search(
-                query_embedding=payload.query_vector,
-                collection_name=payload.collection_name,
-                top_k=payload.top_k,
-            )
-            return QdrantActionResponse(status="success", action=action, data=results)
-
-        elif action == "embed_sigmaref":
-            db = DatabaseService.get_instance()
-
-            if db.is_worker_busy("sigmaref_embeddings"):
-                return QdrantActionResponse(
-                    status="error",
-                    action=action,
-                    error_code="ALREADY_RUNNING",
-                    message="Task already in progress",
-                )
-
-            try:
-                from src.back.qdrant import check_health as qdrant_health
-
-                if not await qdrant_health():
-                    return QdrantActionResponse(
-                        status="error",
-                        action=action,
-                        error_code="QDRANT_DOWN",
-                        message="Qdrant is unreachable",
-                    )
-            except Exception:
-                return QdrantActionResponse(
-                    status="error",
-                    action=action,
-                    error_code="QDRANT_DOWN",
-                    message="Qdrant is unreachable",
-                )
-
-            task_id = str(uuid.uuid4())
-            task = {
-                "task_id": task_id,
-                "task_type": "sigmaref_embeddings",
-                "collection_name": payload.collection_name,
-            }
-
-            db.upsert_worker_state(
-                worker_type="sigmaref_embeddings",
-                status="running",
+            app.state.dispatcher.update_worker_state(
+                worker_type=WorkerName.SIGMAREF_EMBEDDINGS,
+                status=WorkerStatus.RUNNING,
                 current_task_id=task_id,
             )
 
-            # Trigger via dispatcher
-            from src.main import app
-
-            if not app or not hasattr(app.state, "dispatcher"):
-                raise RuntimeError("TaskDispatcher not available — is the server running?")
-
-            await app.state.dispatcher.queue_task("sigmaref_embeddings", task)
+            app.state.dispatcher.queue_task(WorkerName.SIGMAREF_EMBEDDINGS, task)
 
             return QdrantActionResponse(
                 status="success",

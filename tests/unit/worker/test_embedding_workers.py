@@ -12,9 +12,15 @@ from src.worker.workers.local_embedding_worker import LocalEmbeddingWorker
 from src.worker.workers.sigmaref_embedding_worker import SigmaRefEmbeddingWorker
 
 
+def _make_worker(cls, mock_db: MagicMock) -> tuple:
+    """Create a worker with a mock dispatcher. Returns (worker, mock_dispatcher)."""
+    mock_dispatcher = MagicMock()
+    worker = cls(mock_db, mock_dispatcher)
+    return worker, mock_dispatcher
+
+
 class TestSigmaRefEmbeddingWorker:
-    @pytest.mark.asyncio
-    async def test_process_completes_if_no_entries(self, mock_db: MagicMock) -> None:
+    def test_process_completes_if_no_entries(self, mock_db: MagicMock) -> None:
         mock_db.get_pending_sigma_ref.return_value = []
 
         task = {
@@ -24,14 +30,13 @@ class TestSigmaRefEmbeddingWorker:
             "registry_path": "data/documents/sigmaref",
         }
 
-        worker = SigmaRefEmbeddingWorker(mock_db)
-        await worker.process(task)
+        worker, mock_dispatcher = _make_worker(SigmaRefEmbeddingWorker, mock_db)
+        worker.process(task)
 
         mock_db.get_pending_sigma_ref.assert_called()
-        mock_db.upsert_worker_state.assert_not_called()
+        mock_dispatcher.update_worker_state.assert_not_called()
 
-    @pytest.mark.asyncio
-    async def test_process_embeds_entries(self, mock_db: MagicMock, tmp_path: Path) -> None:
+    def test_process_embeds_entries(self, mock_db: MagicMock, tmp_path: Path) -> None:
         registry_dir = tmp_path / "sigmaref"
         registry_dir.mkdir()
         (registry_dir / "abc123.md").write_text("# Test Doc")
@@ -61,15 +66,14 @@ class TestSigmaRefEmbeddingWorker:
             mock_builder.run = MagicMock()
             mock_builder_cls.return_value = mock_builder
 
-            worker = SigmaRefEmbeddingWorker(mock_db)
-            await worker.process(task)
+            worker, mock_dispatcher = _make_worker(SigmaRefEmbeddingWorker, mock_db)
+            worker.process(task)
 
         mock_builder.run.assert_called_once()
         mock_db.update_sigma_ref_embed_status.assert_called_with("abc123", "embedded")
-        mock_db.update_worker_progress.assert_called()
+        mock_dispatcher.update_worker_state.assert_called()
 
-    @pytest.mark.asyncio
-    async def test_process_skips_missing_files(self, mock_db: MagicMock, tmp_path: Path) -> None:
+    def test_process_skips_missing_files(self, mock_db: MagicMock, tmp_path: Path) -> None:
         registry_dir = tmp_path / "sigmaref"
         registry_dir.mkdir()
 
@@ -98,13 +102,12 @@ class TestSigmaRefEmbeddingWorker:
             mock_builder.run = MagicMock()
             mock_builder_cls.return_value = mock_builder
 
-            worker = SigmaRefEmbeddingWorker(mock_db)
-            await worker.process(task)
+            worker, mock_dispatcher = _make_worker(SigmaRefEmbeddingWorker, mock_db)
+            worker.process(task)
 
         mock_db.update_sigma_ref_embed_status.assert_called_with("missing123", "error")
 
-    @pytest.mark.asyncio
-    async def test_process_reports_running_status(self, mock_db: MagicMock, tmp_path: Path) -> None:
+    def test_process_reports_running_status(self, mock_db: MagicMock, tmp_path: Path) -> None:
         registry_dir = tmp_path / "sigmaref"
         registry_dir.mkdir()
         (registry_dir / "abc123.md").write_text("# Test")
@@ -132,17 +135,16 @@ class TestSigmaRefEmbeddingWorker:
             mock_builder.run = MagicMock()
             mock_builder_cls.return_value = mock_builder
 
-            worker = SigmaRefEmbeddingWorker(mock_db)
-            await worker.process(task)
+            worker, mock_dispatcher = _make_worker(SigmaRefEmbeddingWorker, mock_db)
+            worker.process(task)
 
-        state_calls = mock_db.upsert_worker_state.call_args_list
-        assert any(c.kwargs["status"] == "running" for c in state_calls)
-        mock_db.update_worker_progress.assert_called()
+        state_calls = mock_dispatcher.update_worker_state.call_args_list
+        assert any(c.kwargs.get("status") == "running" for c in state_calls)
+        mock_dispatcher.update_worker_state.assert_called()
 
 
 class TestGithubEmbeddingWorker:
-    @pytest.mark.asyncio
-    async def test_process_raises_if_path_missing(self, mock_db: MagicMock, tmp_path: Path) -> None:
+    def test_process_raises_if_path_missing(self, mock_db: MagicMock, tmp_path: Path) -> None:
         task = {
             "task_id": "gh-emb-001",
             "task_type": "github_embeddings",
@@ -155,24 +157,22 @@ class TestGithubEmbeddingWorker:
             return tmp_path / "/".join(args)
 
         with patch("src.worker.workers.github_embedding_worker.Path", side_effect=mock_path):
-            worker = GithubEmbeddingWorker(mock_db)
+            worker, _ = _make_worker(GithubEmbeddingWorker, mock_db)
             with pytest.raises(FileNotFoundError, match="Repository path does not exist"):
-                await worker.process(task)
+                worker.process(task)
 
-    @pytest.mark.asyncio
-    async def test_process_raises_invalid_collection_name(self, mock_db: MagicMock) -> None:
+    def test_process_raises_invalid_collection_name(self, mock_db: MagicMock) -> None:
         task = {
             "task_id": "gh-emb-002",
             "task_type": "github_embeddings",
             "collection_name": "",
         }
 
-        worker = GithubEmbeddingWorker(mock_db)
+        worker, _ = _make_worker(GithubEmbeddingWorker, mock_db)
         with pytest.raises(ValueError, match="collection_name is required"):
-            await worker.process(task)
+            worker.process(task)
 
-    @pytest.mark.asyncio
-    async def test_process_completes_if_no_registry_entries(
+    def test_process_completes_if_no_registry_entries(
         self, mock_db: MagicMock, tmp_path: Path
     ) -> None:
         repo_dir = tmp_path / "test-org" / "test-repo"
@@ -199,13 +199,12 @@ class TestGithubEmbeddingWorker:
                 mock_builder.run = MagicMock()
                 mock_builder_cls.return_value = mock_builder
 
-                worker = GithubEmbeddingWorker(mock_db)
-                await worker.process(task)
+                worker, _ = _make_worker(GithubEmbeddingWorker, mock_db)
+                worker.process(task)
 
         mock_db.get_pending_sigma_ref.assert_called()
 
-    @pytest.mark.asyncio
-    async def test_process_embeds_discovered_files(
+    def test_process_embeds_discovered_files(
         self, mock_db: MagicMock, tmp_path: Path
     ) -> None:
         repo_dir = tmp_path / "test-org" / "test-repo" / "rules"
@@ -243,14 +242,13 @@ class TestGithubEmbeddingWorker:
                 mock_builder.run = MagicMock()
                 mock_builder_cls.return_value = mock_builder
 
-                worker = GithubEmbeddingWorker(mock_db)
-                await worker.process(task)
+                worker, mock_dispatcher = _make_worker(GithubEmbeddingWorker, mock_db)
+                worker.process(task)
 
         mock_builder.run.assert_called_once()
         mock_db.update_sigma_ref_embed_status.assert_called()
 
-    @pytest.mark.asyncio
-    async def test_process_filters_by_org_and_repo(
+    def test_process_filters_by_org_and_repo(
         self, mock_db: MagicMock, tmp_path: Path
     ) -> None:
         repo_dir = tmp_path / "test-org" / "test-repo"
@@ -286,15 +284,14 @@ class TestGithubEmbeddingWorker:
                 mock_builder.run = MagicMock()
                 mock_builder_cls.return_value = mock_builder
 
-                worker = GithubEmbeddingWorker(mock_db)
-                await worker.process(task)
+                worker, _ = _make_worker(GithubEmbeddingWorker, mock_db)
+                worker.process(task)
 
         mock_db.get_pending_sigma_ref.assert_called_with("test-org", "test-repo")
 
 
 class TestLocalEmbeddingWorker:
-    @pytest.mark.asyncio
-    async def test_process_completes_if_path_missing(self, mock_db: MagicMock) -> None:
+    def test_process_completes_if_path_missing(self, mock_db: MagicMock) -> None:
         task = {
             "task_id": "local-emb-001",
             "task_type": "local_embeddings",
@@ -302,13 +299,12 @@ class TestLocalEmbeddingWorker:
             "base_path": "/nonexistent/path",
         }
 
-        worker = LocalEmbeddingWorker(mock_db)
-        await worker.process(task)
+        worker, mock_dispatcher = _make_worker(LocalEmbeddingWorker, mock_db)
+        worker.process(task)
 
-        mock_db.update_worker_progress.assert_not_called()
+        mock_dispatcher.update_worker_state.assert_not_called()
 
-    @pytest.mark.asyncio
-    async def test_process_completes_if_no_registry_entries(
+    def test_process_completes_if_no_registry_entries(
         self, mock_db: MagicMock, tmp_path: Path
     ) -> None:
         local_dir = tmp_path / "local_docs"
@@ -323,13 +319,12 @@ class TestLocalEmbeddingWorker:
             "base_path": str(local_dir),
         }
 
-        worker = LocalEmbeddingWorker(mock_db)
-        await worker.process(task)
+        worker, mock_dispatcher = _make_worker(LocalEmbeddingWorker, mock_db)
+        worker.process(task)
 
-        mock_db.update_worker_progress.assert_not_called()
+        mock_dispatcher.update_worker_state.assert_not_called()
 
-    @pytest.mark.asyncio
-    async def test_process_embeds_discovered_files(
+    def test_process_embeds_discovered_files(
         self, mock_db: MagicMock, tmp_path: Path
     ) -> None:
         local_dir = tmp_path / "local_docs"
@@ -361,15 +356,13 @@ class TestLocalEmbeddingWorker:
             mock_builder.run = MagicMock()
             mock_builder_cls.return_value = mock_builder
 
-            worker = LocalEmbeddingWorker(mock_db)
-            await worker.process(task)
+            worker, mock_dispatcher = _make_worker(LocalEmbeddingWorker, mock_db)
+            worker.process(task)
 
         mock_builder.run.assert_called_once()
-        mock_db.upsert_worker_state.assert_called()
-        mock_db.update_worker_progress.assert_called()
+        mock_dispatcher.update_worker_state.assert_called()
 
-    @pytest.mark.asyncio
-    async def test_process_uses_default_path(self, mock_db: MagicMock) -> None:
+    def test_process_uses_default_path(self, mock_db: MagicMock) -> None:
         mock_db.get_doc_sigma_ref.return_value = []
 
         task = {
@@ -378,7 +371,7 @@ class TestLocalEmbeddingWorker:
             "collection_name": "local",
         }
 
-        worker = LocalEmbeddingWorker(mock_db)
-        await worker.process(task)
+        worker, mock_dispatcher = _make_worker(LocalEmbeddingWorker, mock_db)
+        worker.process(task)
 
-        mock_db.update_worker_progress.assert_not_called()
+        mock_dispatcher.update_worker_state.assert_not_called()

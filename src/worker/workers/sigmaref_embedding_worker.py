@@ -2,6 +2,7 @@ import logging
 from pathlib import Path
 
 from src.worker.workers.embedding_base import EmbeddingWorker
+from src.worker.enums import WorkerName
 
 logger = logging.getLogger(__name__)
 
@@ -9,7 +10,7 @@ logger = logging.getLogger(__name__)
 class SigmaRefEmbeddingWorker(EmbeddingWorker):
     """Embeds Sigma Reference documents from doc_sigma_ref into Qdrant."""
 
-    worker_type = "sigmaref_embeddings"
+    worker_type = WorkerName.SIGMAREF_EMBEDDINGS
     collection_name = "sigma_doc"
 
     def _get_entries(self, task: dict) -> list[dict]:

@@ -13,8 +13,7 @@ from src.worker.workers.sigmaref_discovery_worker import SigmaRefDiscoveryWorker
 
 
 class TestSigmaRefDiscoveryWorker:
-    @pytest.mark.asyncio
-    async def test_process_calls_download_references(self, mock_db: MagicMock) -> None:
+    def test_process_calls_download_references(self, mock_db: MagicMock) -> None:
         task = {
             "task_id": "sr-disc-001",
             "task_type": "sigmaref_discovery",
@@ -30,16 +29,16 @@ class TestSigmaRefDiscoveryWorker:
             return_value=summary,
         ) as mock_download:
             worker = SigmaRefDiscoveryWorker(mock_db)
-            await worker.process(task)
+            worker.process(task)
 
         mock_download.assert_called_once_with(
             rules_dir="data/rules",
             output_dir="data/documents/sigmaref",
+            db=mock_db,
             supported_types={"markdown"},
         )
 
-    @pytest.mark.asyncio
-    async def test_process_propagates_errors(self, mock_db: MagicMock) -> None:
+    def test_process_propagates_errors(self, mock_db: MagicMock) -> None:
         task = {
             "task_id": "sr-disc-003",
             "task_type": "sigmaref_discovery",
@@ -52,12 +51,11 @@ class TestSigmaRefDiscoveryWorker:
         ):
             worker = SigmaRefDiscoveryWorker(mock_db)
             with pytest.raises(RuntimeError, match="download failed"):
-                await worker.process(task)
+                worker.process(task)
 
 
 class TestGithubDiscoveryWorker:
-    @pytest.mark.asyncio
-    async def test_process_completes_if_no_repos(self, mock_db: MagicMock) -> None:
+    def test_process_completes_if_no_repos(self, mock_db: MagicMock) -> None:
         mock_db.get_repos_with_selected_dirs.return_value = []
 
         task = {
@@ -67,10 +65,9 @@ class TestGithubDiscoveryWorker:
         }
 
         worker = GithubDiscoveryWorker(mock_db)
-        await worker.process(task)
+        worker.process(task)
 
-    @pytest.mark.asyncio
-    async def test_process_scans_multiple_repos(self, mock_db: MagicMock, tmp_path: Path) -> None:
+    def test_process_scans_multiple_repos(self, mock_db: MagicMock, tmp_path: Path) -> None:
         repo1 = tmp_path / "test-org" / "test-repo" / "rules"
         repo1.mkdir(parents=True)
         (repo1 / "rule1.md").write_text("# Rule 1")
@@ -94,12 +91,11 @@ class TestGithubDiscoveryWorker:
 
         worker = GithubDiscoveryWorker(mock_db)
         worker.github_base_dir = str(tmp_path)
-        await worker.process(task)
+        worker.process(task)
 
         assert mock_db.upsert_doc_registry.call_count == 3
 
-    @pytest.mark.asyncio
-    async def test_process_respects_selected_dirs(self, mock_db: MagicMock, tmp_path: Path) -> None:
+    def test_process_respects_selected_dirs(self, mock_db: MagicMock, tmp_path: Path) -> None:
         repo_dir = tmp_path / "test-org" / "test-repo"
         rules_dir = repo_dir / "rules"
         rules_dir.mkdir(parents=True)
@@ -119,12 +115,11 @@ class TestGithubDiscoveryWorker:
 
         worker = GithubDiscoveryWorker(mock_db)
         worker.github_base_dir = str(tmp_path)
-        await worker.process(task)
+        worker.process(task)
 
         assert mock_db.upsert_doc_registry.call_count == 1
 
-    @pytest.mark.asyncio
-    async def test_process_skips_missing_repos(self, mock_db: MagicMock, tmp_path: Path) -> None:
+    def test_process_skips_missing_repos(self, mock_db: MagicMock, tmp_path: Path) -> None:
         repo_dir = tmp_path / "test-org" / "test-repo"
         repo_dir.mkdir(parents=True)
         (repo_dir / "file.md").write_text("# File")
@@ -143,12 +138,11 @@ class TestGithubDiscoveryWorker:
 
         worker = GithubDiscoveryWorker(mock_db)
         worker.github_base_dir = str(tmp_path)
-        await worker.process(task)
+        worker.process(task)
 
         assert mock_db.upsert_doc_registry.call_count == 1
 
-    @pytest.mark.asyncio
-    async def test_process_sets_embed_status(self, mock_db: MagicMock, tmp_path: Path) -> None:
+    def test_process_sets_embed_status(self, mock_db: MagicMock, tmp_path: Path) -> None:
         repo_dir = tmp_path / "test-org" / "test-repo"
         repo_dir.mkdir(parents=True)
         (repo_dir / "file.md").write_text("# File")
@@ -164,7 +158,7 @@ class TestGithubDiscoveryWorker:
 
         worker = GithubDiscoveryWorker(mock_db)
         worker.github_base_dir = str(tmp_path)
-        await worker.process(task)
+        worker.process(task)
 
         assert mock_db.upsert_doc_registry.call_count >= 1
         call_args = mock_db.upsert_doc_registry.call_args_list[0][0][0]
@@ -172,8 +166,7 @@ class TestGithubDiscoveryWorker:
 
 
 class TestLocalDiscoveryWorker:
-    @pytest.mark.asyncio
-    async def test_process_completes_if_path_missing(self, mock_db: MagicMock) -> None:
+    def test_process_completes_if_path_missing(self, mock_db: MagicMock) -> None:
         task = {
             "task_id": "local-disc-001",
             "task_type": "local_discovery",
@@ -182,10 +175,9 @@ class TestLocalDiscoveryWorker:
         }
 
         worker = LocalDiscoveryWorker(mock_db)
-        await worker.process(task)
+        worker.process(task)
 
-    @pytest.mark.asyncio
-    async def test_process_scans_local_directory(self, mock_db: MagicMock, tmp_path: Path) -> None:
+    def test_process_scans_local_directory(self, mock_db: MagicMock, tmp_path: Path) -> None:
         local_dir = tmp_path / "local_docs"
         local_dir.mkdir()
         (local_dir / "doc1.md").write_text("# Doc 1")
@@ -199,12 +191,11 @@ class TestLocalDiscoveryWorker:
         }
 
         worker = LocalDiscoveryWorker(mock_db)
-        await worker.process(task)
+        worker.process(task)
 
         assert mock_db.upsert_doc_registry.call_count == 2
 
-    @pytest.mark.asyncio
-    async def test_process_uses_default_path(self, mock_db: MagicMock) -> None:
+    def test_process_uses_default_path(self, mock_db: MagicMock) -> None:
         task = {
             "task_id": "local-disc-003",
             "task_type": "local_discovery",
@@ -212,10 +203,9 @@ class TestLocalDiscoveryWorker:
         }
 
         worker = LocalDiscoveryWorker(mock_db)
-        await worker.process(task)
+        worker.process(task)
 
-    @pytest.mark.asyncio
-    async def test_process_reports_source_type(self, mock_db: MagicMock, tmp_path: Path) -> None:
+    def test_process_reports_source_type(self, mock_db: MagicMock, tmp_path: Path) -> None:
         local_dir = tmp_path / "local_docs"
         local_dir.mkdir()
         (local_dir / "doc1.md").write_text("# Doc 1")
@@ -228,7 +218,7 @@ class TestLocalDiscoveryWorker:
         }
 
         worker = LocalDiscoveryWorker(mock_db)
-        await worker.process(task)
+        worker.process(task)
 
         calls = mock_db.upsert_doc_registry.call_args_list
         assert all(c[0][0]["org"] == "local" for c in calls)

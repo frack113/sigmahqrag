@@ -1,5 +1,7 @@
 """File Discovery and Embedding API v1."""
 
+from __future__ import annotations
+
 import logging
 import uuid
 from typing import Any
@@ -7,9 +9,8 @@ from typing import Any
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 
-from src.api.dependencies import get_database_service
-from src.back.database.service import DatabaseService
 from src.worker.processor import TaskDispatcher
+from src.worker.enums import WorkerName, WorkerStatus
 
 logger = logging.getLogger(__name__)
 
@@ -30,14 +31,92 @@ def _get_dispatcher(request: Request) -> TaskDispatcher:
     return request.app.state.dispatcher
 
 
-async def _trigger_worker(
-    worker_type: str, task: dict, dispatcher: TaskDispatcher, db: DatabaseService
-) -> bool:
-    """Helper to trigger a worker via the dispatcher.
+def _trigger_worker(worker_type: WorkerName, task: dict, dispatcher: TaskDispatcher) -> bool:
+    """Helper to trigger a worker via the dispatcher."""
+    if dispatcher.is_worker_busy(worker_type):
+        return False
 
-    The API only checks if the worker is busy and queues the task.
-    The TaskDispatcher manages state transitions: idle -> running -> idle.
-    """
-    db.reset_stale_workers(stale_seconds=30)
-    state = db.get_worker_state(worker_type)
-    logger.info(f"Worker {worker_type} state: {api_v1_files_ref_to_state") # Wait, I'm seeing this error in my thought process... let me re-check the actual content of _trigger_worker from before.
+    task_id = str(uuid.uuid4())
+    task["task_id"] = task_id
+    dispatcher.update_worker_state(
+        worker_type=worker_type,
+        status=WorkerStatus.RUNNING,
+        current_task_id=task_id,
+    )
+
+    dispatcher.queue_task(worker_type, task)
+    return True
+
+
+@router.post("/list", response_model=FileOperationResponse)
+async def file_list(
+    dispatcher: TaskDispatcher = Depends(_get_dispatcher),
+) -> FileOperationResponse:
+    """Trigger file discovery across all sources (GitHub, Local, SigmaRef)."""
+    triggered = []
+    busy = []
+
+    if _trigger_worker(WorkerName.GITHUB_DISCOVERY, {"task_type": WorkerName.GITHUB_DISCOVERY.value, "collection_name": "all"}, dispatcher):
+        triggered.append(WorkerName.GITHUB_DISCOVERY.value)
+    else:
+        busy.append(WorkerName.GITHUB_DISCOVERY.value)
+
+    if _trigger_worker(WorkerName.LOCAL_DISCOVERY, {"task_type": WorkerName.LOCAL_DISCOVERY.value, "collection_name": "local"}, dispatcher):
+        triggered.append(WorkerName.LOCAL_DISCOVERY.value)
+    else:
+        busy.append(WorkerName.LOCAL_DISCOVERY.value)
+
+    if _trigger_worker(WorkerName.SIGMAREF_DISCOVERY, {"task_type": WorkerName.SIGMAREF_DISCOVERY.value, "collection_name": "sigmaref"}, dispatcher):
+        triggered.append(WorkerName.SIGMAREF_DISCOVERY.value)
+    else:
+        busy.append(WorkerName.SIGMAREF_DISCOVERY.value)
+
+    if busy:
+        return FileOperationResponse(
+            success=False,
+            error=f"Workers already busy: {', '.join(busy)}",
+            data={"triggered": triggered} if triggered else None,
+        )
+
+    return FileOperationResponse(
+        success=True,
+        message=f"Discovery queued for: {', '.join(triggered)}",
+        data={"tasks": triggered},
+    )
+
+
+@router.post("/embed", response_model=FileOperationResponse)
+async def file_embed(
+    dispatcher: TaskDispatcher = Depends(_get_dispatcher),
+) -> FileOperationResponse:
+    """Trigger file embedding across all sources (GitHub, Local, SigmaRef)."""
+    triggered = []
+    busy = []
+
+    if _trigger_worker(WorkerName.GITHUB_EMBEDDINGS, {"task_type": WorkerName.GITHUB_EMBEDDINGS.value, "collection_name": "all"}, dispatcher):
+        triggered.append(WorkerName.GITHUB_EMBEDDINGS.value)
+    else:
+        busy.append(WorkerName.GITHUB_EMBEDDINGS.value)
+
+    if _trigger_worker(WorkerName.LOCAL_EMBEDDINGS, {"task_type": WorkerName.LOCAL_EMBEDDINGS.value, "collection_name": "local"}, dispatcher):
+        triggered.append(WorkerName.LOCAL_EMBEDDINGS.value)
+    else:
+        busy.append(WorkerName.LOCAL_EMBEDDINGS.value)
+
+    if _trigger_worker(WorkerName.SIGMAREF_EMBEDDINGS, {"task_type": WorkerName.SIGMAREF_EMBEDDINGS.value, "collection_name": "sigmaref"}, dispatcher):
+        triggered.append(WorkerName.SIGMAREF_EMBEDDINGS.value)
+    else:
+        busy.append(WorkerName.SIGMAREF_EMBEDDINGS.value)
+
+    if busy:
+        return FileOperationResponse(
+            success=False,
+            error=f"Workers already busy: {', '.join(busy)}",
+            data={"triggered": triggered} if triggered else None,
+        )
+
+    return FileOperationResponse(
+        success=True,
+        message=f"Embedding queued for: {', '.join(triggered)}",
+        data={"tasks": triggered},
+    )

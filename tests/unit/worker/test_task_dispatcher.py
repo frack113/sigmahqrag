@@ -8,13 +8,14 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from src.worker.processor import TaskDispatcher
+from src.worker.enums import WorkerName
 
 
 class TestTaskDispatcherInit:
     def test_default_poll_interval(self, mock_db: MagicMock) -> None:
         with patch("src.worker.processor.DatabaseService.get_instance", return_value=mock_db):
             dispatcher = TaskDispatcher()
-            assert dispatcher.poll_interval == 5
+            assert dispatcher.poll_interval == 1.0
 
     def test_custom_poll_interval(self, mock_db: MagicMock) -> None:
         with patch("src.worker.processor.DatabaseService.get_instance", return_value=mock_db):
@@ -30,14 +31,13 @@ class TestTaskDispatcherInit:
 
 
 class TestTaskDispatcherQueue:
-    @pytest.mark.asyncio
-    async def test_queue_task(self, mock_db: MagicMock) -> None:
+    def test_queue_task(self, mock_db: MagicMock) -> None:
         with patch("src.worker.processor.DatabaseService.get_instance", return_value=mock_db):
             dispatcher = TaskDispatcher()
-            await dispatcher.queue_task("sigmaref_discovery", {"task_id": "test-1"})
+            dispatcher.queue_task(WorkerName.SIGMAREF_DISCOVERY, {"task_id": "test-1"})
 
         item = dispatcher._task_queue.get_nowait()
-        assert item == ("sigmaref_discovery", {"task_id": "test-1"})
+        assert item == (WorkerName.SIGMAREF_DISCOVERY, {"task_id": "test-1"})
 
 
 class TestTaskDispatcherThread:

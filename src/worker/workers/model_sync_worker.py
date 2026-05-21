@@ -3,6 +3,7 @@ import logging
 from pathlib import Path
 
 from src.worker.base import BaseWorker
+from src.worker.enums import WorkerName, WorkerStatus
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +18,7 @@ class ModelSyncWorker(BaseWorker):
     main-thread access.
     """
 
-    async def process(self, task: dict) -> None:
+    def process(self, task: dict) -> None:
         task_id = task.get("task_id", "")
         llm_dir = Path(task.get("llm_dir", "data/models/llm"))
         embeddings_dir = Path(task.get("embeddings_dir", "data/models/embeddings"))
@@ -26,9 +27,9 @@ class ModelSyncWorker(BaseWorker):
             f"[ModelSyncWorker] Starting model sync: LLM={llm_dir}, EMBEDDINGS={embeddings_dir}"
         )
 
-        self.db.upsert_worker_state(
-            worker_type="model_sync",
-            status="running",
+        self.dispatcher.update_worker_state(
+            worker_type=WorkerName.MODEL_SYNC,
+            status=WorkerStatus.RUNNING,
             current_task_id=task_id,
         )
 
@@ -37,15 +38,15 @@ class ModelSyncWorker(BaseWorker):
             registry = self._load_registry()
 
             logger.debug("[ModelSyncWorker] Scanning LLM folder...")
-            self.db.update_worker_progress(
-                worker_type="model_sync",
+            self.dispatcher.update_worker_state(
+                worker_type=WorkerName.MODEL_SYNC,
                 progress_percent=0.0,
                 current_file="scanning LLM models...",
             )
             self._scan_llm_folder(registry, llm_dir)
 
-            self.db.update_worker_progress(
-                worker_type="model_sync",
+            self.dispatcher.update_worker_state(
+                worker_type=WorkerName.MODEL_SYNC,
                 progress_percent=50.0,
                 current_file="LLM models scanned",
             )
@@ -54,8 +55,8 @@ class ModelSyncWorker(BaseWorker):
             logger.debug("[ModelSyncWorker] Scanning embeddings folder...")
             self._scan_embeddings_folder(registry, embeddings_dir)
 
-            self.db.update_worker_progress(
-                worker_type="model_sync",
+            self.dispatcher.update_worker_state(
+                worker_type=WorkerName.MODEL_SYNC,
                 progress_percent=100.0,
                 current_file="embeddings scanned",
             )
@@ -67,9 +68,9 @@ class ModelSyncWorker(BaseWorker):
             error_msg = str(e)
             logger.error(f"[ModelSyncWorker] Failed: {e}", exc_info=True)
 
-        self.db.upsert_worker_state(
-            worker_type="model_sync",
-            status="idle",
+        self.dispatcher.update_worker_state(
+            worker_type=WorkerName.MODEL_SYNC,
+            status=WorkerStatus.IDLE,
             current_task_id="",
             error=error_msg,
         )
