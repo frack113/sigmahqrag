@@ -19,10 +19,6 @@
 <a href="/admin/models" {% if '/admin/models' in request.url.path %}class="active"{% endif %}>Models</a>
 <a href="/admin/system-prompts" {% if '/admin/system-prompts' in request.url.path %}class="active"{% endif %}>Prompts</a>
 <a href="/admin/logs" {% if '/admin/logs' in request.url.path %}class="active"{% endif %}>Logs</a>
-<div class="sidebar-footer">
-    <a href="/chat">← Chat</a>
-    <a href="/data">Data</a>
-</div>
 {% endblock %}
 
 {% block scripts %}
