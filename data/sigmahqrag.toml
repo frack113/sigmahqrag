@@ -1,0 +1,13 @@
+[services.llama]
+base_url = "http://127.0.0.1:8080"
+mode = "managed"
+
+[services.qdrant]
+base_url = "http://127.0.0.1:6333"
+mode = "managed"
+
+[logging]
+level = "INFO"
+log_max_size = "5M"
+log_max_file = 3
+clean_at_startup = false

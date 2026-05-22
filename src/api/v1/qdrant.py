@@ -82,6 +82,7 @@ async def qdrant_status():
         from src.shared import get_config
 
         config = get_config()
+        qdrant_base_url = config.qdrant_base_url
         version = config.qdrant_version
         is_healthy = health_result.get("status") == "active"
 
@@ -99,6 +100,7 @@ async def qdrant_status():
                 "current_version": version or "unknown",
                 "downloads": downloads,
                 "mode": config.qdrant_mode,
+                "base_url": qdrant_base_url,
             }
         )
     except Exception as e:

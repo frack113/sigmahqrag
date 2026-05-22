@@ -38,18 +38,31 @@ from src.back.service_manager import shutdown_all_services
 from src.worker.processor import TaskDispatcher
 from src.worker.enums import WorkerName
 from src.shared.exceptions import SigmaError
+from src.shared import TEMP_DIR
 
 logger = logging.getLogger(__name__)
 
 
-def _setup_logging() -> None:
+def _parse_log_size(size_str: str) -> int:
+    """Parse a human-readable size string (e.g. '5M', '10M', '1G') to bytes."""
+    size_str = size_str.strip().upper()
+    if size_str.endswith("G"):
+        return int(float(size_str[:-1]) * 1024 * 1024 * 1024)
+    if size_str.endswith("M"):
+        return int(float(size_str[:-1]) * 1024 * 1024)
+    if size_str.endswith("K"):
+        return int(float(size_str[:-1]) * 1024)
+    return int(size_str)
+
+
+def _setup_logging(max_size: str = "10M", max_files: int = 5) -> None:
     """Setup logging to file with rotation."""
     from src.shared import LOGS_DIR
 
     log_file = LOGS_DIR / "sigmahqrag.log"
 
     handler = RotatingFileHandler(
-        log_file, maxBytes=10 * 1024 * 1024, backupCount=5, encoding="utf-8"
+        log_file, maxBytes=_parse_log_size(max_size), backupCount=max_files, encoding="utf-8"
     )
     handler.setLevel(logging.INFO)
 
@@ -76,6 +89,34 @@ def _is_db_empty(db: DatabaseService) -> bool:
     return True
 
 
+def _clean_at_startup() -> None:
+    """Clean temp, pid, and rotated log files at startup when clean_at_startup is enabled."""
+    from src.shared import PID_DIR, LOGS_DIR
+
+    for d in (TEMP_DIR, PID_DIR):
+        if d.exists():
+            for p in d.iterdir():
+                try:
+                    if p.is_file():
+                        p.unlink()
+                    elif p.is_dir():
+                        import shutil
+                        shutil.rmtree(p)
+                except Exception as e:
+                    logger.warning("Could not clean %s: %s", p, e)
+
+    # Remove rotated log files (keep current sigmahqrag.log)
+    if LOGS_DIR.exists():
+        for p in LOGS_DIR.iterdir():
+            if p.is_file() and p.name != "sigmahqrag.log":
+                try:
+                    p.unlink()
+                except Exception as e:
+                    logger.warning("Could not clean %s: %s", p, e)
+
+    logger.info("Cleanup at startup: temp, pid, and rotated logs cleared.")
+
+
 def _check_old_data_files() -> list[str]:
     old_paths = [
         Path("data/embedding.toml"),
@@ -93,19 +134,24 @@ async def lifespan(app: FastAPI) -> None:
     dispatcher = None
     db = None
     try:
-        _setup_logging()
-        logger.info("=== Lifespan starting ===")
-
         db = DatabaseService()
         db.initialize()
         app.state.db = db
-        logger.info("Database initialized.")
 
         from src.shared import Config
 
         Config.init_app()
+
+        from src.shared import get_config
+
+        config = get_config()
+        _setup_logging(max_size=config.logging_log_max_size, max_files=config.logging_log_max_file)
+        logger.info("=== Lifespan starting ===")
+        logger.info("Database initialized.")
         logger.info("Config initialized.")
 
+        if config.logging_clean_at_startup:
+            _clean_at_startup()
         old_files = _check_old_data_files()
         if old_files and _is_db_empty(db):
             logger.warning(

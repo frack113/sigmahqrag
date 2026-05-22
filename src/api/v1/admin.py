@@ -127,7 +127,8 @@ async def get_backend() -> JSONResponse:
         data = {
             "services": health,
             "config": config.to_dict(),
-            "mode": config.qdrant_mode,
+            "llama_mode": config.llama_mode,
+            "qdrant_mode": config.qdrant_mode,
         }
         return JSONResponse(content={"data": data, "status": "success"})
     except Exception as e:
