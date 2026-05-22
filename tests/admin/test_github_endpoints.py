@@ -1,338 +1,139 @@
-"""Tests for GitHub admin endpoints."""
+"""Tests for GitHub API v1 endpoints."""
 
 from __future__ import annotations
 
-import json
 from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
-from src.api.routes.admin_github import get_github_repo_manager, router
-from src.git.repo_manager import RepositoryManager
+
+from src.api.v1.github import router
 
 
 @pytest.fixture
-def github_repos_dir(tmp_path):
-    """Create a temporary directory for GitHub repos."""
-    repos_dir = tmp_path / "data" / "github"
-    repos_dir.mkdir(parents=True)
-    return repos_dir
-
-
-@pytest.fixture
-def repo_manager(github_repos_dir):
-    """Create a RepositoryManager with temp directory."""
-    return RepositoryManager(repos_dir=str(github_repos_dir))
-
-
-@pytest.fixture
-def client(repo_manager):
+def client():
     """Create a test client with mocked dependencies."""
     from fastapi import FastAPI
 
     app = FastAPI()
     app.include_router(router)
-
-    # Override the dependency
-    async def mock_get_manager():
-        return repo_manager
-
-    app.dependency_overrides = {get_github_repo_manager: mock_get_manager}
     return TestClient(app)
 
 
-class TestGitHubAdminGet:
-    """Tests for GET /admin/github endpoint."""
+class TestGitHubApiV1:
+    """Tests for GET /api/v1/github endpoints."""
 
     def test_list_repos_empty(self, client):
         """Test listing repos when none exist."""
-        response = client.get("/admin/github?action=list")
+        with patch("src.api.v1.github.list_repos", return_value=[]):
+            response = client.get("/api/v1/github/repos")
 
         assert response.status_code == 200
         data = response.json()
-        assert data["repos"] == []
+        assert data == []
 
-    def test_list_repos_with_metadata(self, client, repo_manager, github_repos_dir):
+    def test_list_repos_with_metadata(self, client):
         """Test listing repos with metadata."""
-        org_name = "test-org"
-        repo_name = "test-repo"
-        repo_path = github_repos_dir / org_name / repo_name
-        repo_path.mkdir(parents=True)
-        (repo_path / ".git").mkdir()
-
-        metadata = {
-            "org": org_name,
-            "name": repo_name,
-            "branch": "main",
-            "extensions_to_index": ["*.yml"],
-        }
-        with open(repo_path / "metadata.json", "w") as f:
-            json.dump(metadata, f)
-
-        response = client.get("/admin/github?action=list")
+        mock_repos = [
+            {
+                "org": "test-org",
+                "name": "test-repo",
+                "path": "/tmp/test-org/test-repo",
+                "branch": "main",
+                "remote_url": "https://github.com/test-org/test-repo.git",
+            }
+        ]
+        with (
+            patch("src.api.v1.github.list_repos", return_value=mock_repos),
+            patch(
+                "src.api.v1.github.get_metadata",
+                return_value={"status": "synced", "last_synced": "2023-01-01T00:00:00"},
+            ),
+            patch("src.api.v1.github.is_repo_outdated", return_value=False),
+            patch("src.api.v1.github.get_last_commit_date", return_value="2023-01-01T00:00:00"),
+        ):
+            response = client.get("/api/v1/github/repos")
 
         assert response.status_code == 200
         data = response.json()
-        assert len(data["repos"]) == 1
-        assert data["repos"][0]["org"] == org_name
-        assert data["repos"][0]["name"] == repo_name
-        assert data["repos"][0]["metadata"] == metadata
+        assert len(data) == 1
+        assert data[0]["org"] == "test-org"
+        assert data[0]["name"] == "test-repo"
+        assert data[0]["sync_class"] == "btn-success"
 
-    def test_info_repo_not_found(self, client):
+    def test_get_repo_not_found(self, client):
         """Test getting info for non-existent repo."""
-        response = client.get("/admin/github?action=info&org=test-org&name=nonexistent")
+        with patch("src.api.v1.github.list_repos", return_value=[]):
+            response = client.get("/api/v1/github/repos/test-org/nonexistent")
 
         assert response.status_code == 404
-        assert "not found" in response.json()["error"].lower()
+        assert "not found" in response.json()["detail"].lower()
 
-    def test_info_missing_params(self, client):
-        """Test getting info with missing parameters."""
-        response = client.get("/admin/github?action=info&name=test-repo")
-
-        assert response.status_code == 400
-        assert "required" in response.json()["error"].lower()
-
-    def test_info_repo_without_metadata(self, client, github_repos_dir):
-        """Test getting info for repo without metadata."""
-        org_name = "test-org"
-        repo_name = "test-repo"
-        repo_path = github_repos_dir / org_name / repo_name
-        repo_path.mkdir(parents=True)
-        (repo_path / ".git").mkdir()
-
-        response = client.get(
-            f"/admin/github?action=info&org={org_name}&name={repo_name}"
-        )
+    def test_get_repo_success(self, client):
+        """Test getting info for existing repo."""
+        mock_repos = [{"org": "test-org", "name": "test-repo"}]
+        with (
+            patch("src.api.v1.github.list_repos", return_value=mock_repos),
+            patch(
+                "src.api.v1.github.get_metadata",
+                return_value={
+                    "status": "synced",
+                    "last_synced": "2023-01-01T00:00:00",
+                    "branch": "main",
+                },
+            ),
+        ):
+            response = client.get("/api/v1/github/repos/test-org/test-repo")
 
         assert response.status_code == 200
         data = response.json()
-        assert data["org"] == org_name
-        assert data["name"] == repo_name
-        assert data["metadata"] is None
-
-    def test_info_repo_with_metadata(self, client, github_repos_dir):
-        """Test getting info for repo with metadata."""
-        org_name = "test-org"
-        repo_name = "test-repo"
-        repo_path = github_repos_dir / org_name / repo_name
-        repo_path.mkdir(parents=True)
-        (repo_path / ".git").mkdir()
-
-        metadata = {
-            "org": org_name,
-            "name": repo_name,
-            "branch": "develop",
-            "extensions_to_index": ["*.yml", "*.yaml"],
-        }
-        with open(repo_path / "metadata.json", "w") as f:
-            json.dump(metadata, f)
-
-        response = client.get(
-            f"/admin/github?action=info&org={org_name}&name={repo_name}"
-        )
-
-        assert response.status_code == 200
-        data = response.json()
-        assert data["metadata"] == metadata
-
-    def test_unknown_action(self, client):
-        """Test with unknown action."""
-        response = client.get("/admin/github?action=unknown")
-
-        assert response.status_code == 400
-        assert "Unknown action" in response.json()["error"]
+        assert data["org"] == "test-org"
+        assert data["name"] == "test-repo"
+        assert data["repo_status"] == "synced"
 
 
-class TestGitHubAdminPost:
-    """Tests for POST /admin/github endpoint."""
+class TestGitHubApiV1Post:
+    """Tests for POST /api/v1/github endpoints."""
 
-    @patch("src.api.routes.admin_github.RepositoryManager.clone")
-    def test_clone_success(self, mock_clone, client, github_repos_dir):
-        """Test successful repo clone."""
+    @patch("src.api.v1.github.clone_repo")
+    def test_add_repo_success(self, mock_clone, client):
+        """Test successful repo addition (background task)."""
         mock_clone.return_value = {
             "success": True,
             "org": "test-org",
             "name": "test-repo",
-            "path": str(github_repos_dir / "test-org" / "test-repo"),
+            "path": "/tmp/test-org/test-repo",
         }
 
-        (github_repos_dir / "test-org").mkdir(exist_ok=True)
-
-        response = client.post(
-            "/admin/github?action=clone&org=test-org&name=test-repo&branch=main"
-            "&extensions_to_index=*.yml&extensions_to_index=*.yaml"
-        )
+        payload = {"url": "https://github.com/test-org/test-repo.git", "branch": "main"}
+        response = client.post("/api/v1/github/repos", json=payload)
 
         assert response.status_code == 200
         data = response.json()
         assert data["success"] is True
-        assert "cloned successfully" in data["message"].lower()
+        assert "cloning" in data["message"].lower()
 
-    def test_clone_missing_params(self, client):
-        """Test clone with missing parameters."""
-        # Missing org
-        response = client.post("/admin/github?action=clone&name=test-repo&branch=main")
-        assert response.status_code == 400
-        assert "required" in response.json()["error"].lower()
-
-        # Missing name
-        response = client.post("/admin/github?action=clone&org=test-org&branch=main")
-        assert response.status_code == 400
-        assert "required" in response.json()["error"].lower()
-
-        # Missing branch
-        response = client.post("/admin/github?action=clone&org=test-org&name=test-repo")
-        assert response.status_code == 400
-        assert "required" in response.json()["error"].lower()
-
-    @patch("src.api.routes.admin_github.RepositoryManager.clone")
-    def test_clone_failure(self, mock_clone, client):
-        """Test clone failure."""
-        mock_clone.return_value = {
-            "success": False,
-            "error": "Repository already exists",
-        }
-
-        response = client.post(
-            "/admin/github?action=clone&org=test-org&name=test-repo&branch=main"
-        )
-
-        assert response.status_code == 400
-        data = response.json()
-        assert data["success"] is False
-
-    @patch("src.api.routes.admin_github.RepositoryManager.update")
-    def test_update_success(self, mock_update, client):
-        """Test successful repo update."""
-        mock_update.return_value = {
-            "success": True,
-            "org": "test-org",
-            "name": "test-repo",
-            "path": "/some/path",
-            "branch": "main",
-        }
-
-        response = client.post(
-            "/admin/github?action=update&org=test-org&name=test-repo"
-        )
-
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is True
-        assert "updated successfully" in data["message"].lower()
-
-    def test_update_missing_params(self, client):
-        """Test update with missing parameters."""
-        response = client.post("/admin/github?action=update&name=test-repo")
-
-        assert response.status_code == 400
-        assert "required" in response.json()["error"].lower()
-
-    @patch("src.api.routes.admin_github.RepositoryManager.update")
-    def test_update_failure(self, mock_update, client):
-        """Test update failure."""
-        mock_update.return_value = {
-            "success": False,
-            "error": "Repository not found",
-        }
-
-        response = client.post(
-            "/admin/github?action=update&org=test-org&name=nonexistent"
-        )
-
-        assert response.status_code == 400
-        data = response.json()
-        assert data["success"] is False
-
-    @patch("src.api.routes.admin_github.RepositoryManager.delete")
-    def test_delete_success(self, mock_delete, client):
-        """Test successful repo delete."""
+    @patch("src.api.v1.github.delete_repo")
+    def test_delete_repo_success(self, mock_delete, client):
+        """Test successful repo deletion."""
         mock_delete.return_value = {"success": True}
 
-        response = client.post(
-            "/admin/github?action=delete&org=test-org&name=test-repo"
-        )
+        response = client.delete("/api/v1/github/repos/test-org/test-repo")
 
         assert response.status_code == 200
         data = response.json()
         assert data["success"] is True
-        assert "deleted" in data["message"].lower()
 
-    def test_delete_missing_params(self, client):
-        """Test delete with missing parameters."""
-        response = client.post("/admin/github?action=delete&name=test-repo")
+    @patch("src.api.v1.git.list_directory_tree")
+    def test_get_repo_tree(self, mock_tree, client):
+        """Test getting directory tree."""
+        mock_tree.return_value = [{"name": "folder", "path": "folder", "children": []}]
+        with patch(
+            "src.api.v1.github.list_repos", return_value=[{"org": "test-org", "name": "test-repo"}]
+        ):
+            response = client.get("/api/v1/github/repos/test-org/test-repo/tree")
 
-        assert response.status_code == 400
-        assert "required" in response.json()["error"].lower()
-
-    @patch("src.api.routes.admin_github.RepositoryManager.delete")
-    def test_delete_failure(self, mock_delete, client):
-        """Test delete failure."""
-        mock_delete.return_value = {
-            "success": False,
-            "error": "Repository not found",
-        }
-
-        response = client.post(
-            "/admin/github?action=delete&org=test-org&name=nonexistent"
-        )
-
-        assert response.status_code == 400
+        assert response.status_code == 200
         data = response.json()
-        assert data["success"] is False
-
-    def test_unknown_action(self, client):
-        """Test with unknown action."""
-        response = client.post("/admin/github?action=unknown")
-
-        assert response.status_code == 400
-        assert "Unknown action" in response.json()["error"]
-
-
-class TestRepositoryManagerMetadata:
-    """Tests for RepositoryManager metadata methods."""
-
-    def test_save_and_get_metadata(self, repo_manager, github_repos_dir):
-        """Test saving and retrieving metadata."""
-        org_name = "test-org"
-        repo_name = "test-repo"
-        repo_path = github_repos_dir / org_name / repo_name
-        repo_path.mkdir(parents=True)
-        (repo_path / ".git").mkdir()
-
-        metadata = {
-            "org": org_name,
-            "name": repo_name,
-            "branch": "main",
-            "extensions_to_index": ["*.yml", "*.yaml"],
-        }
-
-        repo_manager.save_metadata(org_name, repo_name, metadata)
-        retrieved = repo_manager.get_metadata(org_name, repo_name)
-
-        assert retrieved == metadata
-
-    def test_get_metadata_not_exists(self, repo_manager):
-        """Test getting metadata for non-existent repo."""
-        result = repo_manager.get_metadata("nonexistent-org", "nonexistent-repo")
-        assert result is None
-
-    def test_list_with_metadata(self, repo_manager, github_repos_dir):
-        """Test listing repos with metadata."""
-        for org_name, repo_name in [("org1", "repo1"), ("org1", "repo2")]:
-            repo_path = github_repos_dir / org_name / repo_name
-            repo_path.mkdir(parents=True)
-            (repo_path / ".git").mkdir()
-
-            metadata = {
-                "org": org_name,
-                "name": repo_name,
-                "branch": "main",
-                "extensions_to_index": ["*.yml"],
-            }
-            repo_manager.save_metadata(org_name, repo_name, metadata)
-
-        repos = repo_manager.list_with_metadata()
-
-        assert len(repos) == 2
-        assert all("metadata" in repo for repo in repos)
+        assert len(data["tree"]) == 1
+        assert data["tree"][0]["name"] == "folder"

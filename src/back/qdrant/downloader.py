@@ -16,7 +16,9 @@ QDRANT_UI_VERSION = "v0.2.11"
 QDRANT_DOWNLOAD_BASE = (
     f"https://github.com/qdrant/qdrant/releases/download/v{QDRANT_BINARY_VERSION}"
 )
-QDRANT_UI_DOWNLOAD_URL = f"https://github.com/qdrant/qdrant-web-ui/releases/download/{QDRANT_UI_VERSION}/dist-qdrant.zip"
+QDRANT_UI_DOWNLOAD_URL = (
+    f"https://github.com/qdrant/qdrant-web-ui/releases/download/{QDRANT_UI_VERSION}/dist-qdrant.zip"
+)
 
 QDRANT_BIN_DIR = Path("data/bin/qdrant")
 QDRANT_STATIC_DIR = Path("data/bin/qdrant/static")

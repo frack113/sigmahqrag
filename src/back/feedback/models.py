@@ -17,14 +17,10 @@ class FeedbackIn(BaseModel):
 class Feedback(BaseModel):
     """Feedback database model."""
 
-    id: str = Field(
-        default_factory=lambda: str(uuid.uuid4()), description="Unique feedback ID"
-    )
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), description="Unique feedback ID")
     query_hash: str = Field(..., description="Hashed query for anonymity")
     helpful: bool = Field(..., description="Whether results were helpful")
-    timestamp: datetime = Field(
-        default_factory=datetime.utcnow, description="Feedback timestamp"
-    )
+    timestamp: datetime = Field(default_factory=datetime.utcnow, description="Feedback timestamp")
     session_id: str | None = Field(default=None, description="Session ID for tracking")
 
 

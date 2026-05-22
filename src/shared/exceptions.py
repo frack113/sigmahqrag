@@ -8,9 +8,7 @@ class SigmaError(Exception):
 
     http_status: int = 500
 
-    def __init__(
-        self, code: str, message: str, details: dict[str, str] | None = None
-    ) -> None:
+    def __init__(self, code: str, message: str, details: dict[str, str] | None = None) -> None:
         """Initialize exception."""
         self.code = code
         self.message = message

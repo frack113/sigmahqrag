@@ -7,9 +7,7 @@ import pytest
 from src.back.llamacpp.vram import VRAMEstimator
 from src.back.models import (
     HFDownloadService,
-    LocalRegistry,
-    ModelManager,
-    ModelNotFoundError,
+    UnifiedRegistry,
 )
 
 
@@ -20,28 +18,15 @@ def temp_dir(tmp_path):
 
 
 @pytest.fixture
-def registry(temp_dir):
+def registry():
     """Create registry."""
-    return LocalRegistry(registry_path=temp_dir / "registry.json")
+    return UnifiedRegistry.get_instance()
 
 
 @pytest.fixture
 def download_service(temp_dir):
     """Create download service."""
     return HFDownloadService(temp_dir=temp_dir)
-
-
-@pytest.fixture
-def model_manager(registry, download_service):
-    """Create model manager."""
-    return ModelManager(registry=registry, download_service=download_service)
-
-
-@pytest.mark.asyncio
-async def test_model_not_found(model_manager):
-    """Test model not found error."""
-    with pytest.raises(ModelNotFoundError):
-        await model_manager.delete_model("nonexistent/model")
 
 
 @pytest.mark.asyncio

@@ -8,7 +8,6 @@ from typing import Any
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel, Field
 
-from src.back.documents.sigma_ref_downloader import download_references
 from src.back.github.git import (
     clone_repo,
     delete_repo,
@@ -112,9 +111,7 @@ async def add_repo(
 
     existing = list_repos()
     if any(r["org"] == org and r["name"] == name for r in existing):
-        return RepositoryResponse(
-            success=False, error=f"Repository '{org}/{name}' already exists"
-        )
+        return RepositoryResponse(success=False, error=f"Repository '{org}/{name}' already exists")
 
     def clone_with_status() -> None:
         result = clone_repo(url=request.url, branch=request.branch)
@@ -130,6 +127,7 @@ async def add_repo(
                     "status": "synced",
                     "last_synced": datetime.now().isoformat(),
                     "created_at": datetime.now().isoformat(),
+                    "remote_head": result.get("remote_head"),
                 },
             )
             save_selected_dirs(org, name, [])
@@ -161,9 +159,7 @@ async def get_repo(org: str, name: str) -> RepositoryStatus:
     """Get repository details."""
     repos = list_repos()
     if not any(r["org"] == org and r["name"] == name for r in repos):
-        raise HTTPException(
-            status_code=404, detail=f"Repository '{org}/{name}' not found"
-        )
+        raise HTTPException(status_code=404, detail=f"Repository '{org}/{name}' not found")
 
     metadata = get_metadata(org, name) or {}
     return RepositoryStatus(
@@ -195,9 +191,7 @@ async def sync_repo(
 
     repos = list_repos()
     if not any(r["org"] == org and r["name"] == name for r in repos):
-        return RepositoryResponse(
-            success=False, error=f"Repository '{org}/{name}' not found"
-        )
+        return RepositoryResponse(success=False, error=f"Repository '{org}/{name}' not found")
 
     def sync_with_status() -> dict[str, Any]:
         result = update_repo(org=org, name=name, branch=branch)
@@ -208,17 +202,16 @@ async def sync_repo(
                 {
                     "status": "synced",
                     "last_synced": datetime.now().isoformat(),
+                    "branch": branch,
+                    "remote_head": result.get("remote_head"),
                 },
             )
         return result
 
-    background_tasks.add_task(sync_with_status)
+    if background_tasks is not None:
+        background_tasks.add_task(sync_with_status)
 
-    return RepositoryResponse(
-        success=True,
-        message=f"Syncing repository '{org}/{name}' in background",
-        data={"org": org, "name": name, "status": "syncing"},
-    )
+    return RepositoryResponse(success=True, message="Sync started in background")
 
 
 @router.delete("/repos/{org}/{name}", response_model=RepositoryResponse)
@@ -229,9 +222,7 @@ async def delete_repo_handler(
     """Delete a repository."""
     result = delete_repo(org, name)
     if result.get("success"):
-        return RepositoryResponse(
-            success=True, message=f"Repository '{org}/{name}' deleted"
-        )
+        return RepositoryResponse(success=True, message=f"Repository '{org}/{name}' deleted")
     return RepositoryResponse(success=False, error=result.get("error", "Delete failed"))
 
 
@@ -253,46 +244,6 @@ async def get_repo_status(org: str, name: str) -> RepositoryStatus:
     )
 
 
-class DownloadRefRequest(BaseModel):
-    """Request to download Sigma rule references."""
-
-    rules_dir: str | None = Field(
-        default=None, description="Path to Sigma rules directory"
-    )
-    output_dir: str | None = Field(
-        default=None, description="Path to output directory for references"
-    )
-
-
-class DownloadRefResponse(BaseModel):
-    """Response for download-ref operation."""
-
-    success: bool
-    message: str | None = None
-    summary: dict[str, Any] | None = None
-    error: str | None = None
-
-
-@router.post("/download-ref", response_model=DownloadRefResponse)
-async def download_ref_handler(
-    background_tasks: BackgroundTasks,
-    request: DownloadRefRequest | None = None,
-) -> DownloadRefResponse:
-    """Download Sigma rule references for all managed repositories."""
-    if request is None:
-        request = DownloadRefRequest()
-
-    rules_dir = request.rules_dir or "data/github/sigmahq/sigma/rules"
-    output_dir = request.output_dir or "data/documents/sigmaref"
-
-    background_tasks.add_task(download_references, rules_dir, output_dir)
-
-    return DownloadRefResponse(
-        success=True,
-        message="Reference download started in background",
-    )
-
-
 class DirectoryTreeResponse(BaseModel):
     """Response for directory tree listing."""
 
@@ -304,9 +255,7 @@ class DirectoryTreeResponse(BaseModel):
 class SelectDirsRequest(BaseModel):
     """Request to save selected directories."""
 
-    selected: list[str] = Field(
-        default_factory=list, description="List of folder paths"
-    )
+    selected: list[str] = Field(default_factory=list, description="List of folder paths")
 
 
 class SelectDirsResponse(BaseModel):
@@ -363,9 +312,7 @@ async def select_dirs(
     """Save selected directories for a repository."""
     repos = list_repos()
     if not any(r["org"] == org and r["name"] == name for r in repos):
-        return SelectDirsResponse(
-            success=False, error=f"Repository '{org}/{name}' not found"
-        )
+        return SelectDirsResponse(success=False, error=f"Repository '{org}/{name}' not found")
 
     result = save_selected_dirs(org, name, request.selected)
     if result.get("success"):

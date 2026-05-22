@@ -16,7 +16,7 @@ SIMILARITY_THRESHOLD = 0.7
 
 async def search(
     query: str,
-    collection_name: str = "sigma_rules",
+    collection_name: str = "sigma_doc",
     top_k: int = DEFAULT_TOP_K,
     similarity_threshold: float = SIMILARITY_THRESHOLD,
 ) -> list[dict[str, Any]]:
@@ -54,9 +54,7 @@ async def search(
             top_k=top_k,
         )
 
-        filtered_results = [
-            r for r in results if r.get("score", 0) >= similarity_threshold
-        ]
+        filtered_results = [r for r in results if r.get("score", 0) >= similarity_threshold]
 
         return filtered_results
 
@@ -106,7 +104,7 @@ class SearchEngine:
 
     def __init__(
         self,
-        collection_name: str = "sigma_rules",
+        collection_name: str = "sigma_doc",
         top_k: int = DEFAULT_TOP_K,
         similarity_threshold: float = SIMILARITY_THRESHOLD,
     ) -> None:
@@ -115,9 +113,7 @@ class SearchEngine:
         self.top_k = top_k
         self.similarity_threshold = similarity_threshold
 
-    async def search(
-        self, query: str, top_k: int | None = None
-    ) -> list[dict[str, Any]]:
+    async def search(self, query: str, top_k: int | None = None) -> list[dict[str, Any]]:
         """Search for relevant documents."""
         limit = top_k if top_k is not None else self.top_k
         return await search(

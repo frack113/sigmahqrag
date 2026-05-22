@@ -1,4 +1,4 @@
-"""Central configuration module using data/sigmahqrag.toml."""
+"""Central configuration module — TOML (models, services, paths, logging) + DuckDB (backend)."""
 
 from __future__ import annotations
 
@@ -43,7 +43,7 @@ class Config:
     qdrant_host: str = "127.0.0.1"
     qdrant_port: int = 6333
     qdrant_mode: str = "managed"
-    qdrant_collection_name: str = "sigma_rules"
+    qdrant_collection_name: str = "sigma_doc"
     qdrant_vector_size: int = 384
     qdrant_binary_path: str = "data/bin/qdrant"
     qdrant_storage_path: str = "data/qdrant_storage/database"
@@ -75,19 +75,6 @@ class Config:
 
     def _apply_nested_config(self, nested: dict[str, Any]) -> None:
         """Apply nested config dict to dataclass fields."""
-        if "backend" in nested:
-            backend = nested["backend"]
-            if "gpu_type" in backend:
-                self.gpu_type = backend["gpu_type"]
-            if "os" in backend:
-                self.os = backend["os"]
-            if "llamacpp_version" in backend:
-                self.llamacpp_version = backend["llamacpp_version"]
-            if "qdrant_version" in backend:
-                self.qdrant_version = backend["qdrant_version"]
-            if "qdrant_webui_version" in backend:
-                self.qdrant_webui_version = backend["qdrant_webui_version"]
-
         if "models" in nested:
             models = nested["models"]
             if "llm_dir" in models:
@@ -182,16 +169,15 @@ class Config:
         }
 
     def save(self) -> bool:
+        global _config
         try:
             db = DatabaseService.get_instance()
-            if db is None:
-                logger.warning("DatabaseService not available, config not saved")
-                return False
-            db.set_config("backend.os", {"value": self.os})
-            db.set_config("backend.gpu_type", {"value": self.gpu_type})
-            db.set_config("llamacpp_version", {"value": self.llamacpp_version})
-            db.set_config("qdrant_version", {"value": self.qdrant_version})
-            db.set_config("qdrant_webui_version", {"value": self.qdrant_webui_version})
+            db.set_config("backend.os", self.os)
+            db.set_config("backend.gpu_type", self.gpu_type)
+            db.set_config("llamacpp_version", self.llamacpp_version)
+            db.set_config("qdrant_version", self.qdrant_version)
+            db.set_config("qdrant_webui_version", self.qdrant_webui_version)
+            _config = self
             return True
         except Exception as e:
             logger.error(f"Failed to save config to DB: {e}")
@@ -199,8 +185,6 @@ class Config:
 
     def apply_db_overrides(self) -> None:
         db = DatabaseService.get_instance()
-        if db is None:
-            return
         overrides = {
             "backend.os": "os",
             "backend.gpu_type": "gpu_type",
@@ -210,21 +194,30 @@ class Config:
         }
         for key, attr in overrides.items():
             val = db.get_config(key)
-            if val is not None and isinstance(val, dict):
-                v = val.get("value")
-                if v is not None:
+            if val is not None:
+                # Handle legacy {"value": ...} format and plain values
+                if isinstance(val, dict):
+                    val = val.get("value")
+                if val is not None:
                     current = getattr(self, attr, None)
-                    if isinstance(current, int) and isinstance(v, str):
+                    if isinstance(current, int) and isinstance(val, str):
                         try:
-                            v = int(v)
+                            val = int(val)
                         except (ValueError, TypeError):
                             pass
-                    setattr(self, attr, v)
+                    setattr(self, attr, val)
 
     @classmethod
-    def reload(cls) -> Config:
+    def init_app(cls) -> Config:
+        global _config
+        cls.ensure_config_file()
+        cls.ensure_qdrant_config()
         cfg = cls()
-        cfg.apply_db_overrides()
+        try:
+            cfg.apply_db_overrides()
+        except Exception:
+            pass
+        _config = cfg
         return cfg
 
     def resolve_llamacpp_bin_path(self) -> Path:
@@ -250,22 +243,6 @@ class Config:
         return Path(Config().qdrant_binary_path).resolve()
 
     @staticmethod
-    def ensure_data_folder() -> None:
-        BASE_DIR.mkdir(parents=True, exist_ok=True)
-        for subdir in (
-            BIN_DIR,
-            MODELS_DIR,
-            LLM_DIR,
-            EMBEDDINGS_DIR,
-            LOGS_DIR,
-            PID_DIR,
-            QDRANT_STORAGE_DIR,
-            TEMP_DIR,
-        ):
-            subdir.mkdir(parents=True, exist_ok=True)
-        logger.info(f"Data folder ensured at {BASE_DIR}")
-
-    @staticmethod
     def ensure_config_file() -> None:
         if not CONFIG_FILE.exists():
             default_config = Config()
@@ -277,10 +254,6 @@ class Config:
                 logger.info(f"Created default config at {CONFIG_FILE}")
             except Exception as e:
                 logger.error(f"Failed to create config: {e}")
-        else:
-            config = Config()
-            config.save()
-            logger.info(f"Updated config at {CONFIG_FILE}")
 
     @staticmethod
     def ensure_qdrant_config() -> None:
@@ -309,14 +282,6 @@ class Config:
                 logger.info(f"Generated Qdrant config at {config_file}")
         except Exception as e:
             logger.warning(f"Could not generate Qdrant config: {e}")
-
-    @staticmethod
-    def init_app() -> Config:
-        Config.ensure_data_folder()
-        Config.ensure_config_file()
-        Config.ensure_qdrant_config()
-        return Config()
-
 
 _config: Config | None = None
 

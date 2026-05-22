@@ -29,8 +29,6 @@ def _load_all() -> dict[str, Prompt]:
 
 def _save_all(prompts: dict[str, Prompt]) -> None:
     db = DatabaseService.get_instance()
-    if db is None:
-        return
     for p in prompts.values():
         db.upsert_prompt(
             {

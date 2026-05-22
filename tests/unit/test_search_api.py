@@ -3,100 +3,80 @@
 from unittest.mock import AsyncMock, patch
 
 import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
+from src.api.v1.search import router
+
+
+@pytest.fixture
+def app() -> FastAPI:
+    test_app = FastAPI()
+    test_app.include_router(router)
+    return test_app
+
+
+@pytest.fixture
+def client(app: FastAPI) -> TestClient:
+    return TestClient(app)
 
 
 class TestSearchAPI:
     """Test search API endpoint."""
 
-    @pytest.mark.asyncio
-    async def test_search_empty_query(self):
-        """Test search with empty query returns empty response."""
-        from src.api.routes.search import search_rules
+    @patch("src.api.v1.search.search_rules", new_callable=AsyncMock)
+    def test_search_returns_empty_list(self, mock_search: AsyncMock, client: TestClient) -> None:
+        """Test search returns empty list when no results."""
+        mock_search.return_value = []
 
-        from src.shared.schemas.search import SearchRequest
+        response = client.post("/api/v1/search?query=test")
 
-        request = SearchRequest(query="", limit=10)
-        response = await search_rules(request)
+        assert response.status_code == 200
+        data = response.json()
+        assert data == {"rules": []}
 
-        assert response.data == []
-        assert response.meta["count"] == 0
-        assert response.meta["error"] is None
+    @patch("src.api.v1.search.search_rules", new_callable=AsyncMock)
+    def test_search_returns_rules(self, mock_search: AsyncMock, client: TestClient) -> None:
+        """Test search returns rule results."""
+        mock_search.return_value = ["rule-001", "rule-002"]
 
-    @pytest.mark.asyncio
-    async def test_search_whitespace_query(self):
-        """Test search with whitespace only returns empty response."""
-        from src.api.routes.search import search_rules
+        response = client.post("/api/v1/search?query=test&limit=10")
 
-        from src.shared.schemas.search import SearchRequest
+        assert response.status_code == 200
+        data = response.json()
+        assert data == {"rules": ["rule-001", "rule-002"]}
 
-        request = SearchRequest(query="   ", limit=10)
-        response = await search_rules(request)
+    def test_search_empty_query(self, client: TestClient) -> None:
+        """Test search with empty query returns empty list."""
+        response = client.post("/api/v1/search?query=")
 
-        assert response.data == []
-        assert response.meta["count"] == 0
+        assert response.status_code == 200
+        data = response.json()
+        assert data == {"rules": []}
 
-    @pytest.mark.asyncio
-    async def test_search_returns_citation(self):
-        """Test search returns formatted citation."""
-        from src.api.routes.search import search_rules
+    @patch("src.api.v1.search.search_rules", new_callable=AsyncMock)
+    def test_search_failure_returns_500(self, mock_search: AsyncMock, client: TestClient) -> None:
+        """Test search failure returns 500."""
+        mock_search.side_effect = Exception("Search failed")
 
-        from src.back.rag.search import SearchEngine
-        from src.shared.schemas.search import SearchRequest
+        response = client.post("/api/v1/search?query=test")
 
-        with patch.object(
-            SearchEngine, "search", new_callable=AsyncMock
-        ) as mock_search:
-            mock_search.return_value = [
-                {
-                    "text": "test rule content",
-                    "score": 0.85,
-                    "metadata": {
-                        "title": "Test Rule",
-                        "description": "A test rule",
-                        "file_path": "rules/test.yaml",
-                        "line_start": 10,
-                    },
-                }
-            ]
-
-            request = SearchRequest(query="test", limit=10)
-            response = await search_rules(request)
-
-            assert len(response.data) == 1
-            assert response.data[0]["citation"] == "rules/test.yaml:10"
-
-    @pytest.mark.asyncio
-    async def test_search_timeout_raises_exception(self):
-        """Test search timeout raises HTTPException."""
-        from fastapi.exceptions import HTTPException
-        from src.api.routes.search import search_rules
-
-        from src.back.rag.search import SearchEngine
-        from src.shared.schemas.search import SearchRequest
-
-        with patch.object(
-            SearchEngine, "search", new_callable=AsyncMock
-        ) as mock_search:
-
-            mock_search.side_effect = TimeoutError()
-
-            request = SearchRequest(query="test", limit=10)
-
-            with pytest.raises(HTTPException) as exc_info:
-                await search_rules(request)
-
-            assert exc_info.value.status_code == 504
+        assert response.status_code == 500
+        data = response.json()
+        assert "error" in data
 
 
 class TestSearchResultSchema:
-    """Test search result schema."""
+    """Test search response schema."""
 
-    def test_search_result_defaults(self):
-        """Test SearchResult has correct defaults."""
-        from src.api.routes.search import SearchResult
+    def test_response_structure(self) -> None:
+        """Test response structure has rules key."""
+        from src.shared.schemas.search import SearchRequest, SearchResponse
 
-        result = SearchResult()
-        assert result.title == ""
-        assert result.description == ""
-        assert result.score == 0.0
-        assert result.citation == ""
+        req = SearchRequest(query="test", limit=10)
+        assert req.query == "test"
+        assert req.limit == 10
+
+        resp = SearchResponse(data=[{"id": "1"}], meta={"count": 1})
+        assert resp.data == [{"id": "1"}]
+        assert resp.meta["count"] == 1

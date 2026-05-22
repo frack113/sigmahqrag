@@ -128,6 +128,7 @@ def clone_repo(
 
         # gitpython extracts this automatically
         current_branch = cloned.active_branch.name if cloned.active_branch else None
+        head_hash = cloned.head.commit.hexsha
 
         logger.info(f"Cloned repository: {url} -> {dest_path}")
         return {
@@ -136,6 +137,7 @@ def clone_repo(
             "name": name,
             "path": str(dest_path),
             "branch": current_branch,
+            "remote_head": head_hash,
         }
     except Exception as e:
         logger.error(f"Failed to clone {url}: {e}")
@@ -161,7 +163,12 @@ def update_repo(
     try:
         # gitpython provides remotes and fetch/pull natively
         origin = repo.remotes.origin
-        origin.fetch()
+        fetch_info = origin.fetch()
+        remote_head = None
+        for info in fetch_info:
+            if info.ref.remote_head == branch:
+                remote_head = info.commit.hexsha
+                break
         # Pull with rebase or merge based on config
         origin.pull(branch)
         logger.info(f"Updated repository: {org}/{name} on branch {branch}")
@@ -171,15 +178,14 @@ def update_repo(
             "name": name,
             "path": str(repo_path),
             "branch": branch,
+            "remote_head": remote_head,
         }
     except Exception as e:
         logger.error(f"Failed to update {org}/{name}: {e}")
         return {"success": False, "error": str(e)}
 
 
-def delete_repo(
-    org: str, name: str, repos_dir: Path = DEFAULT_REPOS_DIR
-) -> dict[str, Any]:
+def delete_repo(org: str, name: str, repos_dir: Path = DEFAULT_REPOS_DIR) -> dict[str, Any]:
     """Delete a local repository."""
     repos_dir = Path(repos_dir).resolve()
     repo_path = _get_repo_path(repos_dir, org, name)
@@ -240,20 +246,13 @@ def save_metadata(
 ) -> None:
     """Save metadata for a repository to DuckDB."""
     db = DatabaseService.get_instance()
-    if db is None:
-        logger.error("DatabaseService not available, cannot save metadata")
-        return
     repo_key = f"{org}/{name}"
     db.set_git_metadata(repo_key, metadata)
 
 
-def get_metadata(
-    org: str, name: str, repos_dir: Path = DEFAULT_REPOS_DIR
-) -> dict[str, Any] | None:
+def get_metadata(org: str, name: str, repos_dir: Path = DEFAULT_REPOS_DIR) -> dict[str, Any] | None:
     """Get metadata for a repository from DuckDB."""
     db = DatabaseService.get_instance()
-    if db is None:
-        return None
     repo_key = f"{org}/{name}"
     return db.get_git_metadata(repo_key)
 
@@ -321,8 +320,6 @@ def save_selected_dirs(
         Result dict with success status
     """
     db = DatabaseService.get_instance()
-    if db is None:
-        return {"success": False, "error": "DatabaseService not available"}
     repo_key = _get_repo_key(org, name)
     try:
         db.set_selected_dirs(repo_key, selected)
@@ -333,9 +330,7 @@ def save_selected_dirs(
         return {"success": False, "error": str(e)}
 
 
-def get_selected_dirs(
-    org: str, name: str, repos_dir: Path = DEFAULT_REPOS_DIR
-) -> list[str]:
+def get_selected_dirs(org: str, name: str, repos_dir: Path = DEFAULT_REPOS_DIR) -> list[str]:
     """Get selected directories for a repository from DuckDB.
 
     Args:
@@ -347,8 +342,6 @@ def get_selected_dirs(
         List of selected folder paths, empty if not found
     """
     db = DatabaseService.get_instance()
-    if db is None:
-        return []
     repo_key = _get_repo_key(org, name)
     try:
         return db.get_selected_dirs(repo_key)
@@ -357,9 +350,7 @@ def get_selected_dirs(
         return []
 
 
-def get_last_commit_date(
-    org: str, name: str, repos_dir: Path = DEFAULT_REPOS_DIR
-) -> str | None:
+def get_last_commit_date(org: str, name: str, repos_dir: Path = DEFAULT_REPOS_DIR) -> str | None:
     """Get the date of the last commit in the repository."""
     repos_dir = Path(repos_dir).resolve()
     repo_path = _get_repo_path(repos_dir, org, name)
@@ -376,7 +367,7 @@ def get_last_commit_date(
 
 
 def is_repo_outdated(org: str, name: str, repos_dir: Path = DEFAULT_REPOS_DIR) -> bool:
-    """Check if local repo is behind remote by comparing commit hashes."""
+    """Check if local repo is behind remote using stored remote HEAD hash (no network call)."""
     repos_dir = Path(repos_dir).resolve()
     repo_path = _get_repo_path(repos_dir, org, name)
 
@@ -386,12 +377,10 @@ def is_repo_outdated(org: str, name: str, repos_dir: Path = DEFAULT_REPOS_DIR) -
 
     try:
         local_commit = repo.head.commit.hexsha
-        origin = repo.remotes.origin
-        origin.fetch()
-        for ref in origin.refs:
-            if ref.remote_head == repo.active_branch.name:
-                remote_commit = ref.commit.hexsha
-                return local_commit != remote_commit
-        return False
+        metadata = get_metadata(org, name)
+        remote_head = (metadata or {}).get("remote_head")
+        if remote_head is None:
+            return True
+        return local_commit != remote_head
     except Exception:
         return False

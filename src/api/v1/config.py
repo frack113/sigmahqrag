@@ -1,4 +1,4 @@
-"""Centralized configuration API v1 — full sigmahqrag.toml management."""
+"""Centralized configuration API v1 — backend config (DuckDB) + remaining TOML settings."""
 
 from __future__ import annotations
 
@@ -24,20 +24,18 @@ class ConfigUpdateRequest(BaseModel):
 
 @router.get("/config")
 async def get_full_config() -> JSONResponse:
-    """GET /v1/config — Return full application configuration from sigmahqrag.toml."""
+    """GET /v1/config — Return full application configuration."""
     try:
         config = get_config()
         return JSONResponse(content={"status": "success", "data": config.to_dict()})
     except Exception as e:
         logger.error(f"Failed to load config: {e}")
-        return JSONResponse(
-            status_code=500, content={"status": "error", "error": str(e)}
-        )
+        return JSONResponse(status_code=500, content={"status": "error", "error": str(e)})
 
 
 @router.post("/config")
 async def update_config(request: ConfigUpdateRequest) -> JSONResponse:
-    """POST /v1/config — Update configuration and persist to sigmahqrag.toml."""
+    """POST /v1/config — Update backend config (os, gpu_type) persisted to DuckDB."""
     try:
         config = get_config()
         if request.backend:
@@ -60,6 +58,4 @@ async def update_config(request: ConfigUpdateRequest) -> JSONResponse:
         )
     except Exception as e:
         logger.error(f"Failed to update config: {e}")
-        return JSONResponse(
-            status_code=500, content={"status": "error", "error": str(e)}
-        )
+        return JSONResponse(status_code=500, content={"status": "error", "error": str(e)})

@@ -13,7 +13,7 @@ from src.back.models.exceptions import (
     NetworkError,
     RegistryError,
 )
-from src.back.models.registry import UnifiedRegistry, create_unified_registry
+from src.back.models.registry import UnifiedRegistry
 from src.back.models.types import HFRepo
 
 __all__ = [
@@ -25,7 +25,6 @@ __all__ = [
     "DiskSpaceError",
     "NetworkError",
     "UnifiedRegistry",
-    "create_unified_registry",
     "HFDownloadService",
     "EmbeddingManager",
 ]

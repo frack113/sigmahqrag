@@ -6,11 +6,11 @@
 <h1>GitHub Repositories</h1>
 <p>Manage GitHub repositories for Sigma rule indexing.</p>
 
-<div class="github-container">
+<div class="card">
     <div class="github-actions">
         <button id="add-repo-btn" class="btn btn-primary">Add Repository</button>
-        <button id="refresh-btn" class="btn" onclick="loadRepos()">Refresh list</button>
-        <button id="download-ref-btn" class="btn btn-secondary" onclick="downloadRefs()">Download ref</button>
+        <button id="refresh-btn" class="btn btn-primary" onclick="loadRepos()">Refresh list</button>
+        <button id="list-document-btn" class="btn btn-primary" onclick="listDocuments()">List document</button>
     </div>
 
     <div id="repos-list" class="repos-grid"></div>
@@ -32,7 +32,6 @@
             <div class="directory-actions">
                 <button id="expand-all-btn" class="btn btn-sm" onclick="expandAll()">Expand All</button>
                 <button id="collapse-all-btn" class="btn btn-sm" onclick="collapseAll()">Collapse All</button>
-                <button id="scan-selected-btn" class="btn btn-primary" onclick="saveSelectedDirs()">Scan Selected</button>
             </div>
         </div>
         <div id="directory-tree" class="directory-tree"></div>
@@ -59,7 +58,6 @@
         </form>
     </div>
 </div>
-
 {% endblock %}
 
 {% block scripts %}
@@ -218,34 +216,6 @@ function updateSelectedCount() {
         checked + ' folder(s) selected' : '';
 }
 
-async function saveSelectedDirs() {
-    if (!currentRepo) return;
-    
-    const selected = Array.from(document.querySelectorAll('.folder-checkbox:checked'))
-        .map(cb => cb.value);
-    
-    if (selected.length === 0) {
-        alert('Please select at least one directory');
-        return;
-    }
-    
-    try {
-        const response = await fetch(API_BASE + '/repos/' + currentRepo.org + '/' + currentRepo.name + '/select-dirs', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ selected: selected })
-        });
-        const result = await response.json();
-        if (result.success) {
-            alert('Saved ' + selected.length + ' directory selection(s)');
-        } else {
-            alert(result.error || 'Failed to save selections');
-        }
-    } catch (error) {
-        alert('Failed to save selections');
-    }
-}
-
 document.getElementById('add-repo-btn').onclick = () => {
     document.getElementById('add-repo-modal').style.display = 'block';
 };
@@ -294,23 +264,77 @@ async function deleteRepo(org, name) {
     }
 }
 
-async function downloadRefs() {
-    const btn = document.getElementById('download-ref-btn');
-    btn.disabled = true;
-    btn.textContent = 'Starting...';
+const DISCOVERY_WORKERS = ['github_discovery', 'local_discovery', 'sigmaref_discovery'];
+let _discoveryPollInterval = null;
+
+function isWorkerActive(status) {
+    return status === 'running' || status === 'waiting';
+}
+
+async function pollWorkerStatus(workerType) {
     try {
-        const response = await fetch(API_BASE + '/download-ref', { method: 'POST' });
+        const resp = await fetch('/api/v1/qdrant/embed/' + workerType);
+        if (!resp.ok) return 'not_found';
+        const data = await resp.json();
+        return data.details ? data.details.status : 'idle';
+    } catch {
+        return 'not_found';
+    }
+}
+
+async function checkAnyWorkerActive() {
+    const results = await Promise.all(DISCOVERY_WORKERS.map(pollWorkerStatus));
+    return results.some(isWorkerActive);
+}
+
+function setScanningButton(scanning) {
+    const btn = document.getElementById('list-document-btn');
+    if (!btn) return;
+    btn.disabled = scanning;
+    btn.textContent = scanning ? 'Scanning...' : 'List document';
+}
+
+function stopDiscoveryPolling() {
+    if (_discoveryPollInterval) {
+        clearInterval(_discoveryPollInterval);
+        _discoveryPollInterval = null;
+    }
+}
+
+function startDiscoveryPolling(onIdle) {
+    stopDiscoveryPolling();
+    _discoveryPollInterval = setInterval(async () => {
+        const active = await checkAnyWorkerActive();
+        if (!active) {
+            stopDiscoveryPolling();
+            setScanningButton(false);
+            if (onIdle) onIdle();
+        }
+    }, 1000);
+}
+
+async function listDocuments() {
+    setScanningButton(true);
+    try {
+        const response = await fetch('/api/v1/files/list', { method: 'POST' });
         const result = await response.json();
         if (result.success) {
-            alert(result.message || 'Download started in background');
+            startDiscoveryPolling(() => loadRepos());
         } else {
-            alert(result.error || 'Download failed');
+            alert(result.error || 'Scan failed');
+            setScanningButton(false);
         }
     } catch (error) {
-        alert('Failed to download references');
-    } finally {
-        btn.disabled = false;
-        btn.textContent = 'Download ref';
+        alert('Failed to initiate scan');
+        setScanningButton(false);
+    }
+}
+
+async function checkRunningWorkersOnLoad() {
+    const active = await checkAnyWorkerActive();
+    if (active) {
+        setScanningButton(true);
+        startDiscoveryPolling(() => loadRepos());
     }
 }
 
@@ -350,138 +374,11 @@ document.getElementById('add-repo-form').onsubmit = async (e) => {
 };
 
 loadRepos();
+checkRunningWorkersOnLoad();
 </script>
 {% endblock %}
 
 {% block styles %}
 {{ super() }}
-<style>
-.repo-detail-section {
-    margin-top: 20px;
-    padding: 15px;
-    background: #f8f9fa;
-    border-radius: 8px;
-}
-.repo-detail-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 15px;
-}
-.directory-browser {
-    background: white;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    padding: 15px;
-}
-.directory-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 15px;
-    padding-bottom: 10px;
-    border-bottom: 1px solid #eee;
-}
-.directory-actions {
-    display: flex;
-    gap: 10px;
-}
-.directory-tree {
-    max-height: 400px;
-    overflow-y: auto;
-}
-.tree-root, .tree-children {
-    list-style: none;
-    padding-left: 20px;
-    margin: 0;
-}
-.tree-node {
-    margin: 5px 0;
-}
-.tree-item {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-}
-.tree-toggle {
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 0;
-    width: 20px;
-    color: #666;
-}
-.tree-spacer {
-    width: 20px;
-}
-.folder-checkbox {
-    margin-right: 5px;
-}
-.folder-icon {
-    margin-right: 5px;
-}
-.folder-name {
-    cursor: pointer;
-}
-.selected-count {
-    margin-top: 10px;
-    padding: 10px;
-    background: #e8f4f8;
-    border-radius: 4px;
-    font-weight: 500;
-}
-.select-repo-prompt {
-    padding: 20px;
-    text-align: center;
-    color: #666;
-    background: #f8f9fa;
-    border-radius: 4px;
-    margin-top: 10px;
-}
-.info-message {
-    color: #666;
-    padding: 20px;
-    text-align: center;
-}
-.repo-status {
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-size: 12px;
-    font-weight: 500;
-    margin-right: 8px;
-}
-.repo-status.synced {
-    background: #d4edda;
-    color: #155724;
-}
-.repo-status.outdated {
-    background: #fff3cd;
-    color: #856404;
-}
-.repo-status.error, .repo-status.cloning, .repo-status.syncing {
-    background: #f8d7da;
-    color: #721c24;
-}
-.btn-success {
-    background: #27ae60;
-    color: white;
-    border: none;
-}
-.btn-danger {
-    background: #e74c3c;
-    color: white;
-    border: none;
-}
-.btn-warning {
-    background: #f39c12;
-    color: white;
-    border: none;
-}
-.btn-unknown {
-    background: #333;
-    color: white;
-    border: none;
-}
-</style>
+<link rel="stylesheet" href="{{ url_for('static', path='/css/github.css') }}">
 {% endblock %}

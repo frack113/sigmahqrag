@@ -7,9 +7,7 @@ import httpx
 GITHUB_API_URL = "https://api.github.com/repos"
 
 
-async def list_releases(
-    owner: str, repo: str, github_token: str | None = None
-) -> list[dict]:
+async def list_releases(owner: str, repo: str, github_token: str | None = None) -> list[dict]:
     """List all releases for a repository."""
     url = f"{GITHUB_API_URL}/{owner}/{repo}/releases"
     headers = {"Accept": "application/vnd.github+json"}
@@ -33,9 +31,7 @@ async def list_releases(
         ]
 
 
-async def info_release(
-    owner: str, repo: str, tag: str, github_token: str | None = None
-) -> dict:
+async def info_release(owner: str, repo: str, tag: str, github_token: str | None = None) -> dict:
     """Get release info by tag."""
     tag_prefixed = tag if tag.startswith("v") else f"v{tag}"
     url = f"{GITHUB_API_URL}/{owner}/{repo}/releases/tags/{tag_prefixed}"

@@ -33,12 +33,9 @@ async def test_get_current_version_returns_none():
 async def test_check_for_updates_update_available():
     """Test check_for_updates returns update available."""
     with (
-        patch(
-            "src.core.version_manager.get_current_version", new_callable=AsyncMock
-        ) as mock_ver,
+        patch("src.core.version_manager.get_current_version", new_callable=AsyncMock) as mock_ver,
         patch("src.core.version_manager.VersionManager") as mock_vm_class,
     ):
-
         mock_ver.return_value = "1.0.0"
 
         mock_vm = MagicMock()
@@ -59,12 +56,9 @@ async def test_check_for_updates_update_available():
 async def test_check_for_updates_no_update():
     """Test check_for_updates returns no update when already latest."""
     with (
-        patch(
-            "src.core.version_manager.get_current_version", new_callable=AsyncMock
-        ) as mock_ver,
+        patch("src.core.version_manager.get_current_version", new_callable=AsyncMock) as mock_ver,
         patch("src.core.version_manager.VersionManager") as mock_vm_class,
     ):
-
         mock_ver.return_value = "2.0.0"
 
         mock_vm = MagicMock()
@@ -84,9 +78,7 @@ async def test_check_for_updates_no_update():
 @pytest.mark.asyncio
 async def test_check_for_updates_no_current_version():
     """Test check_for_updates returns None when no current version."""
-    with patch(
-        "src.core.version_manager.get_current_version", new_callable=AsyncMock
-    ) as mock_ver:
+    with patch("src.core.version_manager.get_current_version", new_callable=AsyncMock) as mock_ver:
         mock_ver.return_value = None
 
         result = await check_for_updates("llama.cpp")

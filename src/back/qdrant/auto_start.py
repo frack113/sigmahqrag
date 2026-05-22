@@ -49,9 +49,7 @@ async def start_qdrant(
 
             installer_service = QdrantInstallerService()
         try:
-            result = await asyncio.wait_for(
-                installer_service.download_binary(), timeout=120.0
-            )
+            result = await asyncio.wait_for(installer_service.download_binary(), timeout=120.0)
             if not result.get("success"):
                 logger.warning(f"Failed to download Qdrant: {result.get('error')}")
                 return

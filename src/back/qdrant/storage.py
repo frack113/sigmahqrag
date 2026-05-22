@@ -7,6 +7,8 @@ from typing import Any
 
 import qdrant_client
 
+from src.back.qdrant.client import get_qdrant_client
+
 logger = logging.getLogger(__name__)
 
 DEFAULT_VECTOR_SIZE = 384
@@ -16,7 +18,7 @@ async def store_embeddings(
     embeddings: list[list[float]],
     documents: list[str],
     metadata: list[dict[str, Any]] | None = None,
-    collection_name: str = "sigma_rules",
+    collection_name: str = "sigma_doc",
     vector_size: int = DEFAULT_VECTOR_SIZE,
 ) -> bool:
     """Store embeddings in Qdrant.
@@ -57,7 +59,7 @@ async def store_embeddings(
 
 async def search(
     query_embedding: list[float],
-    collection_name: str = "sigma_rules",
+    collection_name: str = "sigma_doc",
     top_k: int = 5,
 ) -> list[dict[str, Any]]:
     """Search for similar vectors in Qdrant.
@@ -93,7 +95,7 @@ async def delete_point(
 ) -> bool:
     """Delete a point from the collection."""
     try:
-        client = qdrant_client.QdrantClient(host=host, port=port)
+        client = get_qdrant_client(host=host, port=port)
         client.delete(
             collection_name=collection_name,
             points_selector=qdrant_client.models.PointIdsList(points=[point_id]),

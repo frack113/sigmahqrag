@@ -26,9 +26,7 @@ class LlamaBinaryService:
         self._config = config or get_config()
         self.llama_bin = self._config.resolve_llamacpp_bin_path()
         self.logs_dir = Path(self._config.paths_logs_dir).resolve()
-        self.pid_dir = Path(
-            self._config.paths_logs_dir.replace("logs", "pids")
-        ).resolve()
+        self.pid_dir = Path(self._config.paths_logs_dir.replace("logs", "pids")).resolve()
 
         if subprocess_manager is None:
             from src.back.service_manager import get_subprocess_manager

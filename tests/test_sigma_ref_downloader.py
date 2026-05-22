@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
-from unittest.mock import ANY, patch
+from unittest.mock import ANY, MagicMock, patch
 
 import httpx
 
@@ -23,34 +22,56 @@ from src.back.documents.sigma_ref_downloader import (
 )
 
 
+def _make_db(entries: list[dict] | None = None) -> MagicMock:
+    """Create a mock DatabaseService with in-memory doc_sigma_ref."""
+
+    data: dict[str, dict] = {}
+    if entries:
+        for e in entries:
+            data[e["url_hash"]] = dict(e)
+
+    def get_doc_sigma_ref() -> list[dict]:
+        return [
+            {
+                "url_hash": k,
+                "original_url": v.get("original_url", ""),
+                "normalized_url": v.get("normalized_url"),
+                "content_type": v.get("content_type"),
+                "rule_id": v.get("rule_id"),
+                "title": v.get("title"),
+                "timestamp": v.get("timestamp"),
+                "content_sha256": v.get("content_sha256"),
+            }
+            for k, v in data.items()
+        ]
+
+    def upsert_doc_sigma_ref(entry: dict) -> None:
+        data[entry["url_hash"]] = dict(entry)
+
+    db = MagicMock()
+    db.get_doc_sigma_ref = get_doc_sigma_ref
+    db.upsert_doc_sigma_ref = upsert_doc_sigma_ref
+    return db
+
+
 class TestNormalizeUrl:
     def test_github_blob_main(self) -> None:
         url = "https://github.com/user/repo/blob/main/doc.md"
-        assert (
-            normalize_url(url)
-            == "https://raw.githubusercontent.com/user/repo/main/doc.md"
-        )
+        assert normalize_url(url) == "https://raw.githubusercontent.com/user/repo/main/doc.md"
 
     def test_github_blob_commit_sha(self) -> None:
         url = "https://github.com/user/repo/blob/abc123def456/doc.md"
         assert (
-            normalize_url(url)
-            == "https://raw.githubusercontent.com/user/repo/abc123def456/doc.md"
+            normalize_url(url) == "https://raw.githubusercontent.com/user/repo/abc123def456/doc.md"
         )
 
     def test_github_blob_refs_heads(self) -> None:
         url = "https://github.com/user/repo/blob/refs/heads/feature/doc.md"
-        assert (
-            normalize_url(url)
-            == "https://raw.githubusercontent.com/user/repo/feature/doc.md"
-        )
+        assert normalize_url(url) == "https://raw.githubusercontent.com/user/repo/feature/doc.md"
 
     def test_github_blob_with_query(self) -> None:
         url = "https://github.com/user/repo/blob/main/doc.md?raw=true"
-        assert (
-            normalize_url(url)
-            == "https://raw.githubusercontent.com/user/repo/main/doc.md"
-        )
+        assert normalize_url(url) == "https://raw.githubusercontent.com/user/repo/main/doc.md"
 
     def test_non_github_url_pass_through(self) -> None:
         url = "https://learn.microsoft.com/en-us/doc"
@@ -77,8 +98,7 @@ class TestDetectUrlType:
 
     def test_no_extension_with_markdown_content_type(self) -> None:
         assert (
-            _detect_url_type("https://example.com/doc", content_type="text/markdown")
-            == "markdown"
+            _detect_url_type("https://example.com/doc", content_type="text/markdown") == "markdown"
         )
 
     def test_no_extension_no_content_type(self) -> None:
@@ -94,9 +114,7 @@ class TestDownloadFile:
         output = tmp_path / "test.md"
 
         with patch("httpx.Client") as mock_client:
-            mock_response = (
-                mock_client.return_value.__enter__.return_value.get.return_value
-            )
+            mock_response = mock_client.return_value.__enter__.return_value.get.return_value
             mock_response.raise_for_status.return_value = None
             mock_response.content = b"# Hello"
             mock_response.status_code = 200
@@ -188,53 +206,64 @@ class TestDownloadFile:
 
 
 class TestRegistry:
-    def test_load_empty(self, tmp_path: Path) -> None:
-        reg = _load_registry(tmp_path / "nonexistent.json")
+    @patch("src.back.documents.sigma_ref_downloader.DatabaseService.get_instance")
+    def test_load_empty(self, mock_get_instance: MagicMock, tmp_path: Path) -> None:
+        mock_get_instance.return_value = _make_db()
+        reg = _load_registry(tmp_path)
         assert reg == {}
 
-    def test_load_valid(self, tmp_path: Path) -> None:
-        path = tmp_path / "registry.json"
-        data = {"abc": {"url": "https://example.com/doc.md"}}
-        path.write_text(json.dumps(data))
-        assert _load_registry(path) == data
+    @patch("src.back.documents.sigma_ref_downloader.DatabaseService.get_instance")
+    def test_load_valid(self, mock_get_instance: MagicMock, tmp_path: Path) -> None:
+        db = _make_db(
+            entries=[
+                {
+                    "url_hash": "abc",
+                    "original_url": "https://example.com/doc.md",
+                    "normalized_url": "https://example.com/doc.md",
+                }
+            ]
+        )
+        mock_get_instance.return_value = db
+        reg = _load_registry(tmp_path)
+        assert reg == {
+            "abc": {
+                "original_url": "https://example.com/doc.md",
+                "normalized_url": "https://example.com/doc.md",
+                "content_type": None,
+                "rule_id": None,
+                "title": None,
+                "timestamp": None,
+                "content_sha256": None,
+            }
+        }
 
-    def test_load_corrupt(self, tmp_path: Path) -> None:
-        path = tmp_path / "registry.json"
-        path.write_text("{bad json")
-        result = _load_registry(path)
-        assert result == {}
-
-    def test_save_atomic(self, tmp_path: Path) -> None:
-        path = tmp_path / "registry.json"
-        data = {"abc": {"url": "https://example.com/doc.md"}}
-        _save_registry(data, path)
-        assert path.exists()
-        loaded = json.loads(path.read_text())
-        assert loaded == data
-        assert not path.with_suffix(".tmp").exists()
-
-    def test_save_and_reload(self, tmp_path: Path) -> None:
-        path = tmp_path / "registry.json"
-        data = {"abc": {"url": "https://example.com/doc.md", "timestamp": _iso_now()}}
-        _save_registry(data, path)
-        assert _load_registry(path) == data
+    @patch("src.back.documents.sigma_ref_downloader.DatabaseService.get_instance")
+    def test_save(self, mock_get_instance: MagicMock, tmp_path: Path) -> None:
+        db = _make_db()
+        mock_get_instance.return_value = db
+        data = {
+            "abc": {
+                "original_url": "https://example.com/doc.md",
+                "timestamp": _iso_now(),
+            }
+        }
+        _save_registry(data, tmp_path)
+        reg = _load_registry(tmp_path)
+        assert "abc" in reg
+        assert reg["abc"]["original_url"] == "https://example.com/doc.md"
 
 
 class TestSha256:
     def test_consistent(self) -> None:
         assert (
-            _sha256("hello")
-            == "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+            _sha256("hello") == "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
         )
 
     def test_different_inputs(self) -> None:
         assert _sha256("a") != _sha256("b")
 
     def test_empty_string(self) -> None:
-        assert (
-            _sha256("")
-            == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-        )
+        assert _sha256("") == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 
 
 class TestDownloadReferences:
@@ -255,8 +284,15 @@ references:
   - https://example.com/valid.md
 """)
 
-        with patch(
-            "src.back.documents.sigma_ref_downloader._download_file", return_value=True
+        with (
+            patch(
+                "src.back.documents.sigma_ref_downloader._download_file",
+                return_value=True,
+            ),
+            patch(
+                "src.back.documents.sigma_ref_downloader.DatabaseService.get_instance",
+                return_value=_make_db(),
+            ),
         ):
             result = download_references(str(rules_dir), str(tmp_path / "output"))
             assert result["downloaded"] == 1
@@ -277,10 +313,14 @@ references:
   - https://example.com/doc.pdf
 """)
 
-        result = download_references(str(rules_dir), str(tmp_path / "output"))
-        assert result["downloaded"] == 0
-        assert result["skipped"] == 1
-        assert result["total_rules"] == 1
+        with patch(
+            "src.back.documents.sigma_ref_downloader.DatabaseService.get_instance",
+            return_value=_make_db(),
+        ):
+            result = download_references(str(rules_dir), str(tmp_path / "output"))
+            assert result["downloaded"] == 0
+            assert result["skipped"] == 1
+            assert result["total_rules"] == 1
 
     def test_duplicate_url_skipped(self, tmp_path: Path) -> None:
         rules_dir = tmp_path / "rules"
@@ -298,8 +338,16 @@ references:
   - https://example.com/doc.md
 """)
 
-        with patch(
-            "src.back.documents.sigma_ref_downloader._download_file", return_value=True
+        db = _make_db()
+        with (
+            patch(
+                "src.back.documents.sigma_ref_downloader._download_file",
+                return_value=True,
+            ),
+            patch(
+                "src.back.documents.sigma_ref_downloader.DatabaseService.get_instance",
+                return_value=db,
+            ),
         ):
             first = download_references(str(rules_dir), str(output_dir))
             assert first["downloaded"] == 1
@@ -324,33 +372,41 @@ references:
   - https://github.com/user/repo/blob/main/docs/guide.md
 """)
 
-        def check_normalized_url(
-            url: str, output_path: Path, timeout: int = 30
-        ) -> bool:
+        def check_normalized_url(url: str, output_path: Path, timeout: int = 30) -> bool:
             assert "raw.githubusercontent.com" in url
             output_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.write_text("# content")
             return True
 
-        with patch(
-            "src.back.documents.sigma_ref_downloader._download_file",
-            check_normalized_url,
+        db = _make_db()
+        with (
+            patch(
+                "src.back.documents.sigma_ref_downloader._download_file",
+                check_normalized_url,
+            ),
+            patch(
+                "src.back.documents.sigma_ref_downloader.DatabaseService.get_instance",
+                return_value=db,
+            ),
         ):
             result = download_references(str(rules_dir), str(output_dir))
             assert result["downloaded"] == 1
 
-            registry_path = output_dir / "registry.json"
-            reg = json.loads(registry_path.read_text())
-            entry = list(reg.values())[0]
+            entries = db.get_doc_sigma_ref()
+            entry = list(entries)[0]
             assert "raw.githubusercontent.com" in entry["normalized_url"]
             assert "/blob/" not in entry["normalized_url"]
 
     def test_empty_rules_dir(self, tmp_path: Path) -> None:
         empty_dir = tmp_path / "empty"
         empty_dir.mkdir()
-        result = download_references(str(empty_dir), str(tmp_path / "output"))
-        assert result["total_rules"] == 0
-        assert result["downloaded"] == 0
+        with patch(
+            "src.back.documents.sigma_ref_downloader.DatabaseService.get_instance",
+            return_value=_make_db(),
+        ):
+            result = download_references(str(empty_dir), str(tmp_path / "output"))
+            assert result["total_rules"] == 0
+            assert result["downloaded"] == 0
 
     def test_output_dir_created(self, tmp_path: Path) -> None:
         rules_dir = tmp_path / "rules"
@@ -368,8 +424,15 @@ references:
   - https://example.com/test.md
 """)
 
-        with patch(
-            "src.back.documents.sigma_ref_downloader._download_file", return_value=True
+        with (
+            patch(
+                "src.back.documents.sigma_ref_downloader._download_file",
+                return_value=True,
+            ),
+            patch(
+                "src.back.documents.sigma_ref_downloader.DatabaseService.get_instance",
+                return_value=_make_db(),
+            ),
         ):
             result = download_references(str(rules_dir), str(output_dir))
             assert result["downloaded"] == 1
@@ -391,16 +454,21 @@ references:
   - https://example.com/fail.md
 """)
 
-        with patch(
-            "src.back.documents.sigma_ref_downloader._download_file", return_value=False
+        db = _make_db()
+        with (
+            patch(
+                "src.back.documents.sigma_ref_downloader._download_file",
+                return_value=False,
+            ),
+            patch(
+                "src.back.documents.sigma_ref_downloader.DatabaseService.get_instance",
+                return_value=db,
+            ),
         ):
             result = download_references(str(rules_dir), str(output_dir))
             assert result["failed"] == 1
             assert result["downloaded"] == 0
-            registry_path = output_dir / "registry.json"
-            if registry_path.exists():
-                reg = json.loads(registry_path.read_text())
-                assert len(reg) == 0
+            assert len(db.get_doc_sigma_ref()) == 0
 
     def test_same_filename_diff_content(self, tmp_path: Path) -> None:
         """Two different URLs with same filename -> stored under different hashes."""
@@ -428,16 +496,20 @@ references:
             output_path.write_text("# content")
             return True
 
-        with patch(
-            "src.back.documents.sigma_ref_downloader._download_file", capture_url
+        db = _make_db()
+        with (
+            patch("src.back.documents.sigma_ref_downloader._download_file", capture_url),
+            patch(
+                "src.back.documents.sigma_ref_downloader.DatabaseService.get_instance",
+                return_value=db,
+            ),
         ):
             result = download_references(str(rules_dir), str(output_dir))
             assert result["downloaded"] == 2
             assert len(urls_downloaded) == 2
             assert urls_downloaded[0] != urls_downloaded[1]
 
-            reg = json.loads((output_dir / "registry.json").read_text())
-            assert len(reg) == 2
+            assert len(db.get_doc_sigma_ref()) == 2
 
 
 class TestContentSha256:
@@ -465,19 +537,22 @@ references:
             output_path.write_text("# content")
             return True
 
+        db = _make_db()
         with (
             patch(
                 "src.back.documents.sigma_ref_downloader._download_file",
                 write_on_download,
             ),
             patch("time.sleep"),
+            patch(
+                "src.back.documents.sigma_ref_downloader.DatabaseService.get_instance",
+                return_value=db,
+            ),
         ):
-            result = download_references(
-                str(rules_dir), str(output_dir), request_delay=0
-            )
+            result = download_references(str(rules_dir), str(output_dir), request_delay=0)
             assert result["downloaded"] == 1
-            reg = json.loads((output_dir / "registry.json").read_text())
-            entry = list(reg.values())[0]
+            entries = db.get_doc_sigma_ref()
+            entry = list(entries)[0]
             assert "content_sha256" in entry
             assert entry["content_sha256"] != ""
 
@@ -502,21 +577,19 @@ references:
         output_file = output_dir / f"{url_hash}.md"
         output_file.write_text("content on disk")
 
-        reg_path = output_dir / "registry.json"
-        reg_path.write_text(
-            json.dumps(
+        db = _make_db(
+            entries=[
                 {
-                    url_hash: {
-                        "original_url": "https://example.com/test.md",
-                        "normalized_url": "https://example.com/test.md",
-                        "content_type": "markdown",
-                        "rule_id": "rule-009",
-                        "title": "Test Rule",
-                        "timestamp": _iso_now(),
-                        "content_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
-                    }
+                    "url_hash": url_hash,
+                    "original_url": "https://example.com/test.md",
+                    "normalized_url": "https://example.com/test.md",
+                    "content_type": "markdown",
+                    "rule_id": "rule-009",
+                    "title": "Test Rule",
+                    "timestamp": _iso_now(),
+                    "content_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
                 }
-            )
+            ]
         )
 
         download_calls: list[str] = []
@@ -533,10 +606,12 @@ references:
                 tracking_download,
             ),
             patch("time.sleep"),
+            patch(
+                "src.back.documents.sigma_ref_downloader.DatabaseService.get_instance",
+                return_value=db,
+            ),
         ):
-            result = download_references(
-                str(rules_dir), str(output_dir), request_delay=0
-            )
+            result = download_references(str(rules_dir), str(output_dir), request_delay=0)
             assert result["downloaded"] == 1
             assert len(download_calls) == 1
 
@@ -562,21 +637,19 @@ references:
         output_file.write_text("same content")
         same_sha = _sha256_file(output_file)
 
-        reg_path = output_dir / "registry.json"
-        reg_path.write_text(
-            json.dumps(
+        db = _make_db(
+            entries=[
                 {
-                    url_hash: {
-                        "original_url": "https://example.com/test.md",
-                        "normalized_url": "https://example.com/test.md",
-                        "content_type": "markdown",
-                        "rule_id": "rule-010",
-                        "title": "Test Rule",
-                        "timestamp": _iso_now(),
-                        "content_sha256": same_sha,
-                    }
+                    "url_hash": url_hash,
+                    "original_url": "https://example.com/test.md",
+                    "normalized_url": "https://example.com/test.md",
+                    "content_type": "markdown",
+                    "rule_id": "rule-010",
+                    "title": "Test Rule",
+                    "timestamp": _iso_now(),
+                    "content_sha256": same_sha,
                 }
-            )
+            ]
         )
 
         download_calls: list[str] = []
@@ -585,12 +658,17 @@ references:
             download_calls.append(url)
             return True
 
-        with patch(
-            "src.back.documents.sigma_ref_downloader._download_file", tracking_download
+        with (
+            patch(
+                "src.back.documents.sigma_ref_downloader._download_file",
+                tracking_download,
+            ),
+            patch(
+                "src.back.documents.sigma_ref_downloader.DatabaseService.get_instance",
+                return_value=db,
+            ),
         ):
-            result = download_references(
-                str(rules_dir), str(output_dir), request_delay=0
-            )
+            result = download_references(str(rules_dir), str(output_dir), request_delay=0)
             assert result["skipped"] >= 1
             assert len(download_calls) == 0
 
@@ -615,20 +693,18 @@ references:
         output_file = output_dir / f"{url_hash}.md"
         output_file.write_text("some content")
 
-        reg_path = output_dir / "registry.json"
-        reg_path.write_text(
-            json.dumps(
+        db = _make_db(
+            entries=[
                 {
-                    url_hash: {
-                        "original_url": "https://example.com/test.md",
-                        "normalized_url": "https://example.com/test.md",
-                        "content_type": "markdown",
-                        "rule_id": "rule-011",
-                        "title": "Test Rule",
-                        "timestamp": _iso_now(),
-                    }
+                    "url_hash": url_hash,
+                    "original_url": "https://example.com/test.md",
+                    "normalized_url": "https://example.com/test.md",
+                    "content_type": "markdown",
+                    "rule_id": "rule-011",
+                    "title": "Test Rule",
+                    "timestamp": _iso_now(),
                 }
-            )
+            ]
         )
 
         download_calls: list[str] = []
@@ -637,12 +713,17 @@ references:
             download_calls.append(url)
             return True
 
-        with patch(
-            "src.back.documents.sigma_ref_downloader._download_file", tracking_download
+        with (
+            patch(
+                "src.back.documents.sigma_ref_downloader._download_file",
+                tracking_download,
+            ),
+            patch(
+                "src.back.documents.sigma_ref_downloader.DatabaseService.get_instance",
+                return_value=db,
+            ),
         ):
-            result = download_references(
-                str(rules_dir), str(output_dir), request_delay=0
-            )
+            result = download_references(str(rules_dir), str(output_dir), request_delay=0)
             assert result["skipped"] >= 1
             assert len(download_calls) == 0
 
@@ -674,10 +755,12 @@ references:
                 return_value=True,
             ),
             patch("time.sleep"),
+            patch(
+                "src.back.documents.sigma_ref_downloader.DatabaseService.get_instance",
+                return_value=_make_db(),
+            ),
         ):
-            result = download_references(
-                str(rules_dir), str(output_dir), request_delay=0
-            )
+            result = download_references(str(rules_dir), str(output_dir), request_delay=0)
             assert result["downloaded"] == 1
 
     def test_uppercase_github_blob(self) -> None:
@@ -690,10 +773,7 @@ references:
 class TestFragmentHandling:
     def test_github_url_with_fragment(self) -> None:
         url = "https://github.com/user/repo/blob/main/doc.md#section"
-        assert (
-            normalize_url(url)
-            == "https://raw.githubusercontent.com/user/repo/main/doc.md"
-        )
+        assert normalize_url(url) == "https://raw.githubusercontent.com/user/repo/main/doc.md"
 
     def test_github_url_with_query_and_fragment(self) -> None:
         url = "https://github.com/user/repo/blob/main/doc.md?raw=true#section"
@@ -718,31 +798,11 @@ class TestBackoffDelay:
         assert _backoff_delay(10) == 9
 
 
-class TestStaleTmpRecovery:
-    def test_tmp_file_recovered(self, tmp_path: Path) -> None:
-        reg_path = tmp_path / "registry.json"
-        tmp_path_ = tmp_path / "registry.tmp"
-        reg_data = {"abc": {"url": "https://example.com/doc.md"}}
-        tmp_path_.write_text(json.dumps(reg_data))
-        result = _load_registry(reg_path)
-        assert result == reg_data
-        assert reg_path.exists()
-        assert not tmp_path_.exists()
-
-    def test_tmp_file_no_target_fresh(self, tmp_path: Path) -> None:
-        reg_path = tmp_path / "registry.json"
-        result = _load_registry(reg_path)
-        assert result == {}
-
-
 class TestSha256File:
     def test_file_sha(self, tmp_path: Path) -> None:
         f = tmp_path / "test.txt"
         f.write_text("hello")
-        assert (
-            _sha256_file(f)
-            == "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
-        )
+        assert _sha256_file(f) == "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
 
     def test_missing_file(self, tmp_path: Path) -> None:
         assert _sha256_file(tmp_path / "nonexistent") == ""

@@ -34,9 +34,7 @@ def sigma_rules_dataset() -> list[dict[str, Any]]:
 class TestRAGAccuracy:
     """Validate RAG pipeline accuracy on Sigma rules."""
 
-    def test_sigma_rule_format_accuracy(
-        self, sigma_rules_dataset: list[dict[str, Any]]
-    ):
+    def test_sigma_rule_format_accuracy(self, sigma_rules_dataset: list[dict[str, Any]]):
         """Test that RAG correctly identifies key Sigma fields."""
         total = len(sigma_rules_dataset)
         correct = 0
@@ -51,10 +49,9 @@ class TestRAGAccuracy:
                 correct += 1
 
         accuracy = (correct / total) * 100 if total > 0 else 0
-        assert accuracy >= 95.0, (
-            f"RAG accuracy {accuracy:.1f}% is below 95% threshold!\n"
-            f"Correct: {correct}/{total}"
-        )
+        assert (
+            accuracy >= 95.0
+        ), f"RAG accuracy {accuracy:.1f}% is below 95% threshold!\nCorrect: {correct}/{total}"
 
     def test_detection_field_parsing(self, sigma_rules_dataset: list[dict[str, Any]]):
         """Test that detection field is correctly parsed."""
@@ -63,9 +60,7 @@ class TestRAGAccuracy:
             assert "selection" in detection, "Detection must have 'selection' key"
             assert "condition" in detection, "Detection must have 'condition' key"
 
-    def test_logsource_field_validation(
-        self, sigma_rules_dataset: list[dict[str, Any]]
-    ):
+    def test_logsource_field_validation(self, sigma_rules_dataset: list[dict[str, Any]]):
         """Test that logsource field is correctly validated."""
         for rule in sigma_rules_dataset:
             logsource = rule.get("logsource", {})

@@ -29,7 +29,7 @@ class CancelPayload(BaseModel):
 class CollectionManagementPayload(BaseModel):
     action: Literal["collection_management"] = "collection_management"
     operation: Literal["create", "delete", "list", "get"]
-    collection_name: str
+    collection_name: str | None = None
     config: dict[str, Any] | None = None
 
 
@@ -51,7 +51,7 @@ class VectorSearchPayload(BaseModel):
 
 class EmbedSigmaRefPayload(BaseModel):
     action: Literal["embed_sigmaref"] = "embed_sigmaref"
-    registry_path: str = "data/documents/sigmaref/registry.json"
+    registry_path: str = "data/documents/sigmaref"
     collection_name: str = "sigma_doc"
 
 

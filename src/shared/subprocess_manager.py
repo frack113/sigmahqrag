@@ -43,8 +43,6 @@ class SubprocessManager:
         """
         self.logs_dir = Path(logs_dir)
         self.pid_dir = Path(pid_dir)
-        self.logs_dir.mkdir(parents=True, exist_ok=True)
-        self.pid_dir.mkdir(parents=True, exist_ok=True)
 
         self._processes: dict[str, ServiceProcess] = {}
         self._sync_from_pid_files()
@@ -113,9 +111,7 @@ class SubprocessManager:
             "name": name,
             "running": is_healthy,
             "pid": proc_info.pid if proc_info else None,
-            "log_file": (
-                str(proc_info.log_file) if proc_info and proc_info.log_file else None
-            ),
+            "log_file": (str(proc_info.log_file) if proc_info and proc_info.log_file else None),
         }
 
     async def restart_service(
@@ -139,9 +135,7 @@ class SubprocessManager:
             Dict with restart status
         """
         if name in self._processes:
-            logger.warning(
-                f"Service {name} is still tracked as running, stopping first."
-            )
+            logger.warning(f"Service {name} is still tracked as running, stopping first.")
             await self.stop_service(name)
 
         pid_file.unlink(missing_ok=True)
@@ -230,11 +224,7 @@ class SubprocessManager:
             Dict with stop status
         """
         process_info = self._processes.get(name)
-        if (
-            not process_info
-            or not process_info.is_running
-            or process_info.process is None
-        ):
+        if not process_info or not process_info.is_running or process_info.process is None:
             return {"success": False, "error": f"{name} not running"}
 
         try:

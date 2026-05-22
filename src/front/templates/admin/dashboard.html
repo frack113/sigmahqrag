@@ -127,7 +127,7 @@ function loadModels() {
                     for (const [filename, f] of Object.entries(m.files)) {
                         html += `<tr>
                             <td>${m.repo_id}/${filename}</td>
-                            <td>${Math.round(f.size / 1024 / 1024)}MB</td>
+                            <td class="num">${Math.round(f.size / 1024 / 1024)}MB</td>
                             <td><button class="btn btn-danger" onclick="deleteModel('${m.repo_id}', '${filename}')">Delete</button></td>
                         </tr>`;
                     }
@@ -171,28 +171,4 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
-<style>
-.status-item {
-    margin-bottom: 15px;
-    padding: 10px;
-    background: #f8f9fa;
-    border-radius: 4px;
-}
-.status-dot {
-    display: inline-block;
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    margin-right: 8px;
-}
-.status-dot.status-ok {
-    background: #27ae60;
-}
-.status-dot.status-warning {
-    background: #f39c12;
-}
-.status-dot.status-error {
-    background: #e74c3c;
-}
-</style>
 {% endblock %}

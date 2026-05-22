@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import logging
 import os
-from pathlib import Path
 from typing import Any
 
 from llama_index.core.schema import Document
 
 from src.back.qdrant.storage import store_embeddings as _store_embeddings
+from src.shared import EMBEDDINGS_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +44,7 @@ def get_embedding_model() -> Any:
 
     from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 
-    embeddings_dir = Path("models/embeddings")
+    embeddings_dir = EMBEDDINGS_DIR
     model_path = None
 
     if embeddings_dir.exists():
@@ -55,9 +55,7 @@ def get_embedding_model() -> Any:
     env_mode = os.environ.get("SIGMA_RAG_EMBED_MODEL", "").lower()
 
     if env_mode == "huggingface":
-        logger.info(
-            "Using HuggingFace Hub for embeddings (SIGMA_RAG_EMBED_MODEL=huggingface)"
-        )
+        logger.info("Using HuggingFace Hub for embeddings (SIGMA_RAG_EMBED_MODEL=huggingface)")
         _embed_model = HuggingFaceEmbedding(
             model_name="BAAI/bge-small-en-v1.5",
             embed_batch_size=BATCH_SIZE,
@@ -73,9 +71,7 @@ def get_embedding_model() -> Any:
         return _embed_model
 
     if env_mode == "local":
-        raise OSError(
-            "SIGMA_RAG_EMBED_MODEL=local but no GGUF model found in models/embeddings/"
-        )
+        raise OSError("SIGMA_RAG_EMBED_MODEL=local but no GGUF model found in models/embeddings/")
 
     if _check_hf_available():
         logger.info("No local GGUF found, falling back to HuggingFace Hub")
@@ -115,7 +111,7 @@ async def embed_documents(documents: list[Document]) -> list[list[float]]:
 async def store_embeddings(
     documents: list[Document],
     embeddings: list[list[float]],
-    collection_name: str = "sigma_rules",
+    collection_name: str = "sigma_doc",
 ) -> bool:
     """Store embeddings in Qdrant.
 

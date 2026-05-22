@@ -37,6 +37,7 @@ dev = [
 [tool.ruff]
 target-version = "py312"
 line-length = 100
+exclude = ["*.sql"]
 
 [tool.mypy]
 python_version = "3.12"
@@ -114,4 +115,5 @@ dev = [
 ]
 
 [tool.black]
-target-version = "py312"
+target-version = ["py312"]
+line-length = 100

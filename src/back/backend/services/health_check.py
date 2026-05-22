@@ -34,6 +34,49 @@ class HealthCheckService:
         }
         return results
 
+    async def check_llama(self) -> dict[str, Any]:
+        """Check llama.cpp health (public alias)."""
+        return await self._check_llamacpp()
+
+    async def check_qdrant(self) -> dict[str, Any]:
+        """Check Qdrant health (public alias)."""
+        return await self._check_qdrant()
+
+    async def _check_llamacpp(self) -> dict[str, Any]:
+        """Check llama.cpp health."""
+        cached = self._get_cached("llamacpp")
+        if cached:
+            return cached
+
+        config = get_config()
+        base_url = config.llama_base_url or "http://127.0.0.1:8080"
+        import time as time_module
+        start = time_module.time()
+        status = "error"
+        message = ""
+
+        try:
+            import httpx
+            async with httpx.AsyncClient(timeout=httpx.Timeout(TIMEOUT)) as client:
+                resp = await client.get(f"{base_url}/health")
+                if resp.status_code == 200:
+                    status = "active"
+                else:
+                    message = f"HTTP {resp.status_code}"
+        except Exception as e:
+            message = str(e)
+
+        result = {
+            "status": status,
+            "url": base_url,
+            "response_time": round(time_module.time() - start, 3),
+        }
+        if message:
+            result["error"] = message
+
+        self._set_cached("llamacpp", result)
+        return result
+
     async def _check_qdrant(self) -> dict[str, Any]:
         """Check Qdrant health."""
         cached = self._get_cached("qdrant")
@@ -52,9 +95,9 @@ class HealthCheckService:
 
         if basic_check["status"] == "active":
             try:
-                from qdrant_client import QdrantClient
+                from src.back.qdrant.client import get_qdrant_client
 
-                client = QdrantClient(host=host, port=port, timeout=TIMEOUT)
+                client = get_qdrant_client(host=host, port=port, timeout=TIMEOUT)
                 collections = client.get_collections().collections
                 collection_exists = any(c.name == collection for c in collections)
                 result = {

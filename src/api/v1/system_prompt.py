@@ -60,9 +60,7 @@ async def prompts_active() -> JSONResponse:
         active = get_active_prompt()
         if active:
             return JSONResponse(content={"name": active.name, "id": active.id})
-        return JSONResponse(
-            status_code=404, content={"error": "No active prompt found"}
-        )
+        return JSONResponse(status_code=404, content={"error": "No active prompt found"})
     except Exception as e:
         logger.error(f"Prompts ACTIVE failed: {e}")
         return JSONResponse(status_code=500, content={"error": "Internal server error"})
@@ -74,9 +72,7 @@ async def prompts_get_by_name(name: str) -> JSONResponse:
     try:
         prompt = get_prompt_by_name(name)
         if prompt is None:
-            return JSONResponse(
-                status_code=404, content={"error": f"Prompt '{name}' not found"}
-            )
+            return JSONResponse(status_code=404, content={"error": f"Prompt '{name}' not found"})
         return JSONResponse(
             content={
                 "id": prompt.id,
@@ -115,9 +111,7 @@ async def prompts_get_by_id(prompt_id: str) -> JSONResponse:
 
 
 @router.put("/{prompt_id}")
-async def prompts_update_by_id(
-    prompt_id: str, request: UpdatePromptRequest
-) -> JSONResponse:
+async def prompts_update_by_id(prompt_id: str, request: UpdatePromptRequest) -> JSONResponse:
     """PUT prompt by ID."""
     try:
         success = update_prompt(

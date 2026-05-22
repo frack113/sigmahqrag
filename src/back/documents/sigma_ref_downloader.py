@@ -25,7 +25,6 @@ GITHUB_BLOB_PATTERN = re.compile(
 MAX_RETRIES = 3
 BACKOFF_DELAYS = [1, 4, 9]
 RETRY_STATUSES = {429, 500, 502, 503, 504}
-REGISTRY_FILENAME = "registry.json"
 DEFAULT_REQUEST_DELAY = 0.5
 SUPPORTED_EXTENSIONS: dict[str, str] = {
     ext: ft.value for ext, ft in SUPPORTED_DOC_EXTENSION_MAP.items()
@@ -101,9 +100,7 @@ def _download_file(
     """
     for attempt in range(1, max_retries + 1):
         try:
-            with httpx.Client(
-                timeout=httpx.Timeout(timeout), follow_redirects=True
-            ) as client:
+            with httpx.Client(timeout=httpx.Timeout(timeout), follow_redirects=True) as client:
                 response = client.get(url)
                 response.raise_for_status()
             output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -153,9 +150,7 @@ def _download_file(
                 )
                 time.sleep(wait)
                 continue
-            logger.warning(
-                "Network error for %s after %d attempts: %s", url, max_retries, exc
-            )
+            logger.warning("Network error for %s after %d attempts: %s", url, max_retries, exc)
             return False
 
     return False
@@ -183,15 +178,12 @@ def _get_retry_after(response: httpx.Response) -> int | None:
         return None
 
 
-def _load_registry(path: Path) -> dict[str, Any]:
+def _load_registry(path: Path, db: DatabaseService) -> dict[str, Any]:
     """Load the registry from DuckDB.
 
     Returns an empty dict if DB not available.
     """
-    db = DatabaseService.get_instance()
-    if db is None:
-        return {}
-    entries = db.get_doc_registry()
+    entries = db.get_doc_sigma_ref()
     registry = {}
     for entry in entries:
         url_hash = entry["url_hash"]
@@ -199,7 +191,7 @@ def _load_registry(path: Path) -> dict[str, Any]:
             "original_url": entry.get("original_url", ""),
             "normalized_url": entry.get("normalized_url"),
             "content_type": entry.get("content_type"),
-            "rule_id": entry.get("rule_id"),
+            "rule_id": entry.get("rel_id"),
             "title": entry.get("title"),
             "timestamp": entry.get("timestamp"),
             "content_sha256": entry.get("content_sha256"),
@@ -207,11 +199,9 @@ def _load_registry(path: Path) -> dict[str, Any]:
     return registry
 
 
-def _save_registry(registry: dict[str, Any], path: Path) -> None:
+
+def _save_registry(registry: dict[str, Any], path: Path, db: DatabaseService) -> None:
     """Save the registry to DuckDB atomically."""
-    db = DatabaseService.get_instance()
-    if db is None:
-        return
     for url_hash, entry in registry.items():
         if isinstance(entry, dict):
             row = {
@@ -223,13 +213,46 @@ def _save_registry(registry: dict[str, Any], path: Path) -> None:
                 "title": entry.get("title"),
                 "timestamp": entry.get("timestamp"),
                 "content_sha256": entry.get("content_sha256"),
+                "org": entry.get("org", "sigmaref"),
+                "repo": entry.get("repo", "references"),
+                "file_name": entry.get("file_name", ""),
+                "file_size": entry.get("file_size"),
             }
-            db.upsert_doc_entry(row)
+            db.upsert_doc_sigma_ref(row)
+
+
+def _make_entry(
+    url_hash: str,
+    original_url: str,
+    normalized_url: str,
+    content_type: str,
+    rule_id: str,
+    title: str,
+    timestamp: str,
+    content_sha256: str,
+    file_name: str = "",
+    file_size: int | None = None,
+) -> dict[str, Any]:
+    """Build a registry entry dict with all fields expected by _save_registry."""
+    return {
+        "original_url": original_url,
+        "normalized_url": normalized_url,
+        "content_type": content_type,
+        "rule_id": rule_id,
+        "title": title,
+        "timestamp": timestamp,
+        "content_sha256": content_sha256,
+        "org": "sigmaref",
+        "repo": "references",
+        "file_name": file_name,
+        "file_size": file_size,
+    }
 
 
 def download_references(
     rules_dir: str,
     output_dir: str,
+    db: DatabaseService,
     supported_types: set[str] | None = None,
     request_delay: float = DEFAULT_REQUEST_DELAY,
 ) -> dict[str, Any]:
@@ -241,6 +264,7 @@ def download_references(
     Args:
         rules_dir: Path to the directory containing Sigma rule YAML files.
         output_dir: Path to the output directory for downloaded files.
+        db: Database service instance.
         supported_types: Set of FileType values to accept (e.g. {"markdown"}).
             Defaults to {"markdown"}.
         request_delay: Seconds to wait between download requests.
@@ -253,14 +277,14 @@ def download_references(
 
     rules_path = Path(rules_dir)
     output_path = Path(output_dir)
-    registry_path = output_path / REGISTRY_FILENAME
+    output_path.mkdir(parents=True, exist_ok=True)
 
     if not rules_path.is_dir():
         logger.warning("Rules directory does not exist: %s", rules_dir)
         return _empty_summary()
 
     with _registry_lock:
-        registry = _load_registry(registry_path)
+        registry = _load_registry(output_path, db)
 
     total_rules = 0
     total_refs = 0
@@ -277,9 +301,7 @@ def download_references(
         if not yml_file.is_file():
             continue
         try:
-            data = yaml.safe_load(
-                yml_file.read_text(encoding="utf-8", errors="replace")
-            )
+            data = yaml.safe_load(yml_file.read_text(encoding="utf-8", errors="replace"))
         except Exception as exc:
             logger.warning("Failed to parse YAML %s: %s", yml_file, exc)
             continue
@@ -306,33 +328,30 @@ def download_references(
             normalized = normalize_url(ref)
 
             url_hash = _sha256(normalized)
+            ext = _url_ext(normalized) or ".md"
+            output_file = output_path / f"{url_hash}{ext}"
+
             if url_hash in registry:
                 existing = registry[url_hash]
-                ext = _url_ext(normalized) or ".md"
-                output_file = output_path / f"{url_hash}{ext}"
                 if output_file.exists():
                     existing_sha = existing.get("content_sha256")
-                    if (
-                        existing_sha is not None
-                        and _sha256_file(output_file) != existing_sha
-                    ):
-                        logger.info(
-                            "Content changed for %s, re-downloading", normalized
-                        )
+                    if existing_sha is not None and _sha256_file(output_file) != existing_sha:
+                        logger.info("Content changed for %s, re-downloading", normalized)
                         if _download_file(normalized, output_file):
-                            registry[url_hash] = {
-                                "original_url": ref,
-                                "normalized_url": normalized,
-                                "content_type": existing.get(
-                                    "content_type", "markdown"
-                                ),
-                                "rule_id": rule_id,
-                                "title": rule_title,
-                                "timestamp": _iso_now(),
-                                "content_sha256": _sha256_file(output_file),
-                            }
+                            registry[url_hash] = _make_entry(
+                                url_hash=url_hash,
+                                original_url=ref,
+                                normalized_url=normalized,
+                                content_type=existing.get("content_type", "markdown"),
+                                rule_id=rule_id,
+                                title=rule_title,
+                                timestamp=_iso_now(),
+                                content_sha256=_sha256_file(output_file),
+                                file_name=output_file.name,
+                                file_size=output_file.stat().st_size,
+                            )
                             with _registry_lock:
-                                _save_registry(registry, registry_path)
+                                _save_registry(registry, output_path, db)
                             downloaded += 1
                         else:
                             failed += 1
@@ -342,27 +361,46 @@ def download_references(
                 skipped += 1
                 continue
 
+            if output_file.exists():
+                content_hash = _sha256_file(output_file)
+                registry[url_hash] = _make_entry(
+                    url_hash=url_hash,
+                    original_url=ref,
+                    normalized_url=normalized,
+                    content_type=_detect_url_type(normalized) or "markdown",
+                    rule_id=rule_id,
+                    title=rule_title,
+                    timestamp=_iso_now(),
+                    content_sha256=content_hash,
+                    file_name=output_file.name,
+                    file_size=output_file.stat().st_size,
+                )
+                with _registry_lock:
+                    _save_registry(registry, output_path, db)
+                skipped += 1
+                continue
+
             ftype = _detect_url_type(normalized)
             if ftype is None or ftype not in supported_types:
                 skipped += 1
                 continue
 
-            ext = _url_ext(normalized) or ".md"
-            output_file = output_path / f"{url_hash}{ext}"
-
             if _download_file(normalized, output_file):
                 content_hash = _sha256_file(output_file) if output_file.exists() else ""
-                registry[url_hash] = {
-                    "original_url": ref,
-                    "normalized_url": normalized,
-                    "content_type": ftype,
-                    "rule_id": rule_id,
-                    "title": rule_title,
-                    "timestamp": _iso_now(),
-                    "content_sha256": content_hash,
-                }
+                registry[url_hash] = _make_entry(
+                    url_hash=url_hash,
+                    original_url=ref,
+                    normalized_url=normalized,
+                    content_type=ftype,
+                    rule_id=rule_id,
+                    title=rule_title,
+                    timestamp=_iso_now(),
+                    content_sha256=content_hash,
+                    file_name=output_file.name,
+                    file_size=output_file.stat().st_size if output_file.exists() else None,
+                )
                 with _registry_lock:
-                    _save_registry(registry, registry_path)
+                    _save_registry(registry, output_path, db)
                 downloaded += 1
             else:
                 failed += 1
@@ -379,6 +417,7 @@ def download_references(
     }
     logger.info("Download complete: %s", summary)
     return summary
+
 
 
 def _sha256(text: str) -> str:
@@ -423,4 +462,4 @@ def _iso_now() -> str:
     """Return current UTC timestamp in ISO 8601 format."""
     from datetime import datetime, timezone
 
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")  # noqa: UP017
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")

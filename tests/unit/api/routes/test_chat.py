@@ -68,9 +68,7 @@ def test_upload_invalid_yaml() -> None:
     client = TestClient(app)
     resp = client.post(
         "/api/v1/chat/upload",
-        files={
-            "file": ("bad.yaml", b"not: [valid: yaml: broken", "application/x-yaml")
-        },
+        files={"file": ("bad.yaml", b"not: [valid: yaml: broken", "application/x-yaml")},
     )
     assert resp.status_code == 422
 

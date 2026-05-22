@@ -72,9 +72,7 @@ async def get_logs(
     logger.info(f"Reading logs from: {log_path}, exists={log_path.exists()}")
 
     if not log_path.exists():
-        return JSONResponse(
-            content={"logs": [], "message": f"Log file not found: {log_path}"}
-        )
+        return JSONResponse(content={"logs": [], "message": f"Log file not found: {log_path}"})
 
     try:
         all_lines = read_log_file(log_path)
@@ -90,9 +88,7 @@ async def get_logs(
         for line in recent:
             entries.append({"text": line.strip()})
 
-        return JSONResponse(
-            content={"logs": entries, "total": len(entries), "source": source}
-        )
+        return JSONResponse(content={"logs": entries, "total": len(entries), "source": source})
 
     except Exception as e:
         import traceback
@@ -103,9 +99,7 @@ async def get_logs(
 
 @router.delete("")
 async def clear_logs(
-    source: str = Query(
-        "", description="Log source to clear: system, llamacpp, qdrant"
-    ),
+    source: str = Query("", description="Log source to clear: system, llamacpp, qdrant"),
 ) -> JSONResponse:
     """Clear log file contents.
 
@@ -128,12 +122,8 @@ async def clear_logs(
             with open(log_path, "w") as f:
                 f.write("")
             logger.info(f"Cleared log file: {log_path}")
-            return JSONResponse(
-                content={"success": True, "message": f"Cleared {log_filename}"}
-            )
-        return JSONResponse(
-            content={"success": False, "message": "Log file does not exist"}
-        )
+            return JSONResponse(content={"success": True, "message": f"Cleared {log_filename}"})
+        return JSONResponse(content={"success": False, "message": "Log file does not exist"})
     except Exception as e:
         logger.error(f"Failed to clear logs: {e}")
         return JSONResponse(status_code=500, content={"error": str(e)})

@@ -9,7 +9,7 @@ import re
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 
-from src.api.dependencies import get_embedding_manager, get_unified_registry
+from src.api.dependencies import get_database_service, get_embedding_manager, get_unified_registry
 from src.back.embedding_config import EmbeddingTypeConfig
 from src.back.models import EmbeddingManager, HFRepo
 from src.back.utils.identify_file_type import FileType
@@ -41,11 +41,12 @@ async def get_download_progress(repo_id: str) -> JSONResponse:
 async def list_installed_llm_models() -> JSONResponse:
     """List installed LLM models."""
     try:
+        db = get_database_service()
         reg = get_unified_registry()
         from src.shared import LLM_DIR
 
-        reg.sync_llm_folder(LLM_DIR)
-        llms = reg.list_llms()
+        reg.sync_llm_folder(LLM_DIR, db)
+        llms = reg.list_llms(db)
         models = []
         for repo_id, data in llms.items():
             files = []
@@ -176,6 +177,22 @@ async def download_llm_model(
     )
 
 
+@router.delete("/llm/{repo_id}")
+async def delete_llm_model(repo_id: str) -> JSONResponse:
+    """Delete a LLM model entry."""
+    try:
+        db = get_database_service()
+        reg = get_unified_registry()
+        record = reg.get_llm(repo_id, db)
+        if not record:
+            return JSONResponse(status_code=404, content={"error": f"Model {repo_id} not found"})
+        reg.remove_llm(repo_id, db)
+        return JSONResponse(content={"success": True, "repo_id": repo_id})
+    except Exception as e:
+        logger.error(f"Delete failed: {e}")
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+
 @router.delete("/llm/{repo_id}/file/{filename}")
 async def delete_llm_model_file(repo_id: str, filename: str) -> JSONResponse:
     """Delete a LLM model file."""
@@ -184,8 +201,9 @@ async def delete_llm_model_file(repo_id: str, filename: str) -> JSONResponse:
     from src.back.models.exceptions import ModelNotFoundError
 
     try:
+        db = get_database_service()
         reg = get_unified_registry()
-        record = reg.get_llm(repo_id)
+        record = reg.get_llm(repo_id, db)
         if not record:
             raise ModelNotFoundError(f"Model {repo_id} not found")
         if filename not in record.get("files", {}):
@@ -194,10 +212,8 @@ async def delete_llm_model_file(repo_id: str, filename: str) -> JSONResponse:
         if path.exists():
             path.unlink()
         del record["files"][filename]
-        reg._save()
-        return JSONResponse(
-            content={"success": True, "repo_id": repo_id, "filename": filename}
-        )
+        reg._save(db)
+        return JSONResponse(content={"success": True, "repo_id": repo_id, "filename": filename})
     except ModelNotFoundError as e:
         return JSONResponse(status_code=404, content={"error": str(e)})
     except Exception as e:
@@ -212,11 +228,12 @@ async def delete_llm_model_file(repo_id: str, filename: str) -> JSONResponse:
 async def list_installed_embedding_models() -> JSONResponse:
     """List installed embedding models."""
     try:
+        db = get_database_service()
         reg = get_unified_registry()
         from src.shared import EMBEDDINGS_DIR
 
-        reg.sync_embeddings_folder(EMBEDDINGS_DIR)
-        embeddings = reg.list_embeddings()
+        reg.sync_embeddings_folder(EMBEDDINGS_DIR, db)
+        embeddings = reg.list_embeddings(db)
         return JSONResponse(content={"models": embeddings})
     except Exception as e:
         logger.error(f"Failed to list installed embedding models: {e}")
@@ -226,9 +243,7 @@ async def list_installed_embedding_models() -> JSONResponse:
 @router.get("/embedding/progress/{repo_id}")
 async def get_embedding_progress(repo_id: str) -> JSONResponse:
     """Get embedding download progress."""
-    progress = _download_progress.get(
-        f"emb_{repo_id}", {"progress": 0, "status": "idle"}
-    )
+    progress = _download_progress.get(f"emb_{repo_id}", {"progress": 0, "status": "idle"})
     return JSONResponse(content=progress)
 
 
@@ -272,19 +287,18 @@ async def delete_embedding_model(repo_id: str) -> JSONResponse:
     from pathlib import Path
 
     try:
+        db = get_database_service()
         reg = get_unified_registry()
-        record = reg.get_embedding(repo_id)
+        record = reg.get_embedding(repo_id, db)
         if not record:
-            return JSONResponse(
-                status_code=404, content={"error": f"Model {repo_id} not found"}
-            )
+            return JSONResponse(status_code=404, content={"error": f"Model {repo_id} not found"})
         path = Path(record.get("local_path", ""))
         if path.exists():
             if path.is_dir():
                 shutil.rmtree(path)
             else:
                 path.unlink()
-        reg.remove_embedding(repo_id)
+        reg.remove_embedding(repo_id, db)
         return JSONResponse(content={"success": True, "repo_id": repo_id})
     except Exception as e:
         logger.error(f"Delete failed: {e}")
@@ -327,14 +341,10 @@ async def update_type_config(type_key: str, body: dict) -> JSONResponse:
     Accepts a generic dict for forward-compatibility.
     """
     if not type_key.strip():
-        return JSONResponse(
-            status_code=400, content={"error": "type_key must not be empty"}
-        )
+        return JSONResponse(status_code=400, content={"error": "type_key must not be empty"})
 
     if type_key not in VALID_TYPE_KEYS:
-        return JSONResponse(
-            status_code=400, content={"error": f"Unknown type_key: {type_key}"}
-        )
+        return JSONResponse(status_code=400, content={"error": f"Unknown type_key: {type_key}"})
 
     if "model" not in body:
         return JSONResponse(status_code=400, content={"error": "model is required"})

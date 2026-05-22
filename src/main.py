@@ -12,15 +12,18 @@ from fastapi.staticfiles import StaticFiles
 from src.api.routes.page_admin import router as admin_pages_router
 from src.api.routes.page_chat import router as chat_page_router
 from src.api.routes.page_data import router as data_page_router
+from src.api.routes.page_duckdb import router as duckdb_page_router
 from src.api.v1.admin import router as admin_v1_router
 from src.api.v1.chat import router as chat_v1_router
 from src.api.v1.config import router as config_v1_router
 from src.api.v1.coverage import router as coverage_v1_router
 from src.api.v1.documents import router as documents_v1_router
+from src.api.v1.duckdb import router as duckdb_v1_router
 from src.api.v1.embedding_config import router as embedding_config_v1_router
 from src.api.v1.embeddings import router as embeddings_v1_router
 from src.api.v1.explain import router as explain_v1_router
 from src.api.v1.feedback import router as feedback_v1_router
+from src.api.v1.files import router as files_v1_router
 from src.api.v1.github import router as github_v1_router
 from src.api.v1.llamacpp import router as llama_router
 from src.api.v1.logs import router as logs_v1_router
@@ -31,6 +34,8 @@ from src.api.v1.system_prompt import router as prompts_v1_router
 from src.back.database import DatabaseService
 from src.back.qdrant.auto_start import start_qdrant, stop_qdrant
 from src.back.service_manager import shutdown_all_services
+from src.worker.processor import TaskDispatcher
+from src.worker.enums import WorkerName
 from src.shared.exceptions import SigmaError
 
 logger = logging.getLogger(__name__)
@@ -38,17 +43,16 @@ logger = logging.getLogger(__name__)
 
 def _setup_logging() -> None:
     """Setup logging to file with rotation."""
-    log_file = Path("data/logs/sigmahqrag.log")
-    log_file.parent.mkdir(parents=True, exist_ok=True)
+    from src.shared import LOGS_DIR
+
+    log_file = LOGS_DIR / "sigmahqrag.log"
 
     handler = RotatingFileHandler(
         log_file, maxBytes=10 * 1024 * 1024, backupCount=5, encoding="utf-8"
     )
     handler.setLevel(logging.INFO)
 
-    formatter = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    )
+    formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
     handler.setFormatter(formatter)
 
     root_logger = logging.getLogger()
@@ -62,11 +66,11 @@ def _is_db_empty(db: DatabaseService) -> bool:
         "embedding_config",
         "system_prompts",
         "models",
-        "doc_registry",
+        "doc_sigma_ref",
         "git_metadata",
         "git_selected_dirs",
     ):
-        if db._row_count(table) > 0:
+        if db.get_table_count(table) > 0:
             return False
     return True
 
@@ -85,30 +89,87 @@ def _check_old_data_files() -> list[str]:
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> None:
     """Application lifespan handler."""
-    _setup_logging()
-    from src.shared import Config
+    dispatcher = None
+    db = None
+    try:
+        _setup_logging()
+        logger.info("=== Lifespan starting ===")
 
-    Config.init_app()
+        db = DatabaseService()
+        db.initialize()
+        app.state.db = db
+        logger.info("Database initialized.")
 
-    db_path = "data/duckdb/sigmahq.duckdb"
-    db = DatabaseService(db_path)
-    db.initialize()
-    app.state.db = db
+        from src.shared import Config
 
-    old_files = _check_old_data_files()
-    if old_files and _is_db_empty(db):
-        logger.warning(
-            "DuckDB is empty but old data files exist (%d found). "
-            "Run 'uv run python scripts/migrate_to_duckdb.py' to migrate data.",
-            len(old_files),
-        )
+        Config.init_app()
+        logger.info("Config initialized.")
 
-    _validate_services()
-    await start_qdrant()
+        old_files = _check_old_data_files()
+        if old_files and _is_db_empty(db):
+            logger.warning(
+                "DuckDB is empty but old data files exist (%d found). "
+                "Run 'uv run python scripts/migrate_to_duckdb.py' to migrate data.",
+                len(old_files),
+            )
+        logger.info("Old files check done.")
+
+        # Sync filesystem repos into git_metadata if missing
+        from src.back.github.git import list_repos, get_metadata, save_metadata
+
+        logger.info("Starting repo sync...")
+        for repo in list_repos():
+            repo_key = f"{repo['org']}/{repo['name']}"
+            if get_metadata(repo["org"], repo["name"]) is None:
+                logger.info("Syncing filesystem repo %s into git_metadata", repo_key)
+                save_metadata(
+                    repo["org"],
+                    repo["name"],
+                    {
+                        "org": repo["org"],
+                        "name": repo["name"],
+                        "url": repo.get("remote_url", ""),
+                        "branch": repo.get("branch", "main"),
+                        "status": "synced",
+                    },
+                )
+        logger.info("Repo sync done.")
+
+        # Start the background task dispatcher in its own thread
+        dispatcher = TaskDispatcher(poll_interval=1, max_workers=4)
+        app.state.dispatcher = dispatcher
+        dispatcher.start()
+        logger.info("Dispatcher started in background thread.")
+
+        # Queue model sync as a background worker task
+        from src.shared import LLM_DIR, EMBEDDINGS_DIR
+
+        logger.info("Queuing model sync as background worker...")
+        if not dispatcher.ask_for_worker(
+            WorkerName.MODEL_SYNC,
+            llm_dir=str(LLM_DIR),
+            embeddings_dir=str(EMBEDDINGS_DIR),
+        ):
+            logger.warning("Model sync not queued — worker is busy")
+        else:
+            logger.info("Model sync queued.")
+
+        _validate_services()
+        logger.info("Services validated.")
+        await start_qdrant()
+        logger.info("Qdrant started.")
+        logger.info("=== Application startup complete ===")
+    except BaseException as e:
+        logger.error(f"Startup failed: {e}", exc_info=True)
+        raise
     yield
+    if dispatcher:
+        dispatcher.stop()
+        logger.info("Dispatcher stopped.")
     await shutdown_all_services()
     await stop_qdrant()
-    db.close()
+    if db:
+        db.close()
 
 
 def _validate_services() -> None:
@@ -117,11 +178,9 @@ def _validate_services() -> None:
 
     config = get_config()
     if not config.llama_base_url:
-        logger.critical("LLM service not configured")
-        raise SystemExit(1)
+        logger.warning("LLM service not configured (llama_base_url missing)")
     if not config.qdrant_collection_name:
-        logger.critical("Qdrant service not configured")
-        raise SystemExit(1)
+        logger.warning("Qdrant service not configured (qdrant_collection_name missing)")
 
 
 def create_app() -> FastAPI:
@@ -138,9 +197,12 @@ def create_app() -> FastAPI:
 
     app.include_router(admin_pages_router)
     app.include_router(admin_v1_router)
+    app.include_router(duckdb_page_router)
+    app.include_router(duckdb_v1_router)
     app.include_router(config_v1_router)
     app.include_router(coverage_v1_router)
     app.include_router(explain_v1_router)
+    app.include_router(files_v1_router)
     app.include_router(github_v1_router)
     app.include_router(llama_router)
     app.include_router(logs_v1_router)

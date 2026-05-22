@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 
 from fastapi import APIRouter, Request
@@ -35,10 +36,11 @@ async def admin_overview(request: Request) -> HTMLResponse:
 @router.get("/admin/backend")
 async def admin_backend(request: Request) -> HTMLResponse:
     """Serve admin backend page."""
+    cfg = get_config().to_dict()
     return templates.TemplateResponse(
         request=request,
         name="admin/backend.html",
-        context={"config": get_config().to_dict()},
+        context={"config": cfg, "config_json": json.dumps(cfg)},
     )
 
 
@@ -63,10 +65,11 @@ async def admin_logs(request: Request) -> HTMLResponse:
 @router.get("/admin/llama")
 async def admin_llama(request: Request) -> HTMLResponse:
     """Serve llama.cpp management page."""
+    cfg = get_config().to_dict()
     return templates.TemplateResponse(
         request=request,
         name="admin/llama.html",
-        context={"config": get_config().to_dict()},
+        context={"config": cfg, "config_json": json.dumps(cfg)},
     )
 
 

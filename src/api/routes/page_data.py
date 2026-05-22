@@ -50,7 +50,7 @@ def _serialize_file_types() -> list[dict]:
 @router.get("/data")
 async def data_page(request: Request):
     """Serve the data sources page."""
-    return templates.TemplateResponse(request=request, name="data/index.html")
+    return templates.TemplateResponse(request=request, name="data/overview.html")
 
 
 @router.get("/data/github")

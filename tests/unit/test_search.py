@@ -11,7 +11,7 @@ class TestSearchEngine:
         from src.back.rag.search import SearchEngine
 
         engine = SearchEngine()
-        assert engine.collection_name == "sigma_rules"
+        assert engine.collection_name == "sigma_doc"
         assert engine.top_k == 10
         assert engine.similarity_threshold == 0.7
 

@@ -8,12 +8,13 @@ import os
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
+from src.back.database.service import DatabaseService
 from src.back.documents.indexing import index_sigma_rules
 from src.back.documents.models import (
     IngestRequest,
-    IngestResponse,
     IngestResult,
 )
+from src.back.documents.sigma_ref_downloader import download_references
 from src.back.documents.parser import parse_sigma_rule, scan_directory
 from src.back.documents.validator import validate_sigma_rule
 
@@ -69,9 +70,7 @@ async def ingest_sigma_rules(
                         file=file_path,
                         success=False,
                         rule_id=rule.id,
-                        error="; ".join(
-                            f"{e.field}: {e.message}" for e in validation.errors
-                        ),
+                        error="; ".join(f"{e.field}: {e.message}" for e in validation.errors),
                     )
                 )
                 continue
@@ -102,10 +101,31 @@ async def ingest_sigma_rules(
             logger.error(f"Failed to index rules: {e}")
 
     return JSONResponse(
-        content=IngestResponse(
-            total_files=len(files),
-            successful=len(successful_rules),
-            failed=len(files) - len(successful_rules),
-            results=results,
-        ).model_dump()
+        content={
+            "success": True,
+            "total": len(results),
+            "successful": len(successful_rules),
+            "failed": len(results) - len(successful_rules),
+            "results": [r.model_dump() for r in results],
+        }
     )
+
+
+@router.post("/index-sigma-ref")
+async def index_sigma_ref(
+    request: IngestRequest | None = None,
+) -> JSONResponse:
+    """Download and prepare Sigma reference documents."""
+    # For now, we use default paths for sigma ref
+    rules_dir = os.environ.get("SIGMA_RULES_DIR", "data/sigma_rules")
+    output_dir = "data/sigma_ref_docs"
+
+    try:
+        db = DatabaseService.get_instance()
+        summary = download_references(
+            rules_dir=rules_dir, output_dir=output_dir, db=db, supported_types={"markdown"}
+        )
+        return JSONResponse(content=summary)
+    except Exception as e:
+        logger.error(f"Failed to index sigma ref: {e}", exc_info=True)
+        return JSONResponse(status_code=500, content={"success": False, "error": str(e)})

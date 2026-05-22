@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+
 def load_registry_files(registry_path: Path) -> list[dict[str, Any]]:
     """
     Loads the registry from a JSON file and returns a list of entries.

@@ -7,7 +7,7 @@ from typing import Any
 
 import yaml
 
-from src.shared.errors import ValidationError
+from src.shared.exceptions import ValidationError
 
 logger = logging.getLogger(__name__)
 
@@ -73,19 +73,12 @@ class SigmaValidator:
     def _validate_field_types(self, data: dict[str, Any]) -> None:
         """Validate field types."""
         if not isinstance(data.get("id"), str) or not data["id"].strip():
-            raise ValidationError(
-                field="id", message="Rule ID must be a non-empty string"
-            )
+            raise ValidationError(field="id", message="Rule ID must be a non-empty string")
 
         if not isinstance(data.get("name"), str) or not data["name"].strip():
-            raise ValidationError(
-                field="name", message="Rule name must be a non-empty string"
-            )
+            raise ValidationError(field="name", message="Rule name must be a non-empty string")
 
-        if (
-            not isinstance(data.get("description"), str)
-            or not data["description"].strip()
-        ):
+        if not isinstance(data.get("description"), str) or not data["description"].strip():
             raise ValidationError(
                 field="description", message="Description must be a non-empty string"
             )
@@ -120,9 +113,7 @@ class SigmaValidator:
             condition_words = set(condition.replace("(", " ").replace(")", " ").split())
             # Check if condition references non-existent detection keys
             invalid_refs = (
-                condition_words
-                - detection_keys
-                - {"and", "or", "not", "1", "of", "them"}
+                condition_words - detection_keys - {"and", "or", "not", "1", "of", "them"}
             )
             if invalid_refs and not condition.startswith("selection"):
                 logger.warning(

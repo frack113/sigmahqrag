@@ -19,10 +19,10 @@
         <div class="form-group">
             <label for="gpu-select">GPU Backend:</label>
             <select id="gpu-select" name="gpu">
-                <option value="cpu">CPU</option>
-                <option value="cuda">CUDA</option>
-                <option value="hip">HIP (AMD)</option>
-                <option value="vulkan">Vulkan</option>
+                <option value="cpu" {% if config.gpu_type == 'cpu' %}selected{% endif %}>CPU</option>
+                <option value="cuda" {% if config.gpu_type == 'cuda' %}selected{% endif %}>CUDA</option>
+                <option value="hip" {% if config.gpu_type == 'hip' %}selected{% endif %}>HIP (AMD)</option>
+                <option value="vulkan" {% if config.gpu_type == 'vulkan' %}selected{% endif %}>Vulkan</option>
             </select>
         </div>
         <button type="submit" class="btn btn-primary">Save Configuration</button>
@@ -47,9 +47,20 @@
     </div>
 </div>
 
+<script id="config-data" type="application/json">{{ config_json | safe }}</script>
 <script>
 let activeDownloadId = null;
 let progressPollInterval = null;
+
+// Load config from embedded JSON (synchronous, no visual lag)
+var _CONFIG = {};
+try { _CONFIG = JSON.parse(document.getElementById('config-data').textContent); } catch(e) {}
+
+function applyConfig(cfg) {
+    const backend = (cfg && cfg.backend) || {};
+    document.getElementById('os-select').value = backend.os || 'windows';
+    document.getElementById('gpu-select').value = backend.gpu_type || 'cpu';
+}
 
 function loadLlamaInfo() {
     fetch('/api/v1/llamacpp/status')
@@ -66,16 +77,11 @@ function loadLlamaInfo() {
         });
 }
 
-function loadLlamaConfig() {
-    fetch('/v1/config')
-        .then(r => r.json())
-        .then(data => {
-            document.getElementById('os-select').value = data.data.backend.os || 'windows';
-            document.getElementById('gpu-select').value = data.data.backend.gpu_type || 'cpu';
-        });
-}
-
 function saveConfig() {
+    const statusEl = document.getElementById('config-status');
+    statusEl.textContent = 'Saving...';
+    statusEl.className = 'status-message';
+
     const os = document.getElementById('os-select').value;
     const gpu = document.getElementById('gpu-select').value;
 
@@ -86,12 +92,17 @@ function saveConfig() {
     })
     .then(r => r.json())
     .then(data => {
-        document.getElementById('config-status').textContent = data.message || 'Saved';
-        document.getElementById('config-status').className = 'status-message success';
+        if (data.status === 'success') {
+            statusEl.textContent = data.message || 'Configuration saved';
+            statusEl.className = 'status-message success';
+        } else {
+            statusEl.textContent = data.error || 'Save failed';
+            statusEl.className = 'status-message error';
+        }
     })
     .catch(err => {
-        document.getElementById('config-status').textContent = 'Error: ' + err;
-        document.getElementById('config-status').className = 'status-message error';
+        statusEl.textContent = 'Error: ' + err;
+        statusEl.className = 'status-message error';
     });
 }
 
@@ -217,52 +228,9 @@ function stopLlama() {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-    loadLlamaConfig();
+    applyConfig(_CONFIG);
     loadLlamaInfo();
 });
 </script>
 
-<style>
-.form-group {
-    margin-bottom: 15px;
-}
-.form-group label {
-    display: inline-block;
-    width: 120px;
-    font-weight: bold;
-}
-.form-group select {
-    padding: 8px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    min-width: 150px;
-}
-.status-message {
-    margin-top: 15px;
-    padding: 10px;
-    border-radius: 4px;
-}
-.status-message.success {
-    background: #d4edda;
-    color: #155724;
-}
-.status-message.error {
-    background: #f8d7da;
-    color: #721c24;
-}
-.progress-bar {
-    width: 100%;
-    height: 20px;
-    background: #e9ecef;
-    border-radius: 4px;
-    margin-top: 10px;
-    overflow: hidden;
-}
-.progress-bar #progress-fill {
-    height: 100%;
-    background: #0d6efd;
-    width: 0%;
-    transition: width 0.3s;
-}
-</style>
 {% endblock %}

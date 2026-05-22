@@ -17,13 +17,10 @@ class EmbeddingManager:
 
     def __init__(self, embeddings_dir: Path | None = None) -> None:
         self.embeddings_dir = embeddings_dir or EMBEDDINGS_DIR
-        self.embeddings_dir.mkdir(parents=True, exist_ok=True)
         self.download_service = HFDownloadService()
 
     async def _load_registry(self) -> dict:
         db = DatabaseService.get_instance()
-        if db is None:
-            return {}
         models = db.get_models()
         registry = {}
         for m in models:
@@ -45,8 +42,6 @@ class EmbeddingManager:
 
     async def _save_registry(self, data: dict) -> None:
         db = DatabaseService.get_instance()
-        if db is None:
-            return
         for repo_id, record in data.items():
             entry = {
                 "repo_id": repo_id,
@@ -157,7 +152,7 @@ class EmbeddingManager:
                 continue
             if model_dir.name.startswith("."):
                 continue
-            if model_dir.name in ("cache", "temp", "embeddings_registry.json"):
+            if model_dir.name in ("cache", "temp"):
                 continue
 
             for sub_dir in model_dir.iterdir():
@@ -165,7 +160,7 @@ class EmbeddingManager:
                     continue
                 if sub_dir.name.startswith("."):
                     continue
-                if sub_dir.name in ("cache", "temp", "embeddings_registry.json"):
+                if sub_dir.name in ("cache", "temp"):
                     continue
 
                 repo_id = f"{model_dir.name}/{sub_dir.name}"

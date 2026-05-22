@@ -68,9 +68,7 @@ class TestIdentify:
         f.write_text("key: value", encoding="utf-8")
         assert identify(str(f)) == FileType.YAML
 
-    def test_file_too_large(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_file_too_large(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr("src.back.utils.identify_file_type.MAX_FILE_SIZE", 10)
         f = tmp_path / "huge.md"
         f.write_bytes(b"x" * 11)

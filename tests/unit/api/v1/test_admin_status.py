@@ -32,7 +32,7 @@ class TestQdrantStatus:
         self, mock_health: AsyncMock, client: TestClient
     ) -> None:
         """Given API processes request, when GET /api/v1/qdrant/status called, then returns component statuses (FR18)."""
-        mock_health.return_value = True
+        mock_health.return_value = {"status": "active"}
 
         response = client.get("/api/v1/qdrant/status")
 
@@ -49,7 +49,7 @@ class TestQdrantStatus:
         """Given API processes request, when GET /api/v1/qdrant/status called, then response time <500ms (NFR5)."""
         import time
 
-        mock_health.return_value = True
+        mock_health.return_value = {"status": "active"}
 
         start = time.time()
         response = client.get("/api/v1/qdrant/status")
