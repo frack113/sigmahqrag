@@ -35,4 +35,4 @@ async def embed_text(
         return JSONResponse(content={"embeddings": embeddings})
     except Exception as e:
         logger.error(f"Embedding failed: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        return JSONResponse(status_code=500, content={"error": "An internal error occurred"})

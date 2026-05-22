@@ -47,7 +47,9 @@ def _validate_directory_path(directory: str, base_dir: str) -> str:
     """
     resolved = Path(directory).resolve()
     base = Path(base_dir).resolve()
-    if not str(resolved).startswith(str(base) + os.sep) and resolved != base:
+    try:
+        resolved.relative_to(base)
+    except ValueError:
         raise ValueError(f"Directory '{directory}' is not within the allowed base directory")
     return str(resolved)
 
@@ -120,7 +122,7 @@ async def ingest_sigma_rules(
                 IngestResult(
                     file=file_path,
                     success=False,
-                    error=str(e),
+                    error="Failed to process rule file",
                 )
             )
 
@@ -158,4 +160,6 @@ async def index_sigma_ref(
         return JSONResponse(content=summary)
     except Exception as e:
         logger.error(f"Failed to index sigma ref: {e}", exc_info=True)
-        return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
+        return JSONResponse(
+            status_code=500, content={"success": False, "error": "An internal error occurred"}
+        )

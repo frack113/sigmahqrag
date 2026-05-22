@@ -147,7 +147,7 @@ async function loadRepoList() {
                 + '</td>'
                 + '</tr>';
         }
-        tbody.innerHTML = html;
+        tbody.textContent = html;
         statusEl.textContent = repos.length + ' repository(s)';
     } catch (error) {
         console.error('Failed to load repos:', error);

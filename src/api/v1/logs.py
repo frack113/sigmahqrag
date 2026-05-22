@@ -59,20 +59,17 @@ async def get_logs(
     if not source:
         source = "system"
 
-    if not lines:
-        lines = 25
-
-    if not level:
-        level = ""
+    if source not in LOG_FILES:
+        return JSONResponse(content={"logs": [], "message": f"Invalid log source: {source}"})
 
     logs_dir = get_logs_dir()
-    log_filename = LOG_FILES.get(source, LOG_FILES["system"])
+    log_filename = LOG_FILES[source]
     log_path = logs_dir / log_filename
 
     logger.info(f"Reading logs from: {log_path}, exists={log_path.exists()}")
 
     if not log_path.exists():
-        return JSONResponse(content={"logs": [], "message": f"Log file not found: {log_path}"})
+        return JSONResponse(content={"logs": [], "message": "Log file not found"})
 
     try:
         all_lines = read_log_file(log_path)
@@ -94,7 +91,7 @@ async def get_logs(
         import traceback
 
         logger.error(f"Failed to read logs: {e}\n{traceback.format_exc()}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        return JSONResponse(status_code=500, content={"error": "An internal error occurred"})
 
 
 @router.delete("")
@@ -113,8 +110,11 @@ async def clear_logs(
     if not source:
         source = "system"
 
+    if source not in LOG_FILES:
+        return JSONResponse(content={"success": False, "message": f"Invalid log source: {source}"})
+
     logs_dir = get_logs_dir()
-    log_filename = LOG_FILES.get(source, LOG_FILES["system"])
+    log_filename = LOG_FILES[source]
     log_path = logs_dir / log_filename
 
     try:
@@ -126,4 +126,4 @@ async def clear_logs(
         return JSONResponse(content={"success": False, "message": "Log file does not exist"})
     except Exception as e:
         logger.error(f"Failed to clear logs: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        return JSONResponse(status_code=500, content={"error": "An internal error occurred"})

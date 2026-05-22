@@ -205,9 +205,7 @@ class TestGithubEmbeddingWorker:
 
         mock_db.get_pending_sigma_ref.assert_called()
 
-    def test_process_embeds_discovered_files(
-        self, mock_db: MagicMock, tmp_path: Path
-    ) -> None:
+    def test_process_embeds_discovered_files(self, mock_db: MagicMock, tmp_path: Path) -> None:
         repo_dir = tmp_path / "test-org" / "test-repo" / "rules"
         repo_dir.mkdir(parents=True)
         (repo_dir / "rule1.md").write_text("# Rule 1")
@@ -249,9 +247,7 @@ class TestGithubEmbeddingWorker:
         mock_builder.run.assert_called_once()
         mock_db.update_sigma_ref_embed_status.assert_called()
 
-    def test_process_filters_by_org_and_repo(
-        self, mock_db: MagicMock, tmp_path: Path
-    ) -> None:
+    def test_process_filters_by_org_and_repo(self, mock_db: MagicMock, tmp_path: Path) -> None:
         repo_dir = tmp_path / "test-org" / "test-repo"
         repo_dir.mkdir(parents=True)
 
@@ -325,9 +321,7 @@ class TestLocalEmbeddingWorker:
 
         mock_dispatcher.update_worker_state.assert_not_called()
 
-    def test_process_embeds_discovered_files(
-        self, mock_db: MagicMock, tmp_path: Path
-    ) -> None:
+    def test_process_embeds_discovered_files(self, mock_db: MagicMock, tmp_path: Path) -> None:
         local_dir = tmp_path / "local_docs"
         local_dir.mkdir()
         (local_dir / "doc1.md").write_text("# Local Doc 1")

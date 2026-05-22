@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import ipaddress
 import logging
 import re
 import shutil
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 from git import Repo
 from git.exc import InvalidGitRepositoryError
@@ -51,6 +53,24 @@ def _get_or_create_repo(path: Path) -> Repo | None:
         return None
 
 
+def _validate_git_url(url: str) -> None:
+    """Validate a git URL to prevent SSRF. Only https:// and git:// schemes, block private IPs."""
+    parsed = urlparse(url)
+    if parsed.scheme not in ("https", "git"):
+        raise ValueError(
+            f"Unsupported URL scheme: {parsed.scheme} — only https:// and git:// are allowed"
+        )
+    host = parsed.hostname or ""
+    if host in ("localhost", "127.0.0.1", "::1"):
+        raise ValueError("URL points to localhost, which is not allowed")
+    try:
+        ip = ipaddress.ip_address(host)
+        if ip.is_private or ip.is_loopback or ip.is_link_local:
+            raise ValueError(f"URL points to a private/reserved IP address: {host}")
+    except ValueError:
+        pass
+
+
 def clone_repo(
     url: str | None = None,
     org: str | None = None,
@@ -69,6 +89,14 @@ def clone_repo(
         branch: Branch to clone (default: None = default branch).
         depth: Shallow clone depth (default: None = full clone).
     """
+    if url is not None:
+        url = url.rstrip("/")
+        if url.endswith(".git"):
+            url = url[:-4]
+        try:
+            _validate_git_url(url)
+        except ValueError as e:
+            return {"success": False, "error": str(e)}
     if url is None:
         if not org or not name:
             return {
@@ -76,10 +104,6 @@ def clone_repo(
                 "error": "org and name required when url is not provided",
             }
         url = f"https://github.com/{org}/{name}.git"
-    else:
-        url = url.rstrip("/")
-        if url.endswith(".git"):
-            url = url[:-4]
 
     repos_dir = Path(repos_dir).resolve()
     repos_dir.mkdir(parents=True, exist_ok=True)

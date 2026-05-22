@@ -9,6 +9,8 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from src.shared import Config
 
+LLM_DIR = Path("data/models/llm").resolve()
+
 _llama_service: LlamaBinaryService | None = None
 
 
@@ -79,13 +81,22 @@ class LlamaBinaryService:
                 ),
             }
 
+        model_resolved = Path(model_path).resolve()
+        try:
+            model_resolved.relative_to(LLM_DIR)
+        except ValueError:
+            return {
+                "success": False,
+                "error": f"Model path '{model_path}' is outside the allowed models directory ({LLM_DIR})",
+            }
+
         log_file = self.logs_dir / "llama.cpp.log"
         pid_file = self.pid_dir / "llama.cpp.pid"
 
         cmd = [
             str(llama_exe),
             "-m",
-            model_path,
+            str(model_resolved),
             "--port",
             str(port),
             "-c",

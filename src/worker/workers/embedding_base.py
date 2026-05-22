@@ -92,7 +92,12 @@ class EmbeddingWorker(BaseWorker):
                 logger.error(f"[{self.__class__.__name__}] Error embedding batch: {e}")
                 for entry in entries_for_docs:
                     self._update_status(entry, "error")
-                    errors.append({"file": entry.get("file_name", "") or entry.get("hash", ""), "error": str(e)})
+                    errors.append(
+                        {
+                            "file": entry.get("file_name", "") or entry.get("hash", ""),
+                            "error": str(e),
+                        }
+                    )
 
         self.dispatcher.update_worker_state(
             worker_type=self.worker_type,

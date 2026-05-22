@@ -165,7 +165,7 @@
                             if (!bubble) {
                                 bubble = addBubble("assistant", "");
                             }
-                            bubble.innerHTML = formatResponse({ response: accumulated }) +
+                            bubble.innerText = formatResponse({ response: accumulated }) +
                                 '<span class="timestamp">' + getTimestamp() + '</span>';
                             chatHistory.scrollTop = chatHistory.scrollHeight;
                         }

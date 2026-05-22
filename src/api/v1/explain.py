@@ -56,4 +56,4 @@ async def explain_rule(
                 )
     except Exception as e:
         logger.error(f"Explain error: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        return JSONResponse(status_code=500, content={"error": "An internal error occurred"})

@@ -269,7 +269,7 @@ class Config:
             if template_path.exists():
                 import jinja2
 
-                template = jinja2.Template(template_path.read_text())
+                template = jinja2.Template(template_path.read_text(), autoescape=True)
                 config = Config()
                 storage_path = Path(config.qdrant_storage_path).resolve().as_posix()
                 snapshots_path = Path(config.qdrant_snapshots_path).resolve().as_posix()
@@ -282,6 +282,7 @@ class Config:
                 logger.info(f"Generated Qdrant config at {config_file}")
         except Exception as e:
             logger.warning(f"Could not generate Qdrant config: {e}")
+
 
 _config: Config | None = None
 

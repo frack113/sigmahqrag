@@ -277,7 +277,6 @@ class DownloadManager:
             target_path: Target path for the service binary/directory
             service: Service name (llama.cpp, qdrant)
         """
-        import subprocess
 
         service_dir = BIN_DIR / service.replace(".", "-")
 

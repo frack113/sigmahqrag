@@ -51,12 +51,14 @@ class HealthCheckService:
         config = get_config()
         base_url = config.llama_base_url or "http://127.0.0.1:8080"
         import time as time_module
+
         start = time_module.time()
         status = "error"
         message = ""
 
         try:
             import httpx
+
             async with httpx.AsyncClient(timeout=httpx.Timeout(TIMEOUT)) as client:
                 resp = await client.get(f"{base_url}/health")
                 if resp.status_code == 200:

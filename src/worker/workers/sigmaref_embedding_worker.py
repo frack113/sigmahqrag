@@ -23,17 +23,19 @@ class SigmaRefEmbeddingWorker(EmbeddingWorker):
             url_hash = e.get("url_hash") or ""
             if not url_hash:
                 continue
-            result.append({
-                "hash": url_hash,
-                "file_name": f"{url_hash}.md",
-                **{k: v for k, v in e.items() if k not in ("url_hash",)},
-            })
+            result.append(
+                {
+                    "hash": url_hash,
+                    "file_name": f"{url_hash}.md",
+                    **{k: v for k, v in e.items() if k not in ("url_hash",)},
+                }
+            )
         return result
 
     def _resolve_file_path(self, entry: dict) -> Path | None:
         registry_path = Path(self._task.get("registry_path", "data/documents/sigmaref"))
-        file_hash = (entry.get("hash") or "")
-        file_name = (entry.get("file_name") or "")
+        file_hash = entry.get("hash") or ""
+        file_name = entry.get("file_name") or ""
 
         if not file_hash and not file_name:
             return None

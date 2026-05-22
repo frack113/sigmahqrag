@@ -132,7 +132,7 @@ async def get_backend() -> JSONResponse:
         return JSONResponse(content={"data": data, "status": "success"})
     except Exception as e:
         logger.error(f"Backend status error: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        return JSONResponse(status_code=500, content={"error": "An internal error occurred"})
 
 
 @router.post("/backend")
@@ -207,7 +207,7 @@ async def post_backend(request: dict) -> JSONResponse:
         )
     except Exception as e:
         logger.error(f"Backend action error: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        return JSONResponse(status_code=500, content={"error": "An internal error occurred"})
 
 
 class DownloadRequest(BaseModel):
@@ -436,14 +436,13 @@ async def get_models() -> JSONResponse:
         logger.error(f"Failed to list models: {e}")
         return JSONResponse(
             status_code=500,
-            content={"status": "error", "error": str(e)},
+            content={"status": "error", "error": "An internal error occurred"},
         )
 
 
 @router.post("/models/delete")
 async def delete_model(request: dict) -> JSONResponse:
     """POST /api/v1/admin/models/delete - Delete a model."""
-    import os
     from pathlib import Path
 
     from src.api.dependencies import get_unified_registry
@@ -462,7 +461,12 @@ async def delete_model(request: dict) -> JSONResponse:
             )
 
         # Validate repo_id to prevent path traversal (format: org/name)
-        if ".." in repo_id or repo_id.count("/") != 1 or repo_id.startswith("/") or repo_id.endswith("/"):
+        if (
+            ".." in repo_id
+            or repo_id.count("/") != 1
+            or repo_id.startswith("/")
+            or repo_id.endswith("/")
+        ):
             return JSONResponse(
                 status_code=400,
                 content={"status": "error", "error": "Invalid repo_id"},
@@ -474,9 +478,9 @@ async def delete_model(request: dict) -> JSONResponse:
         if filename not in record.get("files", {}):
             raise ModelNotFoundError(f"File {filename} not found in {repo_id}")
         path = Path(record["files"][filename]["local_path"]).resolve()
-        # Prevent path traversal: ensure the resolved path is within LLM_DIR
-        llm_dir = str(Path(LLM_DIR).resolve()).rstrip("/\\") + os.sep
-        if not str(path) + os.sep.startswith(llm_dir):
+        try:
+            path.relative_to(Path(LLM_DIR).resolve())
+        except ValueError:
             return JSONResponse(
                 status_code=400,
                 content={"status": "error", "error": "Invalid file path"},
@@ -495,7 +499,7 @@ async def delete_model(request: dict) -> JSONResponse:
         logger.error(f"Failed to delete model: {e}")
         return JSONResponse(
             status_code=500,
-            content={"status": "error", "error": str(e)},
+            content={"status": "error", "error": "An internal error occurred"},
         )
 
 
@@ -509,5 +513,5 @@ async def admin_get_config() -> JSONResponse:
         logger.error(f"Failed to load config: {e}")
         return JSONResponse(
             status_code=500,
-            content={"status": "error", "error": str(e)},
+            content={"status": "error", "error": "An internal error occurred"},
         )

@@ -20,8 +20,7 @@ class GithubEmbeddingWorker(EmbeddingWorker):
         if collection_name == "all":
             all_pending = self.db.get_pending_sigma_ref()
             return [
-                e for e in all_pending
-                if e.get("org") and e.get("org") not in ("local", "sigmaref")
+                e for e in all_pending if e.get("org") and e.get("org") not in ("local", "sigmaref")
             ]
 
         parts = collection_name.split("/")

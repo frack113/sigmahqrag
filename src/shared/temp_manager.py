@@ -18,7 +18,7 @@ class TempManager:
         Args:
             temp_dir: Directory for temporary files
         """
-        self.temp_dir = temp_dir or Path("temp")
+        self.temp_dir = temp_dir or Path("data/temp")
 
     def create_temp_file(self, download_id: str, extension: str = ".tmp") -> Path:
         """Create a temporary file for downloading.
