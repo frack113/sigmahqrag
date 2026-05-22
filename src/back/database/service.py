@@ -524,21 +524,29 @@ class DatabaseService:
     def get_git_metadata(self, repo_key: str) -> dict | None:
         """Get metadata for a repository."""
         result = self._safe_query(
-            "SELECT metadata FROM git_metadata WHERE repo_key = ?", (repo_key,)
+            "SELECT org, name, url, branch FROM git_metadata WHERE repo_key = ?", (repo_key,)
         )
         if result:
-            try:
-                return json.loads(result[0])
-            except (json.JSONDecodeError, TypeError):
-                return None
+            return {"org": result[0], "name": result[1], "url": result[2], "branch": result[3]}
         return None
 
     def set_git_metadata(self, repo_key: str, metadata: dict) -> None:
         """Set metadata for a repository."""
+        org = metadata.get("org", "")
+        name = metadata.get("name", "")
+        url = metadata.get("url") or metadata.get("remote_url") or ""
+        branch = metadata.get("branch", "")
+
         with self._lock:
             self._writer_conn.execute(
-                "INSERT INTO git_metadata (repo_key, metadata) VALUES (?, ?) ON CONFLICT (repo_key) DO UPDATE SET metadata = EXCLUDED.metadata",
-                (repo_key, json.dumps(metadata)),
+                """INSERT INTO git_metadata (repo_key, org, name, url, branch)
+                   VALUES (?, ?, ?, ?, ?)
+                   ON CONFLICT (repo_key) DO UPDATE SET
+                       org = EXCLUDED.org,
+                       name = EXCLUDED.name,
+                       url = EXCLUDED.url,
+                       branch = EXCLUDED.branch""",
+                (repo_key, org, name, url, branch),
             )
             self._writer_conn.commit()
 

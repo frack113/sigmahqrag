@@ -59,7 +59,8 @@ class RepositoryStatus(BaseModel):
 
     org: str
     name: str
-    last_synced: datetime | None = None
+    repo_status: str | None = None
+    last_synced: datetime | str | None = None
     url: str | None = None
     branch: str | None = None
     last_commit: str | None = None
@@ -101,6 +102,7 @@ async def list_repos_handler() -> list[RepositoryStatus]:
             RepositoryStatus(
                 org=repo["org"],
                 name=repo["name"],
+                repo_status=metadata.get("status", "synced"),
                 last_synced=metadata.get("last_synced"),
                 url=metadata.get("url"),
                 branch=metadata.get("branch"),
@@ -210,17 +212,18 @@ async def sync_repo(
 
     def sync_with_status() -> dict[str, Any]:
         result = update_repo(org=org, name=name, branch=branch)
+        existing_meta = get_metadata(org, name) or {}
         if result.get("success"):
-            save_metadata(
-                org,
-                name,
-                {
-                    "status": "synced",
-                    "last_synced": datetime.now().isoformat(),
-                    "branch": branch,
-                    "remote_head": result.get("remote_head"),
-                },
-            )
+            merged = {
+                **existing_meta,
+                "org": org,
+                "name": name,
+                "branch": branch,
+                "status": "synced",
+                "last_synced": datetime.now().isoformat(),
+                "remote_head": result.get("remote_head"),
+            }
+            save_metadata(org, name, merged)
         return result
 
     if background_tasks is not None:

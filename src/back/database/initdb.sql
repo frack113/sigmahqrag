@@ -81,7 +81,10 @@ CREATE TABLE IF NOT EXISTS doc_registry (
 -- git_metadata
 CREATE TABLE IF NOT EXISTS git_metadata (
     repo_key TEXT PRIMARY KEY,
-    metadata TEXT NOT NULL
+    org TEXT NOT NULL,
+    name TEXT NOT NULL,
+    url TEXT NOT NULL,
+    branch TEXT NOT NULL
 );
 
 -- git_selected_dirs
