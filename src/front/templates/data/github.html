@@ -93,14 +93,32 @@ async function loadRepos() {
         
         prompt.style.display = 'block';
         
+        function escAttr(s) {
+            if (s == null) return '';
+            return String(s)
+                .replace(/&/g, '&' + 'amp;')
+                .replace(/"/g, '&' + 'quot;')
+                .replace(/'/g, '&' + '#39;')
+                .replace(/</g, '&' + 'lt;')
+                .replace(/>/g, '&' + 'gt;');
+        }
+        function escHtml(s) {
+            if (s == null) return '';
+            return String(s)
+                .replace(/&/g, '&' + 'amp;')
+                .replace(/</g, '&' + 'lt;')
+                .replace(/>/g, '&' + 'gt;')
+                .replace(/"/g, '&' + 'quot;')
+                .replace(/'/g, '&' + '#39;');
+        }
         container.innerHTML = repos.map(repo => `
             <div class="repo-card">
-                <h3>${repo.org}/${repo.name}</h3>
-                <p>Last commit: ${formatDate(repo.last_commit)}</p>
+                <h3>${escHtml(repo.org)}/${escHtml(repo.name)}</h3>
+                <p>Last commit: ${escHtml(formatDate(repo.last_commit))}</p>
                 <div class="repo-actions">
-                    <button onclick="syncRepo('${repo.org}', '${repo.name}')" class="btn btn-sm ${repo.sync_class || 'btn-unknown'}">Sync</button>
-                    <button onclick="openRepoDetail('${repo.org}', '${repo.name}')" class="btn btn-sm">Browse</button>
-                    <button onclick="deleteRepo('${repo.org}', '${repo.name}')" class="btn btn-danger btn-sm">Delete</button>
+                    <button onclick="syncRepo('${escAttr(repo.org)}', '${escAttr(repo.name)}')" class="btn btn-sm ${escAttr(repo.sync_class || 'btn-unknown')}">Sync</button>
+                    <button onclick="openRepoDetail('${escAttr(repo.org)}', '${escAttr(repo.name)}')" class="btn btn-sm">Browse</button>
+                    <button onclick="deleteRepo('${escAttr(repo.org)}', '${escAttr(repo.name)}')" class="btn btn-danger btn-sm">Delete</button>
                 </div>
             </div>
         `).join('');
@@ -159,9 +177,9 @@ function renderTreeNodes(nodes) {
         return '<li class="tree-node">' +
             '<div class="tree-item">' +
                 (hasChildren ? '<button class="tree-toggle" onclick="toggleNode(this)">&#9658;</button>' : '<span class="tree-spacer"></span>') +
-                '<input type="checkbox" class="folder-checkbox" value="' + node.path + '" ' + isSelected + ' onchange="onSelectionChange()">' +
+                '<input type="checkbox" class="folder-checkbox" value="' + escAttr(node.path) + '" ' + isSelected + ' onchange="onSelectionChange()">' +
                 '<span class="folder-icon">&#128193;</span>' +
-                '<span class="folder-name">' + node.name + '</span>' +
+                '<span class="folder-name">' + escHtml(node.name) + '</span>' +
             '</div>' +
             childrenHtml +
         '</li>';

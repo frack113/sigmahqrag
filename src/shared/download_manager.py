@@ -355,13 +355,17 @@ class DownloadManager:
                 import tempfile
 
                 with tempfile.TemporaryDirectory() as tmp_dir:
-                    result = subprocess.run(
-                        ["tar", "-xf", str(temp_path), "-C", tmp_dir],
-                        capture_output=True,
-                        text=True,
-                    )
-                    if result.returncode != 0:
-                        raise RuntimeError(f"Failed to extract tar.gz: {result.stderr}")
+                    # Validate archive before extraction: reject entries containing path traversal
+                    import tarfile
+
+                    with tarfile.open(temp_path, "r:gz") as tar:
+                        for member in tar.getmembers():
+                            # Reject absolute paths and path traversal sequences
+                            if member.name.startswith("/") or ".." in member.name:
+                                raise RuntimeError(
+                                    f"Tar entry '{member.name}' would extract outside destination"
+                                )
+                        tar.extractall(path=tmp_dir)
 
                     # Find the top-level directory
                     items = list(Path(tmp_dir).iterdir())

@@ -36,13 +36,8 @@
         function addBubble(role, content) {
             var bubble = document.createElement("div");
             bubble.className = "chat-bubble " + role;
-            // For user and error messages, escape content. For assistant, content may contain safe HTML.
-            var safeContent;
-            if (role === "assistant") {
-                safeContent = content;
-            } else {
-                safeContent = escHtml(content);
-            }
+            // Always escape content to prevent DOM-based XSS.
+            var safeContent = escHtml(content);
             bubble.innerHTML = safeContent + '<span class="timestamp">' + getTimestamp() + '</span>';
             chatHistory.appendChild(bubble);
             chatHistory.scrollTop = chatHistory.scrollHeight;
@@ -168,11 +163,10 @@
                             accumulated += data;
 
                             if (!bubble) {
-                                bubble = addBubble("assistant", accumulated);
-                            } else {
-                                bubble.innerHTML = formatResponse({ response: accumulated }) +
-                                    '<span class="timestamp">' + getTimestamp() + '</span>';
+                                bubble = addBubble("assistant", "");
                             }
+                            bubble.innerHTML = formatResponse({ response: accumulated }) +
+                                '<span class="timestamp">' + getTimestamp() + '</span>';
                             chatHistory.scrollTop = chatHistory.scrollHeight;
                         }
                     }
