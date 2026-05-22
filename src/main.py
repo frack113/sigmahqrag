@@ -101,6 +101,7 @@ def _clean_at_startup() -> None:
                         p.unlink()
                     elif p.is_dir():
                         import shutil
+
                         shutil.rmtree(p)
                 except Exception as e:
                     logger.warning("Could not clean %s: %s", p, e)
