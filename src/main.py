@@ -74,21 +74,6 @@ def _setup_logging(max_size: str = "10M", max_files: int = 5) -> None:
     root_logger.setLevel(logging.INFO)
 
 
-def _is_db_empty(db: DatabaseService) -> bool:
-    for table in (
-        "config",
-        "embedding_config",
-        "system_prompts",
-        "models",
-        "doc_sigma_ref",
-        "git_metadata",
-        "git_selected_dirs",
-    ):
-        if db.get_table_count(table) > 0:
-            return False
-    return True
-
-
 def _clean_at_startup() -> None:
     """Clean temp, pid, and rotated log files at startup when clean_at_startup is enabled."""
     from src.shared import PID_DIR, LOGS_DIR
@@ -118,17 +103,6 @@ def _clean_at_startup() -> None:
     logger.info("Cleanup at startup: temp, pid, and rotated logs cleared.")
 
 
-def _check_old_data_files() -> list[str]:
-    old_paths = [
-        Path("data/embedding.toml"),
-        Path("data/system_prompt.toml"),
-        Path("data/models/registry.json"),
-        Path("data/models/embeddings/embeddings_registry.json"),
-        Path("data/documents/sigmaref/registry.json"),
-    ]
-    return [str(p) for p in old_paths if p.exists()]
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> None:
     """Application lifespan handler."""
@@ -153,35 +127,6 @@ async def lifespan(app: FastAPI) -> None:
 
         if config.logging_clean_at_startup:
             _clean_at_startup()
-        old_files = _check_old_data_files()
-        if old_files and _is_db_empty(db):
-            logger.warning(
-                "DuckDB is empty but old data files exist (%d found). "
-                "Run 'uv run python scripts/migrate_to_duckdb.py' to migrate data.",
-                len(old_files),
-            )
-        logger.info("Old files check done.")
-
-        # Sync filesystem repos into git_metadata if missing
-        from src.back.github.git import list_repos, get_metadata, save_metadata
-
-        logger.info("Starting repo sync...")
-        for repo in list_repos():
-            repo_key = f"{repo['org']}/{repo['name']}"
-            if get_metadata(repo["org"], repo["name"]) is None:
-                logger.info("Syncing filesystem repo %s into git_metadata", repo_key)
-                save_metadata(
-                    repo["org"],
-                    repo["name"],
-                    {
-                        "org": repo["org"],
-                        "name": repo["name"],
-                        "url": repo.get("remote_url", ""),
-                        "branch": repo.get("branch", "main"),
-                        "status": "synced",
-                    },
-                )
-        logger.info("Repo sync done.")
 
         # Start the background task dispatcher in its own thread
         dispatcher = TaskDispatcher(poll_interval=1, max_workers=4)
@@ -189,7 +134,7 @@ async def lifespan(app: FastAPI) -> None:
         dispatcher.start()
         logger.info("Dispatcher started in background thread.")
 
-        # Queue model sync as a background worker task
+        # Queue model sync and repo sync as background worker tasks
         from src.shared import LLM_DIR, EMBEDDINGS_DIR
 
         logger.info("Queuing model sync as background worker...")
@@ -201,6 +146,12 @@ async def lifespan(app: FastAPI) -> None:
             logger.warning("Model sync not queued — worker is busy")
         else:
             logger.info("Model sync queued.")
+
+        logger.info("Queuing repo sync as background worker...")
+        if not dispatcher.ask_for_worker(WorkerName.LOCAL_REPO_SYNC):
+            logger.warning("Repo sync not queued — worker is busy")
+        else:
+            logger.info("Repo sync queued.")
 
         _validate_services()
         logger.info("Services validated.")
