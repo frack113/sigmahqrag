@@ -136,7 +136,7 @@ async def lifespan(app: FastAPI) -> None:
         logger.info("Repo sync done.")
 
         # Start the background task dispatcher in its own thread
-        dispatcher = TaskDispatcher(poll_interval=5)
+        dispatcher = TaskDispatcher(poll_interval=1, max_workers=4)
         app.state.dispatcher = dispatcher
         dispatcher.start()
         logger.info("Dispatcher started in background thread.")

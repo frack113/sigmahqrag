@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from src.worker.enums import WorkerStatus
 from src.worker.workers.github_embedding_worker import GithubEmbeddingWorker
 from src.worker.workers.local_embedding_worker import LocalEmbeddingWorker
 from src.worker.workers.sigmaref_embedding_worker import SigmaRefEmbeddingWorker
@@ -139,7 +140,7 @@ class TestSigmaRefEmbeddingWorker:
             worker.process(task)
 
         state_calls = mock_dispatcher.update_worker_state.call_args_list
-        assert any(c.kwargs.get("status") == "running" for c in state_calls)
+        assert any(c.kwargs.get("status") == WorkerStatus.RUNNING for c in state_calls)
         mock_dispatcher.update_worker_state.assert_called()
 
 

@@ -38,7 +38,7 @@ async def _embed_progress_generator(worker_type: str, dispatcher) -> AsyncGenera
 
             yield f"data: {json.dumps(status_data)}\n\n"
 
-            if status_data.get("status") in ("completed", "failed", WorkerStatus.IDLE.value, WorkerStatus.ERROR.value):
+            if status_data.get("status") in (WorkerStatus.IDLE.value, WorkerStatus.ERROR.value):
                 break
         except Exception as e:
             logger.error(f"SSE error for {worker_type}: {e}")

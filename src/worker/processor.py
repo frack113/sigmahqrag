@@ -135,6 +135,14 @@ class TaskDispatcher:
         self._db = DatabaseService.get_instance()
 
         self._workers = {name: cls(self._db, self) for name, cls in self._WORKER_TYPES.items()}
+        for name in self._WORKER_TYPES:
+            self._worker_states[name] = {
+                "status": WorkerStatus.IDLE,
+                "current_task_id": "",
+                "error": "",
+                "progress_percent": 0,
+                "current_file": "",
+            }
         logger.info("TaskDispatcher initialized with %d workers.", len(self._workers))
 
         self._executor = ThreadPoolExecutor(

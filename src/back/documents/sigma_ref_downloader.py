@@ -213,8 +213,40 @@ def _save_registry(registry: dict[str, Any], path: Path, db: DatabaseService) ->
                 "title": entry.get("title"),
                 "timestamp": entry.get("timestamp"),
                 "content_sha256": entry.get("content_sha256"),
+                "org": entry.get("org", "sigmaref"),
+                "repo": entry.get("repo", "references"),
+                "file_name": entry.get("file_name", ""),
+                "file_size": entry.get("file_size"),
             }
             db.upsert_doc_sigma_ref(row)
+
+
+def _make_entry(
+    url_hash: str,
+    original_url: str,
+    normalized_url: str,
+    content_type: str,
+    rule_id: str,
+    title: str,
+    timestamp: str,
+    content_sha256: str,
+    file_name: str = "",
+    file_size: int | None = None,
+) -> dict[str, Any]:
+    """Build a registry entry dict with all fields expected by _save_registry."""
+    return {
+        "original_url": original_url,
+        "normalized_url": normalized_url,
+        "content_type": content_type,
+        "rule_id": rule_id,
+        "title": title,
+        "timestamp": timestamp,
+        "content_sha256": content_sha256,
+        "org": "sigmaref",
+        "repo": "references",
+        "file_name": file_name,
+        "file_size": file_size,
+    }
 
 
 def download_references(
@@ -306,15 +338,18 @@ def download_references(
                     if existing_sha is not None and _sha256_file(output_file) != existing_sha:
                         logger.info("Content changed for %s, re-downloading", normalized)
                         if _download_file(normalized, output_file):
-                            registry[url_hash] = {
-                                "original_url": ref,
-                                "normalized_url": normalized,
-                                "content_type": existing.get("content_type", "markdown"),
-                                "rule_id": rule_id,
-                                "title": rule_title,
-                                "timestamp": _iso_now(),
-                                "content_sha256": _sha256_file(output_file),
-                            }
+                            registry[url_hash] = _make_entry(
+                                url_hash=url_hash,
+                                original_url=ref,
+                                normalized_url=normalized,
+                                content_type=existing.get("content_type", "markdown"),
+                                rule_id=rule_id,
+                                title=rule_title,
+                                timestamp=_iso_now(),
+                                content_sha256=_sha256_file(output_file),
+                                file_name=output_file.name,
+                                file_size=output_file.stat().st_size,
+                            )
                             with _registry_lock:
                                 _save_registry(registry, output_path, db)
                             downloaded += 1
@@ -328,15 +363,18 @@ def download_references(
 
             if output_file.exists():
                 content_hash = _sha256_file(output_file)
-                registry[url_hash] = {
-                    "original_url": ref,
-                    "normalized_url": normalized,
-                    "content_type": _detect_url_type(normalized) or "markdown",
-                    "rule_id": rule_id,
-                    "title": rule_title,
-                    "timestamp": _iso_now(),
-                    "content_sha256": content_hash,
-                }
+                registry[url_hash] = _make_entry(
+                    url_hash=url_hash,
+                    original_url=ref,
+                    normalized_url=normalized,
+                    content_type=_detect_url_type(normalized) or "markdown",
+                    rule_id=rule_id,
+                    title=rule_title,
+                    timestamp=_iso_now(),
+                    content_sha256=content_hash,
+                    file_name=output_file.name,
+                    file_size=output_file.stat().st_size,
+                )
                 with _registry_lock:
                     _save_registry(registry, output_path, db)
                 skipped += 1
@@ -349,15 +387,18 @@ def download_references(
 
             if _download_file(normalized, output_file):
                 content_hash = _sha256_file(output_file) if output_file.exists() else ""
-                registry[url_hash] = {
-                    "original_url": ref,
-                    "normalized_url": normalized,
-                    "content_type": ftype,
-                    "rule_id": rule_id,
-                    "html_title": rule_title,  # Wait, I see a potential bug in the original code: title/rule_id mismatch? No, let's stick to refactoring.
-                    "timestamp": _iso_now(),
-                    "content_sha256": content_hash,
-                }
+                registry[url_hash] = _make_entry(
+                    url_hash=url_hash,
+                    original_url=ref,
+                    normalized_url=normalized,
+                    content_type=ftype,
+                    rule_id=rule_id,
+                    title=rule_title,
+                    timestamp=_iso_now(),
+                    content_sha256=content_hash,
+                    file_name=output_file.name,
+                    file_size=output_file.stat().st_size if output_file.exists() else None,
+                )
                 with _registry_lock:
                     _save_registry(registry, output_path, db)
                 downloaded += 1

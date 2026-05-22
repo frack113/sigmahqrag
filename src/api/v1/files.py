@@ -5,10 +5,10 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
-from src.worker.processor import TaskDispatcher
+from src.api.dependencies import get_dispatcher
 from src.worker.enums import WorkerName
 
 logger = logging.getLogger(__name__)
@@ -25,14 +25,9 @@ class FileOperationResponse(BaseModel):
     error: str | None = None
 
 
-def _get_dispatcher(request: Request) -> TaskDispatcher:
-    """Get the TaskDispatcher instance from app state."""
-    return request.app.state.dispatcher
-
-
 @router.post("/list", response_model=FileOperationResponse)
 async def file_list(
-    dispatcher: TaskDispatcher = Depends(_get_dispatcher),
+    dispatcher = Depends(get_dispatcher),
 ) -> FileOperationResponse:
     """Trigger file discovery across all sources (GitHub, Local, SigmaRef)."""
     triggered = []
@@ -69,7 +64,7 @@ async def file_list(
 
 @router.post("/embed", response_model=FileOperationResponse)
 async def file_embed(
-    dispatcher: TaskDispatcher = Depends(_get_dispatcher),
+    dispatcher = Depends(get_dispatcher),
 ) -> FileOperationResponse:
     """Trigger file embedding across all sources (GitHub, Local, SigmaRef)."""
     triggered = []

@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-import qdrant_client
 from llama_index.vector_stores.qdrant import QdrantVectorStore
 
 from .client import get_qdrant_client
@@ -70,10 +69,7 @@ class QdrantVectorService:
     async def initialize(self) -> None:
         """Initialize the Qdrant client and vector store."""
         try:
-            self._client = qdrant_client.QdrantClient(
-                host=self.host,
-                port=self.port,
-            )
+            self._client = get_qdrant_client(host=self.host, port=self.port)
             self._vector_store = QdrantVectorStore(
                 client=self._client,
                 collection_name=self.collection_name,
@@ -97,10 +93,12 @@ class QdrantVectorService:
 
         from llama_index.core.schema import TextNode
 
-        nodes = [
-            TextNode(text=doc, metadata=meta or {})
-            for doc, meta in zip(documents, metadata or [{}] * len(documents), strict=True)
-        ]
+        nodes: list[TextNode] = []
+        meta_list = metadata or [{}] * len(documents)
+        for emb, doc, meta in zip(embeddings, documents, meta_list, strict=True):
+            node = TextNode(text=doc, metadata=meta)
+            node.embedding = emb
+            nodes.append(node)
 
         self._vector_store.add(nodes)  # type: ignore[union-attr]
         logger.info(f"Added {len(embeddings)} vectors to {self.collection_name}")
@@ -148,6 +146,9 @@ class QdrantVectorService:
         if self._vector_store is None:
             await self.initialize()
 
+        from .collections import create_collection as _create
+
+        await _create(self.host, self.port, self.collection_name, self.vector_size)
         logger.info(f"Collection {self.collection_name} ready")
 
     def __repr__(self) -> str:
