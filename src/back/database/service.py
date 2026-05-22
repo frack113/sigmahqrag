@@ -70,7 +70,8 @@ class DatabaseService:
         if self._initialized:
             logger.warning("initialize() called more than once — skipping")
             return
-        self._writer_conn.execute(open("src/back/database/initdb.sql").read())
+        initdb_path = Path(__file__).parent / "initdb.sql"
+        self._writer_conn.execute(initdb_path.read_text(encoding="utf-8"))
         self._writer_conn.commit()
         if self.db_path.exists():
             self._load_from_file()
@@ -86,7 +87,9 @@ class DatabaseService:
             self._writer_conn.execute(f"ATTACH '{path}' AS file_db (READ_ONLY)")
             for table in _VALID_TABLES:
                 try:
-                    self._writer_conn.execute(f"INSERT OR IGNORE INTO {table} SELECT * FROM file_db.{table}")
+                    self._writer_conn.execute(
+                        f"INSERT OR IGNORE INTO {table} SELECT * FROM file_db.{table}"
+                    )
                 except Exception:
                     logger.warning("Table %s not found in existing database — skipping", table)
             self._writer_conn.execute("DETACH file_db")
@@ -633,7 +636,9 @@ class DatabaseService:
             }
         return None
 
-    def update_worker_progress(self, worker_type: str, progress_percent: float, current_file: str | None = None) -> None:
+    def update_worker_progress(
+        self, worker_type: str, progress_percent: float, current_file: str | None = None
+    ) -> None:
         """Update progress for a worker type."""
         now = _iso_now()
         with self._lock:
@@ -647,7 +652,9 @@ class DatabaseService:
         """Reset workers that haven't sent a heartbeat recently."""
         from datetime import datetime, timedelta, timezone
 
-        cutoff = (datetime.now(timezone.utc) - timedelta(seconds=stale_seconds)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        cutoff = (datetime.now(timezone.utc) - timedelta(seconds=stale_seconds)).strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        )
         with self._lock:
             self._writer_conn.execute(
                 "UPDATE worker_state SET status = 'idle', current_task_id = NULL, progress_percent = 0.0, current_file = NULL WHERE last_heartbeat IS NOT NULL AND last_heartbeat < ?",
@@ -704,4 +711,3 @@ class DatabaseService:
     # =========================================================================
     # EMBEDDING_CONFIG TABLE
     # =========================================================================
-

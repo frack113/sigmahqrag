@@ -63,7 +63,7 @@ async def llama_status():
         )
     except Exception as e:
         logger.error(f"Llama status error: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        return JSONResponse(status_code=500, content={"error": "An internal error occurred"})
 
 
 @router.post("/download")
@@ -88,7 +88,7 @@ async def llama_download(
         return JSONResponse(content=result)
     except Exception as e:
         logger.error(f"Llama download error: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        return JSONResponse(status_code=500, content={"error": "An internal error occurred"})
 
 
 @router.get("/progress/{download_id}")
@@ -101,7 +101,7 @@ async def llama_progress(download_id: str):
         )
     except Exception as e:
         logger.error(f"Llama progress error: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        return JSONResponse(status_code=500, content={"error": "An internal error occurred"})
 
 
 @router.post("/start")
@@ -123,7 +123,7 @@ async def llama_start(
         return JSONResponse(content=result)
     except Exception as e:
         logger.error(f"Llama start error: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        return JSONResponse(status_code=500, content={"error": "An internal error occurred"})
 
 
 @router.post("/stop")
@@ -135,7 +135,7 @@ async def llama_stop():
         return JSONResponse(content=result)
     except Exception as e:
         logger.error(f"Llama stop error: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        return JSONResponse(status_code=500, content={"error": "An internal error occurred"})
 
 
 @router.post("/restart")
@@ -158,4 +158,4 @@ async def llama_restart(
         return JSONResponse(content=result)
     except Exception as e:
         logger.error(f"Llama restart error: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        return JSONResponse(status_code=500, content={"error": "An internal error occurred"})

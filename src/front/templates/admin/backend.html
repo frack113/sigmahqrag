@@ -69,7 +69,7 @@
     </div>
 </div>
 
-<script id="config-data" type="application/json">{{ config_json | safe }}</script>
+<script id="config-data" type="application/json">{{ config_json | tojson }}</script>
 <script>
 let activeDownloadId = null;
 let progressPollInterval = null;

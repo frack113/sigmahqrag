@@ -79,7 +79,6 @@ class UnifiedRegistry:
                     data["index_path"] = record.get("index_path")
                 db.upsert_model(data)
 
-
     def get_llm(self, repo_id: str, db: DatabaseService) -> dict | None:
         self._ensure_loaded(db)
         return self._registry["llm"].get(repo_id)
@@ -92,7 +91,7 @@ class UnifiedRegistry:
         self._ensure_loaded(db)
         return self._registry["llm"]
 
-    def list_embeddings(self, db:DatabaseService) -> dict[str, dict]:
+    def list_embeddings(self, db: DatabaseService) -> dict[str, dict]:
         self._ensure_loaded(db)
         return self._registry["embeddings"]
 
@@ -169,7 +168,9 @@ class UnifiedRegistry:
         if save:
             self._save(db)
 
-    def sync_embeddings_folder(self, embeddings_dir: Path, db: DatabaseService, save: bool = True) -> None:
+    def sync_embeddings_folder(
+        self, embeddings_dir: Path, db: DatabaseService, save: bool = True
+    ) -> None:
         self._ensure_loaded(db)
         if not embeddings_dir.exists():
             return
@@ -197,6 +198,3 @@ class UnifiedRegistry:
 
         if save:
             self._save(db)
-
-
-

@@ -116,6 +116,26 @@ function showLogs(service) {
 }
 
 
+function escHtml(s) {
+    if (s == null) return '';
+    return String(s)
+        .replace(/&/g, '&' + 'amp;')
+        .replace(/</g, '&' + 'lt;')
+        .replace(/>/g, '&' + 'gt;')
+        .replace(/"/g, '&' + 'quot;')
+        .replace(/'/g, '&' + '#39;');
+}
+
+function escAttr(s) {
+    if (s == null) return '';
+    return String(s)
+        .replace(/&/g, '&' + 'amp;')
+        .replace(/"/g, '&' + 'quot;')
+        .replace(/'/g, '&' + '#39;')
+        .replace(/</g, '&' + 'lt;')
+        .replace(/>/g, '&' + 'gt;');
+}
+
 function loadModels() {
     fetch('/api/v1/models/llm/installed')
         .then(r => r.json())
@@ -125,10 +145,12 @@ function loadModels() {
                 let html = '<table><tr><th>Model</th><th>Size</th><th>Action</th></tr>';
                 models.forEach(m => {
                     for (const [filename, f] of Object.entries(m.files)) {
+                        const safeRepoId = escAttr(m.repo_id);
+                        const safeFilename = escAttr(filename);
                         html += `<tr>
-                            <td>${m.repo_id}/${filename}</td>
+                            <td>${escHtml(m.repo_id)}/${escHtml(filename)}</td>
                             <td class="num">${Math.round(f.size / 1024 / 1024)}MB</td>
-                            <td><button class="btn btn-danger" onclick="deleteModel('${m.repo_id}', '${filename}')">Delete</button></td>
+                            <td><button class="btn btn-danger" onclick="deleteModel('${safeRepoId}', '${safeFilename}')">Delete</button></td>
                         </tr>`;
                     }
                 });

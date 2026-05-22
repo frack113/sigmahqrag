@@ -38,7 +38,10 @@ class TestPostAdminDownload:
         mock_manager = AsyncMock()
         mock_dm.return_value = mock_manager
 
-        payload = {"action": "download_update", "payload": {"action": "download_update", "version": "latest"}}
+        payload = {
+            "action": "download_update",
+            "payload": {"action": "download_update", "version": "latest"},
+        }
 
         response = client.post(
             "/api/v1/qdrant",
@@ -78,9 +81,7 @@ class TestPostAdminDownload:
         assert response2.status_code == 200
         assert response1.json()["data"]["job_id"] == response2.json()["data"]["job_id"]
 
-    def test_download_returns_200_with_service_info(
-        self, client: TestClient
-    ) -> None:
+    def test_download_returns_200_with_service_info(self, client: TestClient) -> None:
         """Given download endpoint called, when service name provided, then returns 200 with job info."""
         response = client.post(
             "/api/v1/admin/download",

@@ -8,6 +8,7 @@ from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.datastructures import URL
 
 from src.api.routes.page_admin import router as admin_pages_router
 from src.api.routes.page_chat import router as chat_page_router
@@ -191,6 +192,32 @@ def create_app() -> FastAPI:
         description="Local RAG system for Sigma rules",
         lifespan=lifespan,
     )
+
+    @app.middleware("http")
+    async def csrf_protection(request: Request, call_next):
+        if request.method in ("POST", "PUT", "DELETE", "PATCH"):
+            origin = request.headers.get("origin", "")
+            referer = request.headers.get("referer", "")
+            if origin or referer:
+                allowed = False
+                for val in (origin, referer):
+                    if not val:
+                        continue
+                    try:
+                        parsed = URL(val)
+                        if (
+                            parsed.hostname in ("localhost", "127.0.0.1", "::1")
+                            or parsed.scheme == "null"
+                        ):
+                            allowed = True
+                            break
+                    except Exception:
+                        pass
+                if not allowed:
+                    return JSONResponse(
+                        status_code=403, content={"error": "Cross-site request blocked"}
+                    )
+        return await call_next(request)
 
     static_dir = str(Path(__file__).parent / "front" / "static")
     app.mount("/static", StaticFiles(directory=static_dir), name="static")

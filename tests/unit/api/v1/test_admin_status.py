@@ -70,4 +70,4 @@ class TestQdrantStatus:
         assert response.status_code == 500
         data = response.json()
         assert "error" in data
-        assert "Connection refused" in data["error"]
+        assert data["error"] == "An internal error occurred"

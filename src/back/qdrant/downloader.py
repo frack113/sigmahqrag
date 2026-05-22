@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import logging
+import os
 import shutil
 import zipfile
 from pathlib import Path
 from typing import Any
+
+import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -42,10 +45,24 @@ class QdrantInstallerService:
     def get_ui_dist_path(self) -> Path:
         return self.static_dir / "dist"
 
+    def _safe_extract_zip(self, zip_path: Path, dest_dir: Path) -> None:
+        """Extract a zip file safely, preventing path traversal.
+
+        Rejects any archive entry with absolute paths or path traversal
+        sequences (e.g. ``/etc/passwd``, ``../../foo``), raising
+        ``ValueError`` on the first offending entry.
+        """
+        dest_resolved = dest_dir.resolve()
+        with zipfile.ZipFile(zip_path, "r") as z:
+            for name in z.namelist():
+                if os.path.isabs(name) or ".." in name:
+                    raise ValueError(
+                        f"Zip entry '{name}' would extract outside destination directory"
+                    )
+            z.extractall(dest_resolved)
+
     async def download_binary(self, progress_callback=None) -> dict[str, Any]:
         """Download Qdrant binary for Windows x86_64."""
-        import urllib.request
-
         self.bin_dir.mkdir(parents=True, exist_ok=True)
 
         binary_url = f"{QDRANT_DOWNLOAD_BASE}/qdrant-x86_64-pc-windows-msvc.zip"
@@ -56,13 +73,14 @@ class QdrantInstallerService:
             if progress_callback:
                 progress_callback(5, "Downloading binary...")
 
-            urllib.request.urlretrieve(binary_url, zip_path)
+            response = httpx.get(binary_url, timeout=120.0, follow_redirects=True)
+            response.raise_for_status()
+            zip_path.write_bytes(response.content)
 
             if progress_callback:
                 progress_callback(50, "Extracting binary...")
 
-            with zipfile.ZipFile(zip_path, "r") as z:
-                z.extractall(self.bin_dir)
+            self._safe_extract_zip(zip_path, self.bin_dir)
 
             if progress_callback:
                 progress_callback(80, "Cleaning up...")
@@ -87,8 +105,6 @@ class QdrantInstallerService:
 
     async def download_web_ui(self, progress_callback=None) -> dict[str, Any]:
         """Download Qdrant Web UI (dist-qdrant.zip)."""
-        import urllib.request
-
         QDRANT_UI_DEST.mkdir(parents=True, exist_ok=True)
 
         zip_path = self.static_dir / "dist-qdrant.zip"
@@ -97,13 +113,14 @@ class QdrantInstallerService:
             if progress_callback:
                 progress_callback(5, "Downloading web UI...")
 
-            urllib.request.urlretrieve(QDRANT_UI_DOWNLOAD_URL, zip_path)
+            response = httpx.get(QDRANT_UI_DOWNLOAD_URL, timeout=120.0, follow_redirects=True)
+            response.raise_for_status()
+            zip_path.write_bytes(response.content)
 
             if progress_callback:
                 progress_callback(50, "Extracting web UI...")
 
-            with zipfile.ZipFile(zip_path, "r") as z:
-                z.extractall(self.static_dir)
+            self._safe_extract_zip(zip_path, QDRANT_UI_DEST)
 
             if progress_callback:
                 progress_callback(90, "Cleaning up...")

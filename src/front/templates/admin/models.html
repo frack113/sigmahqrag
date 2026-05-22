@@ -67,10 +67,12 @@ function loadModels() {
             let html = '<table><tr><th>Model</th><th>Size</th><th>Actions</th></tr>';
             models.forEach(m => {
                 for (const [filename, f] of Object.entries(m.files)) {
+                    const safeRepoId = escAttr(m.repo_id);
+                    const safeFilename = escAttr(filename);
                     html += `<tr>
-                        <td>${f.filename || filename}</td>
+                        <td>${escHtml(f.filename || filename)}</td>
                         <td class="num">${Math.round((f.file_size || f.size || 0) / 1024 / 1024)}MB</td>
-                        <td><button class="btn btn-danger btn-sm" onclick="deleteModel('${m.repo_id}', '${filename}')">Delete</button></td>
+                        <td><button class="btn btn-danger btn-sm" onclick="deleteModel('${safeRepoId}', '${safeFilename}')">Delete</button></td>
                     </tr>`;
                 }
             });
@@ -93,9 +95,10 @@ function loadModels() {
             }
             let html = '<table><tr><th>Model</th><th>Actions</th></tr>';
             models.forEach(m => {
+                const safeRepoId = escAttr(m.repo_id);
                 html += `<tr>
-                    <td>${m.repo_id}</td>
-                    <td><button class="btn btn-danger btn-sm" onclick="deleteEmbedding('${m.repo_id}')">Delete</button></td>
+                    <td>${escHtml(m.repo_id)}</td>
+                    <td><button class="btn btn-danger btn-sm" onclick="deleteEmbedding('${safeRepoId}')">Delete</button></td>
                 </tr>`;
             });
             html += '</table>';
@@ -214,6 +217,26 @@ function downloadModel() {
         clearInterval(progressInterval);
         document.getElementById('progress-text').textContent = 'Download failed: ' + err;
     });
+}
+
+function escHtml(s) {
+    if (s == null) return '';
+    return String(s)
+        .replace(/&/g, '&' + 'amp;')
+        .replace(/</g, '&' + 'lt;')
+        .replace(/>/g, '&' + 'gt;')
+        .replace(/"/g, '&' + 'quot;')
+        .replace(/'/g, '&' + '#39;');
+}
+
+function escAttr(s) {
+    if (s == null) return '';
+    return String(s)
+        .replace(/&/g, '&' + 'amp;')
+        .replace(/"/g, '&' + 'quot;')
+        .replace(/'/g, '&' + '#39;')
+        .replace(/</g, '&' + 'lt;')
+        .replace(/>/g, '&' + 'gt;');
 }
 
 function deleteModel(repoId, filename) {

@@ -27,23 +27,35 @@ class FileOperationResponse(BaseModel):
 
 @router.post("/list", response_model=FileOperationResponse)
 async def file_list(
-    dispatcher = Depends(get_dispatcher),
+    dispatcher=Depends(get_dispatcher),
 ) -> FileOperationResponse:
     """Trigger file discovery across all sources (GitHub, Local, SigmaRef)."""
     triggered = []
     busy = []
 
-    if dispatcher.ask_for_worker(WorkerName.GITHUB_DISCOVERY, task_type=WorkerName.GITHUB_DISCOVERY.value, collection_name="all"):
+    if dispatcher.ask_for_worker(
+        WorkerName.GITHUB_DISCOVERY,
+        task_type=WorkerName.GITHUB_DISCOVERY.value,
+        collection_name="all",
+    ):
         triggered.append(WorkerName.GITHUB_DISCOVERY.value)
     else:
         busy.append(WorkerName.GITHUB_DISCOVERY.value)
 
-    if dispatcher.ask_for_worker(WorkerName.LOCAL_DISCOVERY, task_type=WorkerName.LOCAL_DISCOVERY.value, collection_name="local"):
+    if dispatcher.ask_for_worker(
+        WorkerName.LOCAL_DISCOVERY,
+        task_type=WorkerName.LOCAL_DISCOVERY.value,
+        collection_name="local",
+    ):
         triggered.append(WorkerName.LOCAL_DISCOVERY.value)
     else:
         busy.append(WorkerName.LOCAL_DISCOVERY.value)
 
-    if dispatcher.ask_for_worker(WorkerName.SIGMAREF_DISCOVERY, task_type=WorkerName.SIGMAREF_DISCOVERY.value, collection_name="sigmaref"):
+    if dispatcher.ask_for_worker(
+        WorkerName.SIGMAREF_DISCOVERY,
+        task_type=WorkerName.SIGMAREF_DISCOVERY.value,
+        collection_name="sigmaref",
+    ):
         triggered.append(WorkerName.SIGMAREF_DISCOVERY.value)
     else:
         busy.append(WorkerName.SIGMAREF_DISCOVERY.value)
@@ -64,23 +76,35 @@ async def file_list(
 
 @router.post("/embed", response_model=FileOperationResponse)
 async def file_embed(
-    dispatcher = Depends(get_dispatcher),
+    dispatcher=Depends(get_dispatcher),
 ) -> FileOperationResponse:
     """Trigger file embedding across all sources (GitHub, Local, SigmaRef)."""
     triggered = []
     busy = []
 
-    if dispatcher.ask_for_worker(WorkerName.GITHUB_EMBEDDINGS, task_type=WorkerName.GITHUB_EMBEDDINGS.value, collection_name="all"):
+    if dispatcher.ask_for_worker(
+        WorkerName.GITHUB_EMBEDDINGS,
+        task_type=WorkerName.GITHUB_EMBEDDINGS.value,
+        collection_name="all",
+    ):
         triggered.append(WorkerName.GITHUB_EMBEDDINGS.value)
     else:
         busy.append(WorkerName.GITHUB_EMBEDDINGS.value)
 
-    if dispatcher.ask_for_worker(WorkerName.LOCAL_EMBEDDINGS, task_type=WorkerName.LOCAL_EMBEDDINGS.value, collection_name="local"):
+    if dispatcher.ask_for_worker(
+        WorkerName.LOCAL_EMBEDDINGS,
+        task_type=WorkerName.LOCAL_EMBEDDINGS.value,
+        collection_name="local",
+    ):
         triggered.append(WorkerName.LOCAL_EMBEDDINGS.value)
     else:
         busy.append(WorkerName.LOCAL_EMBEDDINGS.value)
 
-    if dispatcher.ask_for_worker(WorkerName.SIGMAREF_EMBEDDINGS, task_type=WorkerName.SIGMAREF_EMBEDDINGS.value, collection_name="sigmaref"):
+    if dispatcher.ask_for_worker(
+        WorkerName.SIGMAREF_EMBEDDINGS,
+        task_type=WorkerName.SIGMAREF_EMBEDDINGS.value,
+        collection_name="sigmaref",
+    ):
         triggered.append(WorkerName.SIGMAREF_EMBEDDINGS.value)
     else:
         busy.append(WorkerName.SIGMAREF_EMBEDDINGS.value)

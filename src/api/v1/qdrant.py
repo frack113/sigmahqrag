@@ -9,7 +9,12 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from src.api.dependencies import get_dispatcher
-from src.back.qdrant.collections import list_collections, create_collection, delete_collection, get_collection
+from src.back.qdrant.collections import (
+    list_collections,
+    create_collection,
+    delete_collection,
+    get_collection,
+)
 from src.back.qdrant.health import check_health
 from src.back.qdrant.service import create_qdrant_service
 from src.back.qdrant.storage import store_embeddings, delete_point, search as qdrant_search
@@ -42,7 +47,7 @@ async def _embed_progress_generator(worker_type: str, dispatcher) -> AsyncGenera
                 break
         except Exception as e:
             logger.error(f"SSE error for {worker_type}: {e}")
-            yield f"data: {json.dumps({'status': 'error', 'message': str(e)})}\n\n"
+            yield f"data: {json.dumps({'status': 'error', 'message': 'An internal error occurred'})}\n\n"
             break
 
         await asyncio.sleep(2)
@@ -98,7 +103,7 @@ async def qdrant_status():
         )
     except Exception as e:
         logger.error(f"Qdrant status error: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        return JSONResponse(status_code=500, content={"error": "An internal error occurred"})
 
 
 @router.get("/progress/{download_id}")
@@ -111,7 +116,7 @@ async def qdrant_progress(download_id: str):
         )
     except Exception as e:
         logger.error(f"qdrant progress error: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        return JSONResponse(status_code=500, content={"error": "An internal error occurred"})
 
 
 @router.get("/embed/{worker_type}")
@@ -142,7 +147,7 @@ async def embed_progress_stream(worker_type: str, dispatcher=Depends(get_dispatc
         )
     except Exception as e:
         logger.error(f"embed progress error: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        return JSONResponse(status_code=500, content={"error": "An internal error occurred"})
 
 
 @router.get("/embed-status/{worker_type}")
@@ -350,5 +355,5 @@ async def qdrant_action(request: QdrantActionRequest, req: Request) -> QdrantAct
             status="error",
             action=action,
             error_code="ACTION_FAILED",
-            message=str(e),
+            message="An internal error occurred",
         )

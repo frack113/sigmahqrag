@@ -46,7 +46,7 @@ async def send_chat_message(req: ChatMessageRequest) -> ChatMessageResponse:
         logger.error(f"Chat processing error: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to process message: {str(e)}",
+            detail="Failed to process message",
         ) from None
 
 
@@ -69,6 +69,12 @@ async def upload_sigma_rule(file: UploadFile) -> dict:
 
     try:
         content = await file.read()
+        if not content:
+            raise HTTPException(status_code=400, detail="Empty file")
+        try:
+            content.decode("utf-8")
+        except UnicodeDecodeError:
+            raise HTTPException(status_code=400, detail="File is not valid UTF-8 text")
         rule_data = await chat_service.validate_and_store_yaml(content)
 
         return {
@@ -85,7 +91,7 @@ async def upload_sigma_rule(file: UploadFile) -> dict:
         logger.error(f"Upload error: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to process upload: {str(e)}",
+            detail="Failed to process upload",
         ) from None
 
 
@@ -106,7 +112,8 @@ async def send_chat_message_stream(req: ChatMessageRequest):
             yield "data: [DONE]\n\n"
         except Exception as e:
             logger.error(f"Stream error: {e}")
-            yield f"data: Error: {str(e)}\n\n"
+            logger.error(f"Stream error: {e}")
+            yield "data: Error: An internal error occurred\n\n"
             yield "data: [DONE]\n\n"
 
     return StreamingResponse(

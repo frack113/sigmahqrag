@@ -50,8 +50,7 @@ class TestVersionPinning:
         """Validate uv.lock exists (provides exact pinning for Air-Gap)."""
         lock_path = Path("uv.lock")
         assert lock_path.exists(), (
-            "uv.lock must exist for Air-Gap reproducibility!\n"
-            "Run 'uv lock' to generate it."
+            "uv.lock must exist for Air-Gap reproducibility!\nRun 'uv lock' to generate it."
         )
 
     def test_uv_lock_not_in_gitignore(self):

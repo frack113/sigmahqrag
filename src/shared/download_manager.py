@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import shutil
 import uuid
 import zipfile
@@ -276,7 +277,6 @@ class DownloadManager:
             target_path: Target path for the service binary/directory
             service: Service name (llama.cpp, qdrant)
         """
-        import subprocess
 
         service_dir = BIN_DIR / service.replace(".", "-")
 
@@ -316,6 +316,12 @@ class DownloadManager:
 
                 with tempfile.TemporaryDirectory() as tmp_dir:
                     with zipfile.ZipFile(temp_path, "r") as zf:
+                        # Prevent path traversal: reject entries with absolute paths or ../
+                        for name in zf.namelist():
+                            if os.path.isabs(name) or ".." in name:
+                                raise RuntimeError(
+                                    f"Zip entry '{name}' would extract outside destination"
+                                )
                         zf.extractall(tmp_dir)
 
                     # Find the top-level directory in the zip
@@ -348,13 +354,17 @@ class DownloadManager:
                 import tempfile
 
                 with tempfile.TemporaryDirectory() as tmp_dir:
-                    result = subprocess.run(
-                        ["tar", "-xf", str(temp_path), "-C", tmp_dir],
-                        capture_output=True,
-                        text=True,
-                    )
-                    if result.returncode != 0:
-                        raise RuntimeError(f"Failed to extract tar.gz: {result.stderr}")
+                    # Validate archive before extraction: reject entries containing path traversal
+                    import tarfile
+
+                    with tarfile.open(temp_path, "r:gz") as tar:
+                        for member in tar.getmembers():
+                            # Reject absolute paths and path traversal sequences
+                            if member.name.startswith("/") or ".." in member.name:
+                                raise RuntimeError(
+                                    f"Tar entry '{member.name}' would extract outside destination"
+                                )
+                        tar.extractall(path=tmp_dir)
 
                     # Find the top-level directory
                     items = list(Path(tmp_dir).iterdir())

@@ -28,4 +28,4 @@ async def search_rules_endpoint(
         return JSONResponse(content={"rules": results})
     except Exception as e:
         logger.error(f"Search failed: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        return JSONResponse(status_code=500, content={"error": "An internal error occurred"})

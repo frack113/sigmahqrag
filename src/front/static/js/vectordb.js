@@ -1,11 +1,23 @@
+function esc(s) {
+    if (s == null) return '';
+    var m = { '&': '\x26amp;', '<': '\x26lt;', '>': '\x26gt;', '"': '\x26quot;', "'": '\x26#39;' };
+    return String(s).replace(/[&<>"']/g, function(c) { return m[c]; });
+}
+
+function escAttr(s) {
+    if (s == null) return '';
+    var m = { '&': '\x26amp;', '"': '\x26quot;', "'": '\x26#39;', '<': '\x26lt;', '>': '\x26gt;' };
+    return String(s).replace(/[&"'<>]/g, function(c) { return m[c]; });
+}
+
 async function loadVectorDB() {
     if (window.isProcessing) return;
     window.isProcessing = true;
 
-    const loadingEl = document.getElementById('vectordb-loading');
-    const contentEl = document.getElementById('vectordb-content');
-    const errorEl = document.getElementById('vectordb-error');
-    const tableBody = document.getElementById('collections-list');
+    var loadingEl = document.getElementById('vectordb-loading');
+    var contentEl = document.getElementById('vectordb-content');
+    var errorEl = document.getElementById('vectordb-error');
+    var tableBody = document.getElementById('collections-list');
 
     if (loadingEl) loadingEl.style.display = 'block';
     if (contentEl) contentEl.style.display = 'none';
@@ -13,37 +25,37 @@ async function loadVectorDB() {
 
     try {
         // 1. Check Status using the new helper
-        const status = await getQdrantStatus();
+        var status = await getQdrantStatus();
 
         if (!status.healthy) {
-            throw new Error(`Qdrint is unhealthy: ${status.service} version ${status.current_version}`);
+            throw new Error('Qdrint is unhealthy: ' + status.service + ' version ' + status.current_version);
         }
 
         // 2. Get Collections List using our new helper
-        const collectionNames = await listCollections();
+        var collectionNames = await listCollections();
 
         if (tableBody) {
             tableBody.innerHTML = '';
         }
 
-        for (const col of collectionNames) {
-             // 3. Use the data already in the list object
-             const config = col;
+        for (var i = 0; i < collectionNames.length; i++) {
+            var col = collectionNames[i];
+            var config = col;
+            var nameEsc = esc(col.name);
+            var nameAttr = escAttr(col.name);
 
             if (tableBody) {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${col.name}</td>
-                    <td><span class="badge bg-success">Active</span></td>
-                    <td class="num">~${config.points || 0}</td>
-                    <td class="num">${col.shards || 1}</td>
-                    <td class="num">${config.vector_size || 384}-dim</td>
-                    <td>
-                        <button class="btn btn-danger btn-sm" onclick="recreateCollection('${col.name}')">
-                            [Re Create]
-                        </button>
-                    </td>
-                `;
+                var row = document.createElement('tr');
+                row.innerHTML = '<td>' + nameEsc + '</td>'
+                    + '<td><span class="badge bg-success">Active</span></td>'
+                    + '<td class="num">~' + esc(config.points || 0) + '</td>'
+                    + '<td class="num">' + esc(col.shards || 1) + '</td>'
+                    + '<td class="num">' + esc(config.vector_size || 384) + '-dim</td>'
+                    + '<td>'
+                    + '<button class="btn btn-danger btn-sm" onclick="recreateCollection(\x27' + nameAttr + '\x27)">'
+                    + '[Re Create]'
+                    + '</button>'
+                    + '</td>';
                 tableBody.appendChild(row);
             }
         }
@@ -53,7 +65,7 @@ async function loadVectorDB() {
     } catch (e) {
         console.error('Error loading Vector DB:', e);
         if (errorEl) {
-            errorEl.textContent = `Error: ${e.message}`;
+            errorEl.textContent = 'Error: ' + e.message;
             errorEl.style.display = 'block';
         }
     } finally {
@@ -63,7 +75,7 @@ async function loadVectorDB() {
 }
 
 async function recreateCollection(name) {
-    if (!confirm(`Are you sure you want to RE-CREATE the collection "${name}"? This will DELETE all existing data.`)) {
+    if (!confirm('Are you sure you want to RE-CREATE the collection "' + name + '"? This will DELETE all existing data.')) {
         return;
     }
 
@@ -77,11 +89,11 @@ async function recreateCollection(name) {
         // 2. Create (using default 384 dim as per project convention)
         await createCollection(name);
 
-        alert(`Collection "${name}" has been successfully re-created.`);
+        alert('Collection "' + name + '" has been successfully re-created.');
         await loadVectorDB();
     } catch (e) {
         console.error('Error recreating collection:', e);
-        alert(`Failed to recreate collection: ${e.message}`);
+        alert('Failed to recreate collection: ' + e.message);
     } finally {
         window.isProcessing = false;
     }
@@ -90,46 +102,46 @@ async function recreateCollection(name) {
 async function startSigmaRefEmbedding() {
     if (window.isProcessing) return;
 
-    const githubProgressSection = document.getElementById('github-progress-section');
-    const githubProgressFill = document.getElementById('github-progress-fill');
-    const githubProgressText = document.getElementById('github-progress-text');
-    const githubMessageEl = document.getElementById('github-message');
+    var githubProgressSection = document.getElementById('github-progress-section');
+    var githubProgressFill = document.getElementById('github-progress-fill');
+    var githubProgressText = document.getElementById('github-progress-text');
+    var githubMessageEl = document.getElementById('github-message');
     
-    const progressSection = document.getElementById('sigmaref-progress-section');
-    const progressFill = document.getElementById('sigmaref-progress-fill');
-    const progressText = document.getElementById('sigmaref-progress-text');
-    const messageEl = document.getElementById('sigmaref-message');
-    const btnIndexDocs = document.getElementById('btn-index-docs');
+    var progressSection = document.getElementById('sigmaref-progress-section');
+    var progressFill = document.getElementById('sigmaref-progress-fill');
+    var progressText = document.getElementById('sigmaref-progress-text');
+    var messageEl = document.getElementById('sigmaref-message');
+    var btnIndexDocs = document.getElementById('btn-index-docs');
 
     if (btnIndexDocs) btnIndexDocs.disabled = true;
     if (githubMessageEl) githubMessageEl.style.display = 'none';
     if (messageEl) messageEl.style.display = 'none';
     
-    [githubProgressFill, progressFill].forEach(fill => {
+    [githubProgressFill, progressFill].forEach(function(fill) {
         if (fill) {
             fill.style.width = '0%';
             fill.style.background = 'linear-gradient(to right, rgb(0, 0, 1), rgb(0, 0, 255))';
         }
     });
-    [githubProgressText, progressText].forEach(text => {
+    [githubProgressText, progressText].forEach(function(text) {
         if (text) text.textContent = '0%';
     });
 
     try {
-        const response = await fetch('/api/v1/files/embed', {
+        var response = await fetch('/api/v1/files/embed', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' }
         });
-        const result = await response.json();
+        var result = await response.json();
 
         if (result.success || result.data) {
-            const tasks = result.data?.triggered || [];
+            var tasks = result.data && result.data.triggered || [];
             
-            if (tasks.includes('github_embeddings')) {
+            if (tasks.indexOf('github_embeddings') !== -1) {
                 pollEmbedProgress('github_embeddings', githubProgressFill, githubProgressText, githubMessageEl, btnIndexDocs);
             }
             
-            if (tasks.includes('sigmaref_embeddings')) {
+            if (tasks.indexOf('sigmaref_embeddings') !== -1) {
                 pollEmbedProgress('sigmaref_embeddings', progressFill, progressText, messageEl, btnIndexDocs);
             }
             
@@ -151,7 +163,7 @@ async function startSigmaRefEmbedding() {
             messageEl.textContent = 'Error: ' + error.message;
             messageEl.style.display = 'block';
         }
-        [githubProgressFill, progressFill].forEach(fill => {
+        [githubProgressFill, progressFill].forEach(function(fill) {
             if (fill) fill.style.width = '0%';
         });
         if (btnIndexDocs) btnIndexDocs.disabled = false;
@@ -159,9 +171,9 @@ async function startSigmaRefEmbedding() {
 }
 
 async function pollEmbedProgress(source, progressFill, progressText, messageEl, btnIndexDocs) {
-    let pollCount = 0;
-    const maxPolls = 300;
-    const pollInterval = setInterval(async () => {
+    var pollCount = 0;
+    var maxPolls = 300;
+    var pollInterval = setInterval(async function() {
         pollCount++;
         if (pollCount > maxPolls) {
             clearInterval(pollInterval);
@@ -169,8 +181,8 @@ async function pollEmbedProgress(source, progressFill, progressText, messageEl, 
             return;
         }
         try {
-            const response = await fetch(`/api/v1/qdrant/embed-status/${source}`);
-            const statusData = await response.json();
+            var response = await fetch('/api/v1/qdrant/embed-status/' + encodeURIComponent(source));
+            var statusData = await response.json();
 
             if (!statusData || statusData.status === 'not_found') {
                 if (pollCount > 5) {
@@ -181,7 +193,7 @@ async function pollEmbedProgress(source, progressFill, progressText, messageEl, 
             }
 
             if (statusData.status === 'running') {
-                const pct = Math.round(statusData.progress_percent || 0);
+                var pct = Math.round(statusData.progress_percent || 0);
                 if (progressFill) progressFill.style.width = pct + '%';
                 if (progressText) progressText.textContent = pct + '%';
             } else if (statusData.status === 'completed' || statusData.status === 'idle') {

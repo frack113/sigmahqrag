@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+from pathlib import Path
 
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
@@ -31,6 +32,28 @@ def get_sigma_rules_dir() -> str:
     return directory
 
 
+def _validate_directory_path(directory: str, base_dir: str) -> str:
+    """Validate and resolve a directory path to prevent path traversal.
+
+    Args:
+        directory: User-provided directory path
+        base_dir: Allowed base directory (from SIGMA_RULES_DIR)
+
+    Returns:
+        Resolved, validated absolute path
+
+    Raises:
+        ValueError: If path traversal is detected
+    """
+    resolved = Path(directory).resolve()
+    base = Path(base_dir).resolve()
+    try:
+        resolved.relative_to(base)
+    except ValueError:
+        raise ValueError(f"Directory '{directory}' is not within the allowed base directory")
+    return str(resolved)
+
+
 @router.post("/ingest")
 async def ingest_sigma_rules(
     request: IngestRequest | None = None,
@@ -41,6 +64,15 @@ async def ingest_sigma_rules(
 
     if not directory:
         directory = get_sigma_rules_dir()
+    else:
+        try:
+            base_dir = get_sigma_rules_dir()
+            directory = _validate_directory_path(directory, base_dir)
+        except ValueError as e:
+            return JSONResponse(
+                status_code=400,
+                content={"success": False, "error": str(e)},
+            )
 
     logger.info(f"Scanning directory: {directory} (recursive={recursive})")
 
@@ -90,7 +122,7 @@ async def ingest_sigma_rules(
                 IngestResult(
                     file=file_path,
                     success=False,
-                    error=str(e),
+                    error="Failed to process rule file",
                 )
             )
 
@@ -128,4 +160,6 @@ async def index_sigma_ref(
         return JSONResponse(content=summary)
     except Exception as e:
         logger.error(f"Failed to index sigma ref: {e}", exc_info=True)
-        return JSONResponse(status_code=500, content={"success": False, "error": str(e)})
+        return JSONResponse(
+            status_code=500, content={"success": False, "error": "An internal error occurred"}
+        )

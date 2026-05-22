@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from datetime import datetime
 from typing import Any
 
@@ -23,6 +24,18 @@ from src.back.github.git import (
 )
 
 router = APIRouter(prefix="/api/v1/github", tags=["v1-github"])
+
+# Valid org/name pattern: alphanumeric, hyphens, underscores, dots (no path separators)
+_VALID_ORG_NAME_RE = re.compile(r"^[\w.-]+$")
+
+
+def _validate_org_name(org: str, name: str) -> None:
+    """Validate org/name to prevent path traversal. Raises HTTPException if invalid."""
+    if not _VALID_ORG_NAME_RE.match(org) or not _VALID_ORG_NAME_RE.match(name):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid org/name: '{org}/{name}' contains path traversal characters",
+        )
 
 
 class RepositoryAddRequest(BaseModel):
@@ -157,6 +170,7 @@ async def add_repo(
 @router.get("/repos/{org}/{name}", response_model=RepositoryStatus)
 async def get_repo(org: str, name: str) -> RepositoryStatus:
     """Get repository details."""
+    _validate_org_name(org, name)
     repos = list_repos()
     if not any(r["org"] == org and r["name"] == name for r in repos):
         raise HTTPException(status_code=404, detail=f"Repository '{org}/{name}' not found")
@@ -180,6 +194,7 @@ async def sync_repo(
     background_tasks: BackgroundTasks = None,
 ) -> RepositoryResponse:
     """Sync a repository."""
+    _validate_org_name(org, name)
     metadata = get_metadata(org, name)
     if branch is None:
         branch = (metadata or {}).get("branch", "main")
@@ -220,6 +235,10 @@ async def delete_repo_handler(
     name: str,
 ) -> RepositoryResponse:
     """Delete a repository."""
+    try:
+        _validate_org_name(org, name)
+    except HTTPException as e:
+        return RepositoryResponse(success=False, error=e.detail)
     result = delete_repo(org, name)
     if result.get("success"):
         return RepositoryResponse(success=True, message=f"Repository '{org}/{name}' deleted")
@@ -229,6 +248,7 @@ async def delete_repo_handler(
 @router.get("/repos/{org}/{name}/status", response_model=RepositoryStatus)
 async def get_repo_status(org: str, name: str) -> RepositoryStatus:
     """Get repository status."""
+    _validate_org_name(org, name)
     repos = list_repos()
     if not any(r["org"] == org and r["name"] == name for r in repos):
         return RepositoryStatus(org=org, name=name, repo_status="error")
@@ -273,6 +293,10 @@ async def get_repo_tree(
     max_depth: int = 5,
 ) -> DirectoryTreeResponse:
     """Get directory tree for a repository."""
+    try:
+        _validate_org_name(org, name)
+    except HTTPException as e:
+        return DirectoryTreeResponse(success=False, error=e.detail)
     repos = list_repos()
     repo_exists = any(r["org"] == org and r["name"] == name for r in repos)
 
@@ -310,6 +334,10 @@ async def select_dirs(
     request: SelectDirsRequest,
 ) -> SelectDirsResponse:
     """Save selected directories for a repository."""
+    try:
+        _validate_org_name(org, name)
+    except HTTPException as e:
+        return SelectDirsResponse(success=False, error=e.detail)
     repos = list_repos()
     if not any(r["org"] == org and r["name"] == name for r in repos):
         return SelectDirsResponse(success=False, error=f"Repository '{org}/{name}' not found")

@@ -7,31 +7,46 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
+function esc(s) {
+    if (s == null) return '';
+    var m = { '&': '\x26amp;', '<': '\x26lt;', '>': '\x26gt;', '"': '\x26quot;', "'": '\x26#39;' };
+    return String(s).replace(/[&<>"']/g, function(c) { return m[c]; });
+}
+
+function escAttr(s) {
+    if (s == null) return '';
+    var m = { '&': '\x26amp;', '"': '\x26quot;', "'": '\x26#39;', '<': '\x26lt;', '>': '\x26gt;' };
+    return String(s).replace(/[&"'<>]/g, function(c) { return m[c]; });
+}
+
 async function loadRepoList() {
-    const tbody = document.getElementById('repo_list_body');
-    const statusEl = document.getElementById('repos_status');
+    var tbody = document.getElementById('repo_list_body');
+    var statusEl = document.getElementById('repos_status');
     if (!tbody) return;
     try {
-        const response = await fetch('/api/v1/github/repos');
-        const repos = await response.json();
+        var response = await fetch('/api/v1/github/repos');
+        var repos = await response.json();
         if (repos.length === 0) {
             tbody.innerHTML = '<tr><td colspan="5">No repositories managed</td></tr>';
             statusEl.textContent = 'No repositories';
             return;
         }
-        tbody.innerHTML = repos.map(repo => `
-            <tr>
-                <td>${repo.org}/${repo.name}</td>
-                <td>${repo.url || '-'}</td>
-                <td><span class="status-${repo.repo_status}">${repo.repo_status}</span></td>
-                <td>${repo.last_synced || '-'}</td>
-                <td class="actions">
-                    <button onclick="syncRepo('${repo.org}', '${repo.name}')" class="sync-btn">Sync</button>
-                    <button onclick="deleteRepo('${repo.org}', '${repo.name}')" class="delete-btn">Delete</button>
-                </td>
-            </tr>
-        `).join('');
-        statusEl.textContent = `${repos.length} repository(s)`;
+        var html = '';
+        for (var i = 0; i < repos.length; i++) {
+            var repo = repos[i];
+            html += '<tr>'
+                + '<td>' + esc(repo.org) + '/' + esc(repo.name) + '</td>'
+                + '<td>' + esc(repo.url || '-') + '</td>'
+                + '<td><span class="status-' + escAttr(repo.repo_status) + '">' + esc(repo.repo_status) + '</span></td>'
+                + '<td>' + esc(repo.last_synced || '-') + '</td>'
+                + '<td class="actions">'
+                + '<button onclick="syncRepo(\x27' + escAttr(repo.org) + '\x27, \x27' + escAttr(repo.name) + '\x27)" class="sync-btn">Sync</button>'
+                + '<button onclick="deleteRepo(\x27' + escAttr(repo.org) + '\x27, \x27' + escAttr(repo.name) + '\x27)" class="delete-btn">Delete</button>'
+                + '</td>'
+                + '</tr>';
+        }
+        tbody.textContent = html;
+        statusEl.textContent = repos.length + ' repository(s)';
     } catch (error) {
         console.error('Failed to load repos:', error);
         statusEl.textContent = 'Error loading repositories';
@@ -39,19 +54,19 @@ async function loadRepoList() {
 }
 
 async function addRepo() {
-    const urlInput = document.getElementById('repo_url');
-    const url = urlInput?.value?.trim();
+    var urlInput = document.getElementById('repo_url');
+    var url = urlInput && urlInput.value.trim();
     if (!url) {
         showToast('Please enter a repository URL', 'error');
         return;
     }
     try {
-        const response = await fetch('/api/v1/github/repos', {
+        var response = await fetch('/api/v1/github/repos', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url, branch: 'main' })
+            body: JSON.stringify({ url: url, branch: 'main' })
         });
-        const result = await response.json();
+        var result = await response.json();
         if (result.success) {
             showToast('Repository added successfully', 'success');
             urlInput.value = '';
@@ -66,10 +81,10 @@ async function addRepo() {
 
 async function syncRepo(org, name) {
     try {
-        const response = await fetch(`/api/v1/github/repos/${org}/${name}/sync`, {
+        var response = await fetch('/api/v1/github/repos/' + encodeURIComponent(org) + '/' + encodeURIComponent(name) + '/sync', {
             method: 'POST'
         });
-        const result = await response.json();
+        var result = await response.json();
         if (result.success) {
             showToast('Repository syncing...', 'success');
         } else {
@@ -81,12 +96,12 @@ async function syncRepo(org, name) {
 }
 
 async function deleteRepo(org, name) {
-    if (!confirm(`Delete repository ${org}/${name}?`)) return;
+    if (!confirm('Delete repository ' + org + '/' + name + '?')) return;
     try {
-        const response = await fetch(`/api/v1/github/repos/${org}/${name}`, {
+        var response = await fetch('/api/v1/github/repos/' + encodeURIComponent(org) + '/' + encodeURIComponent(name), {
             method: 'DELETE'
         });
-        const result = await response.json();
+        var result = await response.json();
         if (result.success) {
             showToast('Repository deleted', 'success');
             loadRepoList();

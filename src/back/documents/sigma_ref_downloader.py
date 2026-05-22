@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ipaddress
 import logging
 import re
 import threading
@@ -17,6 +18,20 @@ from src.back.database import DatabaseService
 from src.back.utils.identify_file_type import SUPPORTED_DOC_EXTENSION_MAP
 
 logger = logging.getLogger(__name__)
+
+
+def _is_private_url(url: str) -> bool:
+    """Check if a URL points to a private/reserved IP to prevent SSRF."""
+    parsed = urllib.parse.urlparse(url)
+    host = parsed.hostname or ""
+    if host in ("localhost", "127.0.0.1", "::1"):
+        return True
+    try:
+        ip = ipaddress.ip_address(host)
+        return ip.is_private or ip.is_loopback or ip.is_link_local
+    except ValueError:
+        return False
+
 
 GITHUB_BLOB_PATTERN = re.compile(
     r"^https?://(?:www\.)?github\.com/([^/]+/[^/]+)/blob/([^#?]+)",
@@ -199,7 +214,6 @@ def _load_registry(path: Path, db: DatabaseService) -> dict[str, Any]:
     return registry
 
 
-
 def _save_registry(registry: dict[str, Any], path: Path, db: DatabaseService) -> None:
     """Save the registry to DuckDB atomically."""
     for url_hash, entry in registry.items():
@@ -324,6 +338,11 @@ def download_references(
                 logger.debug("Non-HTTP ref skipped: %s", ref)
                 continue
 
+            if _is_private_url(ref):
+                logger.warning("Skipping private URL ref: %s", ref)
+                skipped += 1
+                continue
+
             total_refs += 1
             normalized = normalize_url(ref)
 
@@ -417,7 +436,6 @@ def download_references(
     }
     logger.info("Download complete: %s", summary)
     return summary
-
 
 
 def _sha256(text: str) -> str:

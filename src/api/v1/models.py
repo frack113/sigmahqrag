@@ -68,7 +68,7 @@ async def list_installed_llm_models() -> JSONResponse:
         return JSONResponse(content={"models": models})
     except Exception as e:
         logger.error(f"Failed to list installed LLM models: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        return JSONResponse(status_code=500, content={"error": "An internal error occurred"})
 
 
 @router.get("/llm/files")
@@ -85,7 +85,7 @@ async def list_llm_model_files(repo_id: str = None) -> JSONResponse:
         return JSONResponse(content={"files": files})
     except Exception as e:
         logger.error(f"Failed to list files for {repo_id}: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        return JSONResponse(status_code=500, content={"error": "An internal error occurred"})
 
 
 @router.get("/llm/{repo_id}/info")
@@ -134,7 +134,7 @@ async def get_llm_model_info(repo_id: str) -> JSONResponse:
         )
     except Exception as e:
         logger.error(f"Failed to get info for {repo_id}: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        return JSONResponse(status_code=500, content={"error": "An internal error occurred"})
 
 
 @router.post("/llm/download")
@@ -190,7 +190,7 @@ async def delete_llm_model(repo_id: str) -> JSONResponse:
         return JSONResponse(content={"success": True, "repo_id": repo_id})
     except Exception as e:
         logger.error(f"Delete failed: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        return JSONResponse(status_code=500, content={"error": "An internal error occurred"})
 
 
 @router.delete("/llm/{repo_id}/file/{filename}")
@@ -199,6 +199,17 @@ async def delete_llm_model_file(repo_id: str, filename: str) -> JSONResponse:
     from pathlib import Path
 
     from src.back.models.exceptions import ModelNotFoundError
+    from src.shared import LLM_DIR
+
+    # Validate repo_id to prevent path traversal (format: org/name, e.g. "TheBloke/Mistral-7B")
+    if (
+        not repo_id
+        or ".." in repo_id
+        or repo_id.count("/") != 1
+        or repo_id.startswith("/")
+        or repo_id.endswith("/")
+    ):
+        return JSONResponse(status_code=400, content={"error": "Invalid repo_id"})
 
     try:
         db = get_database_service()
@@ -208,7 +219,11 @@ async def delete_llm_model_file(repo_id: str, filename: str) -> JSONResponse:
             raise ModelNotFoundError(f"Model {repo_id} not found")
         if filename not in record.get("files", {}):
             raise ModelNotFoundError(f"File {filename} not found in {repo_id}")
-        path = Path(record["files"][filename]["local_path"])
+        path = Path(record["files"][filename]["local_path"]).resolve()
+        try:
+            path.relative_to(Path(LLM_DIR).resolve())
+        except ValueError:
+            raise ModelNotFoundError(f"Invalid file path for {filename}")
         if path.exists():
             path.unlink()
         del record["files"][filename]
@@ -218,7 +233,7 @@ async def delete_llm_model_file(repo_id: str, filename: str) -> JSONResponse:
         return JSONResponse(status_code=404, content={"error": str(e)})
     except Exception as e:
         logger.error(f"Delete failed: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        return JSONResponse(status_code=500, content={"error": "An internal error occurred"})
 
 
 # ============= Embedding Models =============
@@ -237,7 +252,7 @@ async def list_installed_embedding_models() -> JSONResponse:
         return JSONResponse(content={"models": embeddings})
     except Exception as e:
         logger.error(f"Failed to list installed embedding models: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        return JSONResponse(status_code=500, content={"error": "An internal error occurred"})
 
 
 @router.get("/embedding/progress/{repo_id}")
@@ -286,13 +301,25 @@ async def delete_embedding_model(repo_id: str) -> JSONResponse:
     import shutil
     from pathlib import Path
 
+    from src.shared import EMBEDDINGS_DIR
+
+    # Validate repo_id to prevent path traversal
+    if not repo_id or ".." in repo_id or "/" in repo_id:
+        return JSONResponse(status_code=400, content={"error": "Invalid repo_id"})
+
     try:
         db = get_database_service()
         reg = get_unified_registry()
         record = reg.get_embedding(repo_id, db)
         if not record:
             return JSONResponse(status_code=404, content={"error": f"Model {repo_id} not found"})
-        path = Path(record.get("local_path", ""))
+        path = Path(record.get("local_path", "")).resolve()
+        try:
+            path.relative_to(Path(EMBEDDINGS_DIR).resolve())
+        except ValueError:
+            return JSONResponse(
+                status_code=400, content={"error": f"Invalid path for model {repo_id}"}
+            )
         if path.exists():
             if path.is_dir():
                 shutil.rmtree(path)
@@ -302,7 +329,7 @@ async def delete_embedding_model(repo_id: str) -> JSONResponse:
         return JSONResponse(content={"success": True, "repo_id": repo_id})
     except Exception as e:
         logger.error(f"Delete failed: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        return JSONResponse(status_code=500, content={"error": "An internal error occurred"})
 
 
 @router.get("/embeddings/search")
@@ -317,7 +344,7 @@ async def search_embedding_models(
         return JSONResponse(content={"models": results})
     except Exception as e:
         logger.error(f"Search failed: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        return JSONResponse(status_code=500, content={"error": "An internal error occurred"})
 
 
 # ============= Embedding Config =============
@@ -372,4 +399,4 @@ async def get_embedding_files(
         return JSONResponse(content={"files": files})
     except Exception as e:
         logger.error(f"Files failed: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        return JSONResponse(status_code=500, content={"error": "An internal error occurred"})
