@@ -265,45 +265,76 @@ async function deleteRepo(org, name) {
 }
 
 const DISCOVERY_WORKERS = ['github_discovery', 'local_discovery', 'sigmaref_discovery'];
+let _discoveryPollInterval = null;
+
+function isWorkerActive(status) {
+    return status === 'running' || status === 'waiting';
+}
 
 async function pollWorkerStatus(workerType) {
     try {
         const resp = await fetch('/api/v1/qdrant/embed/' + workerType);
-        if (!resp.ok) return 'idle';
+        if (!resp.ok) return 'not_found';
         const data = await resp.json();
         return data.details ? data.details.status : 'idle';
     } catch {
-        return 'idle';
+        return 'not_found';
     }
 }
 
-async function waitForDiscoveryComplete() {
-    while (true) {
-        const results = await Promise.all(DISCOVERY_WORKERS.map(pollWorkerStatus));
-        const allIdle = results.every(s => s === 'idle' || s === 'not_found');
-        if (allIdle) return;
-        await new Promise(r => setTimeout(r, 1000));
+async function checkAnyWorkerActive() {
+    const results = await Promise.all(DISCOVERY_WORKERS.map(pollWorkerStatus));
+    return results.some(isWorkerActive);
+}
+
+function setScanningButton(scanning) {
+    const btn = document.getElementById('list-document-btn');
+    if (!btn) return;
+    btn.disabled = scanning;
+    btn.textContent = scanning ? 'Scanning...' : 'List document';
+}
+
+function stopDiscoveryPolling() {
+    if (_discoveryPollInterval) {
+        clearInterval(_discoveryPollInterval);
+        _discoveryPollInterval = null;
     }
+}
+
+function startDiscoveryPolling(onIdle) {
+    stopDiscoveryPolling();
+    _discoveryPollInterval = setInterval(async () => {
+        const active = await checkAnyWorkerActive();
+        if (!active) {
+            stopDiscoveryPolling();
+            setScanningButton(false);
+            if (onIdle) onIdle();
+        }
+    }, 1000);
 }
 
 async function listDocuments() {
-    const btn = document.getElementById('list-document-btn');
-    btn.disabled = true;
-    btn.textContent = 'Scanning...';
+    setScanningButton(true);
     try {
         const response = await fetch('/api/v1/files/list', { method: 'POST' });
         const result = await response.json();
         if (result.success) {
-            await waitForDiscoveryComplete();
-            loadRepos();
+            startDiscoveryPolling(() => loadRepos());
         } else {
             alert(result.error || 'Scan failed');
+            setScanningButton(false);
         }
     } catch (error) {
         alert('Failed to initiate scan');
-    } finally {
-        btn.disabled = false;
-        btn.textContent = 'List document';
+        setScanningButton(false);
+    }
+}
+
+async function checkRunningWorkersOnLoad() {
+    const active = await checkAnyWorkerActive();
+    if (active) {
+        setScanningButton(true);
+        startDiscoveryPolling(() => loadRepos());
     }
 }
 
@@ -343,6 +374,7 @@ document.getElementById('add-repo-form').onsubmit = async (e) => {
 };
 
 loadRepos();
+checkRunningWorkersOnLoad();
 </script>
 {% endblock %}
 
