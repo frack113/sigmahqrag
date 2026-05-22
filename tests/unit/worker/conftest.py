@@ -61,7 +61,7 @@ def sample_sigmaref_task() -> dict:
         "task_type": "sigmaref_discovery",
         "collection_name": "sigmaref",
         "source_type": "sigmaref",
-        "rules_dir": "data/rules",
+        "rules_dir": "data/github",
         "output_dir": "data/documents/sigmaref",
     }
 

@@ -264,6 +264,28 @@ async function deleteRepo(org, name) {
     }
 }
 
+const DISCOVERY_WORKERS = ['github_discovery', 'local_discovery', 'sigmaref_discovery'];
+
+async function pollWorkerStatus(workerType) {
+    try {
+        const resp = await fetch('/api/v1/qdrant/embed/' + workerType);
+        if (!resp.ok) return 'idle';
+        const data = await resp.json();
+        return data.details ? data.details.status : 'idle';
+    } catch {
+        return 'idle';
+    }
+}
+
+async function waitForDiscoveryComplete() {
+    while (true) {
+        const results = await Promise.all(DISCOVERY_WORKERS.map(pollWorkerStatus));
+        const allIdle = results.every(s => s === 'idle' || s === 'not_found');
+        if (allIdle) return;
+        await new Promise(r => setTimeout(r, 1000));
+    }
+}
+
 async function listDocuments() {
     const btn = document.getElementById('list-document-btn');
     btn.disabled = true;
@@ -272,7 +294,7 @@ async function listDocuments() {
         const response = await fetch('/api/v1/files/list', { method: 'POST' });
         const result = await response.json();
         if (result.success) {
-            alert(result.message || 'Scan started');
+            await waitForDiscoveryComplete();
             loadRepos();
         } else {
             alert(result.error || 'Scan failed');

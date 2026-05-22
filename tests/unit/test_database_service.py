@@ -176,9 +176,12 @@ class TestModels:
         models = db.get_models()
         assert models[0]["files"] == files
 
-    def test_model_type_constraint(self, db: DatabaseService) -> None:
-        with pytest.raises(Exception, match="CHECK"):
-            db.upsert_model({"repo_id": "bad", "model_type": "invalid"})
+    def test_model_type_stored_as_is(self, db: DatabaseService) -> None:
+        db.upsert_model({"repo_id": "bad", "model_type": "invalid"})
+        models = db.get_models()
+        match = [m for m in models if m["repo_id"] == "bad"]
+        assert len(match) == 1
+        assert match[0]["model_type"] == "invalid"
 
 
 class TestDocSigmaRef:

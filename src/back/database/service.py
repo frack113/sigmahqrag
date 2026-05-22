@@ -80,16 +80,17 @@ class DatabaseService:
 
     def _load_from_file(self) -> None:
         """Import data from an existing DuckDB file into the in-memory tables."""
-        logger.info("Loading database from %s", self.db_path)
-        path = self.db_path.as_posix()
-        self._writer_conn.execute(f"ATTACH '{path}' AS file_db (READ_ONLY)")
-        for table in _VALID_TABLES:
-            try:
-                self._writer_conn.execute(f"INSERT OR IGNORE INTO {table} SELECT * FROM file_db.{table}")
-            except Exception:
-                logger.warning("Table %s not found in existing database — skipping", table)
-        self._writer_conn.execute("DETACH file_db")
-        logger.info("Loaded tables from disk")
+        with self._lock:
+            logger.info("Loading database from %s", self.db_path)
+            path = self.db_path.as_posix()
+            self._writer_conn.execute(f"ATTACH '{path}' AS file_db (READ_ONLY)")
+            for table in _VALID_TABLES:
+                try:
+                    self._writer_conn.execute(f"INSERT OR IGNORE INTO {table} SELECT * FROM file_db.{table}")
+                except Exception:
+                    logger.warning("Table %s not found in existing database — skipping", table)
+            self._writer_conn.execute("DETACH file_db")
+            logger.info("Loaded tables from disk")
 
     def persist(self, path: str | None = None) -> None:
         """Flush the in-memory database to a DuckDB file on disk (atomic write)."""
@@ -99,22 +100,23 @@ class DatabaseService:
         target = Path(path or self.db_path)
         target.parent.mkdir(parents=True, exist_ok=True)
         tmp = target.with_suffix(".duckdb.tmp")
-        try:
-            path_str = tmp.as_posix()
-            self._writer_conn.execute(f"ATTACH '{path_str}' AS file_db (TYPE DUCKDB)")
-            for table in _VALID_TABLES:
-                self._writer_conn.execute(
-                    f"CREATE TABLE file_db.{table} AS SELECT * FROM {table}"
-                )
-            self._writer_conn.execute("DETACH file_db")
-            if target.exists():
-                target.unlink()
-            tmp.rename(target)
-            logger.info("Database persisted to %s", target)
-        except Exception:
-            if tmp.exists():
-                tmp.unlink()
-            raise
+        with self._lock:
+            try:
+                path_str = tmp.as_posix()
+                self._writer_conn.execute(f"ATTACH '{path_str}' AS file_db (TYPE DUCKDB)")
+                for table in _VALID_TABLES:
+                    self._writer_conn.execute(
+                        f"CREATE TABLE file_db.{table} AS SELECT * FROM {table}"
+                    )
+                self._writer_conn.execute("DETACH file_db")
+                if target.exists():
+                    target.unlink()
+                tmp.rename(target)
+                logger.info("Database persisted to %s", target)
+            except Exception:
+                if tmp.exists():
+                    tmp.unlink()
+                raise
 
     def close(self) -> None:
         """Close database connections and clear singleton."""
@@ -135,21 +137,23 @@ class DatabaseService:
 
     def _safe_query(self, query: str, params: tuple = ()) -> Any:
         """Execute a read-only query with parameterized input."""
-        conn = self._get_reader_connection()
-        if conn is None:
-            return None
-        return conn.execute(query, params).fetchone()
+        with self._lock:
+            conn = self._get_reader_connection()
+            if conn is None:
+                return None
+            return conn.execute(query, params).fetchone()
 
     def get_tables(self) -> list[str]:
         """Return sorted list of valid table names."""
-        return sorted(
-            [
-                row[0]
-                for row in self._writer_conn.execute(
-                    "SELECT table_name FROM information_schema.tables WHERE table_type='BASE TABLE'"
-                ).fetchall()
-            ]
-        )
+        with self._lock:
+            return sorted(
+                [
+                    row[0]
+                    for row in self._writer_conn.execute(
+                        "SELECT table_name FROM information_schema.tables WHERE table_type='BASE TABLE'"
+                    ).fetchall()
+                ]
+            )
 
     def get_table_data(self, table_name: str, limit: int = 50, offset: int = 0) -> list[dict]:
         """Fetch paginated data from a table."""
@@ -581,6 +585,73 @@ class DatabaseService:
         with self._lock:
             self._writer_conn.execute(
                 "DELETE FROM git_selected_dirs WHERE repo_key = ?", (repo_key,)
+            )
+            self._writer_conn.commit()
+
+    # =========================================================================
+    # WORKER_STATE TABLE
+    # =========================================================================
+
+    def upsert_worker_state(
+        self,
+        worker_type: str,
+        status: str = "idle",
+        current_task_id: str | None = None,
+        progress_percent: float = 0.0,
+        current_file: str | None = None,
+    ) -> None:
+        """Upsert worker state."""
+        now = _iso_now()
+        with self._lock:
+            self._writer_conn.execute(
+                """INSERT INTO worker_state (worker_type, status, current_task_id, progress_percent, current_file, last_heartbeat)
+                 VALUES (?, ?, ?, ?, ?, ?)
+                 ON CONFLICT (worker_type) DO UPDATE SET
+                     status = EXCLUDED.status,
+                     current_task_id = EXCLUDED.current_task_id,
+                     progress_percent = EXCLUDED.progress_percent,
+                     current_file = EXCLUDED.current_file,
+                     last_heartbeat = EXCLUDED.last_heartbeat""",
+                (worker_type, status, current_task_id, progress_percent, current_file, now),
+            )
+            self._writer_conn.commit()
+
+    def get_worker_progress(self, worker_type: str) -> dict | None:
+        """Get progress for a worker type."""
+        result = self._safe_query(
+            "SELECT worker_type, status, current_task_id, progress_percent, current_file, last_heartbeat FROM worker_state WHERE worker_type = ?",
+            (worker_type,),
+        )
+        if result:
+            return {
+                "worker_type": result[0],
+                "status": result[1],
+                "current_task_id": result[2],
+                "progress_percent": result[3],
+                "current_file": result[4],
+                "last_heartbeat": result[5],
+            }
+        return None
+
+    def update_worker_progress(self, worker_type: str, progress_percent: float, current_file: str | None = None) -> None:
+        """Update progress for a worker type."""
+        now = _iso_now()
+        with self._lock:
+            self._writer_conn.execute(
+                "UPDATE worker_state SET progress_percent = ?, current_file = ?, last_heartbeat = ? WHERE worker_type = ?",
+                (progress_percent, current_file, now, worker_type),
+            )
+            self._writer_conn.commit()
+
+    def reset_stale_workers(self, stale_seconds: int = 60) -> None:
+        """Reset workers that haven't sent a heartbeat recently."""
+        from datetime import datetime, timedelta, timezone
+
+        cutoff = (datetime.now(timezone.utc) - timedelta(seconds=stale_seconds)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        with self._lock:
+            self._writer_conn.execute(
+                "UPDATE worker_state SET status = 'idle', current_task_id = NULL, progress_percent = 0.0, current_file = NULL WHERE last_heartbeat IS NOT NULL AND last_heartbeat < ?",
+                (cutoff,),
             )
             self._writer_conn.commit()
 

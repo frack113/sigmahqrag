@@ -116,6 +116,14 @@ class TaskDispatcher:
                 return False
             return state.get("status") != WorkerStatus.IDLE
 
+    def get_progress_worker(self, worker_type: WorkerName) -> int:
+        """Return progress percentage 0-100 for a worker type."""
+        with self._lock:
+            state = self._worker_states.get(worker_type)
+            if state is None:
+                return 0
+            return state.get("progress_percent", 0)
+
     # ------------------------------------------------------------------
     # Lifecycle
     # ------------------------------------------------------------------

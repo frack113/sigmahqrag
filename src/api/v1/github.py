@@ -127,6 +127,7 @@ async def add_repo(
                     "status": "synced",
                     "last_synced": datetime.now().isoformat(),
                     "created_at": datetime.now().isoformat(),
+                    "remote_head": result.get("remote_head"),
                 },
             )
             save_selected_dirs(org, name, [])
@@ -202,6 +203,7 @@ async def sync_repo(
                     "status": "synced",
                     "last_synced": datetime.now().isoformat(),
                     "branch": branch,
+                    "remote_head": result.get("remote_head"),
                 },
             )
         return result

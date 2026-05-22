@@ -128,6 +128,7 @@ def clone_repo(
 
         # gitpython extracts this automatically
         current_branch = cloned.active_branch.name if cloned.active_branch else None
+        head_hash = cloned.head.commit.hexsha
 
         logger.info(f"Cloned repository: {url} -> {dest_path}")
         return {
@@ -136,6 +137,7 @@ def clone_repo(
             "name": name,
             "path": str(dest_path),
             "branch": current_branch,
+            "remote_head": head_hash,
         }
     except Exception as e:
         logger.error(f"Failed to clone {url}: {e}")
@@ -161,7 +163,12 @@ def update_repo(
     try:
         # gitpython provides remotes and fetch/pull natively
         origin = repo.remotes.origin
-        origin.fetch()
+        fetch_info = origin.fetch()
+        remote_head = None
+        for info in fetch_info:
+            if info.ref.remote_head == branch:
+                remote_head = info.commit.hexsha
+                break
         # Pull with rebase or merge based on config
         origin.pull(branch)
         logger.info(f"Updated repository: {org}/{name} on branch {branch}")
@@ -171,6 +178,7 @@ def update_repo(
             "name": name,
             "path": str(repo_path),
             "branch": branch,
+            "remote_head": remote_head,
         }
     except Exception as e:
         logger.error(f"Failed to update {org}/{name}: {e}")
@@ -359,7 +367,7 @@ def get_last_commit_date(org: str, name: str, repos_dir: Path = DEFAULT_REPOS_DI
 
 
 def is_repo_outdated(org: str, name: str, repos_dir: Path = DEFAULT_REPOS_DIR) -> bool:
-    """Check if local repo is behind remote by comparing commit hashes."""
+    """Check if local repo is behind remote using stored remote HEAD hash (no network call)."""
     repos_dir = Path(repos_dir).resolve()
     repo_path = _get_repo_path(repos_dir, org, name)
 
@@ -369,12 +377,10 @@ def is_repo_outdated(org: str, name: str, repos_dir: Path = DEFAULT_REPOS_DIR) -
 
     try:
         local_commit = repo.head.commit.hexsha
-        origin = repo.remotes.origin
-        origin.fetch()
-        for ref in origin.refs:
-            if ref.remote_head == repo.active_branch.name:
-                remote_commit = ref.commit.hexsha
-                return local_commit != remote_commit
-        return False
+        metadata = get_metadata(org, name)
+        remote_head = (metadata or {}).get("remote_head")
+        if remote_head is None:
+            return True
+        return local_commit != remote_head
     except Exception:
         return False

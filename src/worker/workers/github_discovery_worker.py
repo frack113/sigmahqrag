@@ -83,9 +83,17 @@ class GithubDiscoveryWorker(BaseWorker):
             return False
 
     def process(self, task: dict) -> None:
+        from src.worker.enums import WorkerName
+
         try:
             repo_keys = self.db.get_repos_with_selected_dirs()
             if not repo_keys:
+                if self.dispatcher is not None:
+                    self.dispatcher.update_worker_state(
+                        WorkerName.GITHUB_DISCOVERY,
+                        progress_percent=100,
+                        current_file="",
+                    )
                 logger.info("[GithubDiscoveryWorker] No repos with selected dirs, nothing to scan")
                 return
 
@@ -142,6 +150,20 @@ class GithubDiscoveryWorker(BaseWorker):
                     )
                     skipped_count += 1
 
+                if total_files > 0 and self.dispatcher is not None:
+                    pct = int((processed_count + skipped_count) / total_files * 100)
+                    self.dispatcher.update_worker_state(
+                        WorkerName.GITHUB_DISCOVERY,
+                        progress_percent=pct,
+                        current_file=str(file_path),
+                    )
+
+            if self.dispatcher is not None:
+                self.dispatcher.update_worker_state(
+                    WorkerName.GITHUB_DISCOVERY,
+                    progress_percent=100,
+                    current_file="",
+                )
             logger.info(
                 f"[GithubDiscoveryWorker] Complete: {processed_count} discovered, {skipped_count} skipped"
             )

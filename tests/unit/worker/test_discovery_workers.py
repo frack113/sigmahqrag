@@ -18,7 +18,7 @@ class TestSigmaRefDiscoveryWorker:
             "task_id": "sr-disc-001",
             "task_type": "sigmaref_discovery",
             "collection_name": "sigmaref",
-            "rules_dir": "data/rules",
+            "rules_dir": "data/github",
             "output_dir": "data/documents/sigmaref",
         }
 
@@ -32,7 +32,7 @@ class TestSigmaRefDiscoveryWorker:
             worker.process(task)
 
         mock_download.assert_called_once_with(
-            rules_dir="data/rules",
+            rules_dir="data/github",
             output_dir="data/documents/sigmaref",
             db=mock_db,
             supported_types={"markdown"},

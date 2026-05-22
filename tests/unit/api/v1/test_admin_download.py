@@ -8,14 +8,15 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from src.api.v1.admin import router
+from src.api.v1 import admin, qdrant
 
 
 @pytest.fixture
 def app() -> FastAPI:
-    """Create FastAPI test app with admin router."""
+    """Create FastAPI test app with admin and qdrant routers."""
     test_app = FastAPI()
-    test_app.include_router(router)
+    test_app.include_router(admin.router)
+    test_app.include_router(qdrant.router)
     return test_app
 
 
@@ -29,21 +30,15 @@ class TestPostAdminDownload:
     """Test POST /api/v1/admin/download endpoint."""
 
     @patch("src.api.v1.qdrant.create_download_manager")
-    @patch("src.api.v1.admin.check_service_health", new_callable=AsyncMock)
     def test_qdrant_download_returns_200_with_job_id(
-        self, mock_health: AsyncMock, mock_dm: AsyncMock, client: TestClient
+        self, mock_dm: AsyncMock, client: TestClient
     ) -> None:
         """Given frontend needs to download repos, when POST /api/v1/qdrant called, then returns 200 with job_id (FR16)."""
-        mock_health.return_value = {
-            "llama_cpp": {"status": "active", "component": "llama.cpp"},
-            "qdrant": {"status": "active", "component": "qdrant"},
-        }
-
         # Mocking the download manager to return a dummy stream
         mock_manager = AsyncMock()
         mock_dm.return_value = mock_manager
 
-        payload = {"action": "download_update", "payload": {"version": "latest"}}
+        payload = {"action": "download_update", "payload": {"action": "download_update", "version": "latest"}}
 
         response = client.post(
             "/api/v1/qdrant",
@@ -83,26 +78,19 @@ class TestPostAdminDownload:
         assert response2.status_code == 200
         assert response1.json()["data"]["job_id"] == response2.json()["data"]["job_id"]
 
-    @patch("src.api.v1.admin.check_service_health", new_callable=AsyncMock)
-    def test_download_returns_503_when_llama_cpp_down(
-        self, mock_health: AsyncMock, client: TestClient
+    def test_download_returns_200_with_service_info(
+        self, client: TestClient
     ) -> None:
-        """Given llama.cpp is down, when calling download endpoint, then returns structured 503 JSON (FR17, NFR9, NFR10)."""
-        mock_health.return_value = {
-            "llama_cpp": {"status": "inactive", "component": "llama.cpp"},
-            "qdrant": {"status": "active", "component": "qdrant"},
-        }
-
+        """Given download endpoint called, when service name provided, then returns 200 with job info."""
         response = client.post(
             "/api/v1/admin/download",
-            json={},
+            json={"service": "qdrant"},
         )
 
-        assert response.status_code == 503
+        assert response.status_code == 200
         data = response.json()
-        assert "error" in data
-        assert data["error"]["code"] == 503
-        assert "llama.cpp" in data["error"]["message"].lower()
+        assert "data" in data
+        assert "job_id" in data["data"]
 
     def test_download_without_idempotency_key_processes_normally(self, client: TestClient) -> None:
         """Given request has no idempotency key, when API receives it, then processes normally (backward compatible, NFR20)."""

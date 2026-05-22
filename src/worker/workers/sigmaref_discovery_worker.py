@@ -10,7 +10,7 @@ class SigmaRefDiscoveryWorker(BaseWorker):
     """Scans Sigma rule YAML files, extracts reference URLs, and downloads them."""
 
     def process(self, task: dict) -> None:
-        rules_dir = task.get("rules_dir", "data/rules")
+        rules_dir = task.get("rules_dir", "data/github")
         output_dir = task.get("output_dir", "data/documents/sigmaref")
 
         logger.info(
