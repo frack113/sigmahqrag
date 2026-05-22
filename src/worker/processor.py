@@ -230,6 +230,8 @@ class TaskDispatcher:
                 self._worker_states[worker_type]["current_task_id"] = ""
                 self._worker_states[worker_type]["error"] = error or ""
                 self._worker_states[worker_type]["progress_percent"] = 0
+            if self._db is not None:
+                self._db.persist()
 
     def _on_task_done(self, future: Future) -> None:
         """Callback executed when a future completes."""
