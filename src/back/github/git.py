@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import shutil
 from pathlib import Path
 from typing import Any
@@ -17,9 +18,19 @@ logger = logging.getLogger(__name__)
 DEFAULT_REPOS_DIR = Path("data/github")
 LOCKFILE = ".cloning"
 
+# Valid org/name pattern: alphanumeric, hyphens, underscores, dots (no path separators)
+_VALID_ORG_NAME_RE = re.compile(r"^[\w.-]+$")
+
+
+def _validate_org_name(org: str, name: str) -> None:
+    """Validate org/name to prevent path traversal."""
+    if not _VALID_ORG_NAME_RE.match(org) or not _VALID_ORG_NAME_RE.match(name):
+        raise ValueError(f"Invalid org/name: '{org}/{name}' contains path traversal characters")
+
 
 def _get_repo_path(repos_dir: Path, org: str, name: str) -> Path:
     """Get the full path for a repository."""
+    _validate_org_name(org, name)
     return repos_dir / org / name
 
 
@@ -208,6 +219,9 @@ def delete_repo(org: str, name: str, repos_dir: Path = DEFAULT_REPOS_DIR) -> dic
             db.delete_selected_dirs(repo_key)
 
         return {"success": True}
+    except ValueError as e:
+        logger.error(f"Delete failed: {e}")
+        return {"success": False, "error": str(e)}
     except Exception as e:
         logger.error(f"Failed to delete {org}/{name}: {e}")
         return {"success": False, "error": str(e)}

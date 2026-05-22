@@ -33,7 +33,7 @@ class RAGPipeline:
         self.cache = ResponseCache()
         self.env = Environment(
             loader=FileSystemLoader(PROMPT_DIR),
-            autoescape=False,
+            autoescape=True,
         )
 
     async def explain_rule(

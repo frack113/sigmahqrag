@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import shutil
 import uuid
 import zipfile
@@ -316,6 +317,12 @@ class DownloadManager:
 
                 with tempfile.TemporaryDirectory() as tmp_dir:
                     with zipfile.ZipFile(temp_path, "r") as zf:
+                        # Prevent path traversal: reject entries with absolute paths or ../
+                        for name in zf.namelist():
+                            if os.path.isabs(name) or ".." in name:
+                                raise RuntimeError(
+                                    f"Zip entry '{name}' would extract outside destination"
+                                )
                         zf.extractall(tmp_dir)
 
                     # Find the top-level directory in the zip

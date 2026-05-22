@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import shutil
 import zipfile
 from pathlib import Path
@@ -42,6 +43,23 @@ class QdrantInstallerService:
     def get_ui_dist_path(self) -> Path:
         return self.static_dir / "dist"
 
+    def _safe_extract_zip(self, zip_path: Path, dest_dir: Path) -> None:
+        """Extract a zip file safely, preventing path traversal.
+
+        Rejects any archive entry with absolute paths or path traversal
+        sequences (e.g. ``/etc/passwd``, ``../../foo``), raising
+        ``ValueError`` on the first offending entry.
+        """
+        dest_resolved = dest_dir.resolve()
+        with zipfile.ZipFile(zip_path, "r") as z:
+            for name in z.namelist():
+                # Prevent absolute paths and path traversal in archive entries
+                if os.path.isabs(name) or ".." in name:
+                    raise ValueError(
+                        f"Zip entry '{name}' would extract outside destination directory"
+                    )
+            z.extractall(dest_dir)
+
     async def download_binary(self, progress_callback=None) -> dict[str, Any]:
         """Download Qdrant binary for Windows x86_64."""
         import urllib.request
@@ -61,8 +79,7 @@ class QdrantInstallerService:
             if progress_callback:
                 progress_callback(50, "Extracting binary...")
 
-            with zipfile.ZipFile(zip_path, "r") as z:
-                z.extractall(self.bin_dir)
+            self._safe_extract_zip(zip_path, self.bin_dir)
 
             if progress_callback:
                 progress_callback(80, "Cleaning up...")
@@ -102,8 +119,7 @@ class QdrantInstallerService:
             if progress_callback:
                 progress_callback(50, "Extracting web UI...")
 
-            with zipfile.ZipFile(zip_path, "r") as z:
-                z.extractall(self.static_dir)
+            self._safe_extract_zip(zip_path, QDRANT_UI_DEST)
 
             if progress_callback:
                 progress_callback(90, "Cleaning up...")

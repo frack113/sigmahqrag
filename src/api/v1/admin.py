@@ -443,10 +443,12 @@ async def get_models() -> JSONResponse:
 @router.post("/models/delete")
 async def delete_model(request: dict) -> JSONResponse:
     """POST /api/v1/admin/models/delete - Delete a model."""
+    import os
     from pathlib import Path
 
     from src.api.dependencies import get_unified_registry
     from src.back.models import ModelNotFoundError
+    from src.shared import LLM_DIR
 
     try:
         reg = get_unified_registry()
@@ -459,12 +461,26 @@ async def delete_model(request: dict) -> JSONResponse:
                 content={"status": "error", "error": "repo_id and filename required"},
             )
 
+        # Validate repo_id to prevent path traversal (format: org/name)
+        if ".." in repo_id or repo_id.count("/") != 1 or repo_id.startswith("/") or repo_id.endswith("/"):
+            return JSONResponse(
+                status_code=400,
+                content={"status": "error", "error": "Invalid repo_id"},
+            )
+
         record = reg.get_llm(repo_id)
         if not record:
             raise ModelNotFoundError(f"Model {repo_id} not found")
         if filename not in record.get("files", {}):
             raise ModelNotFoundError(f"File {filename} not found in {repo_id}")
-        path = Path(record["files"][filename]["local_path"])
+        path = Path(record["files"][filename]["local_path"]).resolve()
+        # Prevent path traversal: ensure the resolved path is within LLM_DIR
+        llm_dir = str(Path(LLM_DIR).resolve()).rstrip("/\\") + os.sep
+        if not str(path) + os.sep.startswith(llm_dir):
+            return JSONResponse(
+                status_code=400,
+                content={"status": "error", "error": "Invalid file path"},
+            )
         if path.exists():
             path.unlink()
         del record["files"][filename]

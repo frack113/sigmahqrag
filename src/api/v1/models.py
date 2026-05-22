@@ -196,9 +196,15 @@ async def delete_llm_model(repo_id: str) -> JSONResponse:
 @router.delete("/llm/{repo_id}/file/{filename}")
 async def delete_llm_model_file(repo_id: str, filename: str) -> JSONResponse:
     """Delete a LLM model file."""
+    import os
     from pathlib import Path
 
     from src.back.models.exceptions import ModelNotFoundError
+    from src.shared import LLM_DIR
+
+    # Validate repo_id to prevent path traversal (format: org/name, e.g. "TheBloke/Mistral-7B")
+    if not repo_id or ".." in repo_id or repo_id.count("/") != 1 or repo_id.startswith("/") or repo_id.endswith("/"):
+        return JSONResponse(status_code=400, content={"error": "Invalid repo_id"})
 
     try:
         db = get_database_service()
@@ -208,7 +214,12 @@ async def delete_llm_model_file(repo_id: str, filename: str) -> JSONResponse:
             raise ModelNotFoundError(f"Model {repo_id} not found")
         if filename not in record.get("files", {}):
             raise ModelNotFoundError(f"File {filename} not found in {repo_id}")
-        path = Path(record["files"][filename]["local_path"])
+        path = Path(record["files"][filename]["local_path"]).resolve()
+        # Prevent path traversal: ensure the resolved path is within LLM_DIR
+        # Use os.sep suffix to prevent prefix matching attacks (e.g. "llm_evil")
+        llm_dir = str(Path(LLM_DIR).resolve()).rstrip("/\\") + os.sep
+        if not str(path) + os.sep.startswith(llm_dir):
+            raise ModelNotFoundError(f"Invalid file path for {filename}")
         if path.exists():
             path.unlink()
         del record["files"][filename]
@@ -283,8 +294,15 @@ async def download_embedding_model(
 @router.delete("/embedding/{repo_id}")
 async def delete_embedding_model(repo_id: str) -> JSONResponse:
     """Delete an embedding model."""
+    import os
     import shutil
     from pathlib import Path
+
+    from src.shared import EMBEDDINGS_DIR
+
+    # Validate repo_id to prevent path traversal
+    if not repo_id or ".." in repo_id or "/" in repo_id:
+        return JSONResponse(status_code=400, content={"error": "Invalid repo_id"})
 
     try:
         db = get_database_service()
@@ -292,7 +310,12 @@ async def delete_embedding_model(repo_id: str) -> JSONResponse:
         record = reg.get_embedding(repo_id, db)
         if not record:
             return JSONResponse(status_code=404, content={"error": f"Model {repo_id} not found"})
-        path = Path(record.get("local_path", ""))
+        path = Path(record.get("local_path", "")).resolve()
+        # Prevent path traversal: ensure the resolved path is within EMBEDDINGS_DIR
+        # Use os.sep suffix to prevent prefix matching attacks (e.g. "embeddings_evil")
+        embeddings_dir = str(Path(EMBEDDINGS_DIR).resolve()).rstrip("/\\") + os.sep
+        if not str(path) + os.sep.startswith(embeddings_dir):
+            return JSONResponse(status_code=400, content={"error": f"Invalid path for model {repo_id}"})
         if path.exists():
             if path.is_dir():
                 shutil.rmtree(path)

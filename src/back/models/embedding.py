@@ -192,14 +192,20 @@ class EmbeddingManager:
         """Delete an embedding model."""
         registry = await self._load_registry()
         if repo_id in registry:
-            path = Path(registry[repo_id]["local_path"])
+            path = Path(registry[repo_id]["local_path"]).resolve()
+            # Prevent path traversal: ensure the resolved path is within embeddings_dir
+            if not str(path).startswith(str(self.embeddings_dir.resolve())):
+                return
             if path.exists():
                 if path.is_dir():
                     shutil.rmtree(path)
                 else:
                     path.unlink()
             index_path = registry[repo_id].get("index_path")
-            if index_path and Path(index_path).exists():
-                Path(index_path).unlink()
+            if index_path:
+                index_path_resolved = Path(index_path).resolve()
+                if str(index_path_resolved).startswith(str(self.embeddings_dir.resolve())):
+                    if index_path_resolved.exists():
+                        index_path_resolved.unlink()
             del registry[repo_id]
             await self._save_registry(registry)
