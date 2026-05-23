@@ -52,7 +52,7 @@ def mock_path_not_exists():
 class FakeConfig:
     """Simulated config matching the fields used by auto_start."""
 
-    qdrant_mode: str = "managed"
+    qdrant_manage_internally: bool = True
     qdrant_port: int = 6333
     qdrant_binary_path: str = "data/bin/qdrant"
 
@@ -71,8 +71,8 @@ class TestStartQdrant:
         mock_health.assert_awaited_once()
         assert not _auto_start_mod._qdrant_started_by_us
 
-    async def test_skips_when_mode_external(self, mock_config):
-        mock_config.qdrant_mode = "external"
+    async def test_skips_when_not_managed_internally(self, mock_config):
+        mock_config.qdrant_manage_internally = False
         await start_qdrant()
         assert not _auto_start_mod._qdrant_started_by_us
 

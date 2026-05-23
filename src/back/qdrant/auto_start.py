@@ -23,8 +23,8 @@ async def start_qdrant(
 
     config = get_config()
 
-    if config.qdrant_mode == "external":
-        logger.info("Qdrant mode=external -- skipping auto-start")
+    if not config.qdrant_manage_internally:
+        logger.info("Qdrant manage_internally=false -- skipping auto-start")
         return
 
     if health_check is None:

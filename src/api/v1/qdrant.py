@@ -83,7 +83,7 @@ async def qdrant_status():
                 "healthy": is_healthy,
                 "current_version": version or "unknown",
                 "downloads": downloads,
-                "mode": config.qdrant_mode,
+                "mode": "managed" if config.qdrant_manage_internally else "external",
                 "base_url": qdrant_base_url,
             }
         )
