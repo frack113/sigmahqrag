@@ -3,7 +3,6 @@
 import logging
 from contextlib import asynccontextmanager
 from logging.handlers import RotatingFileHandler
-from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -18,8 +17,9 @@ from src.api.v1.admin import router as admin_v1_router
 from src.api.v1.chat import router as chat_v1_router
 from src.api.v1.config import router as config_v1_router
 from src.api.v1.coverage import router as coverage_v1_router
-from src.api.v1.documents import router as documents_v1_router
+from src.api.v1.dispatcher import router as dispatcher_v1_router
 from src.api.v1.duckdb import router as duckdb_v1_router
+from src.api.v1.documents import router as documents_v1_router
 from src.api.v1.embedding_config import router as embedding_config_v1_router
 from src.api.v1.embeddings import router as embeddings_v1_router
 from src.api.v1.explain import router as explain_v1_router
@@ -37,6 +37,7 @@ from src.back.qdrant.auto_start import start_qdrant, stop_qdrant
 from src.back.service_manager import shutdown_all_services
 from src.worker.processor import TaskDispatcher
 from src.worker.enums import WorkerName
+from src.front import STATIC_DIR
 from src.shared.exceptions import SigmaError
 from src.shared import TEMP_DIR
 
@@ -217,8 +218,7 @@ def create_app() -> FastAPI:
                     )
         return await call_next(request)
 
-    static_dir = str(Path(__file__).parent / "front" / "static")
-    app.mount("/static", StaticFiles(directory=static_dir), name="static")
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
     app.include_router(admin_pages_router)
     app.include_router(admin_v1_router)
@@ -226,6 +226,7 @@ def create_app() -> FastAPI:
     app.include_router(duckdb_v1_router)
     app.include_router(config_v1_router)
     app.include_router(coverage_v1_router)
+    app.include_router(dispatcher_v1_router)
     app.include_router(explain_v1_router)
     app.include_router(files_v1_router)
     app.include_router(github_v1_router)

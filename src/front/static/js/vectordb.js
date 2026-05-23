@@ -1,3 +1,5 @@
+const DISPATCHER_API = '/api/v1/dispatcher';
+
 function esc(s) {
     if (s == null) return '';
     var m = { '&': '\x26amp;', '<': '\x26lt;', '>': '\x26gt;', '"': '\x26quot;', "'": '\x26#39;' };
@@ -24,14 +26,12 @@ async function loadVectorDB() {
     if (errorEl) errorEl.style.display = 'none';
 
     try {
-        // 1. Check Status using the new helper
         var status = await getQdrantStatus();
 
         if (!status.healthy) {
             throw new Error('Qdrint is unhealthy: ' + status.service + ' version ' + status.current_version);
         }
 
-        // 2. Get Collections List using our new helper
         var collectionNames = await listCollections();
 
         if (tableBody) {
@@ -83,10 +83,7 @@ async function recreateCollection(name) {
     window.isProcessing = true;
 
     try {
-        // 1. Delete
         await deleteCollection(name);
-        
-        // 2. Create (using default 384 dim as per project convention)
         await createCollection(name);
 
         alert('Collection "' + name + '" has been successfully re-created.');
@@ -99,6 +96,15 @@ async function recreateCollection(name) {
     }
 }
 
+async function askWorker(workerType, taskParams) {
+    var resp = await fetch(DISPATCHER_API + '/ask', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ worker_type: workerType, task_params: taskParams || {} }),
+    });
+    return await resp.json();
+}
+
 async function startSigmaRefEmbedding() {
     if (window.isProcessing) return;
 
@@ -106,7 +112,7 @@ async function startSigmaRefEmbedding() {
     var githubProgressFill = document.getElementById('github-progress-fill');
     var githubProgressText = document.getElementById('github-progress-text');
     var githubMessageEl = document.getElementById('github-message');
-    
+
     var progressSection = document.getElementById('sigmaref-progress-section');
     var progressFill = document.getElementById('sigmaref-progress-fill');
     var progressText = document.getElementById('sigmaref-progress-text');
@@ -116,7 +122,7 @@ async function startSigmaRefEmbedding() {
     if (btnIndexDocs) btnIndexDocs.disabled = true;
     if (githubMessageEl) githubMessageEl.style.display = 'none';
     if (messageEl) messageEl.style.display = 'none';
-    
+
     [githubProgressFill, progressFill].forEach(function(fill) {
         if (fill) {
             fill.style.width = '0%';
@@ -128,30 +134,35 @@ async function startSigmaRefEmbedding() {
     });
 
     try {
-        var response = await fetch('/api/v1/files/embed', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' }
-        });
-        var result = await response.json();
+        var tasks = [];
 
-        if (result.success || result.data) {
-            var tasks = result.data && result.data.triggered || [];
-            
-            if (tasks.indexOf('github_embeddings') !== -1) {
-                pollEmbedProgress('github_embeddings', githubProgressFill, githubProgressText, githubMessageEl, btnIndexDocs);
+        var gResult = await askWorker('github_embeddings', { collection_name: 'all' });
+        if (gResult.task_id) {
+            tasks.push('github_embeddings');
+        }
+
+        var lResult = await askWorker('local_embeddings', { collection_name: 'local' });
+        if (lResult.task_id) {
+            tasks.push('local_embeddings');
+        }
+
+        var sResult = await askWorker('sigmaref_embeddings', { collection_name: 'sigmaref' });
+        if (sResult.task_id) {
+            tasks.push('sigmaref_embeddings');
+        }
+
+        if (tasks.indexOf('github_embeddings') !== -1) {
+            pollEmbedProgress('github_embeddings', githubProgressFill, githubProgressText, githubMessageEl, btnIndexDocs);
+        }
+
+        if (tasks.indexOf('sigmaref_embeddings') !== -1) {
+            pollEmbedProgress('sigmaref_embeddings', progressFill, progressText, messageEl, btnIndexDocs);
+        }
+
+        if (tasks.length === 0) {
+            if (gResult.error && sResult.error) {
+                throw new Error('All workers busy');
             }
-            
-            if (tasks.indexOf('sigmaref_embeddings') !== -1) {
-                pollEmbedProgress('sigmaref_embeddings', progressFill, progressText, messageEl, btnIndexDocs);
-            }
-            
-            if (tasks.length === 0) {
-                if (result.error) {
-                    throw new Error(result.error);
-                }
-            }
-        } else {
-            throw new Error(result.error || result.message || 'Unknown error');
         }
     } catch (error) {
         console.error('Failed to start embedding:', error);
@@ -181,34 +192,33 @@ async function pollEmbedProgress(source, progressFill, progressText, messageEl, 
             return;
         }
         try {
-            var response = await fetch('/api/v1/qdrant/embed-status/' + encodeURIComponent(source));
-            var statusData = await response.json();
-
-            if (!statusData || statusData.status === 'not_found') {
+            var response = await fetch(DISPATCHER_API + '/status/' + encodeURIComponent(source));
+            if (response.status === 404) {
                 if (pollCount > 5) {
                     clearInterval(pollInterval);
                     checkAllComplete(btnIndexDocs);
                 }
                 return;
             }
+            var statusData = await response.json();
 
-            if (statusData.status === 'running') {
+            if (statusData.status === 'running' || statusData.status === 'waiting') {
                 var pct = Math.round(statusData.progress_percent || 0);
                 if (progressFill) progressFill.style.width = pct + '%';
                 if (progressText) progressText.textContent = pct + '%';
-            } else if (statusData.status === 'completed' || statusData.status === 'idle') {
+            } else if (statusData.status === 'idle') {
                 if (progressFill) {
                     progressFill.style.width = '100%';
                     progressFill.style.background = '#4caf50';
                 }
                 if (progressText) progressText.textContent = '100%';
                 if (messageEl) {
-                    messageEl.textContent = statusData.status === 'idle' ? 'Completed (no new documents)' : (statusData.message || 'Completed');
+                    messageEl.textContent = 'Completed';
                     messageEl.style.display = 'block';
                 }
                 clearInterval(pollInterval);
                 checkAllComplete(btnIndexDocs);
-            } else if (statusData.status === 'failed') {
+            } else if (statusData.status === 'error') {
                 if (progressFill) {
                     progressFill.style.background = '#f44336';
                 }
@@ -231,5 +241,4 @@ function checkAllComplete(btnIndexDocs) {
     if (btnIndexDocs) btnIndexDocs.disabled = false;
 }
 
-// Initialize on load
 document.addEventListener('DOMContentLoaded', loadVectorDB);

@@ -6,9 +6,8 @@ import logging
 from collections.abc import AsyncGenerator
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, StreamingResponse
-from src.api.dependencies import get_dispatcher
 from src.back.qdrant.collections import (
     list_collections,
     create_collection,
@@ -23,34 +22,12 @@ from src.shared.schemas.qdrant import (
     QdrantActionRequest,
     QdrantActionResponse,
 )
-from src.worker.enums import WorkerName, WorkerStatus
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/qdrant", tags=["v1-qdrant"])
 
 SERVICE_NAME = "qdrant"
-
-
-async def _embed_progress_generator(worker_type: str, dispatcher) -> AsyncGenerator[str, None]:
-    """Generate SSE progress updates by polling the TaskDispatcher."""
-    while True:
-        try:
-            status_data = dispatcher.get_worker_progress(worker_type)
-            if not status_data:
-                yield f"data: {json.dumps({'status': 'not_found'})}\n\n"
-                break
-
-            yield f"data: {json.dumps(status_data)}\n\n"
-
-            if status_data.get("status") in (WorkerStatus.IDLE.value, WorkerStatus.ERROR.value):
-                break
-        except Exception as e:
-            logger.error(f"SSE error for {worker_type}: {e}")
-            yield f"data: {json.dumps({'status': 'error', 'message': 'An internal error occurred'})}\n\n"
-            break
-
-        await asyncio.sleep(2)
 
 
 async def _progress_generator(download_id: str) -> AsyncGenerator[str, None]:
@@ -119,49 +96,6 @@ async def qdrant_progress(download_id: str):
     except Exception as e:
         logger.error(f"qdrant progress error: {e}")
         return JSONResponse(status_code=500, content={"error": "An internal error occurred"})
-
-
-@router.get("/embed/{worker_type}")
-async def embed_progress(worker_type: str, dispatcher=Depends(get_dispatcher)):
-    """Get the status of an embedding worker."""
-    status_data = dispatcher.get_worker_progress(worker_type)
-    if not status_data:
-        return JSONResponse(
-            status_code=404,
-            content={"status": "not_found", "message": "Worker not found"},
-        )
-    return JSONResponse(
-        content={
-            "status": status_data.get("status", "unknown"),
-            "worker_type": worker_type,
-            "details": status_data,
-        }
-    )
-
-
-@router.get("/embed/{worker_type}/stream")
-async def embed_progress_stream(worker_type: str, dispatcher=Depends(get_dispatcher)):
-    """Stream SSE progress for an embedding worker."""
-    try:
-        return StreamingResponse(
-            _embed_progress_generator(worker_type, dispatcher),
-            media_type="text/event-stream",
-        )
-    except Exception as e:
-        logger.error(f"embed progress error: {e}")
-        return JSONResponse(status_code=500, content={"error": "An internal error occurred"})
-
-
-@router.get("/embed-status/{worker_type}")
-async def worker_embed_status(worker_type: str, dispatcher=Depends(get_dispatcher)):
-    """Get embedding progress for a worker type."""
-    progress = dispatcher.get_worker_progress(worker_type)
-    if not progress:
-        return JSONResponse(
-            status_code=404,
-            content={"status": "not_found", "message": "Worker not found"},
-        )
-    return JSONResponse(content=progress)
 
 
 @router.post("")
@@ -299,49 +233,6 @@ async def qdrant_action(request: QdrantActionRequest, req: Request) -> QdrantAct
                 top_k=payload.top_k,
             )
             return QdrantActionResponse(status="success", action=action, data=results)
-
-        elif action == "embed_sigmaref":
-            try:
-                from src.back.qdrant import check_health as qdrant_health
-
-                if not await qdrant_health():
-                    return QdrantActionResponse(
-                        status="error",
-                        action=action,
-                        error_code="QDRANT_DOWN",
-                        message="Qdrant is unreachable",
-                    )
-            except Exception:
-                return QdrantActionResponse(
-                    status="error",
-                    action=action,
-                    error_code="QDRANT_DOWN",
-                    message="Qdrant is unreachable",
-                )
-
-            # Trigger via dispatcher — ask_for_worker is atomic (check + set)
-            if not hasattr(req.app.state, "dispatcher"):
-                raise RuntimeError("TaskDispatcher not available — is the server running?")
-
-            task_id = req.app.state.dispatcher.ask_for_worker(
-                WorkerName.SIGMAREF_EMBEDDINGS,
-                task_type=WorkerName.SIGMAREF_EMBEDDINGS.value,
-                collection_name=payload.collection_name,
-            )
-            if not task_id:
-                return QdrantActionResponse(
-                    status="error",
-                    action=action,
-                    error_code="ALREADY_RUNNING",
-                    message="Task already in progress",
-                )
-
-            return QdrantActionResponse(
-                status="success",
-                action=action,
-                data={"task_id": task_id},
-                message="SigmaRef embedding queued (will start within 5s)",
-            )
 
         else:
             return QdrantActionResponse(

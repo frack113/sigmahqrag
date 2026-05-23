@@ -3,20 +3,18 @@
 from __future__ import annotations
 
 import json
-import logging
 
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from src.back.backend.services.health_check import HealthCheckService
+from src.front import TEMPLATES_DIR
 from src.shared import get_config
 
-logger = logging.getLogger(__name__)
+templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
-router = APIRouter(tags=["admin-pages"])
-
-templates = Jinja2Templates(directory="src/front/templates")
+router = APIRouter(prefix="", tags=["page-admin"])
 
 health_service = HealthCheckService()
 

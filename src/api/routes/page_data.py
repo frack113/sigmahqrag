@@ -12,9 +12,11 @@ from src.back.utils.identify_file_type import (
     SUPPORTED_DOC_EXTENSION_MAP,
     FileType,
 )
+from src.front import TEMPLATES_DIR
 
-router = APIRouter(prefix="", tags=["pages"])
-templates = Jinja2Templates(directory="src/front/templates")
+templates = Jinja2Templates(directory=TEMPLATES_DIR)
+
+router = APIRouter(prefix="", tags=["page-data"])
 
 
 def _build_filetype_extensions() -> dict[str, list[str]]:

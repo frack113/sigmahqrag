@@ -46,6 +46,4 @@ class LocalRepoSyncWorker(BaseWorker):
             status=WorkerStatus.IDLE,
             current_task_id="",
         )
-        logger.info(
-            f"[LocalRepoSyncWorker] Complete: {synced} synced, {skipped} already present."
-        )
+        logger.info(f"[LocalRepoSyncWorker] Complete: {synced} synced, {skipped} already present.")
