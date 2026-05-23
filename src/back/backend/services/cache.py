@@ -46,7 +46,7 @@ class ResponseCache:
             return None
 
         self._update_access_order(key)
-        return entry["response"]
+        return entry["response"]  # type: ignore[no-any-return]
 
     def set(self, key: str, response: str) -> None:
         """Cache a response.
@@ -82,7 +82,7 @@ class ResponseCache:
 
     def _is_expired(self, entry: dict[str, Any]) -> bool:
         """Check if cache entry is expired."""
-        return time.time() - entry["timestamp"] > self.ttl
+        return time.time() - entry["timestamp"] > self.ttl  # type: ignore[no-any-return]
 
     def _evict_oldest(self) -> None:
         """Evict oldest accessed entry (FIFO)."""

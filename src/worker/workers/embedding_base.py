@@ -18,6 +18,7 @@ class EmbeddingWorker(BaseWorker):
     collection_name: str = ""
 
     def process(self, task: dict) -> None:
+        assert self.dispatcher is not None
         task_id = task.get("task_id", "")
         self._collection_name = task.get("collection_name", self.collection_name)
         self._task = task

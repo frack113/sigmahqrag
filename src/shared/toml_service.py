@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 try:
     import tomllib
 except ModuleNotFoundError:
-    import tomli as tomllib
+    import tomli as tomllib  # type: ignore[no-redef]
 
 try:
     import tomli_w

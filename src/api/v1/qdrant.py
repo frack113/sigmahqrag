@@ -6,9 +6,8 @@ import logging
 from collections.abc import AsyncGenerator
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, StreamingResponse
-from src.api.dependencies import get_dispatcher
 from src.back.qdrant.collections import (
     list_collections,
     create_collection,
@@ -20,37 +19,22 @@ from src.back.qdrant.service import create_qdrant_service
 from src.back.qdrant.storage import store_embeddings, delete_point, search as qdrant_search
 from src.shared.download_manager import create_download_manager
 from src.shared.schemas.qdrant import (
+    CancelPayload,
+    CollectionManagementPayload,
+    DataManagementPayload,
+    DownloadUpdatePayload,
+    ProgressPayload,
     QdrantActionRequest,
     QdrantActionResponse,
+    ServiceControlPayload,
+    VectorSearchPayload,
 )
-from src.worker.enums import WorkerName, WorkerStatus
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/qdrant", tags=["v1-qdrant"])
 
 SERVICE_NAME = "qdrant"
-
-
-async def _embed_progress_generator(worker_type: str, dispatcher) -> AsyncGenerator[str, None]:
-    """Generate SSE progress updates by polling the TaskDispatcher."""
-    while True:
-        try:
-            status_data = dispatcher.get_worker_progress(worker_type)
-            if not status_data:
-                yield f"data: {json.dumps({'status': 'not_found'})}\n\n"
-                break
-
-            yield f"data: {json.dumps(status_data)}\n\n"
-
-            if status_data.get("status") in (WorkerStatus.IDLE.value, WorkerStatus.ERROR.value):
-                break
-        except Exception as e:
-            logger.error(f"SSE error for {worker_type}: {e}")
-            yield f"data: {json.dumps({'status': 'error', 'message': 'An internal error occurred'})}\n\n"
-            break
-
-        await asyncio.sleep(2)
 
 
 async def _progress_generator(download_id: str) -> AsyncGenerator[str, None]:
@@ -82,6 +66,7 @@ async def qdrant_status():
         from src.shared import get_config
 
         config = get_config()
+        qdrant_base_url = config.qdrant_base_url
         version = config.qdrant_version
         is_healthy = health_result.get("status") == "active"
 
@@ -99,6 +84,7 @@ async def qdrant_status():
                 "current_version": version or "unknown",
                 "downloads": downloads,
                 "mode": config.qdrant_mode,
+                "base_url": qdrant_base_url,
             }
         )
     except Exception as e:
@@ -119,51 +105,10 @@ async def qdrant_progress(download_id: str):
         return JSONResponse(status_code=500, content={"error": "An internal error occurred"})
 
 
-@router.get("/embed/{worker_type}")
-async def embed_progress(worker_type: str, dispatcher=Depends(get_dispatcher)):
-    """Get the status of an embedding worker."""
-    status_data = dispatcher.get_worker_progress(worker_type)
-    if not status_data:
-        return JSONResponse(
-            status_code=404,
-            content={"status": "not_found", "message": "Worker not found"},
-        )
-    return JSONResponse(
-        content={
-            "status": status_data.get("status", "unknown"),
-            "worker_type": worker_type,
-            "details": status_data,
-        }
-    )
-
-
-@router.get("/embed/{worker_type}/stream")
-async def embed_progress_stream(worker_type: str, dispatcher=Depends(get_dispatcher)):
-    """Stream SSE progress for an embedding worker."""
-    try:
-        return StreamingResponse(
-            _embed_progress_generator(worker_type, dispatcher),
-            media_type="text/event-stream",
-        )
-    except Exception as e:
-        logger.error(f"embed progress error: {e}")
-        return JSONResponse(status_code=500, content={"error": "An internal error occurred"})
-
-
-@router.get("/embed-status/{worker_type}")
-async def worker_embed_status(worker_type: str, dispatcher=Depends(get_dispatcher)):
-    """Get embedding progress for a worker type."""
-    progress = dispatcher.get_worker_progress(worker_type)
-    if not progress:
-        return JSONResponse(
-            status_code=404,
-            content={"status": "not_found", "message": "Worker not found"},
-        )
-    return JSONResponse(content=progress)
-
-
-@router.post("")
-async def qdrant_action(request: QdrantActionRequest, req: Request) -> QdrantActionResponse:
+@router.post("", response_model=None)
+async def qdrant_action(
+    request: QdrantActionRequest, req: Request
+) -> QdrantActionResponse | JSONResponse:
     """Unified endpoint for all Qdrant actions."""
     action = request.action
     payload = request.payload
@@ -175,7 +120,7 @@ async def qdrant_action(request: QdrantActionRequest, req: Request) -> QdrantAct
     port = config.qdrant_port
 
     try:
-        if action == "download_update":
+        if isinstance(payload, DownloadUpdatePayload):
             manager = create_download_manager()
 
             async def post_install_call(target_path: Path):
@@ -201,13 +146,11 @@ async def qdrant_action(request: QdrantActionRequest, req: Request) -> QdrantAct
                 message=f"Download initiated for version {payload.version}",
             )
 
-        elif action == "service_control":
+        elif isinstance(payload, ServiceControlPayload):
             service_manager = create_qdrant_service()
             command = payload.command
             if command == "start":
-                from src.shared import QDRANT_STORAGE_DIR
-
-                result = await service_manager.start(storage_path=str(QDRANT_STORAGE_DIR))
+                result = await service_manager.start()
             elif command == "stop":
                 result = await service_manager.stop()
             elif command == "restart":
@@ -217,24 +160,25 @@ async def qdrant_action(request: QdrantActionRequest, req: Request) -> QdrantAct
                 raise ValueError(f"Unknown command: {command}")
             return QdrantActionResponse(status="success", action=action, data=result)
 
-        elif action == "progress":
+        elif isinstance(payload, ProgressPayload):
             return JSONResponse(
                 status_code=307,
                 headers={"Location": f"/api/v1/qdrant/progress/{payload.download_id}"},
             )
 
-        elif action == "cancel":
+        elif isinstance(payload, CancelPayload):
             manager = create_download_manager()
-            manager.cancel_download(payload.download_id)
+            await manager.cancel_download(payload.download_id)
             return QdrantActionResponse(
                 status="success",
                 action=action,
                 message=f"Download {payload.download_id} cancelled",
             )
 
-        elif action == "collection_management":
+        elif isinstance(payload, CollectionManagementPayload):
             op = payload.operation
             name = payload.collection_name
+            assert name is not None
             if op == "list":
                 data = await list_collections(host, port)
                 return QdrantActionResponse(status="success", action=action, data=data)
@@ -254,17 +198,18 @@ async def qdrant_action(request: QdrantActionRequest, req: Request) -> QdrantAct
                     message=f"Collection {name} deleted",
                 )
             elif op == "get":
-                data = await get_collection(host, port, name)
-                return QdrantActionResponse(status="success", action=action, data=data)
+                col_data = await get_collection(host, port, name)
+                return QdrantActionResponse(status="success", action=action, data=col_data)
             else:
                 raise ValueError(f"Unknown operation: {op}")
 
-        elif action == "data_management":
-            op = payload.operation
+        elif isinstance(payload, DataManagementPayload):
+            dm_op = payload.operation
             name = payload.collection_name
-            if op == "add" or op == "update":
+            if dm_op == "add" or dm_op == "update":
                 if not payload.vector or not payload.id:
                     raise ValueError("id and vector are required for add/update")
+                assert isinstance(name, str)
                 success = await store_embeddings(
                     embeddings=[payload.vector],
                     documents=["placeholder"],
@@ -276,9 +221,10 @@ async def qdrant_action(request: QdrantActionRequest, req: Request) -> QdrantAct
                 return QdrantActionResponse(
                     status="success", action=action, message="Data processed"
                 )
-            elif op == "delete":
+            elif dm_op == "delete":
                 if not payload.id:
                     raise ValueError("id is required for delete")
+                assert isinstance(name, str)
                 success = await delete_point(name, payload.id, host, port)
                 if not success:
                     raise ValueError("Failed to delete data")
@@ -288,58 +234,15 @@ async def qdrant_action(request: QdrantActionRequest, req: Request) -> QdrantAct
                     message="Data deleted",
                 )
             else:
-                raise ValueError(f"Unknown operation: {op}")
+                raise ValueError(f"Unknown operation: {dm_op}")
 
-        elif action == "vector_search":
+        elif isinstance(payload, VectorSearchPayload):
             results = await qdrant_search(
                 query_embedding=payload.query_vector,
                 collection_name=payload.collection_name,
                 top_k=payload.top_k,
             )
             return QdrantActionResponse(status="success", action=action, data=results)
-
-        elif action == "embed_sigmaref":
-            try:
-                from src.back.qdrant import check_health as qdrant_health
-
-                if not await qdrant_health():
-                    return QdrantActionResponse(
-                        status="error",
-                        action=action,
-                        error_code="QDRANT_DOWN",
-                        message="Qdrant is unreachable",
-                    )
-            except Exception:
-                return QdrantActionResponse(
-                    status="error",
-                    action=action,
-                    error_code="QDRANT_DOWN",
-                    message="Qdrant is unreachable",
-                )
-
-            # Trigger via dispatcher — ask_for_worker is atomic (check + set)
-            if not hasattr(req.app.state, "dispatcher"):
-                raise RuntimeError("TaskDispatcher not available — is the server running?")
-
-            task_id = req.app.state.dispatcher.ask_for_worker(
-                WorkerName.SIGMAREF_EMBEDDINGS,
-                task_type=WorkerName.SIGMAREF_EMBEDDINGS.value,
-                collection_name=payload.collection_name,
-            )
-            if not task_id:
-                return QdrantActionResponse(
-                    status="error",
-                    action=action,
-                    error_code="ALREADY_RUNNING",
-                    message="Task already in progress",
-                )
-
-            return QdrantActionResponse(
-                status="success",
-                action=action,
-                data={"task_id": task_id},
-                message="SigmaRef embedding queued (will start within 5s)",
-            )
 
         else:
             return QdrantActionResponse(

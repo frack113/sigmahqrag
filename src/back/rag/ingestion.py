@@ -35,7 +35,7 @@ _pipeline_registry: dict[tuple[str, str], IngestionPipeline] = {}
 def _first_configured_model(config: dict) -> str | None:
     for _type_key, type_config in config.items():
         if isinstance(type_config, dict) and "model" in type_config:
-            return type_config["model"]
+            return type_config["model"]  # type: ignore[no-any-return]
     return None
 
 
@@ -175,7 +175,7 @@ class IngestionPipelineBuilder:
             except Exception as e:
                 logger.warning("Failed to persist pipeline cache: %s", e)
 
-        return nodes
+        return list(nodes)
 
     async def arun(
         self,
@@ -207,29 +207,29 @@ class IngestionPipelineBuilder:
             except Exception as e:
                 logger.warning("Failed to persist pipeline cache: %s", e)
 
-        return nodes
+        return list(nodes)
 
     def as_query_engine(
         self,
         similarity_top_k: int = DEFAULT_SIMILARITY_TOP_K,
     ):
         self.build()
-        vector_store = self._vector_store
 
-        if vector_store is None:
+        if self._vector_store is None:
             from llama_index.core.vector_stores import SimpleVectorStore
 
-            vector_store = SimpleVectorStore()
             logger.warning("Qdrant unavailable, using in-memory vector store")
+            vs: QdrantVectorStore | SimpleVectorStore = SimpleVectorStore()
+        else:
+            vs = self._vector_store
 
         try:
-            index = VectorStoreIndex.from_vector_store(vector_store=vector_store)
+            index = VectorStoreIndex.from_vector_store(vector_store=vs)
         except Exception as e:
             logger.warning("Failed to build index from vector store: %s", e)
             from llama_index.core.vector_stores import SimpleVectorStore
 
-            vector_store = SimpleVectorStore()
-            index = VectorStoreIndex.from_vector_store(vector_store=vector_store)
+            index = VectorStoreIndex.from_vector_store(vector_store=SimpleVectorStore())
         return index.as_query_engine(similarity_top_k=similarity_top_k)
 
 

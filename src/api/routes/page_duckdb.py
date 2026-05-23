@@ -4,9 +4,11 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-router = APIRouter(tags=["duckdb-pages"])
+from src.front import TEMPLATES_DIR
 
-templates = Jinja2Templates(directory="src/front/templates")
+templates = Jinja2Templates(directory=TEMPLATES_DIR)
+
+router = APIRouter(prefix="", tags=["page-duckdb"])
 
 
 @router.get("/duckdb", response_class=HTMLResponse)

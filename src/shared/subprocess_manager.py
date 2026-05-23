@@ -176,6 +176,7 @@ class SubprocessManager:
                 stdout=log_handle,
                 stderr=subprocess.STDOUT,
                 cwd=str(cwd) if cwd else None,
+                text=True,
             )
 
             if process.pid is None:

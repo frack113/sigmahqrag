@@ -30,6 +30,7 @@ async def start_qdrant(
     if health_check is None:
         from src.back.qdrant.health import check_health as health_check
 
+    assert health_check is not None
     try:
         health = await health_check(timeout=2.0, port=config.qdrant_port)
         if health.get("status") == "active":
@@ -37,7 +38,6 @@ async def start_qdrant(
             return
     except Exception:
         logger.warning("Qdrant health check failed -- will attempt start anyway")
-        pass
 
     qdrant_bin = Path(config.qdrant_binary_path).resolve()
     qdrant_exe = qdrant_bin / "qdrant.exe"
@@ -77,6 +77,7 @@ async def start_qdrant(
     global _qdrant_started_by_us, _started_binary_service
     _started_binary_service = binary_service
 
+    assert health_check is not None
     for _ in range(10):
         try:
             health = await health_check(timeout=2.0, port=config.qdrant_port)

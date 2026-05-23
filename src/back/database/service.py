@@ -66,7 +66,7 @@ class DatabaseService:
         return cls._instance
 
     def initialize(self) -> None:
-        """Apply schema + seed data, then load existing database from disk if present."""
+        """Apply schema + seed data, then load persisted data from disk (overrides seed)."""
         if self._initialized:
             logger.warning("initialize() called more than once — skipping")
             return
@@ -88,7 +88,7 @@ class DatabaseService:
             for table in _VALID_TABLES:
                 try:
                     self._writer_conn.execute(
-                        f"INSERT OR IGNORE INTO {table} SELECT * FROM file_db.{table}"
+                        f"INSERT OR REPLACE INTO {table} SELECT * FROM file_db.{table}"
                     )
                 except Exception:
                     logger.warning("Table %s not found in existing database — skipping", table)
@@ -123,7 +123,7 @@ class DatabaseService:
 
     def close(self) -> None:
         """Close database connections and clear singleton."""
-        if hasattr(self, "_writer_conn") and self._writer_conn:
+        if getattr(self, "_writer_conn", None) is not None:
             self._writer_conn.close()
             self._writer_conn = None
             self._conn = None
@@ -195,7 +195,7 @@ class DatabaseService:
                 return result[0]
         return None
 
-    def set_config(self, key: str, value: dict) -> None:
+    def set_config(self, key: str, value: dict[str, Any] | str | int | bool | None) -> None:
         """Set config value as JSON."""
         with self._lock:
             self._writer_conn.execute(
@@ -269,7 +269,8 @@ class DatabaseService:
         with self._lock:
             result = self._writer_conn.execute("DELETE FROM models WHERE repo_id = ?", (repo_id,))
             self._writer_conn.commit()
-            return result.rowcount > 0
+            rc = result.rowcount
+            return rc is not None and rc > 0
 
     # =========================================================================
     # SYSTEM_PROMPTS TABLE
@@ -524,21 +525,29 @@ class DatabaseService:
     def get_git_metadata(self, repo_key: str) -> dict | None:
         """Get metadata for a repository."""
         result = self._safe_query(
-            "SELECT metadata FROM git_metadata WHERE repo_key = ?", (repo_key,)
+            "SELECT org, name, url, branch FROM git_metadata WHERE repo_key = ?", (repo_key,)
         )
         if result:
-            try:
-                return json.loads(result[0])
-            except (json.JSONDecodeError, TypeError):
-                return None
+            return {"org": result[0], "name": result[1], "url": result[2], "branch": result[3]}
         return None
 
     def set_git_metadata(self, repo_key: str, metadata: dict) -> None:
         """Set metadata for a repository."""
+        org = metadata.get("org", "")
+        name = metadata.get("name", "")
+        url = metadata.get("url") or metadata.get("remote_url") or ""
+        branch = metadata.get("branch", "")
+
         with self._lock:
             self._writer_conn.execute(
-                "INSERT INTO git_metadata (repo_key, metadata) VALUES (?, ?) ON CONFLICT (repo_key) DO UPDATE SET metadata = EXCLUDED.metadata",
-                (repo_key, json.dumps(metadata)),
+                """INSERT INTO git_metadata (repo_key, org, name, url, branch)
+                   VALUES (?, ?, ?, ?, ?)
+                   ON CONFLICT (repo_key) DO UPDATE SET
+                       org = EXCLUDED.org,
+                       name = EXCLUDED.name,
+                       url = EXCLUDED.url,
+                       branch = EXCLUDED.branch""",
+                (repo_key, org, name, url, branch),
             )
             self._writer_conn.commit()
 

@@ -44,7 +44,7 @@ async function loadTableList() {
     try {
         const res = await fetch('/api/v1/duckdb/tables');
         const data = await res.json();
-        container.textContent = data.tables.map(t =>
+        container.innerHTML = data.tables.map(t =>
             `<a href="#" data-table="${escAttr(t)}" ${currentTable === t ? 'class="active"' : ''}>${esc(t)}</a>`
         ).join('');
         container.querySelectorAll('a').forEach(a => {
@@ -103,7 +103,7 @@ function renderTable(data, container) {
     const rows = data.rows;
     if (rows.length === 0) {
         const prevDisabled = currentOffset === 0 ? 'disabled' : '';
-        container.textContent = `<div class="table-controls">
+        container.innerHTML = `<div class="table-controls">
             <h2>${esc(currentTable)}</h2>
             <div class="pagination">
                 <button onclick="prevPage()" ${prevDisabled}>← Prev</button>

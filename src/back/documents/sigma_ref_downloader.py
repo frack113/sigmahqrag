@@ -136,7 +136,7 @@ def _download_file(
             if status in RETRY_STATUSES and attempt < max_retries:
                 retry_after = _get_retry_after(exc.response)
                 if retry_after is not None:
-                    wait = min(retry_after, 120)
+                    wait: float = min(retry_after, 120)
                 else:
                     wait = _backoff_delay(attempt)
                 logger.warning(
@@ -154,7 +154,7 @@ def _download_file(
 
         except (httpx.TimeoutException, httpx.NetworkError, httpx.ConnectError) as exc:
             if attempt < max_retries:
-                wait = _backoff_delay(attempt)
+                wait: float = _backoff_delay(attempt)  # type: ignore[no-redef]
                 logger.warning(
                     "Network error on attempt %d/%d for %s: %s — waiting %ds",
                     attempt,
@@ -206,7 +206,7 @@ def _load_registry(path: Path, db: DatabaseService) -> dict[str, Any]:
             "original_url": entry.get("original_url", ""),
             "normalized_url": entry.get("normalized_url"),
             "content_type": entry.get("content_type"),
-            "rule_id": entry.get("rel_id"),
+            "rule_id": entry.get("rule_id"),
             "title": entry.get("title"),
             "timestamp": entry.get("timestamp"),
             "content_sha256": entry.get("content_sha256"),

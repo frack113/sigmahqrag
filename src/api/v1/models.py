@@ -72,15 +72,15 @@ async def list_installed_llm_models() -> JSONResponse:
 
 
 @router.get("/llm/files")
-async def list_llm_model_files(repo_id: str = None) -> JSONResponse:
+async def list_llm_model_files(repo_id: str | None = None) -> JSONResponse:
     """List available GGUF files for a LLM model."""
-    from src.api.dependencies import get_model_manager
-
     if not repo_id:
         return JSONResponse(status_code=400, content={"error": "repo_id is required"})
 
     try:
-        mm = get_model_manager()
+        from src.api.dependencies import get_embedding_manager
+
+        mm = get_embedding_manager()
         files = mm.download_service.list_gguf_files(HFRepo.from_string(repo_id))
         return JSONResponse(content={"files": files})
     except Exception as e:
@@ -91,10 +91,10 @@ async def list_llm_model_files(repo_id: str = None) -> JSONResponse:
 @router.get("/llm/{repo_id}/info")
 async def get_llm_model_info(repo_id: str) -> JSONResponse:
     """Get detailed information about a LLM model."""
-    from src.api.dependencies import get_model_manager
-
     try:
-        mm = get_model_manager()
+        from src.api.dependencies import get_embedding_manager
+
+        mm = get_embedding_manager()
         info = await mm.get_model_info(repo_id)
         if not info:
             return JSONResponse(
@@ -146,13 +146,13 @@ async def download_llm_model(
     """Download a LLM model from HuggingFace. Returns immediately - download runs in background."""
     import asyncio
 
-    from src.api.dependencies import get_model_manager
+    from src.api.dependencies import get_embedding_manager
 
     set_progress(repo_id, 0, "starting")
 
     async def download_in_background():
         try:
-            mm = get_model_manager()
+            mm = get_embedding_manager()
             set_progress(repo_id, 5, "downloading")
             await mm.download_model(
                 repo_id=repo_id,

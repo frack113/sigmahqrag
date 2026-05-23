@@ -11,6 +11,7 @@ from src.worker.workers.github_discovery_worker import GithubDiscoveryWorker
 from src.worker.workers.github_embedding_worker import GithubEmbeddingWorker
 from src.worker.workers.local_discovery_worker import LocalDiscoveryWorker
 from src.worker.workers.local_embedding_worker import LocalEmbeddingWorker
+from src.worker.workers.local_repo_sync_worker import LocalRepoSyncWorker
 from src.worker.workers.model_sync_worker import ModelSyncWorker
 from src.worker.workers.sigmaref_discovery_worker import SigmaRefDiscoveryWorker
 from src.worker.workers.sigmaref_embedding_worker import SigmaRefEmbeddingWorker
@@ -31,6 +32,7 @@ class TaskDispatcher:
         WorkerName.SIGMAREF_DISCOVERY: SigmaRefDiscoveryWorker,
         WorkerName.GITHUB_DISCOVERY: GithubDiscoveryWorker,
         WorkerName.LOCAL_DISCOVERY: LocalDiscoveryWorker,
+        WorkerName.LOCAL_REPO_SYNC: LocalRepoSyncWorker,
         WorkerName.SIGMAREF_EMBEDDINGS: SigmaRefEmbeddingWorker,
         WorkerName.GITHUB_EMBEDDINGS: GithubEmbeddingWorker,
         WorkerName.LOCAL_EMBEDDINGS: LocalEmbeddingWorker,
@@ -122,7 +124,7 @@ class TaskDispatcher:
             state = self._worker_states.get(worker_type)
             if state is None:
                 return 0
-            return state.get("progress_percent", 0)
+            return state.get("progress_percent", 0)  # type: ignore[no-any-return]
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -201,6 +203,7 @@ class TaskDispatcher:
                         f"Submitting task {task.get('task_id', '')} (type: {worker_type.value}) → RUNNING"
                     )
                     try:
+                        assert self._executor is not None
                         future: Future = self._executor.submit(
                             self._run_worker, worker_type, worker, task
                         )

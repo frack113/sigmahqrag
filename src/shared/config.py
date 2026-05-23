@@ -37,9 +37,11 @@ class Config:
     embeddings_dir: str = "data/models/embeddings"
 
     llama_base_url: str = "http://127.0.0.1:8080"
+    llama_mode: str = "managed"
     llama_model_name: str | None = None
     llama_binary_path: str = "data/bin/llama-cpp"
 
+    qdrant_base_url: str = "http://127.0.0.1:6333"
     qdrant_host: str = "127.0.0.1"
     qdrant_port: int = 6333
     qdrant_mode: str = "managed"
@@ -55,6 +57,9 @@ class Config:
     paths_temp_dir: str = "data/temp"
 
     logging_level: str = "INFO"
+    logging_log_max_size: str = "10M"
+    logging_log_max_file: int = 5
+    logging_clean_at_startup: bool = False
 
     def __post_init__(self) -> None:
         self._load_from_toml()
@@ -75,96 +80,64 @@ class Config:
 
     def _apply_nested_config(self, nested: dict[str, Any]) -> None:
         """Apply nested config dict to dataclass fields."""
-        if "models" in nested:
-            models = nested["models"]
-            if "llm_dir" in models:
-                self.llm_dir = models["llm_dir"]
-            if "embeddings_dir" in models:
-                self.embeddings_dir = models["embeddings_dir"]
-
         if "services" in nested:
             services = nested["services"]
             if "llama" in services:
                 llama = services["llama"]
                 if "base_url" in llama:
                     self.llama_base_url = llama["base_url"]
-                if "model_name" in llama:
-                    self.llama_model_name = llama["model_name"]
-                if "binary_path" in llama:
-                    self.llama_binary_path = llama["binary_path"]
+                if "mode" in llama:
+                    self.llama_mode = llama["mode"]
             if "qdrant" in services:
                 qdrant = services["qdrant"]
-                if "host" in qdrant:
-                    self.qdrant_host = qdrant["host"]
-                if "port" in qdrant:
-                    self.qdrant_port = qdrant["port"]
+                if "base_url" in qdrant:
+                    self.qdrant_base_url = qdrant["base_url"]
+                    # Parse host/port from base_url for internal consumers
+                    from urllib.parse import urlparse
+
+                    parsed = urlparse(qdrant["base_url"])
+                    if parsed.hostname:
+                        self.qdrant_host = parsed.hostname
+                    if parsed.port:
+                        self.qdrant_port = parsed.port
                 if "mode" in qdrant:
                     self.qdrant_mode = qdrant["mode"]
-                if "collection_name" in qdrant:
-                    self.qdrant_collection_name = qdrant["collection_name"]
-                if "vector_size" in qdrant:
-                    self.qdrant_vector_size = qdrant["vector_size"]
-                if "binary_path" in qdrant:
-                    self.qdrant_binary_path = qdrant["binary_path"]
-                if "storage_path" in qdrant:
-                    self.qdrant_storage_path = qdrant["storage_path"]
-                if "snapshots_path" in qdrant:
-                    self.qdrant_snapshots_path = qdrant["snapshots_path"]
-
-        if "paths" in nested:
-            paths = nested["paths"]
-            if "bin_dir" in paths:
-                self.paths_bin_dir = paths["bin_dir"]
-            if "models_dir" in paths:
-                self.paths_models_dir = paths["models_dir"]
-            if "logs_dir" in paths:
-                self.paths_logs_dir = paths["logs_dir"]
-            if "temp_dir" in paths:
-                self.paths_temp_dir = paths["temp_dir"]
 
         if "logging" in nested:
             logging_cfg = nested["logging"]
             if "level" in logging_cfg:
                 self.logging_level = logging_cfg["level"]
+            if "log_max_size" in logging_cfg:
+                self.logging_log_max_size = logging_cfg["log_max_size"]
+            if "log_max_file" in logging_cfg:
+                self.logging_log_max_file = logging_cfg["log_max_file"]
+            if "clean_at_startup" in logging_cfg:
+                self.logging_clean_at_startup = logging_cfg["clean_at_startup"]
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "backend": {
-                "gpu_type": self.gpu_type,
                 "os": self.os,
+                "gpu_type": self.gpu_type,
                 "llamacpp_version": self.llamacpp_version,
                 "qdrant_version": self.qdrant_version,
                 "qdrant_webui_version": self.qdrant_webui_version,
             },
-            "models": {
-                "llm_dir": self.llm_dir,
-                "embeddings_dir": self.embeddings_dir,
-            },
             "services": {
                 "llama": {
                     "base_url": self.llama_base_url,
-                    "model_name": self.llama_model_name,
-                    "binary_path": self.llama_binary_path,
+                    "mode": self.llama_mode,
                 },
                 "qdrant": {
-                    "host": self.qdrant_host,
-                    "port": self.qdrant_port,
+                    "base_url": self.qdrant_base_url,
                     "mode": self.qdrant_mode,
-                    "collection_name": self.qdrant_collection_name,
-                    "vector_size": self.qdrant_vector_size,
-                    "binary_path": self.qdrant_binary_path,
-                    "storage_path": self.qdrant_storage_path,
-                    "snapshots_path": self.qdrant_snapshots_path,
                 },
-            },
-            "paths": {
-                "bin_dir": self.paths_bin_dir,
-                "models_dir": self.paths_models_dir,
-                "logs_dir": self.paths_logs_dir,
-                "temp_dir": self.paths_temp_dir,
             },
             "logging": {
                 "level": self.logging_level,
+                "log_max_size": self.logging_log_max_size,
+                "log_max_file": self.logging_log_max_file,
+                "clean_at_startup": self.logging_clean_at_startup,
             },
         }
 
@@ -177,6 +150,7 @@ class Config:
             db.set_config("llamacpp_version", self.llamacpp_version)
             db.set_config("qdrant_version", self.qdrant_version)
             db.set_config("qdrant_webui_version", self.qdrant_webui_version)
+            db.persist()
             _config = self
             return True
         except Exception as e:

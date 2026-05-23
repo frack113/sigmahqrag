@@ -115,12 +115,14 @@ class FeedbackRepository:
 
         async with aiosqlite.connect(self._db_path) as db:
             async with db.execute("SELECT COUNT(*) as total FROM feedback") as cursor:
-                total = (await cursor.fetchone())[0]
+                row = await cursor.fetchone()
+                total = row[0] if row else 0
 
             async with db.execute(
                 "SELECT COUNT(*) as count FROM feedback WHERE helpful = 1"
             ) as cursor:
-                helpful_count = (await cursor.fetchone())[0]
+                row = await cursor.fetchone()
+                helpful_count = row[0] if row else 0
 
         not_helpful_count = total - helpful_count
         helpful_percentage = (helpful_count / total * 100) if total > 0 else 0.0

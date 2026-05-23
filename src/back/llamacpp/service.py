@@ -103,7 +103,7 @@ class LlamaBinaryService:
             str(context_size),
         ]
 
-        return await self._subprocess_manager.start_service(
+        return await self._subprocess_manager.start_service(  # type: ignore[no-any-return]
             name="llama.cpp",
             cmd=cmd,
             log_file=log_file,
@@ -113,11 +113,11 @@ class LlamaBinaryService:
 
     async def stop(self) -> dict[str, Any]:
         """Stop llama.cpp server."""
-        return await self._subprocess_manager.stop_service("llama.cpp")
+        return await self._subprocess_manager.stop_service("llama.cpp")  # type: ignore[no-any-return]
 
     def get_logs(self, lines: int = 50) -> str:
         """Get recent log lines for llama.cpp."""
-        return self._subprocess_manager.get_logs("llama.cpp", lines)
+        return self._subprocess_manager.get_logs("llama.cpp", lines)  # type: ignore[no-any-return]
 
 
 def create_llama_service() -> LlamaBinaryService:

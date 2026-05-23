@@ -1,9 +1,9 @@
 """Main application entry point."""
 
 import logging
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from logging.handlers import RotatingFileHandler
-from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -18,8 +18,9 @@ from src.api.v1.admin import router as admin_v1_router
 from src.api.v1.chat import router as chat_v1_router
 from src.api.v1.config import router as config_v1_router
 from src.api.v1.coverage import router as coverage_v1_router
-from src.api.v1.documents import router as documents_v1_router
+from src.api.v1.dispatcher import router as dispatcher_v1_router
 from src.api.v1.duckdb import router as duckdb_v1_router
+from src.api.v1.documents import router as documents_v1_router
 from src.api.v1.embedding_config import router as embedding_config_v1_router
 from src.api.v1.embeddings import router as embeddings_v1_router
 from src.api.v1.explain import router as explain_v1_router
@@ -37,19 +38,33 @@ from src.back.qdrant.auto_start import start_qdrant, stop_qdrant
 from src.back.service_manager import shutdown_all_services
 from src.worker.processor import TaskDispatcher
 from src.worker.enums import WorkerName
+from src.front import STATIC_DIR
 from src.shared.exceptions import SigmaError
+from src.shared import TEMP_DIR
 
 logger = logging.getLogger(__name__)
 
 
-def _setup_logging() -> None:
+def _parse_log_size(size_str: str) -> int:
+    """Parse a human-readable size string (e.g. '5M', '10M', '1G') to bytes."""
+    size_str = size_str.strip().upper()
+    if size_str.endswith("G"):
+        return int(float(size_str[:-1]) * 1024 * 1024 * 1024)
+    if size_str.endswith("M"):
+        return int(float(size_str[:-1]) * 1024 * 1024)
+    if size_str.endswith("K"):
+        return int(float(size_str[:-1]) * 1024)
+    return int(size_str)
+
+
+def _setup_logging(max_size: str = "10M", max_files: int = 5) -> None:
     """Setup logging to file with rotation."""
     from src.shared import LOGS_DIR
 
     log_file = LOGS_DIR / "sigmahqrag.log"
 
     handler = RotatingFileHandler(
-        log_file, maxBytes=10 * 1024 * 1024, backupCount=5, encoding="utf-8"
+        log_file, maxBytes=_parse_log_size(max_size), backupCount=max_files, encoding="utf-8"
     )
     handler.setLevel(logging.INFO)
 
@@ -61,80 +76,59 @@ def _setup_logging() -> None:
     root_logger.setLevel(logging.INFO)
 
 
-def _is_db_empty(db: DatabaseService) -> bool:
-    for table in (
-        "config",
-        "embedding_config",
-        "system_prompts",
-        "models",
-        "doc_sigma_ref",
-        "git_metadata",
-        "git_selected_dirs",
-    ):
-        if db.get_table_count(table) > 0:
-            return False
-    return True
+def _clean_at_startup() -> None:
+    """Clean temp, pid, and rotated log files at startup when clean_at_startup is enabled."""
+    from src.shared import PID_DIR, LOGS_DIR
 
+    for d in (TEMP_DIR, PID_DIR):
+        if d.exists():
+            for p in d.iterdir():
+                try:
+                    if p.is_file():
+                        p.unlink()
+                    elif p.is_dir():
+                        import shutil
 
-def _check_old_data_files() -> list[str]:
-    old_paths = [
-        Path("data/embedding.toml"),
-        Path("data/system_prompt.toml"),
-        Path("data/models/registry.json"),
-        Path("data/models/embeddings/embeddings_registry.json"),
-        Path("data/documents/sigmaref/registry.json"),
-    ]
-    return [str(p) for p in old_paths if p.exists()]
+                        shutil.rmtree(p)
+                except Exception as e:
+                    logger.warning("Could not clean %s: %s", p, e)
+
+    # Remove rotated log files (keep current sigmahqrag.log)
+    if LOGS_DIR.exists():
+        for p in LOGS_DIR.iterdir():
+            if p.is_file() and p.name != "sigmahqrag.log":
+                try:
+                    p.unlink()
+                except Exception as e:
+                    logger.warning("Could not clean %s: %s", p, e)
+
+    logger.info("Cleanup at startup: temp, pid, and rotated logs cleared.")
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI) -> None:
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan handler."""
     dispatcher = None
     db = None
     try:
-        _setup_logging()
-        logger.info("=== Lifespan starting ===")
-
         db = DatabaseService()
         db.initialize()
         app.state.db = db
-        logger.info("Database initialized.")
 
         from src.shared import Config
 
         Config.init_app()
+
+        from src.shared import get_config
+
+        config = get_config()
+        _setup_logging(max_size=config.logging_log_max_size, max_files=config.logging_log_max_file)
+        logger.info("=== Lifespan starting ===")
+        logger.info("Database initialized.")
         logger.info("Config initialized.")
 
-        old_files = _check_old_data_files()
-        if old_files and _is_db_empty(db):
-            logger.warning(
-                "DuckDB is empty but old data files exist (%d found). "
-                "Run 'uv run python scripts/migrate_to_duckdb.py' to migrate data.",
-                len(old_files),
-            )
-        logger.info("Old files check done.")
-
-        # Sync filesystem repos into git_metadata if missing
-        from src.back.github.git import list_repos, get_metadata, save_metadata
-
-        logger.info("Starting repo sync...")
-        for repo in list_repos():
-            repo_key = f"{repo['org']}/{repo['name']}"
-            if get_metadata(repo["org"], repo["name"]) is None:
-                logger.info("Syncing filesystem repo %s into git_metadata", repo_key)
-                save_metadata(
-                    repo["org"],
-                    repo["name"],
-                    {
-                        "org": repo["org"],
-                        "name": repo["name"],
-                        "url": repo.get("remote_url", ""),
-                        "branch": repo.get("branch", "main"),
-                        "status": "synced",
-                    },
-                )
-        logger.info("Repo sync done.")
+        if config.logging_clean_at_startup:
+            _clean_at_startup()
 
         # Start the background task dispatcher in its own thread
         dispatcher = TaskDispatcher(poll_interval=1, max_workers=4)
@@ -142,7 +136,7 @@ async def lifespan(app: FastAPI) -> None:
         dispatcher.start()
         logger.info("Dispatcher started in background thread.")
 
-        # Queue model sync as a background worker task
+        # Queue model sync and repo sync as background worker tasks
         from src.shared import LLM_DIR, EMBEDDINGS_DIR
 
         logger.info("Queuing model sync as background worker...")
@@ -154,6 +148,12 @@ async def lifespan(app: FastAPI) -> None:
             logger.warning("Model sync not queued — worker is busy")
         else:
             logger.info("Model sync queued.")
+
+        logger.info("Queuing repo sync as background worker...")
+        if not dispatcher.ask_for_worker(WorkerName.LOCAL_REPO_SYNC):
+            logger.warning("Repo sync not queued — worker is busy")
+        else:
+            logger.info("Repo sync queued.")
 
         _validate_services()
         logger.info("Services validated.")
@@ -219,8 +219,7 @@ def create_app() -> FastAPI:
                     )
         return await call_next(request)
 
-    static_dir = str(Path(__file__).parent / "front" / "static")
-    app.mount("/static", StaticFiles(directory=static_dir), name="static")
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
     app.include_router(admin_pages_router)
     app.include_router(admin_v1_router)
@@ -228,6 +227,7 @@ def create_app() -> FastAPI:
     app.include_router(duckdb_v1_router)
     app.include_router(config_v1_router)
     app.include_router(coverage_v1_router)
+    app.include_router(dispatcher_v1_router)
     app.include_router(explain_v1_router)
     app.include_router(files_v1_router)
     app.include_router(github_v1_router)

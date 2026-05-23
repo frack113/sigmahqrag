@@ -8,7 +8,7 @@ from enum import Enum
 from pathlib import Path
 
 import puremagic
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 UTF8_BOM = b"\xef\xbb\xbf"
 MAX_FILE_SIZE = 100 * 1024 * 1024

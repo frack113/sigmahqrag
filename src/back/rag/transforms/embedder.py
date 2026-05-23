@@ -12,7 +12,7 @@ class Embedder:
         self._model = build_embed_model(model_name)
 
     def embed(self, text: str) -> list[float]:
-        return self._model.get_text_embedding(text)
+        return list(self._model.get_text_embedding(text))
 
     def embed_batch(self, texts: list[str]) -> list[list[float]]:
-        return self._model.get_text_embedding_batch(texts)
+        return list(self._model.get_text_embedding_batch(texts))

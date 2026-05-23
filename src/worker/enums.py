@@ -16,3 +16,4 @@ class WorkerName(Enum):
     GITHUB_EMBEDDINGS = "github_embeddings"
     LOCAL_EMBEDDINGS = "local_embeddings"
     MODEL_SYNC = "model_sync"
+    LOCAL_REPO_SYNC = "local_repo_sync"

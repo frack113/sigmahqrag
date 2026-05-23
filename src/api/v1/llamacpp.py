@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from src.back.backend.services.health_check import HealthCheckService
 from src.back.llamacpp.service import create_llama_service
 from src.shared.download_manager import create_download_manager
+from src.shared import get_config
 
 logger = logging.getLogger(__name__)
 
@@ -49,14 +50,21 @@ async def llama_status():
 
         manager = create_download_manager()
         downloads = {
-            k: {"status": v.status, "service": v.service, "version": v.version}
+            k: {
+                "status": v.status,
+                "service": v.service,
+                "version": v.version,
+                "error": v.error,
+            }
             for k, v in manager.active_downloads.items()
             if v.service == SERVICE_NAME
         }
 
+        config = get_config()
         return JSONResponse(
             content={
                 "service": SERVICE_NAME,
+                "mode": config.llama_mode,
                 "current_version": version or "unknown",
                 "downloads": downloads,
             }
@@ -81,7 +89,7 @@ async def llama_download(
                     "success": True,
                     "download_id": None,
                     "version": result.get("version"),
-                    "message": result.get("message", "Version already installed"),
+                    "message": result.get("message", "Version already up to date"),
                 }
             )
 

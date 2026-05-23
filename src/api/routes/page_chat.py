@@ -5,8 +5,11 @@ from __future__ import annotations
 from fastapi import APIRouter, Request
 from fastapi.templating import Jinja2Templates
 
-router = APIRouter(tags=["chat-page"])
-templates = Jinja2Templates(directory="src/front/templates")
+from src.front import TEMPLATES_DIR
+
+templates = Jinja2Templates(directory=TEMPLATES_DIR)
+
+router = APIRouter(prefix="", tags=["page-chat"])
 
 
 @router.get("/")

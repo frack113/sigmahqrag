@@ -153,7 +153,7 @@ def clone_repo(
 
     try:
         dest_path.parent.mkdir(parents=True, exist_ok=True)
-        kwargs = {}
+        kwargs: dict[str, Any] = {}
         if branch:
             kwargs["branch"] = branch
         if depth:
@@ -201,7 +201,7 @@ def update_repo(
         fetch_info = origin.fetch()
         remote_head = None
         for info in fetch_info:
-            if info.ref.remote_head == branch:
+            if info.remote_ref_name == branch:
                 remote_head = info.commit.hexsha
                 break
         # Pull with rebase or merge based on config
@@ -263,7 +263,7 @@ def list_repos(repos_dir: Path = DEFAULT_REPOS_DIR) -> list[dict[str, Any]]:
         for repo_dir in org_dir.iterdir():
             repo = _get_or_create_repo(repo_dir)
             if repo is not None:
-                info = {
+                info: dict[str, Any] = {
                     "org": org_dir.name,
                     "name": repo_dir.name,
                     "path": str(repo_dir),
@@ -329,7 +329,7 @@ def list_directory_tree(
                     if entry.name.startswith(".") or entry.name.startswith("__"):
                         continue
                     children = _walk_dir(entry, current_depth + 1)
-                    node = {
+                    node: dict[str, Any] = {
                         "name": entry.name,
                         "path": entry.relative_to(repo_path).as_posix(),
                     }
@@ -399,7 +399,7 @@ def get_last_commit_date(org: str, name: str, repos_dir: Path = DEFAULT_REPOS_DI
 
     try:
         commit = repo.head.commit
-        return commit.committed_datetime.isoformat()
+        return str(commit.committed_datetime.isoformat())
     except Exception:
         return None
 
@@ -419,6 +419,6 @@ def is_repo_outdated(org: str, name: str, repos_dir: Path = DEFAULT_REPOS_DIR) -
         remote_head = (metadata or {}).get("remote_head")
         if remote_head is None:
             return True
-        return local_commit != remote_head
+        return local_commit != remote_head  # type: ignore[no-any-return]
     except Exception:
         return False

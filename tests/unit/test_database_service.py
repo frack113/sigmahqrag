@@ -264,25 +264,35 @@ class TestGitMetadata:
         assert db.get_git_metadata("org/repo") is None
 
     def test_set_and_get(self, db: DatabaseService) -> None:
-        db.set_git_metadata("org/repo", {"key": "val", "number": 42})
+        db.set_git_metadata(
+            "org/repo", {"org": "org", "name": "repo", "url": "http://x", "branch": "main"}
+        )
         meta = db.get_git_metadata("org/repo")
-        assert meta == {"key": "val", "number": 42}
+        assert meta == {"org": "org", "name": "repo", "url": "http://x", "branch": "main"}
 
     def test_overwrite(self, db: DatabaseService) -> None:
-        db.set_git_metadata("org/repo", {"v": 1})
-        db.set_git_metadata("org/repo", {"v": 2})
-        assert db.get_git_metadata("org/repo") == {"v": 2}
+        db.set_git_metadata(
+            "org/repo", {"org": "org", "name": "repo", "url": "http://a", "branch": "main"}
+        )
+        db.set_git_metadata(
+            "org/repo", {"org": "org", "name": "repo", "url": "http://b", "branch": "dev"}
+        )
+        meta = db.get_git_metadata("org/repo")
+        assert meta["url"] == "http://b"
+        assert meta["branch"] == "dev"
 
     def test_delete(self, db: DatabaseService) -> None:
-        db.set_git_metadata("org/repo", {"x": 1})
+        db.set_git_metadata(
+            "org/repo", {"org": "org", "name": "repo", "url": "http://x", "branch": "main"}
+        )
         db.delete_git_metadata("org/repo")
         assert db.get_git_metadata("org/repo") is None
 
     def test_multiple_repos(self, db: DatabaseService) -> None:
-        db.set_git_metadata("a/r1", {"name": "r1"})
-        db.set_git_metadata("b/r2", {"name": "r2"})
-        assert db.get_git_metadata("a/r1") == {"name": "r1"}
-        assert db.get_git_metadata("b/r2") == {"name": "r2"}
+        db.set_git_metadata("a/r1", {"org": "a", "name": "r1", "url": "http://x", "branch": "main"})
+        db.set_git_metadata("b/r2", {"org": "b", "name": "r2", "url": "http://y", "branch": "main"})
+        assert db.get_git_metadata("a/r1")["name"] == "r1"
+        assert db.get_git_metadata("b/r2")["name"] == "r2"
 
 
 class TestGitSelectedDirs:
@@ -348,8 +358,10 @@ class TestRoundtrip:
         db.upsert_doc_sigma_ref({"url_hash": "h1", "original_url": "http://x"})
         assert db.doc_sigma_ref_exists("h1")
 
-        db.set_git_metadata("org/repo", {"k": "v"})
-        assert db.get_git_metadata("org/repo") == {"k": "v"}
+        db.set_git_metadata(
+            "org/repo", {"org": "org", "name": "repo", "url": "http://x", "branch": "main"}
+        )
+        assert db.get_git_metadata("org/repo")["org"] == "org"
 
         db.set_selected_dirs("org/repo", ["a", "b"])
         assert db.get_selected_dirs("org/repo") == ["a", "b"]

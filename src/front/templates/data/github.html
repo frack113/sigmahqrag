@@ -291,10 +291,10 @@ function isWorkerActive(status) {
 
 async function pollWorkerStatus(workerType) {
     try {
-        const resp = await fetch('/api/v1/qdrant/embed/' + workerType);
+        const resp = await fetch('/api/v1/dispatcher/status/' + workerType);
         if (!resp.ok) return 'not_found';
         const data = await resp.json();
-        return data.details ? data.details.status : 'idle';
+        return data.status || 'idle';
     } catch {
         return 'not_found';
     }

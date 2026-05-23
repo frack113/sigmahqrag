@@ -11,18 +11,18 @@
         <div class="form-group">
             <label for="os-select">OS:</label>
             <select id="os-select" name="os">
-                <option value="windows" {% if config.os == 'windows' %}selected{% endif %}>Windows</option>
-                <option value="linux" {% if config.os == 'linux' %}selected{% endif %}>Linux</option>
-                <option value="macos" {% if config.os == 'macos' %}selected{% endif %}>macOS</option>
+                    <option value="windows" {% if config.backend.os == 'windows' %}selected{% endif %}>Windows</option>
+                    <option value="linux" {% if config.backend.os == 'linux' %}selected{% endif %}>Linux</option>
+                    <option value="macos" {% if config.backend.os == 'macos' %}selected{% endif %}>macOS</option>
             </select>
         </div>
         <div class="form-group">
             <label for="gpu-select">GPU Backend:</label>
             <select id="gpu-select" name="gpu">
-                <option value="cpu" {% if config.gpu_type == 'cpu' %}selected{% endif %}>CPU</option>
-                <option value="cuda" {% if config.gpu_type == 'cuda' %}selected{% endif %}>CUDA</option>
-                <option value="hip" {% if config.gpu_type == 'hip' %}selected{% endif %}>HIP (AMD)</option>
-                <option value="vulkan" {% if config.gpu_type == 'vulkan' %}selected{% endif %}>Vulkan</option>
+                    <option value="cpu" {% if config.backend.gpu_type == 'cpu' %}selected{% endif %}>CPU</option>
+                    <option value="cuda" {% if config.backend.gpu_type == 'cuda' %}selected{% endif %}>CUDA</option>
+                    <option value="hip" {% if config.backend.gpu_type == 'hip' %}selected{% endif %}>HIP (AMD)</option>
+                    <option value="vulkan" {% if config.backend.gpu_type == 'vulkan' %}selected{% endif %}>Vulkan</option>
             </select>
         </div>
         <button type="submit" class="btn btn-primary">Save Configuration</button>
