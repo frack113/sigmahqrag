@@ -1,7 +1,5 @@
 """GitHub Repository Management API v1."""
 
-from __future__ import annotations
-
 import re
 from datetime import datetime
 from typing import Any
@@ -116,8 +114,8 @@ async def list_repos_handler() -> list[RepositoryStatus]:
 @router.post("/repos", response_model=RepositoryResponse)
 async def add_repo(
     request: RepositoryAddRequest,
-    background_tasks: BackgroundTasks | None = None,
-) -> RepositoryResponse:
+    background_tasks=None,
+):
     """Add a new repository."""
     try:
         org, name = _extract_org_name(request.url)
@@ -194,8 +192,8 @@ async def sync_repo(
     org: str,
     name: str,
     branch: str | None = None,
-    background_tasks: BackgroundTasks | None = None,
-) -> RepositoryResponse:
+    background_tasks=None,
+):
     """Sync a repository."""
     _validate_org_name(org, name)
     metadata = get_metadata(org, name)
