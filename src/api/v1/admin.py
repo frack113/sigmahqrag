@@ -419,7 +419,7 @@ async def cancel_action(
         # Patch 4: Cache error responses too
         if _is_valid_idempotency_key(x_idempotency_key):
             _idempotency_store[f"cancel:{x_idempotency_key}"] = (
-                response.content,
+                response.body,
                 time.time(),
                 "cancel",
             )

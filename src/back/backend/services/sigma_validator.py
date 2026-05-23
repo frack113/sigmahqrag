@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-import yaml  # type: ignore[import-untyped]
+import yaml
 
 from src.shared.exceptions import ValidationError
 

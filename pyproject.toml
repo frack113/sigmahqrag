@@ -54,18 +54,6 @@ warn_no_return = true
 strict_equality = true
 ignore_missing_imports = true
 
-[[tool.mypy.overrides]]
-module = "src.sigmahqrag.*"
-ignore_errors = true
-
-[[tool.mypy.overrides]]
-module = "src.sigmahqrag.services.*"
-disallow_untyped_defs = false
-ignore_errors = true
-
-[[tool.mypy.overrides]]
-module = "tests.*"
-ignore_errors = true
 
 [[tool.mypy.overrides]]
 module = "gradio"
@@ -93,6 +81,10 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = "huggingface_hub"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "yaml"
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

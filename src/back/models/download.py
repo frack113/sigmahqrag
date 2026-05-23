@@ -140,7 +140,7 @@ class HFDownloadService:
 
         api = HfApi(token=self.token)
         try:
-            results = api.hf_hub_search(query, sort="downloads", direction=-1)
+            results = api.search_models(query, sort="downloads", direction=-1)
             return [HFRepo.from_string(r.id) for r in results]
         except Exception as e:
             raise DownloadError(f"Failed to search models: {e}") from e

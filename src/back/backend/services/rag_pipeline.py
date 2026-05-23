@@ -6,7 +6,7 @@ import asyncio
 import logging
 from typing import Any
 
-import yaml  # type: ignore[import-untyped]
+import yaml
 from jinja2 import Environment, FileSystemLoader
 
 from src.back.llamacpp import LlamaClient

@@ -19,8 +19,16 @@ from src.back.qdrant.service import create_qdrant_service
 from src.back.qdrant.storage import store_embeddings, delete_point, search as qdrant_search
 from src.shared.download_manager import create_download_manager
 from src.shared.schemas.qdrant import (
+    CancelPayload,
+    CollectionManagementPayload,
+    DataManagementPayload,
+    DownloadUpdatePayload,
+    EmbedSigmaRefPayload,
+    ProgressPayload,
     QdrantActionRequest,
     QdrantActionResponse,
+    ServiceControlPayload,
+    VectorSearchPayload,
 )
 
 logger = logging.getLogger(__name__)
@@ -113,7 +121,7 @@ async def qdrant_action(
     port = config.qdrant_port
 
     try:
-        if action == "download_update":
+        if isinstance(payload, DownloadUpdatePayload):
             manager = create_download_manager()
 
             async def post_install_call(target_path: Path):
@@ -139,7 +147,7 @@ async def qdrant_action(
                 message=f"Download initiated for version {payload.version}",
             )
 
-        elif action == "service_control":
+        elif isinstance(payload, ServiceControlPayload):
             service_manager = create_qdrant_service()
             command = payload.command
             if command == "start":
@@ -153,13 +161,13 @@ async def qdrant_action(
                 raise ValueError(f"Unknown command: {command}")
             return QdrantActionResponse(status="success", action=action, data=result)
 
-        elif action == "progress":
+        elif isinstance(payload, ProgressPayload):
             return JSONResponse(
                 status_code=307,
                 headers={"Location": f"/api/v1/qdrant/progress/{payload.download_id}"},
             )
 
-        elif action == "cancel":
+        elif isinstance(payload, CancelPayload):
             manager = create_download_manager()
             await manager.cancel_download(payload.download_id)
             return QdrantActionResponse(
@@ -168,7 +176,7 @@ async def qdrant_action(
                 message=f"Download {payload.download_id} cancelled",
             )
 
-        elif action == "collection_management":
+        elif isinstance(payload, CollectionManagementPayload):
             op = payload.operation
             name = payload.collection_name
             assert name is not None
@@ -196,10 +204,10 @@ async def qdrant_action(
             else:
                 raise ValueError(f"Unknown operation: {op}")
 
-        elif action == "data_management":
-            op = payload.operation
+        elif isinstance(payload, DataManagementPayload):
+            dm_op = payload.operation
             name = payload.collection_name
-            if op == "add" or op == "update":
+            if dm_op == "add" or dm_op == "update":
                 if not payload.vector or not payload.id:
                     raise ValueError("id and vector are required for add/update")
                 assert isinstance(name, str)
@@ -214,7 +222,7 @@ async def qdrant_action(
                 return QdrantActionResponse(
                     status="success", action=action, message="Data processed"
                 )
-            elif op == "delete":
+            elif dm_op == "delete":
                 if not payload.id:
                     raise ValueError("id is required for delete")
                 assert isinstance(name, str)
@@ -227,10 +235,9 @@ async def qdrant_action(
                     message="Data deleted",
                 )
             else:
-                raise ValueError(f"Unknown operation: {op}")
+                raise ValueError(f"Unknown operation: {dm_op}")
 
-        elif action == "vector_search":
-            assert isinstance(payload.collection_name, str)
+        elif isinstance(payload, VectorSearchPayload):
             results = await qdrant_search(
                 query_embedding=payload.query_vector,
                 collection_name=payload.collection_name,

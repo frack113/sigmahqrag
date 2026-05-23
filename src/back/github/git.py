@@ -201,7 +201,7 @@ def update_repo(
         fetch_info = origin.fetch()
         remote_head = None
         for info in fetch_info:
-            if info.ref.remote_head == branch:
+            if info.remote_ref_name == branch:
                 remote_head = info.commit.hexsha
                 break
         # Pull with rebase or merge based on config
@@ -399,7 +399,7 @@ def get_last_commit_date(org: str, name: str, repos_dir: Path = DEFAULT_REPOS_DI
 
     try:
         commit = repo.head.commit
-        return commit.committed_datetime.isoformat()  # type: ignore[no-any-return]
+        return str(commit.committed_datetime.isoformat())
     except Exception:
         return None
 

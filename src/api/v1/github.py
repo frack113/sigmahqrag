@@ -116,7 +116,7 @@ async def list_repos_handler() -> list[RepositoryStatus]:
 @router.post("/repos", response_model=RepositoryResponse)
 async def add_repo(
     request: RepositoryAddRequest,
-    background_tasks: BackgroundTasks = None,
+    background_tasks: BackgroundTasks | None = None,
 ) -> RepositoryResponse:
     """Add a new repository."""
     try:
@@ -160,7 +160,8 @@ async def add_repo(
                 },
             )
 
-    background_tasks.add_task(clone_with_status)
+    if background_tasks is not None:
+        background_tasks.add_task(clone_with_status)
 
     return RepositoryResponse(
         success=True,
@@ -193,7 +194,7 @@ async def sync_repo(
     org: str,
     name: str,
     branch: str | None = None,
-    background_tasks: BackgroundTasks = None,
+    background_tasks: BackgroundTasks | None = None,
 ) -> RepositoryResponse:
     """Sync a repository."""
     _validate_org_name(org, name)

@@ -42,7 +42,10 @@ async def create_collection(
         client = get_qdrant_client(host=host, port=port)
         client.create_collection(
             collection_name=collection_name,
-            vectors_config=qdrant_client.models.VectorParams(size=vector_size, distance="Cosine"),
+            vectors_config=qdrant_client.models.VectorParams(
+                size=vector_size,
+                distance=qdrant_client.models.Distance.COSINE,
+            ),
         )
         logger.info(f"Collection '{collection_name}' created successfully.")
         return True

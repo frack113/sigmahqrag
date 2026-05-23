@@ -175,7 +175,7 @@ class IngestionPipelineBuilder:
             except Exception as e:
                 logger.warning("Failed to persist pipeline cache: %s", e)
 
-        return nodes  # type: ignore[no-any-return]
+        return list(nodes)
 
     async def arun(
         self,
@@ -207,29 +207,29 @@ class IngestionPipelineBuilder:
             except Exception as e:
                 logger.warning("Failed to persist pipeline cache: %s", e)
 
-        return nodes  # type: ignore[no-any-return]
+        return list(nodes)
 
     def as_query_engine(
         self,
         similarity_top_k: int = DEFAULT_SIMILARITY_TOP_K,
     ):
         self.build()
-        vector_store = self._vector_store
 
-        if vector_store is None:
+        if self._vector_store is None:
             from llama_index.core.vector_stores import SimpleVectorStore
 
-            vector_store = SimpleVectorStore()
             logger.warning("Qdrant unavailable, using in-memory vector store")
+            vs: QdrantVectorStore | SimpleVectorStore = SimpleVectorStore()
+        else:
+            vs = self._vector_store
 
         try:
-            index = VectorStoreIndex.from_vector_store(vector_store=vector_store)
+            index = VectorStoreIndex.from_vector_store(vector_store=vs)
         except Exception as e:
             logger.warning("Failed to build index from vector store: %s", e)
             from llama_index.core.vector_stores import SimpleVectorStore
 
-            vector_store = SimpleVectorStore()
-            index = VectorStoreIndex.from_vector_store(vector_store=vector_store)
+            index = VectorStoreIndex.from_vector_store(vector_store=SimpleVectorStore())
         return index.as_query_engine(similarity_top_k=similarity_top_k)
 
 

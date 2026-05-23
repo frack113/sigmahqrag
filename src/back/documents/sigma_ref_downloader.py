@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 import httpx
-import yaml  # type: ignore[import-untyped]
+import yaml
 
 from src.back.database import DatabaseService
 from src.back.utils.identify_file_type import SUPPORTED_DOC_EXTENSION_MAP
@@ -206,7 +206,7 @@ def _load_registry(path: Path, db: DatabaseService) -> dict[str, Any]:
             "original_url": entry.get("original_url", ""),
             "normalized_url": entry.get("normalized_url"),
             "content_type": entry.get("content_type"),
-            "rule_id": entry.get("rel_id"),
+            "rule_id": entry.get("rule_id"),
             "title": entry.get("title"),
             "timestamp": entry.get("timestamp"),
             "content_sha256": entry.get("content_sha256"),

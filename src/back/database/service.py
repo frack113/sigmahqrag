@@ -123,7 +123,7 @@ class DatabaseService:
 
     def close(self) -> None:
         """Close database connections and clear singleton."""
-        if hasattr(self, "_writer_conn") and self._writer_conn:
+        if getattr(self, "_writer_conn", None) is not None:
             self._writer_conn.close()
             self._writer_conn = None
             self._conn = None
@@ -269,7 +269,8 @@ class DatabaseService:
         with self._lock:
             result = self._writer_conn.execute("DELETE FROM models WHERE repo_id = ?", (repo_id,))
             self._writer_conn.commit()
-            return result.rowcount > 0  # type: ignore[no-any-return]
+            rc = result.rowcount
+            return rc is not None and rc > 0
 
     # =========================================================================
     # SYSTEM_PROMPTS TABLE
