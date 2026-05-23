@@ -50,7 +50,12 @@ async def llama_status():
 
         manager = create_download_manager()
         downloads = {
-            k: {"status": v.status, "service": v.service, "version": v.version}
+            k: {
+                "status": v.status,
+                "service": v.service,
+                "version": v.version,
+                "error": v.error,
+            }
             for k, v in manager.active_downloads.items()
             if v.service == SERVICE_NAME
         }
@@ -84,7 +89,7 @@ async def llama_download(
                     "success": True,
                     "download_id": None,
                     "version": result.get("version"),
-                    "message": result.get("message", "Version already installed"),
+                    "message": result.get("message", "Version already up to date"),
                 }
             )
 

@@ -86,14 +86,23 @@ function downloadLlama() {
     })
     .then(r => r.json())
     .then(data => {
-        if (data.status === 'success') {
-            document.getElementById('llama-download-status').textContent = data.message || 'Download started';
+        const info = data.data || {};
+        if (data.status === 'success' && info.status === 'started') {
+            document.getElementById('llama-download-status').textContent = info.message || 'Download started';
             document.getElementById('llama-download-status').className = 'status-message success';
-            loadStatus();
-        } else {
-            document.getElementById('llama-download-status').textContent = data.error || 'Download failed';
+            if (info.download_id) {
+                activeDownloadId = info.download_id;
+                startProgressPollingLlama(activeDownloadId);
+            }
+        } else if (info.error) {
+            document.getElementById('llama-download-status').textContent = info.error;
             document.getElementById('llama-download-status').className = 'status-message error';
             document.getElementById('llama-progress-container').style.display = 'none';
+        } else {
+            document.getElementById('llama-download-status').textContent = info.message || 'Download completed';
+            document.getElementById('llama-download-status').className = 'status-message success';
+            document.getElementById('llama-progress-container').style.display = 'none';
+            loadStatus();
         }
     })
     .catch(err => {
@@ -101,6 +110,35 @@ function downloadLlama() {
         document.getElementById('llama-download-status').className = 'status-message error';
         document.getElementById('llama-progress-container').style.display = 'none';
     });
+}
+
+function startProgressPollingLlama(downloadId) {
+    if (progressPollInterval) clearInterval(progressPollInterval);
+    progressPollInterval = setInterval(() => {
+        fetch('/api/v1/llamacpp/status')
+            .then(r => r.json())
+            .then(data => {
+                const task = data.downloads?.[downloadId];
+                if (!task) {
+                    clearInterval(progressPollInterval);
+                    loadStatus();
+                    return;
+                }
+                document.getElementById('llama-progress-text').textContent = 'Status: ' + task.status;
+                if (task.status === 'completed') {
+                    clearInterval(progressPollInterval);
+                    document.getElementById('llama-download-status').textContent = 'Download completed!';
+                    document.getElementById('llama-progress-container').style.display = 'none';
+                    loadStatus();
+                } else if (task.status === 'failed') {
+                    clearInterval(progressPollInterval);
+                    document.getElementById('llama-download-status').textContent = 'Download failed: ' + (task.error || 'Unknown error');
+                    document.getElementById('llama-download-status').className = 'status-message error';
+                    document.getElementById('llama-progress-container').style.display = 'none';
+                }
+            })
+            .catch(() => {});
+    }, 1000);
 }
 
 function downloadQdrant() {

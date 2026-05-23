@@ -150,6 +150,7 @@ class Config:
             db.set_config("llamacpp_version", self.llamacpp_version)
             db.set_config("qdrant_version", self.qdrant_version)
             db.set_config("qdrant_webui_version", self.qdrant_webui_version)
+            db.persist()
             _config = self
             return True
         except Exception as e:

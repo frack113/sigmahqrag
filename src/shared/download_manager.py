@@ -40,6 +40,7 @@ class DownloadTask:
     bytes_downloaded: int = 0
     total_bytes: int = 0
     speed_bps: int = 0
+    error: str | None = None
     cancel_event: asyncio.Event = field(default_factory=asyncio.Event)
     progress_queue: asyncio.Queue | None = None
     post_install_callback: Any | None = None
@@ -83,6 +84,13 @@ class DownloadManager:
         if service not in ("llama.cpp", "qdrant"):
             raise DownloadError(f"Unsupported service: {service}")
 
+        # Check if a download is already active for this service
+        for existing in self.active_downloads.values():
+            if existing.service == service and existing.status in ("started", "pending"):
+                raise DownloadError(
+                    f"A download for {service} is already in progress ({existing.status})"
+                )
+
         # Check if requested version is already installed
         if version == "latest":
             release = await self.version_manager.get_release(service, version)
@@ -108,14 +116,18 @@ class DownloadManager:
                 "status": "skipped",
                 "service": service,
                 "version": version_to_check,
-                "message": "Version already installed",
+                "message": "Version already up to date",
             }
 
         release = await self.version_manager.get_release(service, version)
 
         asset = self.version_manager.find_matching_asset(release, service)
         if not asset:
-            raise DownloadError(f"No matching binary found for {service} on this platform")
+            os_name, arch, preferred_gpu = self.version_manager._detect_platform()
+            gpu_hint = f"GPU={preferred_gpu}" if preferred_gpu else "no GPU preference"
+            raise DownloadError(
+                f"No matching binary found for {service} on {os_name}-{arch} ({gpu_hint})"
+            )
 
         download_id = str(uuid.uuid4())
         file_ext = ".zip" if asset.name.endswith(".zip") else ".tar.gz"
@@ -169,7 +181,7 @@ class DownloadManager:
 
         try:
             async with httpx.AsyncClient(
-                timeout=httpx.Timeout(300.0, connect=30.0),
+                timeout=httpx.Timeout(600.0, connect=30.0, read=600.0),
                 follow_redirects=True,
             ) as client:
                 async with client.stream(
@@ -258,14 +270,16 @@ class DownloadManager:
                     logger.info(f"Download {download_id} completed: {task.target_path}")
 
         except Exception as e:
-            logger.error(f"Download {download_id} failed: {e}")
+            error_msg = str(e)
+            logger.error(f"Download {download_id} failed: {error_msg}")
             task.status = "failed"
+            task.error = error_msg
             self.temp_manager.cleanup(task.temp_path)
             if task.progress_queue:
                 await task.progress_queue.put(
                     {
                         "status": "failed",
-                        "error": str(e),
+                        "error": error_msg,
                     }
                 )
 
@@ -393,6 +407,16 @@ class DownloadManager:
             # Verify extraction success
             if not service_dir.exists():
                 raise RuntimeError(f"Extraction failed: {service_dir} does not exist")
+
+            # Clean up any alternate (legacy) paths to avoid confusion
+            if service == "llama.cpp":
+                legacy_dir = BIN_DIR / "llamacpp"
+                if legacy_dir.exists() and legacy_dir != service_dir:
+                    try:
+                        shutil.rmtree(legacy_dir)
+                        logger.info(f"Cleaned up legacy directory: {legacy_dir}")
+                    except Exception as e:
+                        logger.warning(f"Could not remove legacy directory {legacy_dir}: {e}")
 
             logger.info(f"Successfully installed {service} to {service_dir}")
 

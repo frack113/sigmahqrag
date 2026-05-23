@@ -64,11 +64,13 @@ async def check_service_health() -> dict[str, Any]:
 
     from httpx import AsyncClient
 
+    from src.back.llamacpp import get_version as get_llama_version
+    from src.back.qdrant import get_version as get_qdrant_version
     from src.shared import get_config
 
     config = get_config()
-    llama_version = config.llamacpp_version or "Not installed"
-    qdrant_version = config.qdrant_version or "Not installed"
+    llama_version = get_llama_version() or "Not installed"
+    qdrant_version = get_qdrant_version() or "Not installed"
 
     base_url = config.llama_base_url or "http://127.0.0.1:8080"
     llama_host, llama_port = _parse_llama_url(base_url)
@@ -236,18 +238,42 @@ async def start_download(service: str | None = None, target: str | None = None) 
     """Start download action and return job info."""
     import uuid
 
-    from src.back.qdrant.downloader import (
-        QDRANT_BINARY_VERSION,
-        QDRANT_UI_VERSION,
-        create_qdrant_installer,
-    )
+    from src.shared.download_manager import create_download_manager
 
     target_service = service or "qdrant"
     target_component = target or "all"
 
     job_id = f"job-{uuid.uuid4().hex[:8]}"
 
+    if target_service == "llama":
+        try:
+            manager = create_download_manager()
+            result = await manager.start_download("llama.cpp", "latest")
+            download_id = result.get("download_id")
+            return {
+                "job_id": job_id,
+                "download_id": download_id,
+                "status": result.get("status", "started"),
+                "service": target_service,
+                "message": result.get("message", "Download started"),
+                "version": result.get("version"),
+            }
+        except Exception as e:
+            logger.error(f"Llama download failed: {e}")
+            return {
+                "job_id": job_id,
+                "status": "failed",
+                "service": target_service,
+                "error": str(e),
+            }
+
     if target_service == "qdrant":
+        from src.back.qdrant.downloader import (
+            QDRANT_BINARY_VERSION,
+            QDRANT_UI_VERSION,
+            create_qdrant_installer,
+        )
+
         installer = create_qdrant_installer()
 
         binary_result = {"success": False, "error": "skipped (binary running)"}
@@ -286,7 +312,12 @@ async def start_download(service: str | None = None, target: str | None = None) 
             "ui_error": (ui_result.get("error") if not ui_result.get("success") else None),
         }
 
-    return {"job_id": job_id, "status": "started", "service": target_service}
+    return {
+        "job_id": job_id,
+        "status": "failed",
+        "service": target_service,
+        "error": f"Unsupported service: {target_service}",
+    }
 
 
 def _build_error_response(
@@ -327,7 +358,9 @@ async def download_action(
     response_content = {
         "data": result,
         "status": (
-            "success" if result.get("status") == "completed" else result.get("status", "success")
+            "success"
+            if result.get("status") in ("completed", "started")
+            else result.get("status", "success")
         ),
     }
 

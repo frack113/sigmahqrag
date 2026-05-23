@@ -44,11 +44,13 @@ class VersionManager:
 
     BINARY_PATTERNS = {
         "llama.cpp": [
-            r"llama-.*-win-hip.*x64",
+            r"llama-.*-win-hip-radeon-x64",
             r"llama-.*-win-cuda-\d+\.\d+-x64",
             r"llama-.*-win-cpu-x64",
-            r"llama-.*-linux-x64",
-            r"llama-.*-linux-arm64",
+            r"llama-.*-win-vulkan-x64",
+            r"llama-.*-win-sycl-x64",
+            r"llama-.*-ubuntu-x64",
+            r"llama-.*-ubuntu-arm64",
             r"llama-.*-macos-x64",
             r"llama-.*-macos-arm64",
         ],
@@ -219,26 +221,35 @@ class VersionManager:
         for asset in release.assets:
             asset_name = asset.name.lower()
 
-            # Skip CUDA/cuBLAS/cuDNN/cuDART runtime libraries - these are not the main binary
-            if "cuda" in asset_name or "cudnn" in asset_name or "cublas" in asset_name:
+            # Skip cudart-* packages - these are CUDA runtime redistributables (DLLs only)
+            # The main llama.cpp CUDA builds are named like llama-*-cuda-*.zip and should be kept
+            if asset_name.startswith("cudart-"):
                 continue
 
             if service == "llama.cpp":
+                # Determine GPU type this asset corresponds to (from its name)
+                def _asset_gpu_type(name: str) -> str | None:
+                    if "hip" in name:
+                        return "hip"
+                    if "cuda" in name:
+                        return "cuda"
+                    if "vulkan" in name:
+                        return "vulkan"
+                    if "sycl" in name:
+                        return "sycl"
+                    if "opencl" in name:
+                        return "opencl"
+                    if "cpu" in name:
+                        return "cpu"
+                    return None
+
                 # Try pattern match
                 for pattern in patterns:
                     if re.search(pattern, asset_name):
-                        # If GPU preference is set, prioritize matching type
+                        asset_gpu = _asset_gpu_type(asset_name)
+                        # If GPU preference is set on Windows, only accept matching GPU type
                         if preferred_gpu and os_name == "windows":
-                            if (
-                                (preferred_gpu == "hip" and "hip" in asset_name)
-                                or (preferred_gpu == "cuda" and "cuda" in asset_name)
-                                or (
-                                    preferred_gpu == "cpu"
-                                    and "cpu" in asset_name
-                                    and "hip" not in asset_name
-                                    and "cuda" not in asset_name
-                                )
-                            ):
+                            if asset_gpu == preferred_gpu:
                                 logger.info(
                                     f"Matched {preferred_gpu.upper()} pattern {pattern} for {asset.name} (from config)"
                                 )
@@ -248,15 +259,11 @@ class VersionManager:
                             return asset
 
                 # Fallback: check for OS+arch in asset name
+                asset_gpu = _asset_gpu_type(asset_name)
                 if os_name == "windows" and "win" in asset_name and arch in asset_name:
-                    if preferred_gpu == "hip" and "hip" in asset_name:
-                        return asset
-                    elif preferred_gpu == "cuda" and "cuda" in asset_name:
-                        return asset
-                    elif preferred_gpu == "cpu" and "cpu" in asset_name:
+                    if preferred_gpu and asset_gpu == preferred_gpu:
                         return asset
                     elif preferred_gpu is None:
-                        # No preference: default to CPU or first match
                         return asset
                 elif (
                     os_name == "linux"
@@ -330,6 +337,75 @@ def create_version_manager(github_token: str | None = None) -> VersionManager:
     return VersionManager(github_token=github_token)
 
 
+def _detect_llama_server_binary() -> Path | None:
+    """Find the llama-server executable in the expected location.
+
+    Returns:
+        Path to llama-server or None if not found
+    """
+    import sys
+
+    from src.shared import get_config
+
+    config = get_config()
+    bin_dir = config.resolve_llamacpp_bin_path()
+
+    if sys.platform == "win32":
+        candidates = ("llama-server.exe", "llama-server")
+    else:
+        candidates = ("llama-server", "llama-server.exe")
+
+    for name in candidates:
+        candidate = bin_dir / name
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+def _try_get_llama_version_from_binary() -> str | None:
+    """Try to detect llama.cpp version by running the binary with --version.
+
+    Returns:
+        Version string like "b9277" or None if detection fails
+    """
+    import re
+    import subprocess
+
+    binary = _detect_llama_server_binary()
+    if not binary:
+        return None
+
+    try:
+        result = subprocess.run(
+            [str(binary), "--version"],
+            capture_output=True,
+            text=True,
+            timeout=10.0,
+        )
+        output = result.stdout + result.stderr
+
+        # Try to find version in output (common format: "b1234" or "version: b1234")
+        patterns = [
+            r"\b(b\d+)\b",  # Matches b1234
+            r"version[:\s]+(b\d+)",
+            r"llama.cpp\s+(b\d+)",
+            r"build\s+(b\d+)",
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, output, re.IGNORECASE)
+            if match:
+                return match.group(1)
+
+        # Try to find numeric version without 'b' prefix
+        num_match = re.search(r"\b(\d{4,})\b", output)
+        if num_match:
+            return f"b{num_match.group(1)}"
+
+        return None
+    except Exception:
+        return None
+
+
 async def get_current_version(service: str) -> str | None:
     """Get currently installed version for a service.
 
@@ -343,7 +419,21 @@ async def get_current_version(service: str) -> str | None:
 
     config = get_config()
     if service in ("llama", "llama.cpp"):
-        return config.llamacpp_version
+        version = config.llamacpp_version
+        # If version is default "0" but binary exists, try to detect actual version
+        if version == "0":
+            binary = _detect_llama_server_binary()
+            if binary:
+                # Binary exists but version is unknown - try to detect it
+                detected = _try_get_llama_version_from_binary()
+                if detected:
+                    # Update config with detected version
+                    config.llamacpp_version = detected
+                    config.save()
+                    return detected
+                # Couldn't detect exact version, but binary exists
+                return "installed"
+        return version
     elif service in ("qdrant", "qdrant_db"):
         return config.qdrant_version
     return None

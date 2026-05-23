@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import Any
 
 from llama_index.vector_stores.qdrant import QdrantVectorStore
@@ -20,11 +21,75 @@ from .storage import search, store_embeddings
 logger = logging.getLogger(__name__)
 
 
-def get_version() -> str | None:
-    """Get current qdrant version."""
+def _find_qdrant_binary() -> Path | None:
+    """Find the qdrant executable in the expected location."""
     from src.shared import get_config
 
-    return get_config().qdrant_version
+    config = get_config()
+    qdrant_bin = Path(config.qdrant_binary_path).resolve()
+    for name in ("qdrant.exe", "qdrant"):
+        candidate = qdrant_bin / name
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def _try_get_qdrant_version_from_binary() -> str | None:
+    """Try to detect qdrant version by running the binary with --version."""
+    import re
+    import subprocess
+
+    binary = _find_qdrant_binary()
+    if not binary:
+        return None
+
+    try:
+        result = subprocess.run(
+            [str(binary), "--version"],
+            capture_output=True,
+            text=True,
+            timeout=10.0,
+        )
+        output = result.stdout + result.stderr
+
+        # Qdrant outputs like: "Qdrant 1.7.0" or "qdrant 1.7.0"
+        patterns = [
+            r"(?:Qdrant|qdrant)\s+(\d+\.\d+\.\d+)",
+            r"version[:\s]+(\d+\.\d+\.\d+)",
+            r"(\d+\.\d+\.\d+)",
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, output)
+            if match:
+                return match.group(1)
+        return None
+    except Exception:
+        return None
+
+
+def get_version() -> str | None:
+    """Get current qdrant version.
+
+    Detects from config first, then falls back to binary detection if version is "0".
+    """
+    from src.shared import get_config
+
+    config = get_config()
+    version = config.qdrant_version
+
+    if version != "0":
+        return version
+
+    binary = _find_qdrant_binary()
+    if binary:
+        detected = _try_get_qdrant_version_from_binary()
+        if detected:
+            config.qdrant_version = detected
+            config.save()
+            return detected
+        return "installed"
+
+    return version
 
 
 def set_version(version: str) -> None:
