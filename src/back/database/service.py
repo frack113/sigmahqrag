@@ -66,7 +66,7 @@ class DatabaseService:
         return cls._instance
 
     def initialize(self) -> None:
-        """Apply schema + seed data, then load existing database from disk if present."""
+        """Apply schema + seed data, then load persisted data from disk (overrides seed)."""
         if self._initialized:
             logger.warning("initialize() called more than once — skipping")
             return
@@ -88,7 +88,7 @@ class DatabaseService:
             for table in _VALID_TABLES:
                 try:
                     self._writer_conn.execute(
-                        f"INSERT OR IGNORE INTO {table} SELECT * FROM file_db.{table}"
+                        f"INSERT OR REPLACE INTO {table} SELECT * FROM file_db.{table}"
                     )
                 except Exception:
                     logger.warning("Table %s not found in existing database — skipping", table)

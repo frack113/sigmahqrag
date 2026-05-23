@@ -98,7 +98,7 @@ async def qdrant_progress(download_id: str):
         return JSONResponse(status_code=500, content={"error": "An internal error occurred"})
 
 
-@router.post("")
+@router.post("", response_model=None)
 async def qdrant_action(
     request: QdrantActionRequest, req: Request
 ) -> QdrantActionResponse | JSONResponse:

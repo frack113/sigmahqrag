@@ -116,6 +116,13 @@ class Config:
 
     def to_dict(self) -> dict[str, Any]:
         return {
+            "backend": {
+                "os": self.os,
+                "gpu_type": self.gpu_type,
+                "llamacpp_version": self.llamacpp_version,
+                "qdrant_version": self.qdrant_version,
+                "qdrant_webui_version": self.qdrant_webui_version,
+            },
             "services": {
                 "llama": {
                     "base_url": self.llama_base_url,
