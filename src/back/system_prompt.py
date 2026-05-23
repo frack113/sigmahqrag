@@ -163,7 +163,10 @@ def add_prompt(name: str, description: str, content: str) -> Prompt:
 
 
 def update_prompt(
-    prompt_id: str, name: str = None, description: str = None, content: str = None
+    prompt_id: str,
+    name: str | None = None,
+    description: str | None = None,
+    content: str | None = None,
 ) -> bool:
     """Update an existing prompt."""
     _ensure_loaded()

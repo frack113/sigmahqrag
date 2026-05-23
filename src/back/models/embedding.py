@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import shutil
 from pathlib import Path
+from typing import Any
 
 from src.back.database import DatabaseService
 from src.back.models.download import HFDownloadService
@@ -54,6 +55,28 @@ class EmbeddingManager:
             }
             db.upsert_model(entry)
 
+    async def embed_text(
+        self, texts: list[str], model_name: str | None = None
+    ) -> list[list[float]]:
+        """Generate embeddings for text."""
+        from src.back.rag.embeddings import embed_documents
+        from llama_index.core.schema import Document
+
+        if model_name:
+            logger = __import__("logging").getLogger(__name__)
+            logger.info("Using custom model: %s", model_name)
+
+        docs = [Document(text=t) for t in texts]
+        return await embed_documents(docs)
+
+    async def get_model_info(self, repo_id: str) -> Any:
+        """Get model info from HuggingFace."""
+        from src.back.models.download import HFDownloadService
+
+        service = HFDownloadService()
+        repo = HFRepo.from_string(repo_id)
+        return service.get_model_info(repo)
+
     async def search_models(
         self, query: str = "sentence-transformers", limit: int = 10
     ) -> list[HFRepo]:
@@ -76,6 +99,7 @@ class EmbeddingManager:
         self,
         repo_id: str,
         filename: str | None = None,
+        expected_hash: str | None = None,
         create_index: bool = True,
     ) -> dict:
         """Download an embedding model.

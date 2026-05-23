@@ -42,7 +42,7 @@ async def info_release(owner: str, repo: str, tag: str, github_token: str | None
     async with httpx.AsyncClient(timeout=30.0) as client:
         response = await client.get(url, headers=headers)
         response.raise_for_status()
-        return response.json()
+        return response.json()  # type: ignore[no-any-return]
 
 
 async def list_release_files(

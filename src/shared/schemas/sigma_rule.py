@@ -38,7 +38,7 @@ class SigmaRule(BaseModel):
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
-        return self.model_dump(exclude_none=True)
+        return self.model_dump(exclude_none=True)  # type: ignore[no-any-return]
 
     @property
     def path(self) -> Path | None:

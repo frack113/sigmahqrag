@@ -124,7 +124,7 @@ class TaskDispatcher:
             state = self._worker_states.get(worker_type)
             if state is None:
                 return 0
-            return state.get("progress_percent", 0)
+            return state.get("progress_percent", 0)  # type: ignore[no-any-return]
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -203,6 +203,7 @@ class TaskDispatcher:
                         f"Submitting task {task.get('task_id', '')} (type: {worker_type.value}) → RUNNING"
                     )
                     try:
+                        assert self._executor is not None
                         future: Future = self._executor.submit(
                             self._run_worker, worker_type, worker, task
                         )

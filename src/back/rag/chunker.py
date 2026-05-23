@@ -6,7 +6,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 from llama_index.core.schema import Document
 
 from src.shared.schemas.sigma_rule import SigmaRule

@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 from src.back.documents.models import SigmaRule
 
@@ -44,7 +44,7 @@ def parse_yaml_file(file_path: str) -> dict[str, Any]:
         raise ValueError(f"File too large: {size} bytes (max {MAX_FILE_SIZE})")
 
     with open(file_path, encoding="utf-8") as f:
-        return yaml.safe_load(f)
+        return yaml.safe_load(f)  # type: ignore[no-any-return]
 
 
 def parse_sigma_rule(file_path: str) -> SigmaRule | None:

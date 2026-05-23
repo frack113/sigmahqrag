@@ -178,8 +178,8 @@ async def post_backend(request: dict) -> JSONResponse:
             elif service == "qdrant":
                 from src.back.qdrant.service import create_qdrant_service
 
-                service_manager = create_qdrant_service()
-                result = await service_manager.start()
+                qdrant_svc = create_qdrant_service()
+                result = await qdrant_svc.start()
             else:
                 result = {"success": False, "error": f"Unknown service: {service}"}
 
@@ -187,13 +187,13 @@ async def post_backend(request: dict) -> JSONResponse:
             if service == "llama":
                 from src.back.llamacpp.service import create_llama_service
 
-                service_manager = create_llama_service()
-                result = await service_manager.stop()
+                llm_svc = create_llama_service()
+                result = await llm_svc.stop()
             elif service == "qdrant":
                 from src.back.qdrant.service import create_qdrant_service
 
-                service_manager = create_qdrant_service()
-                result = await service_manager.stop()
+                qdrant_svc = create_qdrant_service()
+                result = await qdrant_svc.stop()
             else:
                 result = {"success": False, "error": f"Unknown service: {service}"}
 
@@ -232,7 +232,7 @@ class JobResponse(BaseModel):
     status: str
 
 
-async def start_download(service: str = None, target: str = None) -> dict[str, Any]:
+async def start_download(service: str | None = None, target: str | None = None) -> dict[str, Any]:
     """Start download action and return job info."""
     import uuid
 
@@ -417,9 +417,12 @@ async def get_models() -> JSONResponse:
     from src.shared import LLM_DIR
 
     try:
+        from src.api.dependencies import get_database_service
+
+        db = get_database_service()
         reg = get_unified_registry()
-        reg.sync_llm_folder(LLM_DIR)
-        llms = reg.list_llms()
+        reg.sync_llm_folder(LLM_DIR, db)
+        llms = reg.list_llms(db)
 
         model_list = []
         for repo_id, data in llms.items():
@@ -473,7 +476,10 @@ async def delete_model(request: dict) -> JSONResponse:
                 content={"status": "error", "error": "Invalid repo_id"},
             )
 
-        record = reg.get_llm(repo_id)
+        from src.api.dependencies import get_database_service
+
+        db = get_database_service()
+        record = reg.get_llm(repo_id, db)
         if not record:
             raise ModelNotFoundError(f"Model {repo_id} not found")
         if filename not in record.get("files", {}):
@@ -489,7 +495,7 @@ async def delete_model(request: dict) -> JSONResponse:
         if path.exists():
             path.unlink()
         del record["files"][filename]
-        reg._save()
+        reg._save(db)
 
         return JSONResponse(
             content={"status": "success", "message": f"Deleted {repo_id}/{filename}"}

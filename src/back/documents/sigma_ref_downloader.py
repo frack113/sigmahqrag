@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 import httpx
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 from src.back.database import DatabaseService
 from src.back.utils.identify_file_type import SUPPORTED_DOC_EXTENSION_MAP
@@ -136,7 +136,7 @@ def _download_file(
             if status in RETRY_STATUSES and attempt < max_retries:
                 retry_after = _get_retry_after(exc.response)
                 if retry_after is not None:
-                    wait = min(retry_after, 120)
+                    wait: float = min(retry_after, 120)
                 else:
                     wait = _backoff_delay(attempt)
                 logger.warning(
@@ -154,7 +154,7 @@ def _download_file(
 
         except (httpx.TimeoutException, httpx.NetworkError, httpx.ConnectError) as exc:
             if attempt < max_retries:
-                wait = _backoff_delay(attempt)
+                wait: float = _backoff_delay(attempt)  # type: ignore[no-redef]
                 logger.warning(
                     "Network error on attempt %d/%d for %s: %s — waiting %ds",
                     attempt,

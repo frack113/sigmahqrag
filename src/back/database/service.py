@@ -195,7 +195,7 @@ class DatabaseService:
                 return result[0]
         return None
 
-    def set_config(self, key: str, value: dict) -> None:
+    def set_config(self, key: str, value: dict[str, Any] | str | int | bool | None) -> None:
         """Set config value as JSON."""
         with self._lock:
             self._writer_conn.execute(
@@ -269,7 +269,7 @@ class DatabaseService:
         with self._lock:
             result = self._writer_conn.execute("DELETE FROM models WHERE repo_id = ?", (repo_id,))
             self._writer_conn.commit()
-            return result.rowcount > 0
+            return result.rowcount > 0  # type: ignore[no-any-return]
 
     # =========================================================================
     # SYSTEM_PROMPTS TABLE

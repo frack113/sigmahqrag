@@ -11,7 +11,7 @@ class BaseWorker(ABC):
 
     def __init__(self, db: "DatabaseService", dispatcher: "TaskDispatcher | None" = None):
         self.db = db
-        self.dispatcher = dispatcher
+        self.dispatcher: "TaskDispatcher | None" = dispatcher
 
     @abstractmethod
     def process(self, task: dict) -> None:

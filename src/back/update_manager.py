@@ -41,7 +41,7 @@ class UpdateService:
             else:
                 return False
 
-            return health["status"] == "active"
+            return health["status"] == "active"  # type: ignore[no-any-return]
         except Exception as e:
             logger.error(f"Health check failed: {e}")
             return False

@@ -1,6 +1,7 @@
 """Main application entry point."""
 
 import logging
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from logging.handlers import RotatingFileHandler
 
@@ -105,7 +106,7 @@ def _clean_at_startup() -> None:
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI) -> None:
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan handler."""
     dispatcher = None
     db = None

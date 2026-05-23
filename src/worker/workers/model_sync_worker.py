@@ -1,6 +1,7 @@
 import json
 import logging
 from pathlib import Path
+from typing import Any
 
 from src.worker.base import BaseWorker
 from src.worker.enums import WorkerName, WorkerStatus
@@ -19,6 +20,7 @@ class ModelSyncWorker(BaseWorker):
     """
 
     def process(self, task: dict) -> None:
+        assert self.dispatcher is not None
         task_id = task.get("task_id", "")
         llm_dir = Path(task.get("llm_dir", "data/models/llm"))
         embeddings_dir = Path(task.get("embeddings_dir", "data/models/embeddings"))
@@ -76,10 +78,10 @@ class ModelSyncWorker(BaseWorker):
         )
         logger.info(f"[ModelSyncWorker] Complete (error={error_msg or 'none'}).")
 
-    def _load_registry(self) -> dict:
+    def _load_registry(self) -> dict[str, Any]:
         if REGISTRY_PATH.exists():
             try:
-                return json.loads(REGISTRY_PATH.read_text())
+                return json.loads(REGISTRY_PATH.read_text())  # type: ignore[no-any-return]
             except Exception:
                 pass
         return {"llm": {}, "embeddings": {}}

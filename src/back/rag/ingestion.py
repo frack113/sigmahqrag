@@ -35,7 +35,7 @@ _pipeline_registry: dict[tuple[str, str], IngestionPipeline] = {}
 def _first_configured_model(config: dict) -> str | None:
     for _type_key, type_config in config.items():
         if isinstance(type_config, dict) and "model" in type_config:
-            return type_config["model"]
+            return type_config["model"]  # type: ignore[no-any-return]
     return None
 
 
@@ -175,7 +175,7 @@ class IngestionPipelineBuilder:
             except Exception as e:
                 logger.warning("Failed to persist pipeline cache: %s", e)
 
-        return nodes
+        return nodes  # type: ignore[no-any-return]
 
     async def arun(
         self,
@@ -207,7 +207,7 @@ class IngestionPipelineBuilder:
             except Exception as e:
                 logger.warning("Failed to persist pipeline cache: %s", e)
 
-        return nodes
+        return nodes  # type: ignore[no-any-return]
 
     def as_query_engine(
         self,

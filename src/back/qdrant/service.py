@@ -65,7 +65,7 @@ class QdrantBinaryService:
         if Path(config_path).exists():
             cmd.extend(["--config-path", config_path])
 
-        return await self._subprocess_manager.start_service(
+        return await self._subprocess_manager.start_service(  # type: ignore[no-any-return]
             name="qdrant",
             cmd=cmd,
             log_file=log_file,
@@ -75,11 +75,11 @@ class QdrantBinaryService:
 
     async def stop(self) -> dict[str, Any]:
         """Stop Qdrant server."""
-        return await self._subprocess_manager.stop_service("qdrant")
+        return await self._subprocess_manager.stop_service("qdrant")  # type: ignore[no-any-return]
 
     def get_logs(self, lines: int = 50) -> str:
         """Get recent log lines for qdrant."""
-        return self._subprocess_manager.get_logs("qdrant", lines)
+        return self._subprocess_manager.get_logs("qdrant", lines)  # type: ignore[no-any-return]
 
 
 def create_qdrant_service() -> QdrantBinaryService:

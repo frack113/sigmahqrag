@@ -99,7 +99,9 @@ async def qdrant_progress(download_id: str):
 
 
 @router.post("")
-async def qdrant_action(request: QdrantActionRequest, req: Request) -> QdrantActionResponse:
+async def qdrant_action(
+    request: QdrantActionRequest, req: Request
+) -> QdrantActionResponse | JSONResponse:
     """Unified endpoint for all Qdrant actions."""
     action = request.action
     payload = request.payload
@@ -141,9 +143,7 @@ async def qdrant_action(request: QdrantActionRequest, req: Request) -> QdrantAct
             service_manager = create_qdrant_service()
             command = payload.command
             if command == "start":
-                from src.shared import QDRANT_STORAGE_DIR
-
-                result = await service_manager.start(storage_path=str(QDRANT_STORAGE_DIR))
+                result = await service_manager.start()
             elif command == "stop":
                 result = await service_manager.stop()
             elif command == "restart":
@@ -161,7 +161,7 @@ async def qdrant_action(request: QdrantActionRequest, req: Request) -> QdrantAct
 
         elif action == "cancel":
             manager = create_download_manager()
-            manager.cancel_download(payload.download_id)
+            await manager.cancel_download(payload.download_id)
             return QdrantActionResponse(
                 status="success",
                 action=action,
@@ -171,6 +171,7 @@ async def qdrant_action(request: QdrantActionRequest, req: Request) -> QdrantAct
         elif action == "collection_management":
             op = payload.operation
             name = payload.collection_name
+            assert name is not None
             if op == "list":
                 data = await list_collections(host, port)
                 return QdrantActionResponse(status="success", action=action, data=data)
@@ -190,8 +191,8 @@ async def qdrant_action(request: QdrantActionRequest, req: Request) -> QdrantAct
                     message=f"Collection {name} deleted",
                 )
             elif op == "get":
-                data = await get_collection(host, port, name)
-                return QdrantActionResponse(status="success", action=action, data=data)
+                col_data = await get_collection(host, port, name)
+                return QdrantActionResponse(status="success", action=action, data=col_data)
             else:
                 raise ValueError(f"Unknown operation: {op}")
 
@@ -201,6 +202,7 @@ async def qdrant_action(request: QdrantActionRequest, req: Request) -> QdrantAct
             if op == "add" or op == "update":
                 if not payload.vector or not payload.id:
                     raise ValueError("id and vector are required for add/update")
+                assert isinstance(name, str)
                 success = await store_embeddings(
                     embeddings=[payload.vector],
                     documents=["placeholder"],
@@ -215,6 +217,7 @@ async def qdrant_action(request: QdrantActionRequest, req: Request) -> QdrantAct
             elif op == "delete":
                 if not payload.id:
                     raise ValueError("id is required for delete")
+                assert isinstance(name, str)
                 success = await delete_point(name, payload.id, host, port)
                 if not success:
                     raise ValueError("Failed to delete data")
@@ -227,6 +230,7 @@ async def qdrant_action(request: QdrantActionRequest, req: Request) -> QdrantAct
                 raise ValueError(f"Unknown operation: {op}")
 
         elif action == "vector_search":
+            assert isinstance(payload.collection_name, str)
             results = await qdrant_search(
                 query_embedding=payload.query_vector,
                 collection_name=payload.collection_name,

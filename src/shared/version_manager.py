@@ -6,6 +6,7 @@ import logging
 import platform
 import re
 from dataclasses import dataclass
+from pathlib import Path
 
 import httpx
 
@@ -306,7 +307,7 @@ class VersionManager:
         )
         return None
 
-    def get_binary_name(self, service: str, asset: ReleaseAsset) -> str:
+    def get_binary_name(self, service: str, asset: ReleaseAsset) -> Path:
         """Get the target binary name for a service.
 
         Args:

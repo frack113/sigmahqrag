@@ -11,6 +11,7 @@ class LocalRepoSyncWorker(BaseWorker):
     """Syncs filesystem git repositories into git_metadata table."""
 
     def process(self, task: dict) -> None:
+        assert self.dispatcher is not None
         self.dispatcher.update_worker_state(
             worker_type=WorkerName.LOCAL_REPO_SYNC,
             status=WorkerStatus.RUNNING,

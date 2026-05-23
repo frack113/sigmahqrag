@@ -123,7 +123,7 @@ class DownloadManager:
         target_path = BIN_DIR / f"{service.replace('.', '-')}{file_ext}"
 
         cancel_event = asyncio.Event()
-        progress_queue = asyncio.Queue()
+        progress_queue: asyncio.Queue = asyncio.Queue()
 
         download_task = DownloadTask(
             download_id=download_id,

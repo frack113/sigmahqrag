@@ -25,7 +25,7 @@ def _check_hf_available() -> bool:
         import httpx
 
         response = httpx.get("https://huggingface.co", timeout=5)
-        return response.status_code == 200
+        return response.status_code == 200  # type: ignore[no-any-return]
     except Exception:
         return False
 
@@ -102,7 +102,7 @@ async def embed_documents(documents: list[Document]) -> list[list[float]]:
     try:
         embed_model = get_embedding_model()
         embeddings = await embed_model.aembed_documents([doc.text for doc in documents])
-        return embeddings  # type: ignore[return-value]
+        return embeddings  # type: ignore[no-any-return]
     except Exception as e:
         logger.error(f"Failed to generate embeddings: {e}")
         return []
