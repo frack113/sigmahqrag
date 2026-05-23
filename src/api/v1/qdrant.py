@@ -23,7 +23,6 @@ from src.shared.schemas.qdrant import (
     CollectionManagementPayload,
     DataManagementPayload,
     DownloadUpdatePayload,
-    EmbedSigmaRefPayload,
     ProgressPayload,
     QdrantActionRequest,
     QdrantActionResponse,
