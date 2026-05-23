@@ -37,14 +37,14 @@ class Config:
     embeddings_dir: str = "data/models/embeddings"
 
     llama_base_url: str = "http://127.0.0.1:8080"
-    llama_mode: str = "managed"
+    llama_manage_internally: bool = True
     llama_model_name: str | None = None
     llama_binary_path: str = "data/bin/llama-cpp"
 
     qdrant_base_url: str = "http://127.0.0.1:6333"
     qdrant_host: str = "127.0.0.1"
     qdrant_port: int = 6333
-    qdrant_mode: str = "managed"
+    qdrant_manage_internally: bool = True
     qdrant_collection_name: str = "sigma_doc"
     qdrant_vector_size: int = 384
     qdrant_binary_path: str = "data/bin/qdrant"
@@ -86,8 +86,8 @@ class Config:
                 llama = services["llama"]
                 if "base_url" in llama:
                     self.llama_base_url = llama["base_url"]
-                if "mode" in llama:
-                    self.llama_mode = llama["mode"]
+                if "manage_internally" in llama:
+                    self.llama_manage_internally = bool(llama["manage_internally"])
             if "qdrant" in services:
                 qdrant = services["qdrant"]
                 if "base_url" in qdrant:
@@ -100,8 +100,8 @@ class Config:
                         self.qdrant_host = parsed.hostname
                     if parsed.port:
                         self.qdrant_port = parsed.port
-                if "mode" in qdrant:
-                    self.qdrant_mode = qdrant["mode"]
+                if "manage_internally" in qdrant:
+                    self.qdrant_manage_internally = bool(qdrant["manage_internally"])
 
         if "logging" in nested:
             logging_cfg = nested["logging"]
@@ -126,11 +126,11 @@ class Config:
             "services": {
                 "llama": {
                     "base_url": self.llama_base_url,
-                    "mode": self.llama_mode,
+                    "manage_internally": self.llama_manage_internally,
                 },
                 "qdrant": {
                     "base_url": self.qdrant_base_url,
-                    "mode": self.qdrant_mode,
+                    "manage_internally": self.qdrant_manage_internally,
                 },
             },
             "logging": {

@@ -64,7 +64,7 @@ async def llama_status():
         return JSONResponse(
             content={
                 "service": SERVICE_NAME,
-                "mode": config.llama_mode,
+                "mode": "managed" if config.llama_manage_internally else "external",
                 "current_version": version or "unknown",
                 "downloads": downloads,
             }
