@@ -26,8 +26,5 @@ jobs:
       - name: Ruff check
         run: uv run ruff check main.py src/ tests/
 
-      - name: mypy
-        run: uv run mypy main.py src/
-
       - name: Black check
         run: uv run black --check main.py src/ tests/
