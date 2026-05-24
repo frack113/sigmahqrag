@@ -123,11 +123,11 @@ def clone_repo(
             # git@github.com:org/name.git or https://github.com/org/name.git
             parts = remote_url.rstrip("/").replace(".git", "").split("/")
             if remote_url.startswith("git@"):
-                org = parts[-1]
-                name = parts[-2]
+                org = parts[-1].lower()
+                name = parts[-2].lower()
             else:
-                org = parts[-2]
-                name = parts[-1]
+                org = parts[-2].lower()
+                name = parts[-1].lower()
         finally:
             shutil.rmtree(temp_dir, ignore_errors=True)
 
@@ -199,11 +199,19 @@ def update_repo(
         # gitpython provides remotes and fetch/pull natively
         origin = repo.remotes.origin
         fetch_info = origin.fetch()
+       # Try to find the remote head from fetch info
         remote_head = None
         for info in fetch_info:
-            if info.remote_ref_name == branch:
+            ref = info.remote_ref_path
+            if ref == branch or ref == f"refs/heads/{branch}":
                 remote_head = info.commit.hexsha
                 break
+        # Fallback: access the remote tracking ref after fetch
+        if remote_head is None:
+            try:
+                remote_head = repo.refs[f"origin/{branch}"].commit.hexsha
+            except Exception:
+                pass
         # Pull with rebase or merge based on config
         origin.pull(branch)
         logger.info(f"Updated repository: {org}/{name} on branch {branch}")
@@ -213,7 +221,7 @@ def update_repo(
             "name": name,
             "path": str(repo_path),
             "branch": branch,
-            "remote_head": remote_head,
+            "remote_head": remote_head or "",
         }
     except Exception as e:
         logger.error(f"Failed to update {org}/{name}: {e}")
@@ -274,6 +282,14 @@ def list_repos(repos_dir: Path = DEFAULT_REPOS_DIR) -> list[dict[str, Any]]:
                     info["remote_url"] = repo.remote().url
                 except Exception:
                     info["remote_url"] = None
+                try:
+                    origin = repo.remotes.origin
+                    origin.fetch()
+                    remote_ref = f"origin/{info.get('branch')}"
+                    remote_head = repo.refs[remote_ref].commit.hexsha if remote_ref in repo.refs else ""
+                    info["remote_head"] = remote_head
+                except Exception:
+                    info["remote_head"] = ""
                 repos.append(info)
 
     return sorted(repos, key=lambda r: (r["org"], r["name"]))

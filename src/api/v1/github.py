@@ -6,8 +6,14 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
+from threading import Lock
+
+import logging
 
 from src.back.github.git import (
+    DEFAULT_REPOS_DIR,
+    _get_repo_path,
+    _is_valid_repo,
     clone_repo,
     delete_repo,
     get_last_commit_date,
@@ -21,7 +27,10 @@ from src.back.github.git import (
     update_repo,
 )
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api/v1/github", tags=["v1-github"])
+_sync_lock = Lock()
 
 # Valid org/name pattern: alphanumeric, hyphens, underscores, dots (no path separators)
 _VALID_ORG_NAME_RE = re.compile(r"^[\w.-]+$")
@@ -75,7 +84,7 @@ def _extract_org_name(url: str) -> tuple[str, str]:
     parts = url.split("/")
     if len(parts) < 2:
         raise ValueError("Invalid URL format")
-    return parts[-2], parts[-1]
+    return parts[-2].lower(), parts[-1].lower()
 
 
 @router.get("/repos", response_model=list[RepositoryStatus])
@@ -127,36 +136,37 @@ async def add_repo(
         return RepositoryResponse(success=False, error=f"Repository '{org}/{name}' already exists")
 
     def clone_with_status() -> None:
-        result = clone_repo(url=request.url, branch=request.branch)
-        if result.get("success"):
-            save_metadata(
-                org,
-                name,
-                {
-                    "org": org,
-                    "name": name,
-                    "url": request.url,
-                    "branch": request.branch,
-                    "status": "synced",
-                    "last_synced": datetime.now().isoformat(),
-                    "created_at": datetime.now().isoformat(),
-                    "remote_head": result.get("remote_head"),
-                },
-            )
-            save_selected_dirs(org, name, [])
-        else:
-            save_metadata(
-                org,
-                name,
-                {
-                    "org": org,
-                    "name": name,
-                    "url": request.url,
-                    "branch": request.branch,
-                    "status": "error",
-                    "error": result.get("error"),
-                },
-            )
+        with _sync_lock:
+            result = clone_repo(url=request.url, branch=request.branch)
+            if result.get("success"):
+                save_metadata(
+                    org,
+                    name,
+                    {
+                        "org": org,
+                        "name": name,
+                        "url": request.url,
+                        "branch": request.branch,
+                        "status": "synced",
+                        "last_synced": datetime.now().isoformat(),
+                        "created_at": datetime.now().isoformat(),
+                        "remote_head": result.get("remote_head"),
+                    },
+                )
+                save_selected_dirs(org, name, [])
+            else:
+                save_metadata(
+                    org,
+                    name,
+                    {
+                        "org": org,
+                        "name": name,
+                        "url": request.url,
+                        "branch": request.branch,
+                        "status": "error",
+                        "error": result.get("error"),
+                    },
+                )
 
     if background_tasks is not None:
         background_tasks.add_task(clone_with_status)
@@ -177,6 +187,7 @@ async def get_repo(org: str, name: str) -> RepositoryStatus:
         raise HTTPException(status_code=404, detail=f"Repository '{org}/{name}' not found")
 
     metadata = get_metadata(org, name) or {}
+    last_commit = get_last_commit_date(org, name)
     return RepositoryStatus(
         org=org,
         name=name,
@@ -184,6 +195,7 @@ async def get_repo(org: str, name: str) -> RepositoryStatus:
         last_synced=metadata.get("last_synced"),
         url=metadata.get("url"),
         branch=metadata.get("branch"),
+        last_commit=last_commit,
     )
 
 
@@ -210,25 +222,63 @@ async def sync_repo(
         return RepositoryResponse(success=False, error=f"Repository '{org}/{name}' not found")
 
     def sync_with_status() -> dict[str, Any]:
-        result = update_repo(org=org, name=name, branch=branch)
-        existing_meta = get_metadata(org, name) or {}
-        if result.get("success"):
-            merged = {
-                **existing_meta,
-                "org": org,
-                "name": name,
-                "branch": branch,
-                "status": "synced",
-                "last_synced": datetime.now().isoformat(),
-                "remote_head": result.get("remote_head"),
-            }
-            save_metadata(org, name, merged)
+        with _sync_lock:
+            result = update_repo(org=org, name=name, branch=branch)
+            existing_meta = get_metadata(org, name) or {}
+            if result.get("success"):
+                merged = {
+                    **existing_meta,
+                    "org": org,
+                    "name": name,
+                    "branch": branch,
+                    "status": "synced",
+                    "last_synced": datetime.now().isoformat(),
+                    "remote_head": result.get("remote_head"),
+                }
+                save_metadata(org, name, merged)
         return result
 
     if background_tasks is not None:
         background_tasks.add_task(sync_with_status)
 
     return RepositoryResponse(success=True, message="Sync started in background")
+
+
+@router.post("/repos/sync-all", response_model=RepositoryResponse)
+async def sync_all_repos(
+    background_tasks=None,
+):
+    """Sync all registered repositories."""
+    repos = list_repos()
+    if not repos:
+        return RepositoryResponse(success=True, message="No repositories to sync")
+
+    def sync_all_task() -> None:
+        for repo in list(repos):
+            repo_data = {k: repo[k] for k in ("org", "name")}
+            try:
+                with _sync_lock:
+                    meta = get_metadata(repo_data["org"], repo_data["name"]) or {}
+                    branch = meta.get("branch", "main")
+                    result = update_repo(org=repo_data["org"], name=repo_data["name"], branch=branch)
+                    existing_meta = get_metadata(repo_data["org"], repo_data["name"]) or {}
+                    merged = {
+                        **existing_meta,
+                        "org": repo_data["org"],
+                        "name": repo_data["name"],
+                        "branch": branch,
+                        "status": "synced",
+                        "last_synced": datetime.now().isoformat(),
+                        "remote_head": result.get("remote_head"),
+                    }
+                    save_metadata(repo_data["org"], repo_data["name"], merged)
+            except Exception as e:
+                logger.error(f"Failed to sync {repo_data['org']}/{repo_data['name']}: {e}")
+
+    if background_tasks is not None:
+        background_tasks.add_task(sync_all_task)
+
+    return RepositoryResponse(success=True, message="Sync started for all repositories")
 
 
 @router.delete("/repos/{org}/{name}", response_model=RepositoryResponse)
@@ -299,30 +349,59 @@ async def get_repo_tree(
         _validate_org_name(org, name)
     except HTTPException as e:
         return DirectoryTreeResponse(success=False, error=e.detail)
-    repos = list_repos()
-    repo_exists = any(r["org"] == org and r["name"] == name for r in repos)
+    try:
+        # Check repo exists on filesystem directly (avoids fetching all repos)
+        repo_path = _get_repo_path(DEFAULT_REPOS_DIR, org, name)
+        if not repo_path.exists() or not _is_valid_repo(repo_path):
+            # Check DB — registered but not cloned locally?
+            try:
+                metadata = get_metadata(org, name)
+                if metadata:
+                    return DirectoryTreeResponse(
+                        success=False,
+                        error=f"Repository '{org}/{name}' not cloned yet",
+                    )
+            except Exception as db_err:
+                logger.debug(f"Could not check DB for {org}/{name}: {db_err}")
+            return DirectoryTreeResponse(
+                success=False,
+                error=f"Repository '{org}/{name}' not found or not cloned yet",
+            )
 
-    if not repo_exists:
+        tree = list_directory_tree(org, name, max_depth=max_depth)
+        selected: list[str] = []
+        try:
+            selected = get_selected_dirs(org, name) or []
+        except Exception as db_err:
+            logger.debug(f"Could not load selected dirs for {org}/{name}: {db_err}")
+
+        for node in tree:
+            _mark_selected(node, selected)
+
+        return DirectoryTreeResponse(
+            success=True,
+            tree=tree,
+        )
+    except PermissionError as e:
+        logger.error(f"Permission denied accessing repo dir for {org}/{name}: {e}")
         return DirectoryTreeResponse(
             success=False,
-            error=f"Repository '{org}/{name}' not found or not cloned yet",
+            error="Permission denied accessing repository directory",
         )
+    except Exception as e:
+        logger.error(f"Failed to get tree for {org}/{name}: {type(e).__name__}: {e}")
+        import traceback
 
-    tree = list_directory_tree(org, name, max_depth=max_depth)
-    selected = get_selected_dirs(org, name)
-
-    for node in tree:
-        _mark_selected(node, selected)
-
-    return DirectoryTreeResponse(
-        success=True,
-        tree=tree,
-    )
+        logger.error(traceback.format_exc())
+        return DirectoryTreeResponse(
+            success=False,
+            error=f"Error loading directory structure: {type(e).__name__}",
+        )
 
 
 def _mark_selected(node: dict[str, Any], selected: list[str]) -> None:
     """Mark nodes as selected based on their path."""
-    if node["path"] in selected:
+    if node.get("path") in selected:
         node["selected"] = True
     if "children" in node:
         for child in node["children"]:
@@ -340,10 +419,12 @@ async def select_dirs(
         _validate_org_name(org, name)
     except HTTPException as e:
         return SelectDirsResponse(success=False, error=e.detail)
-    repos = list_repos()
-    if not any(r["org"] == org and r["name"] == name for r in repos):
-        return SelectDirsResponse(success=False, error=f"Repository '{org}/{name}' not found")
-
+    try:
+        repo_path = _get_repo_path(DEFAULT_REPOS_DIR, org, name)
+        if not repo_path.exists() or not _is_valid_repo(repo_path):
+            return SelectDirsResponse(success=False, error=f"Repository '{org}/{name}' not found")
+    except Exception as e:
+        return SelectDirsResponse(success=False, error=str(e))
     result = save_selected_dirs(org, name, request.selected)
     if result.get("success"):
         return SelectDirsResponse(
