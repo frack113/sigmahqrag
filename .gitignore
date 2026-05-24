@@ -58,3 +58,5 @@ $null
 # Snyk Security
 .snyk
 .dcignore
+# AI agent guidance (local only, not tracked)
+AGENTS.md
