@@ -17,7 +17,8 @@ CREATE TABLE IF NOT EXISTS embedding_config (
     doc_type TEXT PRIMARY KEY,
     model TEXT NOT NULL DEFAULT '',
     chunk_size INTEGER DEFAULT 512,
-    overlap INTEGER DEFAULT 50
+    overlap INTEGER DEFAULT 50,
+    chunk_strategy TEXT DEFAULT 'recursive'
 );
 
 -- system_prompts
@@ -120,8 +121,8 @@ CREATE INDEX IF NOT EXISTS idx_doc_registry_org_repo ON doc_registry(org, repo);
 -- =========================================================================
 
 -- Embedding config defaults
-INSERT OR IGNORE INTO embedding_config (doc_type, model, chunk_size, overlap) VALUES
-    ('markdown', 'sentence-transformers/all-MiniLM-L6-v2', 512, 50);
+INSERT OR IGNORE INTO embedding_config (doc_type, model, chunk_size, overlap, chunk_strategy) VALUES
+    ('markdown', 'sentence-transformers/all-MiniLM-L6-v2', 512, 50, 'recursive');
 
 -- Default app config
 INSERT OR IGNORE INTO config (key, value) VALUES

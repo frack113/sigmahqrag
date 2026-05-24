@@ -679,14 +679,15 @@ class DatabaseService:
         """Get all embedding configurations."""
         with self._lock:
             results = self._writer_conn.execute(
-                "SELECT doc_type, model, chunk_size, overlap FROM embedding_config ORDER BY doc_type"
+                "SELECT doc_type, model, chunk_size, overlap, chunk_strategy FROM embedding_config ORDER BY doc_type"
             ).fetchall()
         config: dict[str, dict[str, Any]] = {}
         for row in results:
             config[row[0]] = {
                 "model": row[1],
                 "chunk_size": row[2],
-                "overlap": row[3],
+                "chunk_overlap": row[3],
+                "chunk_strategy": row[4],
             }
         return config
 
@@ -694,17 +695,19 @@ class DatabaseService:
         """Set embedding configuration for a document type."""
         with self._lock:
             self._writer_conn.execute(
-                """INSERT INTO embedding_config (doc_type, model, chunk_size, overlap)
-                 VALUES (?, ?, ?, ?)
-                 ON CONFLICT (doc_type) DO UPDATE SET
-                     model = EXCLUDED.model,
-                     chunk_size = EXCLUDED.chunk_size,
-                     overlap = EXCLUDED.overlap""",
+                """INSERT INTO embedding_config (doc_type, model, chunk_size, overlap, chunk_strategy)
+                  VALUES (?, ?, ?, ?, ?)
+                  ON CONFLICT (doc_type) DO UPDATE SET
+                      model = EXCLUDED.model,
+                      chunk_size = EXCLUDED.chunk_size,
+                      overlap = EXCLUDED.overlap,
+                      chunk_strategy = EXCLUDED.chunk_strategy""",
                 (
                     doc_type,
                     cfg.get("model", ""),
                     cfg.get("chunk_size", 512),
-                    cfg.get("overlap", 50),
+                    cfg.get("overlap") if "overlap" in cfg else cfg.get("chunk_overlap", 50),
+                    cfg.get("chunk_strategy", "recursive"),
                 ),
             )
             self._writer_conn.commit()
