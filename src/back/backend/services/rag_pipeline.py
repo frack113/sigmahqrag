@@ -138,6 +138,7 @@ class RAGPipeline:
         self,
         query: str,
         search_results: list[dict[str, Any]],
+        system_prompt_id: str = "",
     ) -> AsyncGenerator[str, None]:
         """Stream answer for a search query using LLM."""
         results_text = self._format_search_results(search_results)
@@ -150,11 +151,14 @@ class RAGPipeline:
                 yield token
             return
 
+        system_prompt = self._resolve_system_prompt(system_prompt_id)
         template = self.env.get_template("search_answer.j2")
         prompt = template.render(
             search_results=results_text,
             question=query,
         )
+        if system_prompt:
+            prompt = system_prompt + "\n\n" + prompt
 
         try:
             stream = self.llm_client.generate_stream(
@@ -173,12 +177,14 @@ class RAGPipeline:
         self,
         query: str,
         search_results: list[dict[str, Any]],
+        system_prompt_id: str = "",
     ) -> str:
         """Generate answer for a search query using LLM.
 
         Args:
             query: User's question
             search_results: Search results from Qdrant
+            system_prompt_id: Optional system prompt ID to inject
 
         Returns:
             LLM-generated answer
@@ -191,11 +197,14 @@ class RAGPipeline:
             logger.info(f"Cache hit for search query: {query[:50]}")
             return cached
 
+        system_prompt = self._resolve_system_prompt(system_prompt_id)
         template = self.env.get_template("search_answer.j2")
         prompt = template.render(
             search_results=results_text,
             question=query,
         )
+        if system_prompt:
+            prompt = system_prompt + "\n\n" + prompt
 
         try:
             response = await self.llm_client.generate(
@@ -328,6 +337,23 @@ class RAGPipeline:
         return await loop.run_in_executor(
             None, lambda: yaml.dump(rule, default_flow_style=False, allow_unicode=True)
         )
+
+    def _resolve_system_prompt(self, prompt_id: str) -> str:
+        """Resolve system prompt content by ID, falling back to active prompt."""
+        if not prompt_id:
+            return ""
+        try:
+            from src.back.system_prompt import get_prompt_by_id, get_active_prompt
+
+            prompt = get_prompt_by_id(prompt_id)
+            if prompt:
+                return prompt.content
+            active = get_active_prompt()
+            if active:
+                return active.content
+        except Exception:
+            logger.warning("Failed to resolve system prompt %s", prompt_id)
+        return ""
 
     def _fallback_explanation(self, rule_data: dict[str, Any]) -> str:
         """Fallback explanation without LLM."""

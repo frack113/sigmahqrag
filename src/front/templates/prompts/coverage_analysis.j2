@@ -14,4 +14,11 @@ Task: Analyze the detection coverage of the uploaded rule compared to existing r
 3. Redundancies (rules that duplicate detection)
 4. Recommendations for improving coverage
 
+Format your analysis clearly with Markdown:
+- Use ## headings for each section
+- Use **bold** for rule names and key findings
+- Use `code` for field names and file paths
+- Use bullet points and numbered lists for comparisons
+- Use ```yaml blocks for rule excerpts
+
 Provide a structured analysis suitable for threat hunting planning.

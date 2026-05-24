@@ -2,34 +2,60 @@
 
 {% block title %}Chat - SigmaHQ RAG{% endblock %}
 
+{% block header %}{% endblock %}
+
 {% block styles %}
 <link rel="stylesheet" href="{{ url_for('static', path='/css/chat.css') }}">
 {% endblock %}
 
 {% block content %}
-<div class="chat-layout">
-    <div class="chat-header-bar">
-        <span class="chat-header-title">SigmaHQ RAG</span>
-        <div class="chat-header-actions">
-            <button class="chat-header-btn" id="new-chat-btn" title="Nouvelle discussion">+ Nouvelle discussion</button>
+<div class="chat-page-layout">
+    <aside class="chat-sidebar">
+        <nav class="chat-sidebar-nav" aria-label="Main navigation">
+            <ul>
+                <li><a href="/chat" class="active">Chat</a></li>
+                <li><a href="/data">Data</a></li>
+                <li><a href="/admin">Admin</a></li>
+                <li><a href="/duckdb">DuckDB</a></li>
+            </ul>
+        </nav>
+        <div class="chat-sidebar-actions">
+            <button class="chat-sidebar-btn" id="new-chat-btn" title="Nouvelle discussion">+ New Chat</button>
+            <div class="chat-sidebar-group">
+                <label class="chat-sidebar-label" for="llm-select">Select LLM</label>
+                <select id="llm-select" class="chat-sidebar-select">
+                    <option value="">— Loading models —</option>
+                </select>
+            </div>
+            <div class="chat-sidebar-group">
+                <label class="chat-sidebar-label" for="prompt-select">System Prompt</label>
+                <select id="prompt-select" class="chat-sidebar-select">
+                    <option value="">— Default (none) —</option>
+                </select>
+            </div>
         </div>
-    </div>
-    <div class="chat-messages" id="chat-messages" role="log" aria-live="polite" aria-label="Messages du chat">
-        <div class="chat-welcome" id="chat-welcome">
-            <h2>SigmaHQ RAG</h2>
-            <p>Ask questions about Sigma detection rules</p>
+    </aside>
+    <div class="chat-layout">
+        <div class="chat-header-bar">
+            <span class="chat-header-title">SigmaHQ RAG</span>
         </div>
-        <div class="typing-indicator" id="typing-indicator" hidden>
-            <span class="typing-dot"></span>
-            <span class="typing-dot"></span>
-            <span class="typing-dot"></span>
+        <div class="chat-messages" id="chat-messages" role="log" aria-live="polite" aria-label="Messages du chat">
+            <div class="chat-welcome" id="chat-welcome">
+                <h2>SigmaHQ RAG</h2>
+                <p>Ask questions about Sigma detection rules</p>
+            </div>
+            <div class="typing-indicator" id="typing-indicator" hidden>
+                <span class="typing-dot"></span>
+                <span class="typing-dot"></span>
+                <span class="typing-dot"></span>
+            </div>
         </div>
-    </div>
-    <div class="chat-input-bar">
-        <form id="chat-form">
-            <textarea id="message-input" placeholder="Ask a question..." rows="1"></textarea>
-            <button type="submit" id="send-btn">Send</button>
-        </form>
+        <div class="chat-input-bar">
+            <form id="chat-form">
+                <textarea id="message-input" placeholder="Ask a question..." rows="1"></textarea>
+                <button type="submit" id="send-btn">Send</button>
+            </form>
+        </div>
     </div>
 </div>
 {% endblock %}
@@ -38,5 +64,9 @@
 
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+<script>
+    window.__INITIAL_MODELS = {{ models | tojson | safe }};
+    window.__INITIAL_PROMPTS = {{ prompts | tojson | safe }};
+</script>
 <script src="{{ url_for('static', path='/js/chat.js') }}"></script>
 {% endblock %}

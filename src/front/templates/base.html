@@ -9,7 +9,7 @@
     {% block styles %}{% endblock %}
 </head>
 <body>
-    {% include 'shared/_header.html' %}
+    {% block header %}{% include 'shared/_header.html' %}{% endblock %}
 
     <main>
         {% block content %}{% endblock %}

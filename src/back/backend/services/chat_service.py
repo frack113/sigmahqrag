@@ -27,17 +27,22 @@ class ChatService:
         self._history: list[dict[str, str]] = []
         self._uploaded_rule: dict[str, Any] | None = None
         self._last_citations: list[str] = []
+        self._current_prompt_id: str = ""
 
     async def process_message(
         self,
         message: str,
         mode: str = ChatMode.SEARCH.value,
+        model: str = "",
+        prompt_id: str = "",
     ) -> str:
         """Process a chat message based on the current mode.
 
         Args:
             message: User message text
             mode: Chat mode (search, coverage, explain)
+            model: Selected LLM model path
+            prompt_id: Selected system prompt ID
 
         Returns:
             AI response text
@@ -46,6 +51,7 @@ class ChatService:
             return ""
 
         self._add_to_history("user", message)
+        self._current_prompt_id = prompt_id
 
         try:
             if mode == ChatMode.EXPLAIN.value:
@@ -65,12 +71,19 @@ class ChatService:
         self,
         message: str,
         mode: str = ChatMode.SEARCH.value,
+        model: str = "",
+        prompt_id: str = "",
     ) -> AsyncGenerator[str, None]:
         """Stream a chat message response based on the current mode."""
         if not message.strip():
             return
 
         self._add_to_history("user", message)
+        self._current_prompt_id = prompt_id
+        if model:
+            logger.info("Selected model: %s", model)
+        if prompt_id:
+            logger.info("Selected prompt_id: %s", prompt_id)
 
         accumulated: list[str] = []
         try:
@@ -108,7 +121,9 @@ class ChatService:
         ]
 
         try:
-            return await self.rag_pipeline.answer_search_query(message, results)
+            return await self.rag_pipeline.answer_search_query(
+                message, results, system_prompt_id=self._current_prompt_id
+            )
         except Exception as e:
             logger.error(f"RAG pipeline failed: {e}")
             return self._fallback_search_results(results)
@@ -177,7 +192,9 @@ class ChatService:
         ]
 
         try:
-            async for token in self.rag_pipeline.answer_search_query_stream(message, results):
+            async for token in self.rag_pipeline.answer_search_query_stream(
+                message, results, system_prompt_id=self._current_prompt_id
+            ):
                 yield token
         except Exception as e:
             logger.error(f"RAG pipeline failed: {e}")

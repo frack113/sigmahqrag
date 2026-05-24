@@ -9,6 +9,8 @@
         var welcome = document.getElementById("chat-welcome");
         var newChatBtn = document.getElementById("new-chat-btn");
         var typingEl = document.getElementById("typing-indicator");
+        var llmSelect = document.getElementById("llm-select");
+        var promptSelect = document.getElementById("prompt-select");
 
         if (typeof marked !== "undefined") {
             marked.setOptions({ gfm: true, breaks: true });
@@ -25,6 +27,97 @@
 
         if (!messagesEl || !chatForm || !input || !sendBtn) return;
 
+        /* ---- Model selector ---- */
+        function populateModelSelect(models) {
+            if (!llmSelect) return;
+            llmSelect.innerHTML = "";
+            var emptyOpt = document.createElement("option");
+            emptyOpt.value = "";
+            emptyOpt.textContent = "— Select a model —";
+            llmSelect.appendChild(emptyOpt);
+
+            models.forEach(function (m) {
+                var opt = document.createElement("option");
+                opt.value = m.repo_id + "/" + m.filename;
+                opt.textContent = m.repo_id + " — " + m.filename + " (" + m.size_mb + " MB)";
+                llmSelect.appendChild(opt);
+            });
+        }
+
+        /* Load from server-side injected data or fetch */
+        function loadModels() {
+            if (window.__INITIAL_MODELS && window.__INITIAL_MODELS.length > 0) {
+                populateModelSelect(window.__INITIAL_MODELS);
+                return;
+            }
+            fetch("/api/v1/models/llm/installed")
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    var models = data.models || [];
+                    var flat = [];
+                    models.forEach(function (entry) {
+                        (entry.files || []).forEach(function (f) {
+                            flat.push({
+                                repo_id: entry.repo_id,
+                                filename: f.filename,
+                                size_mb: f.size ? (f.size / (1024 * 1024)).toFixed(1) : "?",
+                            });
+                        });
+                    });
+                    populateModelSelect(flat);
+                })
+                .catch(function () {
+                    if (llmSelect) {
+                        llmSelect.innerHTML = "<option value=\"\">— No models found —</option>";
+                    }
+                });
+        }
+
+        function getSelectedModel() {
+            if (llmSelect) return llmSelect.value || "";
+            return "";
+        }
+
+        /* ---- Prompt selector ---- */
+        function populatePromptSelect(prompts) {
+            if (!promptSelect) return;
+            promptSelect.innerHTML = "";
+            var defaultOpt = document.createElement("option");
+            defaultOpt.value = "";
+            defaultOpt.textContent = "— Default (none) —";
+            promptSelect.appendChild(defaultOpt);
+
+            prompts.forEach(function (p) {
+                var opt = document.createElement("option");
+                opt.value = p.id;
+                opt.textContent = p.name + (p.is_active ? " (active)" : "");
+                promptSelect.appendChild(opt);
+            });
+        }
+
+        function loadPrompts() {
+            if (window.__INITIAL_PROMPTS && window.__INITIAL_PROMPTS.length > 0) {
+                populatePromptSelect(window.__INITIAL_PROMPTS);
+                return;
+            }
+            fetch("/api/v1/admin/prompts")
+                .then(function (r) { return r.json(); })
+                .then(function (prompts) {
+                    populatePromptSelect(prompts);
+                })
+                .catch(function () {
+                    if (promptSelect) {
+                        promptSelect.innerHTML = "<option value=\"\">— No prompts —</option>";
+                    }
+                });
+        }
+
+        function getSelectedPrompt() {
+            if (promptSelect) return promptSelect.value || "";
+            return "";
+        }
+
+        /* ---- Chat ---- */
         function showTyping() {
             if (typingEl) typingEl.hidden = false;
         }
@@ -149,6 +242,8 @@
             newChatBtn.addEventListener("click", clearChat);
         }
 
+        loadModels();
+        loadPrompts();
         loadHistory();
 
         chatForm.addEventListener("submit", async function (e) {
@@ -163,12 +258,14 @@
 
             if (welcome) { welcome.remove(); welcome = null; }
 
+            var model = getSelectedModel();
+            var promptId = getSelectedPrompt();
             var resp;
             try {
                 resp = await fetch("/api/v1/chat/message/stream", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ message: text, mode: "search" }),
+                    body: JSON.stringify({ message: text, mode: "search", model: model, prompt_id: promptId }),
                 });
             } catch (err) {
                 addMessage("error", "Erreur réseau: " + err.message);
