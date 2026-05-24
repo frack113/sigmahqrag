@@ -177,12 +177,15 @@ async def qdrant_action(
 
         elif isinstance(payload, CollectionManagementPayload):
             op = payload.operation
-            name = payload.collection_name
-            assert name is not None
             if op == "list":
                 data = await list_collections(host, port)
                 return QdrantActionResponse(status="success", action=action, data=data)
-            elif op == "create":
+            name = payload.collection_name
+            if op not in ("create", "delete", "get"):
+                raise ValueError(f"Unknown operation: {op}")
+            if name is None:
+                raise ValueError(f"collection_name is required for operation '{op}'")
+            if op == "create":
                 v_size = payload.config.get("vector_size", 384) if payload.config else 384
                 await create_collection(host, port, name, v_size)
                 return QdrantActionResponse(
@@ -200,8 +203,6 @@ async def qdrant_action(
             elif op == "get":
                 col_data = await get_collection(host, port, name)
                 return QdrantActionResponse(status="success", action=action, data=col_data)
-            else:
-                raise ValueError(f"Unknown operation: {op}")
 
         elif isinstance(payload, DataManagementPayload):
             dm_op = payload.operation
@@ -253,7 +254,13 @@ async def qdrant_action(
             )
 
     except Exception as e:
-        logger.error(f"Qdrant action error ({action}): {e}")
+        logger.error(
+            "Qdrant action error (%s): %s: %s",
+            action,
+            type(e).__name__,
+            e,
+            exc_info=True,
+        )
         return QdrantActionResponse(
             status="error",
             action=action,

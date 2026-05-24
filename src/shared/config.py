@@ -39,7 +39,7 @@ class Config:
     llama_base_url: str = "http://127.0.0.1:8080"
     llama_manage_internally: bool = True
     llama_model_name: str | None = None
-    llama_binary_path: str = "data/bin/llama-cpp"
+    llama_binary_path: str = "data/bin/llamacpp"
 
     qdrant_base_url: str = "http://127.0.0.1:6333"
     qdrant_host: str = "127.0.0.1"

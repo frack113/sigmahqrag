@@ -82,17 +82,20 @@ async function recreateCollection(name) {
     if (window.isProcessing) return;
     window.isProcessing = true;
 
+    var btn = event?.target || event?.srcElement;
+    if (btn) btn.disabled = true;
+
     try {
         await deleteCollection(name);
         await createCollection(name);
 
-        alert('Collection "' + name + '" has been successfully re-created.');
         await loadVectorDB();
     } catch (e) {
         console.error('Error recreating collection:', e);
         alert('Failed to recreate collection: ' + e.message);
     } finally {
         window.isProcessing = false;
+        if (btn) btn.disabled = false;
     }
 }
 
