@@ -41,7 +41,7 @@ function loadStatus() {
                     <span class="status-text">${llama.status || 'unknown'}</span>
                     ${llamaInfo.current_version ? `<span class="version">v${llamaInfo.current_version}</span>` : ''}
                 </div>
-                <div class="service-actions">
+                <div class="service-actions" id="llama-actions">
                     <button class="btn btn-sm btn-success" onclick="startService('llama')">Start</button>
                     <button class="btn btn-sm btn-danger" onclick="stopService('llama')">Stop</button>
                     <button class="btn btn-sm" onclick="showLogs('llama')">Logs</button>
@@ -64,14 +64,23 @@ function loadStatus() {
         document.getElementById('status-cards').innerHTML = html;
         
         // Disable Qdrant management buttons in external mode
-        const isExternal = qdrantInfo.mode === 'external';
-        if (isExternal) {
+        const isQdrantExternal = qdrantInfo.mode === 'external';
+        if (isQdrantExternal) {
             const qdrantActions = document.getElementById('qdrant-actions');
             if (qdrantActions) {
                 qdrantActions.querySelectorAll('button').forEach(b => b.disabled = true);
             }
         }
-        
+
+        // Disable llama.cpp management buttons in external mode
+        const isLlamaExternal = llamaInfo.mode === 'external';
+        if (isLlamaExternal) {
+            const llamaActions = document.getElementById('llama-actions');
+            if (llamaActions) {
+                llamaActions.querySelectorAll('button').forEach(b => b.disabled = true);
+            }
+        }
+
         // Update banner
         let bannerHtml = '';
         if (llamaInfo.update_available) {

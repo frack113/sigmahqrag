@@ -36,9 +36,9 @@
         <p>Loading...</p>
     </div>
     <div style="margin-top: 15px;">
-        <button class="btn btn-primary" onclick="downloadLlama()">Download / Update</button>
-        <button class="btn btn-success" onclick="startLlama()">Start</button>
-        <button class="btn btn-danger" onclick="stopLlama()">Stop</button>
+        <button id="llama-download-btn" class="btn btn-primary" onclick="downloadLlama()">Download / Update</button>
+        <button id="llama-start-btn" class="btn btn-success" onclick="startLlama()">Start</button>
+        <button id="llama-stop-btn" class="btn btn-danger" onclick="stopLlama()">Stop</button>
     </div>
     <div id="download-status" class="status-message"></div>
     <div id="progress-container" style="display:none;">
@@ -71,6 +71,11 @@ function loadLlamaInfo() {
                 html += '<p class="warning">Download in progress</p>';
             }
             document.getElementById('llama-info').innerHTML = html;
+
+            const isExternal = data.mode === 'external';
+            document.getElementById('llama-start-btn').disabled = isExternal;
+            document.getElementById('llama-stop-btn').disabled = isExternal;
+            document.getElementById('llama-download-btn').disabled = isExternal;
         })
         .catch(err => {
             document.getElementById('llama-info').innerHTML = '<p class="error">Failed to load info: ' + err + '</p>';

@@ -40,9 +40,9 @@
         <p>Loading...</p>
     </div>
     <div style="margin-top: 15px;">
-        <button class="btn btn-success" onclick="startService('llama')">Start</button>
-        <button class="btn btn-danger" onclick="stopService('llama')">Stop</button>
-        <button class="btn btn-primary" onclick="downloadLlama()">Download / Update</button>
+        <button id="llama-start-btn" class="btn btn-success" onclick="startService('llama')">Start</button>
+        <button id="llama-stop-btn" class="btn btn-danger" onclick="stopService('llama')">Stop</button>
+        <button id="llama-download-btn" class="btn btn-primary" onclick="downloadLlama()">Download / Update</button>
     </div>
     <div id="llama-download-status" class="status-message"></div>
     <div id="llama-progress-container" style="display:none;">
@@ -195,51 +195,64 @@ function applyConfig(cfg) {
 }
 
 function loadStatus() {
-    fetch('/api/v1/admin/status')
-        .then(r => r.json())
-        .then(response => {
-            const services = response.data || {};
-            const llama = services.llama_cpp || {};
-            const qdrant = services.qdrant || {};
+    Promise.all([
+        fetch('/api/v1/admin/status').then(r => r.json()).catch(() => ({})),
+        fetch('/api/v1/llamacpp/status').then(r => r.json()).catch(() => ({})),
+        fetch('/api/v1/qdrant/status').then(r => r.json()).catch(() => ({}))
+    ])
+    .then(([adminResponse, llamaInfo, qdrantInfo]) => {
+        const services = adminResponse.data || {};
+        const llama = services.llama_cpp || {};
+        const qdrant = services.qdrant || {};
 
-            const getStatusClass = (status) => {
-                if (status === 'active') return 'ok';
-                if (status === 'inactive') return 'error';
-                return 'warning';
-            };
+        const getStatusClass = (status) => {
+            if (status === 'active') return 'ok';
+            if (status === 'inactive') return 'error';
+            return 'warning';
+        };
 
-            document.getElementById('llama-status').innerHTML = `
-                <div class="status-row">
-                    <span class="status-label">Status:</span>
-                    <span class="status-dot status-${getStatusClass(llama.status)}"></span>
-                    <span>${llama.status || 'unknown'}</span>
-                </div>
-                <div class="status-row">
-                    <span class="status-label">Version:</span>
-                    <span>${llama.version || 'Not installed'}</span>
-                </div>
-            `;
+        document.getElementById('llama-status').innerHTML = `
+            <div class="status-row">
+                <span class="status-label">Status:</span>
+                <span class="status-dot status-${getStatusClass(llama.status)}"></span>
+                <span>${llama.status || 'unknown'}</span>
+            </div>
+            <div class="status-row">
+                <span class="status-label">Version:</span>
+                <span>${llama.version || 'Not installed'}</span>
+            </div>
+        `;
 
-            document.getElementById('qdrant-status').innerHTML = `
-                <div class="status-row">
-                    <span class="status-label">Status:</span>
-                    <span class="status-dot status-${getStatusClass(qdrant.status)}"></span>
-                    <span>${qdrant.status || 'unknown'}</span>
-                </div>
-                <div class="status-row">
-                    <span class="status-label">Binary:</span>
-                    <span>${qdrant.version || 'Not installed'}</span>
-                </div>
-                <div class="status-row">
-                    <span class="status-label">Web UI:</span>
-                    <span>v0.2.11</span>
-                </div>
-            `;
-        })
-        .catch(err => {
-            document.getElementById('llama-status').innerHTML = '<p class="error">Failed to load status</p>';
-            document.getElementById('qdrant-status').innerHTML = '<p class="error">Failed to load status</p>';
-        });
+        document.getElementById('qdrant-status').innerHTML = `
+            <div class="status-row">
+                <span class="status-label">Status:</span>
+                <span class="status-dot status-${getStatusClass(qdrant.status)}"></span>
+                <span>${qdrant.status || 'unknown'}</span>
+            </div>
+            <div class="status-row">
+                <span class="status-label">Binary:</span>
+                <span>${qdrant.version || 'Not installed'}</span>
+            </div>
+            <div class="status-row">
+                <span class="status-label">Web UI:</span>
+                <span>v0.2.11</span>
+            </div>
+        `;
+
+        const isLlamaExternal = llamaInfo.mode === 'external';
+        document.getElementById('llama-start-btn').disabled = isLlamaExternal;
+        document.getElementById('llama-stop-btn').disabled = isLlamaExternal;
+        document.getElementById('llama-download-btn').disabled = isLlamaExternal;
+
+        const isQdrantExternal = qdrantInfo.mode === 'external';
+        document.getElementById('qdrant-start-btn').disabled = isQdrantExternal;
+        document.getElementById('qdrant-stop-btn').disabled = isQdrantExternal;
+        document.getElementById('qdrant-download-btn').disabled = isQdrantExternal;
+    })
+    .catch(err => {
+        document.getElementById('llama-status').innerHTML = '<p class="error">Failed to load status</p>';
+        document.getElementById('qdrant-status').innerHTML = '<p class="error">Failed to load status</p>';
+    });
 }
 
 function saveConfig() {
