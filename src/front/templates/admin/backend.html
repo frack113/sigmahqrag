@@ -124,7 +124,14 @@ function startProgressPollingLlama(downloadId) {
                     loadStatus();
                     return;
                 }
-                document.getElementById('llama-progress-text').textContent = 'Status: ' + task.status;
+                const bytesDownloaded = task.bytes_downloaded || 0;
+                const totalBytes = task.total_bytes || 1;
+                const percent = Math.round(bytesDownloaded / totalBytes * 100);
+                document.getElementById('llama-progress-fill').style.width = percent + '%';
+                document.getElementById('llama-progress-text').textContent = 
+                    `${percent}% (${Math.round(bytesDownloaded/1024/1024)}MB / ${Math.round(totalBytes/1024/1024)}MB)`;
+                document.getElementById('llama-download-status').textContent = 
+                    `Downloading... ${percent}% (${Math.round(bytesDownloaded/1024/1024)}MB / ${Math.round(totalBytes/1024/1024)}MB)`;
                 if (task.status === 'completed') {
                     clearInterval(progressPollInterval);
                     document.getElementById('llama-download-status').textContent = 'Download completed!';

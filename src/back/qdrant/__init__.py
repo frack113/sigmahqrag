@@ -178,10 +178,14 @@ class QdrantVectorService:
             await self.initialize()
 
         try:
-            results = self._vector_store.query(  # type: ignore[union-attr]
-                query=query_embedding,
-                top_k=top_k,
+            from llama_index.core.vector_stores.types import VectorStoreQuery
+
+            query = VectorStoreQuery(
+                query_embedding=query_embedding,
+                similarity_top_k=top_k,
             )
+            results = self._vector_store.query(query=query)  # type: ignore[union-attr]
+
             nodes = results.nodes
             if nodes:
                 return [

@@ -5,18 +5,30 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from src.back.qdrant import QdrantService
-from src.back.rag.embeddings import EMBEDDING_DIM, get_embedding_model
+from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+
+from src.back.qdrant.client import get_qdrant_client
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_TOP_K = 10
-SIMILARITY_THRESHOLD = 0.7
+SIMILARITY_THRESHOLD = 0.0
+DEFAULT_EMBED_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+
+
+_async_embed_model: Any | None = None
+
+
+def _get_search_embed_model() -> Any:
+    global _async_embed_model
+    if _async_embed_model is None:
+        _async_embed_model = HuggingFaceEmbedding(model_name=DEFAULT_EMBED_MODEL)
+    return _async_embed_model
 
 
 async def search(
     query: str,
-    collection_name: str = "sigma_doc",
+    collection_name: str = "sigmaref",
     top_k: int = DEFAULT_TOP_K,
     similarity_threshold: float = SIMILARITY_THRESHOLD,
 ) -> list[dict[str, Any]]:
@@ -36,27 +48,45 @@ async def search(
         return []
 
     try:
-        service = QdrantService(
-            collection_name=collection_name,
-            vector_size=EMBEDDING_DIM,
-        )
+        client = get_qdrant_client()
+        embed_model = _get_search_embed_model()
+        query_embedding = await embed_model.aget_query_embedding(query)
 
-        is_healthy = await service.health_check()
-        if not is_healthy:
-            logger.warning("Qdrant service not available")
+        points = client.query_points(collection_name, query=query_embedding, limit=top_k)
+        scored_points = points.points
+
+        if not scored_points:
             return []
 
-        embed_model = get_embedding_model()
-        query_embedding = await embed_model.aembed_query(query)
+        results = []
+        for point in scored_points:
+            score = point.score if point.score else 0.0
+            if score >= similarity_threshold:
+                payload = point.payload or {}
+                node_content = payload.get("_node_content", "{}")
+                if isinstance(node_content, str):
+                    import json
 
-        results = await service.search(
-            query_embedding=query_embedding,
-            top_k=top_k,
-        )
+                    try:
+                        node_data = json.loads(node_content)
+                        text = node_data.get("text", "")
+                        metadata = node_data.get("metadata", {})
+                    except (json.JSONDecodeError, KeyError):
+                        text = payload.get("_node_content", "")
+                        metadata = payload
+                else:
+                    text = node_content.get("text", "") if node_content else ""
+                    metadata = node_content.get("metadata", {}) if node_content else {}
 
-        filtered_results = [r for r in results if r.get("score", 0) >= similarity_threshold]
+                results.append(
+                    {
+                        "text": text,
+                        "score": score,
+                        "metadata": metadata,
+                    }
+                )
 
-        return filtered_results
+        return results
 
     except Exception as e:
         logger.error(f"Search failed: {e}")
@@ -104,7 +134,7 @@ class SearchEngine:
 
     def __init__(
         self,
-        collection_name: str = "sigma_doc",
+        collection_name: str = "sigmaref",
         top_k: int = DEFAULT_TOP_K,
         similarity_threshold: float = SIMILARITY_THRESHOLD,
     ) -> None:

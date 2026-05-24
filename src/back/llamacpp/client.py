@@ -1,8 +1,15 @@
 """Llama.cpp HTTP client (talks to llama-server.exe)."""
 
+from __future__ import annotations
+
+import json
+import logging
+from collections.abc import AsyncGenerator
 from typing import Any
 
 import httpx
+
+logger = logging.getLogger(__name__)
 
 
 def _default_base_url() -> str:
@@ -31,6 +38,7 @@ class LlamaClient:
         prompt: str,
         temperature: float = 0.3,
         max_tokens: int = 512,
+        stream: bool = False,
     ) -> str:
         """Generate text from a single prompt via /v1/completions.
 
@@ -45,6 +53,7 @@ class LlamaClient:
                         "prompt": prompt,
                         "temperature": temperature,
                         "max_tokens": max_tokens,
+                        "stream": stream,
                     },
                     timeout=120.0,
                 )
@@ -57,6 +66,75 @@ class LlamaClient:
                 return text if text is not None else ""
             except Exception as e:
                 raise RuntimeError(f"Llama.cpp generate failed: {e}") from e
+
+    async def generate_stream(
+        self,
+        prompt: str,
+        temperature: float = 0.3,
+        max_tokens: int = 1024,
+    ) -> AsyncGenerator[str, None]:
+        """Stream text generation via /v1/completions?stream=true.
+
+        Yields individual token strings from llama.cpp SSE events.
+        """
+        logger.info("Llama.cpp generate_stream called, prompt length: %d", len(prompt))
+        async with httpx.AsyncClient(timeout=httpx.Timeout(120.0, connect=10.0)) as client:
+            try:
+                async with client.stream(
+                    "POST",
+                    f"{self.base_url}/v1/completions",
+                    json={
+                        "prompt": prompt,
+                        "temperature": temperature,
+                        "max_tokens": max_tokens,
+                        "stream": True,
+                        "n_predict": max_tokens,
+                    },
+                ) as response:
+                    logger.info("Llama.cpp stream response status: %d", response.status_code)
+                    response.raise_for_status()
+                    raw_lines = []
+                    data_lines = []
+                    line_count = 0
+                    async for line in response.aiter_lines():
+                        line_count += 1
+                        line = line.strip()
+                        if not line or not line.startswith("data: "):
+                            if line_count <= 10:
+                                raw_lines.append(f"  line {line_count}: {repr(line)}")
+                            continue
+                        data_str = line[6:]
+                        if data_str == "[DONE]":
+                            logger.info("Llama.cpp stream completed after %d lines", line_count)
+                            break
+                        if len(data_lines) < 5:
+                            data_lines.append(data_str[:300])
+                        try:
+                            event = json.loads(data_str)
+                            choices = event.get("choices") or []
+                            if not choices:
+                                logger.warning("SSE event has no choices: %s", data_str[:300])
+                            for choice in choices:
+                                text = choice.get("text")
+                                if text:
+                                    yield text
+                        except json.JSONDecodeError:
+                            logger.debug("Invalid SSE event: %s", data_str[:200])
+                    if raw_lines:
+                        logger.info(
+                            "First %d raw SSE lines (non-data): %s",
+                            len(raw_lines),
+                            "\n".join(raw_lines),
+                        )
+                    if data_lines:
+                        logger.info("First %d SSE data events: %s", len(data_lines), data_lines)
+                    logger.info("Finished reading %d SSE lines", line_count)
+            except httpx.TimeoutException:
+                logger.error("Llama.cpp generate_stream timed out")
+                raise
+            except Exception as e:
+                logger.error("Llama.cpp generate_stream failed: %s", e)
+                raise RuntimeError(f"Llama.cpp generate_stream failed: {e}") from e
 
     async def complete(self, prompt: str) -> str:
         """Legacy alias for :meth:`generate` (kept for back-compat)."""

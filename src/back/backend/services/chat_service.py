@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
 from typing import Any
 
@@ -60,6 +61,39 @@ class ChatService:
         self._add_to_history("assistant", response)
         return response
 
+    async def process_message_stream(
+        self,
+        message: str,
+        mode: str = ChatMode.SEARCH.value,
+    ) -> AsyncGenerator[str, None]:
+        """Stream a chat message response based on the current mode."""
+        if not message.strip():
+            return
+
+        self._add_to_history("user", message)
+
+        accumulated: list[str] = []
+        try:
+            if mode == ChatMode.EXPLAIN.value:
+                async for token in self._handle_explain_stream(message):
+                    accumulated.append(token)
+                    yield token
+            elif mode == ChatMode.COVERAGE.value:
+                async for token in self._handle_coverage_stream(message):
+                    accumulated.append(token)
+                    yield token
+            else:
+                async for token in self._handle_search_stream(message):
+                    accumulated.append(token)
+                    yield token
+        except Exception as e:
+            logger.error(f"Chat processing error: {e}")
+            error_text = f"Error processing message: {str(e)}"
+            accumulated.append(error_text)
+            yield error_text
+
+        self._add_to_history("assistant", "".join(accumulated))
+
     async def _handle_search(self, message: str) -> str:
         """Handle search mode: semantic search over indexed Sigma rules."""
         results = await self.search_engine.search(message)
@@ -91,6 +125,25 @@ class ChatService:
             logger.error(f"RAG pipeline failed: {e}")
             return self._fallback_explanation(self._uploaded_rule)
 
+    async def _handle_explain_stream(
+        self,
+        message: str,
+    ) -> AsyncGenerator[str, None]:
+        """Handle explain mode with streaming."""
+        if not self._uploaded_rule:
+            yield "No Sigma rule uploaded. Please upload a .yaml file first."
+            return
+
+        try:
+            related = await self.search_engine.search(self._uploaded_rule.get("name", ""))
+            async for token in self.rag_pipeline.explain_rule_stream(self._uploaded_rule, related):
+                yield token
+        except Exception as e:
+            logger.error(f"RAG pipeline failed: {e}")
+            fallback = self._fallback_explanation(self._uploaded_rule)
+            for token in fallback:
+                yield token
+
     async def _handle_coverage(self, message: str) -> str:
         """Handle coverage mode."""
         if not self._uploaded_rule:
@@ -105,6 +158,57 @@ class ChatService:
         except Exception as e:
             logger.error(f"RAG pipeline failed: {e}")
             return f"Found {len(results)} related rules for coverage comparison."
+
+    async def _handle_search_stream(
+        self,
+        message: str,
+    ) -> AsyncGenerator[str, None]:
+        """Handle search mode with streaming: semantic search + LLM token stream."""
+        results = await self.search_engine.search(message)
+
+        if not results:
+            yield "No matching Sigma rules found. Try a different query."
+            return
+
+        self._last_citations = [
+            self.search_engine.get_citation(r)
+            for r in results[:5]
+            if self.search_engine.get_citation(r)
+        ]
+
+        try:
+            async for token in self.rag_pipeline.answer_search_query_stream(message, results):
+                yield token
+        except Exception as e:
+            logger.error(f"RAG pipeline failed: {e}")
+            fallback = self._fallback_search_results(results)
+            for token in fallback:
+                yield token
+
+    async def _handle_coverage_stream(
+        self,
+        message: str,
+    ) -> AsyncGenerator[str, None]:
+        """Handle coverage mode with streaming."""
+        if not self._uploaded_rule:
+            yield "No Sigma rule uploaded. Upload a .yaml file to check coverage."
+            return
+
+        results = await self.search_engine.search(message)
+        if not results:
+            yield "No related rules found for coverage analysis."
+            return
+
+        try:
+            async for token in self.rag_pipeline.analyze_coverage_stream(
+                self._uploaded_rule, results
+            ):
+                yield token
+        except Exception as e:
+            logger.error(f"RAG pipeline failed: {e}")
+            fallback = f"Found {len(results)} related rules for coverage comparison."
+            for token in fallback:
+                yield token
 
     async def validate_and_store_yaml(self, content: bytes) -> dict[str, Any]:
         """Validate YAML content and store rule data in session.

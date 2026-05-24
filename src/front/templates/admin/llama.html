@@ -151,7 +151,12 @@ function startProgressPolling(downloadId) {
             .then(r => r.json())
             .then(data => {
                 const task = data.downloads?.[downloadId];
-                if (!task) return;
+                if (!task) {
+                    clearInterval(progressPollInterval);
+                    document.getElementById('download-status').textContent = 'Download task not found';
+                    document.getElementById('download-status').className = 'status-message error';
+                    return;
+                }
                 
                 const bytesDownloaded = task.bytes_downloaded || 0;
                 const totalBytes = task.total_bytes || 1;
@@ -160,10 +165,13 @@ function startProgressPolling(downloadId) {
                 document.getElementById('progress-fill').style.width = percent + '%';
                 document.getElementById('progress-text').textContent = 
                     `${percent}% (${Math.round(bytesDownloaded/1024/1024)}MB / ${Math.round(totalBytes/1024/1024)}MB)`;
+                document.getElementById('download-status').textContent = 
+                    `Downloading... ${percent}% (${Math.round(bytesDownloaded/1024/1024)}MB / ${Math.round(totalBytes/1024/1024)}MB)`;
                 
                 if (task.status === 'completed') {
                     clearInterval(progressPollInterval);
                     document.getElementById('download-status').textContent = 'Download completed!';
+                    document.getElementById('download-status').className = 'status-message success';
                     document.getElementById('progress-container').style.display = 'none';
                     loadLlamaInfo();
                 } else if (task.status === 'failed') {

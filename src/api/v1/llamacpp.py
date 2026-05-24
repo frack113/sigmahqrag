@@ -55,6 +55,9 @@ async def llama_status():
                 "service": v.service,
                 "version": v.version,
                 "error": v.error,
+                "bytes_downloaded": v.bytes_downloaded,
+                "total_bytes": v.total_bytes,
+                "speed_bps": v.speed_bps,
             }
             for k, v in manager.active_downloads.items()
             if v.service == SERVICE_NAME

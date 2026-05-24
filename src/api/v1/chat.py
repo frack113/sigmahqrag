@@ -107,11 +107,10 @@ async def send_chat_message_stream(req: ChatMessageRequest):
     async def generate():
         """Generate SSE events from LLM stream."""
         try:
-            response_text = await chat_service.process_message(req.message, req.mode)
-            yield f"data: {response_text}\n\n"
+            async for token in chat_service.process_message_stream(req.message, req.mode):
+                yield f"data: {token}\n\n"
             yield "data: [DONE]\n\n"
         except Exception as e:
-            logger.error(f"Stream error: {e}")
             logger.error(f"Stream error: {e}")
             yield "data: Error: An internal error occurred\n\n"
             yield "data: [DONE]\n\n"

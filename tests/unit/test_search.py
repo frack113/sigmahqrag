@@ -11,9 +11,9 @@ class TestSearchEngine:
         from src.back.rag.search import SearchEngine
 
         engine = SearchEngine()
-        assert engine.collection_name == "sigma_doc"
+        assert engine.collection_name == "sigmaref"
         assert engine.top_k == 10
-        assert engine.similarity_threshold == 0.7
+        assert engine.similarity_threshold == 0.0
 
     def test_init_custom(self):
         """Test custom initialization."""
