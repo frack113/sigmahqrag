@@ -51,7 +51,6 @@ _bmad-output/
 
 # Opencode need it to not kill my code everey time I run it
 .opencode/
-AGENTS.md
 
 # PowerShell artifacts
 $null
