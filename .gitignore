@@ -53,6 +53,9 @@ _bmad-output/
 .opencode/
 AGENTS.md
 
+# PowerShell artifacts
+$null
+
 # Snyk Security
 .snyk
 .dcignore
