@@ -118,7 +118,10 @@ class TestGitHubApiV1Get:
             patch("src.api.v1.github.list_repos", return_value=mock_repos),
             patch(
                 "src.api.v1.github.get_metadata",
-                return_value={"status": "cloning", "last_synced": datetime.now(timezone.utc).isoformat()},
+                return_value={
+                    "status": "cloning",
+                    "last_synced": datetime.now(timezone.utc).isoformat(),
+                },
             ),
             patch(
                 "src.api.v1.github.get_last_commit_date",
@@ -378,7 +381,10 @@ class TestGitHubApiV1Sync:
                 "src.api.v1.github.list_repos",
                 return_value=[{"org": "test-org", "name": "test-repo"}],
             ),
-            patch("src.api.v1.github.update_repo", return_value={"success": True, "remote_head": "def456"}),
+            patch(
+                "src.api.v1.github.update_repo",
+                return_value={"success": True, "remote_head": "def456"},
+            ),
         ):
             response = client.post("/api/v1/github/repos/test-org/test-repo/sync")
 
@@ -423,7 +429,10 @@ class TestGitHubApiV1Sync:
         with (
             patch(
                 "src.api.v1.github.list_repos",
-                return_value=[{"org": "test-org", "name": "repo-a"}, {"org": "test-org", "name": "repo-b"}],
+                return_value=[
+                    {"org": "test-org", "name": "repo-a"},
+                    {"org": "test-org", "name": "repo-b"},
+                ],
             ),
             patch("src.api.v1.github.get_metadata", return_value={"branch": "main"}),
             patch("src.api.v1.github.update_repo", return_value={"success": True}),
@@ -460,7 +469,10 @@ class TestGitHubApiV1Status:
             ),
             patch(
                 "src.api.v1.github.get_metadata",
-                return_value={"status": "synced", "last_synced": datetime.now(timezone.utc).isoformat()},
+                return_value={
+                    "status": "synced",
+                    "last_synced": datetime.now(timezone.utc).isoformat(),
+                },
             ),
         ):
             response = client.get("/api/v1/github/repos/test-org/test-repo/status")
@@ -502,7 +514,9 @@ class TestGitHubApiV1Validation:
                 return_value=[{"org": "test-org", "name": "test-repo"}],
             ),
         ):
-            response = client.post("/api/v1/github/repos/test-org/test-repo/sync?branch=../etc/passwd")
+            response = client.post(
+                "/api/v1/github/repos/test-org/test-repo/sync?branch=../etc/passwd"
+            )
 
         assert response.status_code == 200
         data = response.json()
@@ -520,7 +534,9 @@ class TestGitHubApiV1Validation:
                 return_value=[{"org": "test-org", "name": "test-repo"}],
             ),
         ):
-            response = client.post(f"/api/v1/github/repos/test-org/test-repo/sync?branch={long_branch}")
+            response = client.post(
+                f"/api/v1/github/repos/test-org/test-repo/sync?branch={long_branch}"
+            )
 
         assert response.status_code == 200
         data = response.json()
@@ -541,7 +557,10 @@ class TestGitHubApiV1ModelValidation:
     def test_add_repo_branch_default(self, client):
         """Test that branch defaults to main."""
         with (
-            patch("src.api.v1.github.clone_repo", return_value={"success": True, "org": "x", "name": "y", "remote_head": ""}),
+            patch(
+                "src.api.v1.github.clone_repo",
+                return_value={"success": True, "org": "x", "name": "y", "remote_head": ""},
+            ),
             patch("src.api.v1.github.list_repos", return_value=[]),
         ):
             payload = {"url": "https://github.com/x/y.git"}

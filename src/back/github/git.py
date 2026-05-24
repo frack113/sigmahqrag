@@ -199,7 +199,7 @@ def update_repo(
         # gitpython provides remotes and fetch/pull natively
         origin = repo.remotes.origin
         fetch_info = origin.fetch()
-       # Try to find the remote head from fetch info
+        # Try to find the remote head from fetch info
         remote_head = None
         for info in fetch_info:
             ref = info.remote_ref_path
@@ -286,7 +286,9 @@ def list_repos(repos_dir: Path = DEFAULT_REPOS_DIR) -> list[dict[str, Any]]:
                     origin = repo.remotes.origin
                     origin.fetch()
                     remote_ref = f"origin/{info.get('branch')}"
-                    remote_head = repo.refs[remote_ref].commit.hexsha if remote_ref in repo.refs else ""
+                    remote_head = (
+                        repo.refs[remote_ref].commit.hexsha if remote_ref in repo.refs else ""
+                    )
                     info["remote_head"] = remote_head
                 except Exception:
                     info["remote_head"] = ""
@@ -421,7 +423,7 @@ def get_last_commit_date(org: str, name: str, repos_dir: Path = DEFAULT_REPOS_DI
 
 
 def is_repo_outdated(org: str, name: str, repos_dir: Path = DEFAULT_REPOS_DIR) -> bool:
-    """Check if local repo is behind remote using stored remote HEAD hash (no network call)."""
+    """Check if local repo is behind remote by comparing against the tracking ref."""
     repos_dir = Path(repos_dir).resolve()
     repo_path = _get_repo_path(repos_dir, org, name)
 
@@ -431,10 +433,12 @@ def is_repo_outdated(org: str, name: str, repos_dir: Path = DEFAULT_REPOS_DIR) -
 
     try:
         local_commit = repo.head.commit.hexsha
-        metadata = get_metadata(org, name)
-        remote_head = (metadata or {}).get("remote_head")
-        if remote_head is None:
+        branch = repo.active_branch.name
+        # Compare against origin tracking ref (always up-to-date after fetch in list_repos)
+        remote_ref = f"origin/{branch}"
+        if remote_ref not in repo.refs:
             return True
-        return local_commit != remote_head  # type: ignore[no-any-return]
+        remote_commit = repo.refs[remote_ref].commit.hexsha
+        return local_commit != remote_commit  # type: ignore[no-any-return]
     except Exception:
         return False

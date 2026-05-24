@@ -260,7 +260,9 @@ async def sync_all_repos(
                 with _sync_lock:
                     meta = get_metadata(repo_data["org"], repo_data["name"]) or {}
                     branch = meta.get("branch", "main")
-                    result = update_repo(org=repo_data["org"], name=repo_data["name"], branch=branch)
+                    result = update_repo(
+                        org=repo_data["org"], name=repo_data["name"], branch=branch
+                    )
                     existing_meta = get_metadata(repo_data["org"], repo_data["name"]) or {}
                     merged = {
                         **existing_meta,
