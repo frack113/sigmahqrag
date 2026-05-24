@@ -1,3 +1,7 @@
+body.chat-page > header {
+    display: none;
+}
+
 body {
     height: 100vh;
     display: flex;
