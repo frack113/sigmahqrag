@@ -56,6 +56,9 @@ class Config:
     paths_logs_dir: str = "data/logs"
     paths_temp_dir: str = "data/temp"
 
+    local_documents_path: str = "data/documents/local"
+    sigmaref_documents_path: str = "data/documents/sigmaref"
+
     logging_level: str = "INFO"
     logging_log_max_size: str = "10M"
     logging_log_max_file: int = 5

@@ -39,6 +39,12 @@ def mock_db() -> MagicMock:
     db.update_sigma_ref_embed_status = MagicMock()
     db.get_doc_sigma_ref = MagicMock(return_value=[])
     db.delete_doc_sigma_ref_by_repo = MagicMock()
+    db.get_pending_doc_registry = MagicMock(return_value=[])
+    db.upsert_doc_registry = MagicMock()
+    db.update_doc_registry_embed_status = MagicMock()
+    db.delete_doc_registry_by_url = MagicMock()
+    db.get_local_files = MagicMock(return_value=[])
+    db.get_local_file_count = MagicMock(return_value=0)
     db.get_repos_with_selected_dirs = MagicMock(return_value=[])
     db.get_selected_dirs = MagicMock(return_value=[])
     return db

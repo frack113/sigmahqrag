@@ -1,6 +1,7 @@
 import logging
 from pathlib import Path
 
+from src.shared.config import get_config
 from src.worker.workers.embedding_base import EmbeddingWorker
 from src.worker.enums import WorkerName
 
@@ -33,7 +34,11 @@ class SigmaRefEmbeddingWorker(EmbeddingWorker):
         return result
 
     def _resolve_file_path(self, entry: dict) -> Path | None:
-        registry_path = Path(self._task.get("registry_path", "data/documents/sigmaref"))
+        cfg = get_config()
+        task_registry = self._task.get("registry_path")
+        registry_path = (
+            Path(task_registry) if task_registry else Path(cfg.sigmaref_documents_path).resolve()
+        )
         file_hash = entry.get("hash") or ""
         file_name = entry.get("file_name") or ""
 

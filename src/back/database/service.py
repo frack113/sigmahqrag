@@ -504,6 +504,34 @@ class DatabaseService:
             )
             self._writer_conn.commit()
 
+    def delete_doc_registry_by_url(self, original_url: str) -> None:
+        """Delete a registry record by its original URL."""
+        with self._lock:
+            self._writer_conn.execute(
+                "DELETE FROM doc_registry WHERE original_url = ?", (original_url,)
+            )
+            self._writer_conn.commit()
+
+    def get_local_files(self, limit: int = 1000, offset: int = 0) -> list[dict]:
+        """Fetch local files from doc_registry."""
+        with self._lock:
+            results = self._writer_conn.execute(
+                "SELECT url_hash, org, repo, content_type, file_name, content_sha256, file_size, "
+                "original_url, normalized_url, rule_id, title, timestamp, last_seen, embed_status "
+                "FROM doc_registry WHERE org = 'local' AND repo = 'local' LIMIT ? OFFSET ?",
+                [limit, offset],
+            ).fetchall()
+            col_names = [desc[0] for desc in self._writer_conn.description]
+        return [dict(zip(col_names, row)) for row in results]
+
+    def get_local_file_count(self) -> int:
+        """Count local files in doc_registry."""
+        with self._lock:
+            result = self._writer_conn.execute(
+                "SELECT COUNT(*) FROM doc_registry WHERE org = 'local' AND repo = 'local'"
+            ).fetchone()
+        return result[0]
+
     # =========================================================================
     # GIT_METADATA TABLE
     # =========================================================================

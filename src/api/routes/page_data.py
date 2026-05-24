@@ -89,3 +89,9 @@ async def data_embedding_page(request: Request):
 async def data_vectordb_page(request: Request):
     """Serve the Vector DB status page."""
     return templates.TemplateResponse(request=request, name="data/vectordb.html")
+
+
+@router.get("/data/local")
+async def data_local_page(request: Request):
+    """Serve the Local Files management page."""
+    return templates.TemplateResponse(request=request, name="data/local.html")
