@@ -111,7 +111,7 @@ async def embed_documents(documents: list[Document]) -> list[list[float]]:
 async def store_embeddings(
     documents: list[Document],
     embeddings: list[list[float]],
-    collection_name: str = "sigma_doc",
+    collection_name: str = "sigmaref",
 ) -> bool:
     """Store embeddings in Qdrant.
 

@@ -18,6 +18,18 @@ router = APIRouter(prefix="/api/v1/chat", tags=["v1-chat"])
 chat_service = ChatService()
 
 
+@router.get("/history")
+async def get_chat_history() -> list[dict]:
+    """Get chat message history."""
+    return chat_service.get_history()
+
+
+@router.delete("/history", status_code=status.HTTP_204_NO_CONTENT)
+async def clear_chat_history() -> None:
+    """Clear chat history."""
+    chat_service.clear_history()
+
+
 @router.post("/message", response_model=ChatMessageResponse)
 async def send_chat_message(req: ChatMessageRequest) -> ChatMessageResponse:
     """Process a chat message and return AI response."""

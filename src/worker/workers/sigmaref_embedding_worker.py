@@ -11,7 +11,7 @@ class SigmaRefEmbeddingWorker(EmbeddingWorker):
     """Embeds Sigma Reference documents from doc_sigma_ref into Qdrant."""
 
     worker_type = WorkerName.SIGMAREF_EMBEDDINGS
-    collection_name = "sigma_doc"
+    collection_name = "sigmaref"
 
     def _get_entries(self, task: dict) -> list[dict]:
         raw_entries = self.db.get_pending_sigma_ref()

@@ -27,12 +27,9 @@ async def _stream_cache_wrapper(
 ) -> AsyncGenerator[str, None]:
     """Wrap a token stream to cache the full response."""
     accumulated: list[str] = []
-    try:
-        async for token in stream:
-            accumulated.append(token)
-            yield token
-    except Exception:
-        pass
+    async for token in stream:
+        accumulated.append(token)
+        yield token
     full_text = "".join(accumulated)
     if full_text:
         pipeline.cache.set(cache_key, full_text)
@@ -52,7 +49,7 @@ class RAGPipeline:
         self.cache = ResponseCache()
         self.env = Environment(
             loader=FileSystemLoader(PROMPT_DIR),
-            autoescape=True,
+            autoescape=False,
         )
 
     async def explain_rule(
@@ -299,7 +296,7 @@ class RAGPipeline:
             return "No related rules found."
 
         lines = []
-        for i, result in enumerate(results[:5], 1):
+        for i, result in enumerate(results[:2], 1):
             text = result.get("text", "")[:800]
             metadata = result.get("metadata", {})
             title = metadata.get("title", "")
@@ -348,8 +345,8 @@ class RAGPipeline:
             return "No matching Sigma rules found."
 
         lines = []
-        for i, result in enumerate(results[:5], 1):
-            text = result.get("text", "")[:300]
+        for i, result in enumerate(results[:2], 1):
+            text = result.get("text", "")[:500]
             lines.append(f"{i}. {text}")
 
         return "\n\n".join(lines)

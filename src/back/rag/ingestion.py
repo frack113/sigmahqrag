@@ -70,7 +70,7 @@ class IngestionPipelineBuilder:
     ) -> None:
         config_data = EmbeddingTypeConfig().load()
         self._model_name = model_name or _first_configured_model(config_data) or DEFAULT_MODEL
-        self._collection_name = collection_name or "sigma_doc"
+        self._collection_name = collection_name or "sigmaref"
         self._num_workers = num_workers
         self._embed_model = build_embed_model(self._model_name)
         self._pipeline: IngestionPipeline | None = None
@@ -240,7 +240,7 @@ def get_pipeline(
     """Get or create a cached IngestionPipeline keyed by (model, collection)."""
     config_data = EmbeddingTypeConfig().load()
     model = model_name or _first_configured_model(config_data) or DEFAULT_MODEL
-    collection = collection_name or "sigma_doc"
+    collection = collection_name or "sigmaref"
     key = (model, collection)
     if key not in _pipeline_registry:
         builder = IngestionPipelineBuilder(
