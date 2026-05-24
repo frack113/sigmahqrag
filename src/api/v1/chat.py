@@ -40,7 +40,9 @@ async def send_chat_message(req: ChatMessageRequest) -> ChatMessageResponse:
         )
 
     try:
-        response_text = await chat_service.process_message(req.message, req.mode, req.model)
+        response_text = await chat_service.process_message(
+            req.message, req.mode, req.model, prompt_id=req.prompt_id
+        )
         citations = chat_service.get_last_citations()
 
         # Format citations as [sigma:rule_id] in response
@@ -120,7 +122,7 @@ async def send_chat_message_stream(req: ChatMessageRequest):
         """Generate SSE events from LLM stream."""
         try:
             async for token in chat_service.process_message_stream(
-                req.message, req.mode, req.model
+                req.message, req.mode, req.model, prompt_id=req.prompt_id
             ):
                 yield f"data: {token}\n\n"
             yield "data: [DONE]\n\n"

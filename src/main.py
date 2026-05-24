@@ -116,6 +116,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         db.initialize()
         app.state.db = db
 
+        from src.back.system_prompt import sync_prompts_from_files
+
+        sync_prompts_from_files()
+
         from src.shared import Config
 
         Config.init_app()

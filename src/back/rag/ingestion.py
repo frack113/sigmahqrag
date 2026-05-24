@@ -10,7 +10,7 @@ import portalocker
 from llama_index.core import VectorStoreIndex
 from llama_index.core.base.embeddings.base import BaseEmbedding
 from llama_index.core.ingestion import IngestionPipeline
-from llama_index.core.node_parser import SentenceSplitter
+from llama_index.core.node_parser import MarkdownNodeParser, SentenceSplitter
 from llama_index.core.schema import Document
 from llama_index.core.storage.docstore import SimpleDocumentStore
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
@@ -21,13 +21,55 @@ from src.back.embedding_config import EmbeddingTypeConfig
 logger = logging.getLogger(__name__)
 
 DEFAULT_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
-DEFAULT_CHUNK_SIZE = 512
-DEFAULT_CHUNK_OVERLAP = 50
+DEFAULT_CHUNK_SIZE = 1024
+DEFAULT_CHUNK_OVERLAP = 100
 DEFAULT_EMBED_BATCH_SIZE = 8
 DEFAULT_NUM_WORKERS = 4
 DEFAULT_SIMILARITY_TOP_K = 5
 CACHE_DIR = Path("data/rag_cache")
 LOCAL_EMBEDDINGS_DIR = Path("data/models/embeddings")
+
+# Chunkers optimized per source type
+SOURCE_CHUNK_CONFIG: dict[str, dict[str, Any]] = {
+    "sigmaref": {
+        "chunk_size": 1024,
+        "chunk_overlap": 100,
+        "use_markdown_parser": True,
+    },
+    "github": {
+        "chunk_size": 1024,
+        "chunk_overlap": 100,
+        "use_markdown_parser": True,
+    },
+    "local": {
+        "chunk_size": 1024,
+        "chunk_overlap": 100,
+        "use_markdown_parser": True,
+    },
+    "sigma_rules": {
+        "chunk_size": 512,
+        "chunk_overlap": 50,
+        "use_markdown_parser": False,
+    },
+}
+
+
+def _get_chunker_for_collection(collection_name: str) -> tuple[Any, dict[str, Any]]:
+    """Return (markdown_parser, sentence_splitter) for the given collection."""
+    source = ""
+    if collection_name:
+        parts = collection_name.lower().split("/")
+        source = parts[0] if parts else collection_name
+
+    cfg = SOURCE_CHUNK_CONFIG.get(source, SOURCE_CHUNK_CONFIG["sigmaref"])
+    md_parser = MarkdownNodeParser(include_metadata=True) if cfg["use_markdown_parser"] else None
+    splitter = SentenceSplitter(
+        chunk_size=cfg["chunk_size"],
+        chunk_overlap=cfg["chunk_overlap"],
+        include_metadata=True,
+    )
+    return md_parser, splitter
+
 
 _pipeline_registry: dict[tuple[str, str], IngestionPipeline] = {}
 
@@ -104,24 +146,22 @@ class IngestionPipelineBuilder:
         if self._pipeline is not None and self._cached:
             return self._pipeline
 
-        if DEFAULT_CHUNK_SIZE <= 0:
-            raise ValueError(f"chunk_size must be positive, got {DEFAULT_CHUNK_SIZE}")
-
         qdrant_healthy = self._check_qdrant_health()
         if qdrant_healthy:
             self._vector_store = self._get_qdrant_store()
 
         CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
+        md_parser, splitter = _get_chunker_for_collection(self._collection_name)
+
+        transformations: list[Any] = [self._embed_model]
+
+        if md_parser is not None:
+            transformations.insert(0, md_parser)
+        transformations.insert(0, splitter)
+
         self._pipeline = IngestionPipeline(
-            transformations=[
-                SentenceSplitter(
-                    chunk_size=DEFAULT_CHUNK_SIZE,
-                    chunk_overlap=DEFAULT_CHUNK_OVERLAP,
-                    include_metadata=True,
-                ),
-                self._embed_model,
-            ],
+            transformations=transformations,
             vector_store=self._vector_store,
             docstore=SimpleDocumentStore(),
         )

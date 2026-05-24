@@ -11,7 +11,7 @@ from src.back.qdrant.client import get_qdrant_client
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_TOP_K = 10
+DEFAULT_TOP_K = 15
 SIMILARITY_THRESHOLD = 0.0
 DEFAULT_EMBED_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 

@@ -2,6 +2,7 @@ import logging
 from abc import abstractmethod
 from pathlib import Path
 
+from llama_index.core.node_parser import MarkdownNodeParser
 from llama_index.core.schema import Document
 
 from src.back.rag.ingestion import IngestionPipelineBuilder
@@ -73,7 +74,20 @@ class EmbeddingWorker(BaseWorker):
                 continue
 
             metadata = self._build_metadata(entry, self._collection_name)
-            valid_docs.append((Document(text=doc_text, metadata=metadata), entry))
+
+            # Pre-chunk documents based on source type
+            source = metadata.get("source", "")
+            content_type = metadata.get("content_type", "")
+
+            if source in ("sigmaref", "github", "local") and content_type in ("markdown", ""):
+                md_parser = MarkdownNodeParser(include_metadata=True)
+                doc = Document(text=doc_text, metadata=metadata)
+                parsed_nodes = md_parser.get_nodes_from_documents([doc])
+                for node in parsed_nodes:
+                    enriched_metadata = {**metadata, **node.metadata}
+                    valid_docs.append((Document(text=node.text, metadata=enriched_metadata), entry))
+            else:
+                valid_docs.append((Document(text=doc_text, metadata=metadata), entry))
 
             progress = ((idx + 1) / total) * 100
             self.dispatcher.update_worker_state(

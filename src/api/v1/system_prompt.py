@@ -16,6 +16,7 @@ from src.back.system_prompt import (
     get_prompt_by_name,
     list_prompts,
     set_active_prompt,
+    sync_prompts_from_files,
     update_prompt,
 )
 
@@ -40,6 +41,17 @@ class UpdatePromptRequest(BaseModel):
     name: str | None = Field(None, max_length=25, pattern=NAME_PATTERN)
     content: str | None = None
     description: str | None = Field(None, max_length=100)
+
+
+@router.post("/sync")
+async def prompts_sync() -> JSONResponse:
+    """POST sync prompts from .md files to DuckDB."""
+    try:
+        count = sync_prompts_from_files()
+        return JSONResponse(content={"message": f"Synced {count} prompts from files"})
+    except Exception as e:
+        logger.error(f"Prompts SYNC failed: {e}")
+        return JSONResponse(status_code=500, content={"error": "Internal server error"})
 
 
 @router.get("")

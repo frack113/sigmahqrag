@@ -9,6 +9,7 @@
     <div class="card-header d-flex justify-content-between align-items-center">
         <span class="h5 mb-0">Prompts List</span>
         <div>
+            <button class="btn btn-sm btn-success" onclick="syncFromFiles()">Sync from files</button>
             <button class="btn btn-sm btn-primary" onclick="EnableEditForm()">Add new</button>
             <button class="btn btn-sm btn-secondary" onclick="refreshList()">Refresh list</button>
         </div>
@@ -94,6 +95,22 @@ async function loadPrompts() {
     } catch (err) {
         console.error('Error loading prompts:', err);
         showStatus('Failed to load prompts', 'error');
+    }
+}
+
+async function syncFromFiles() {
+    showStatus('Syncing prompts from files...', 'info');
+    try {
+        const res = await fetch('/api/v1/admin/prompts/sync', { method: 'POST' });
+        const data = await res.json();
+        if (res.ok) {
+            showStatus(data.message || 'Sync complete', 'success');
+            await loadPrompts();
+        } else {
+            showStatus(data.error || 'Sync failed', 'error');
+        }
+    } catch (err) {
+        showStatus('Network error: ' + err.message, 'error');
     }
 }
 

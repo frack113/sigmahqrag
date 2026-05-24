@@ -9,16 +9,9 @@
 {% endblock %}
 
 {% block content %}
+{% include 'shared/_header.html' %}
 <div class="chat-page-layout">
     <aside class="chat-sidebar">
-        <nav class="chat-sidebar-nav" aria-label="Main navigation">
-            <ul>
-                <li><a href="/chat" class="active">Chat</a></li>
-                <li><a href="/data">Data</a></li>
-                <li><a href="/admin">Admin</a></li>
-                <li><a href="/duckdb">DuckDB</a></li>
-            </ul>
-        </nav>
         <div class="chat-sidebar-actions">
             <button class="chat-sidebar-btn" id="new-chat-btn" title="Nouvelle discussion">+ New Chat</button>
             <div class="chat-sidebar-group">
