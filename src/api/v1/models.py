@@ -13,7 +13,6 @@ from src.api.dependencies import get_database_service, get_embedding_manager, ge
 from src.back.embedding_config import EmbeddingTypeConfig
 from src.back.models import EmbeddingManager, HFRepo
 
-
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/models", tags=["v1-models"])
