@@ -8,6 +8,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, StreamingResponse
+from src.back.database.service import DatabaseService
 from src.back.qdrant.collections import (
     list_collections,
     create_collection,
@@ -195,10 +196,12 @@ async def qdrant_action(
                 )
             elif op == "delete":
                 await delete_collection(host, port, name)
+                db = DatabaseService.get_instance()
+                db.reset_embed_status_for_collection(name)
                 return QdrantActionResponse(
                     status="success",
                     action=action,
-                    message=f"Collection {name} deleted",
+                    message=f"Collection {name} deleted, embed status reset to discovery",
                 )
             elif op == "get":
                 col_data = await get_collection(host, port, name)

@@ -51,10 +51,9 @@ class EmbeddingWorker(BaseWorker):
                 logger.warning(f"[{self.__class__.__name__}] File not found: {file_path}")
                 skipped.append(current_file)
                 self._update_status(entry, "error")
-                progress = ((idx + 1) / total) * 100
                 self.dispatcher.update_worker_state(
                     worker_type=self.worker_type,
-                    progress_percent=round(progress, 2),
+                    progress_percent=round(((idx + 1) / total) * 10, 2),
                     current_file=current_file,
                 )
                 continue
@@ -65,17 +64,15 @@ class EmbeddingWorker(BaseWorker):
                 logger.warning(f"[{self.__class__.__name__}] Error reading {file_path}: {e}")
                 errors.append({"file": current_file, "error": str(e)})
                 self._update_status(entry, "error")
-                progress = ((idx + 1) / total) * 100
                 self.dispatcher.update_worker_state(
                     worker_type=self.worker_type,
-                    progress_percent=round(progress, 2),
+                    progress_percent=round(((idx + 1) / total) * 10, 2),
                     current_file=current_file,
                 )
                 continue
 
             metadata = self._build_metadata(entry, self._collection_name)
 
-            # Pre-chunk documents based on source type
             source = metadata.get("source", "")
             content_type = metadata.get("content_type", "")
 
@@ -89,37 +86,57 @@ class EmbeddingWorker(BaseWorker):
             else:
                 valid_docs.append((Document(text=doc_text, metadata=metadata), entry))
 
-            progress = ((idx + 1) / total) * 100
             self.dispatcher.update_worker_state(
                 worker_type=self.worker_type,
-                progress_percent=round(progress, 2),
+                progress_percent=round(((idx + 1) / total) * 10, 2),
                 current_file=current_file,
             )
 
         if valid_docs:
-            docs = [d[0] for d in valid_docs]
-            entries_for_docs = [d[1] for d in valid_docs]
-            try:
-                builder.run(documents=docs)
-                for entry in entries_for_docs:
-                    self._update_status(entry, "embedded")
-            except Exception as e:
-                logger.error(f"[{self.__class__.__name__}] Error embedding batch: {e}")
-                for entry in entries_for_docs:
-                    self._update_status(entry, "error")
-                    errors.append(
-                        {
-                            "file": entry.get("file_name", "") or entry.get("hash", ""),
-                            "error": str(e),
-                        }
-                    )
+            entry_to_docs: dict[int, tuple[dict, list[Document]]] = {}
+            for doc, entry in valid_docs:
+                eid = id(entry)
+                if eid not in entry_to_docs:
+                    entry_to_docs[eid] = (entry, [])
+                entry_to_docs[eid][1].append(doc)
+
+            entry_groups = list(entry_to_docs.values())
+            embedded_count = 0
+            batch_size = max(1, len(entry_groups) // 20 or 1)
+
+            for i in range(0, len(entry_groups), batch_size):
+                batch = entry_groups[i : i + batch_size]
+                batch_docs = []
+                for e, docs in batch:
+                    batch_docs.extend(docs)
+
+                try:
+                    builder.run(documents=batch_docs)
+                    for e, _ in batch:
+                        self._update_status(e, "embedded")
+                except Exception as e:
+                    logger.error(f"[{self.__class__.__name__}] Error embedding batch: {e}")
+                    for entry_obj, _ in batch:
+                        self._update_status(entry_obj, "error")
+                        errors.append(
+                            {
+                                "file": entry_obj.get("file_name", "") or entry_obj.get("hash", ""),
+                                "error": str(e),
+                            }
+                        )
+
+                embedded_count += len(batch)
+                self.dispatcher.update_worker_state(
+                    worker_type=self.worker_type,
+                    progress_percent=round(10 + (embedded_count / total) * 90, 2),
+                )
 
         self.dispatcher.update_worker_state(
             worker_type=self.worker_type,
             progress_percent=100.0,
         )
 
-        processed = len(valid_docs) if not errors else len(valid_docs) - len(errors)
+        processed = len(entry_to_docs) if valid_docs else 0
         logger.info(
             f"[{self.__class__.__name__}] Complete: {processed}/{total} embedded, "
             f"{len(errors)} errors, {len(skipped)} skipped"

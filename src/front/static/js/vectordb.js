@@ -144,11 +144,6 @@ async function startSigmaRefEmbedding() {
             tasks.push('github_embeddings');
         }
 
-        var lResult = await askWorker('local_embeddings', { collection_name: 'local' });
-        if (lResult.task_id) {
-            tasks.push('local_embeddings');
-        }
-
         var sResult = await askWorker('sigmaref_embeddings', { collection_name: 'sigmaref' });
         if (sResult.task_id) {
             tasks.push('sigmaref_embeddings');

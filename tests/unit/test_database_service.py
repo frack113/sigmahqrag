@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import tempfile
+from pathlib import Path
 
 import pytest
 
@@ -432,6 +433,159 @@ class TestLocalFiles:
         db.delete_doc_registry_by_url("http://local/remove")
         count = db.get_local_file_count()
         assert count == 0
+
+    def test_resync_local_file_sizes(self, db: DatabaseService, tmp_path) -> None:
+        doc_dir = str(tmp_path / "documents")
+        os.makedirs(doc_dir, exist_ok=True)
+        test_file = os.path.join(doc_dir, "test_rule.yml")
+        with open(test_file, "w") as f:
+            f.write("title: Test\n")
+        file_size = os.path.getsize(test_file)
+
+        db.upsert_doc_registry(
+            {
+                "url_hash": "resync1",
+                "org": "local",
+                "repo": "local",
+                "file_name": "test_rule.yml",
+                "content_type": "yaml",
+                "original_url": f"file://{test_file}",
+                "file_size": 0,
+            }
+        )
+        result = db.resync_local_file_sizes(doc_dir)
+        assert result["updated"] == 1
+        assert result["skipped"] == 0
+        assert result["error"] == 0
+
+        record = db.get_local_files()[0]
+        assert record["file_size"] == file_size
+
+    def test_resync_local_file_sizes_missing_file(self, db: DatabaseService, tmp_path) -> None:
+        doc_dir = str(tmp_path / "documents")
+        os.makedirs(doc_dir, exist_ok=True)
+
+        db.upsert_doc_registry(
+            {
+                "url_hash": "resync2",
+                "org": "local",
+                "repo": "local",
+                "file_name": "missing.yml",
+                "content_type": "yaml",
+                "original_url": "file:///nonexistent",
+                "file_size": 0,
+            }
+        )
+        result = db.resync_local_file_sizes(doc_dir)
+        assert result["updated"] == 0
+        assert result["error"] == 1
+
+    def test_resync_local_file_sizes_non_existing_path(self, db: DatabaseService) -> None:
+        result = db.resync_local_file_sizes("/nonexistent/path")
+        assert result == {"updated": 0, "skipped": 0, "error": 0, "incomplete": 0}
+
+    def test_resync_local_file_sizes_both_tables(self, db: DatabaseService, tmp_path) -> None:
+        doc_dir = str(tmp_path / "documents")
+        os.makedirs(doc_dir, exist_ok=True)
+        test_file = os.path.join(doc_dir, "local_rule.yml")
+        file_size = 42
+        with open(test_file, "w") as f:
+            f.write("x" * file_size)
+
+        db.upsert_doc_registry(
+            {
+                "url_hash": "reg1",
+                "org": "local",
+                "repo": "local",
+                "file_name": "local_rule.yml",
+                "content_type": "yaml",
+                "original_url": f"file://{test_file}",
+                "file_size": 0,
+            }
+        )
+        db.upsert_doc_sigma_ref(
+            {
+                "url_hash": "sigma1",
+                "org": "local",
+                "repo": "local",
+                "file_name": "local_rule.yml",
+                "content_type": "yaml",
+                "original_url": f"file://{test_file}",
+                "file_size": 0,
+            }
+        )
+        result = db.resync_local_file_sizes(doc_dir)
+        assert result["updated"] == 2
+
+        reg_record = db.get_local_files()[0]
+        assert reg_record["file_size"] == file_size
+
+    def test_resync_local_file_sizes_zero_byte_file(self, db: DatabaseService, tmp_path) -> None:
+        doc_dir = str(tmp_path / "documents")
+        os.makedirs(doc_dir, exist_ok=True)
+        empty_file = os.path.join(doc_dir, "empty.yml")
+        Path(empty_file).touch()
+
+        db.upsert_doc_registry(
+            {
+                "url_hash": "zero1",
+                "org": "local",
+                "repo": "local",
+                "file_name": "empty.yml",
+                "content_type": "yaml",
+                "original_url": f"file://{empty_file}",
+                "file_size": 0,
+            }
+        )
+        result = db.resync_local_file_sizes(doc_dir)
+        assert result["updated"] == 1
+
+    def test_resync_local_file_sizes_existing_hash_skip(
+        self, db: DatabaseService, tmp_path
+    ) -> None:
+        doc_dir = str(tmp_path / "documents")
+        os.makedirs(doc_dir, exist_ok=True)
+        file_size = 99
+
+        file_path = os.path.join(doc_dir, "already_hashed.yml")
+        with open(file_path, "w") as f:
+            f.write("y" * file_size)
+
+        db.upsert_doc_registry(
+            {
+                "url_hash": "hash1",
+                "org": "local",
+                "repo": "local",
+                "file_name": "already_hashed.yml",
+                "content_type": "yaml",
+                "original_url": f"file://{file_path}",
+                "file_size": 0,
+            }
+        )
+        result = db.resync_local_file_sizes(doc_dir)
+        assert result["updated"] == 1
+
+    def test_resync_local_file_sizes_no_reprocess(self, db: DatabaseService, tmp_path) -> None:
+        doc_dir = str(tmp_path / "documents")
+        os.makedirs(doc_dir, exist_ok=True)
+        file_size = 50
+        file_path = os.path.join(doc_dir, "already_sized.yml")
+        with open(file_path, "w") as f:
+            f.write("z" * file_size)
+
+        db.upsert_doc_registry(
+            {
+                "url_hash": "nosize1",
+                "org": "local",
+                "repo": "local",
+                "file_name": "already_sized.yml",
+                "content_type": "yaml",
+                "original_url": f"file://{file_path}",
+                "file_size": file_size,
+            }
+        )
+        result = db.resync_local_file_sizes(doc_dir)
+        assert result["updated"] == 0
 
 
 class TestEmbedProgress:

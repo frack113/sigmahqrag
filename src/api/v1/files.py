@@ -53,6 +53,13 @@ class LocalFileListResponse(BaseModel):
     error: str | None = None
 
 
+class LocalFileResyncResponse(BaseModel):
+    success: bool
+    message: str | None = None
+    data: dict[str, Any] | None = None
+    error: str | None = None
+
+
 @router.post("/list", response_model=FileOperationResponse)
 async def file_list(
     dispatcher=Depends(get_dispatcher),
@@ -180,7 +187,15 @@ async def add_local_file(
             data={"supported_extensions": list(SUPPORTED_DOC_EXTENSION_MAP.keys())},
         )
 
-    dest_path = base_path / file.filename
+    resolved_filename = Path(file.filename).resolve()
+    dest_path = (base_path / file.filename).resolve()
+    try:
+        rel = dest_path.relative_to(base_path.resolve())
+        if ".." in rel.parts or str(dest_path) != str(resolved_filename):
+            return LocalFileAddResponse(success=False, error="Path traversal detected")
+    except ValueError:
+        return LocalFileAddResponse(success=False, error="Path traversal detected")
+
     if dest_path.exists():
         return LocalFileAddResponse(
             success=False,
@@ -215,8 +230,8 @@ async def add_local_file(
             "file_name": file_rel_path,
             "content_sha256": content_hash,
             "file_size": file_size,
-            "original_url": f"file://{dest_path}",
-            "normalized_url": f"file://{dest_path}",
+            "original_url": f"file://{dest_path.as_posix()}",
+            "normalized_url": f"file://{dest_path.as_posix()}",
             "rule_id": "00000000-0000-0000-0000-000000000000",
             "title": title,
             "timestamp": iso_now(),
@@ -262,7 +277,8 @@ async def delete_local_file(
         return LocalFileDeleteResponse(success=False, error=f"Failed to delete file: {str(e)}")
 
     db = DatabaseService.get_instance()
-    db.delete_doc_registry_by_url(file_path)
+    url_match = f"file://{fs_path.as_posix()}"
+    db.delete_doc_registry_by_url(url_match)
 
     return LocalFileDeleteResponse(
         success=True,
@@ -292,4 +308,45 @@ async def list_local_files(
         success=True,
         data=files,
         total=total,
+    )
+
+
+@router.post("/local/resync", response_model=LocalFileResyncResponse)
+def resync_local_file_sizes() -> LocalFileResyncResponse:
+    """Synchronous endpoint for resync — runs in FastAPI thread pool to avoid blocking event loop."""
+    cfg = get_config()
+    base_path = cfg.local_documents_path
+
+    if not base_path or not isinstance(base_path, str):
+        return LocalFileResyncResponse(
+            success=False,
+            error="local_documents_path is not configured",
+        )
+
+    db = DatabaseService.get_instance()
+    result = db.resync_local_file_sizes(base_path)
+
+    has_errors = result["error"] > 0
+    has_incomplete = result.get("incomplete", 0) > 0
+    all_skipped = result["updated"] == 0 and result["skipped"] > 0
+
+    if has_errors or all_skipped:
+        return LocalFileResyncResponse(
+            success=False,
+            message=(
+                f"Resync complete: {result['updated']} updated, "
+                f"{result['skipped']} skipped, {result['error']} errors"
+                + (f", {result['incomplete']} incomplete hashes" if has_incomplete else "")
+            ),
+            data=result,
+        )
+
+    return LocalFileResyncResponse(
+        success=not has_incomplete or result["updated"] > 0,
+        message=(
+            f"Resync complete: {result['updated']} updated, "
+            f"{result['skipped']} skipped, {result['error']} errors"
+            + (f", {result['incomplete']} files with incomplete hashes" if has_incomplete else "")
+        ),
+        data=result,
     )

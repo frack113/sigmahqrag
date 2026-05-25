@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
+import os
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
@@ -42,7 +44,7 @@ class DatabaseService:
     """
 
     _instance: DatabaseService | None = None
-    _lock: threading.Lock = threading.Lock()
+    _lock: threading.RLock = threading.RLock()
 
     def __init__(self, db_path: str | None = None) -> None:
         self.db_path = Path(db_path or DEFAULT_DB_PATH)
@@ -496,6 +498,35 @@ class DatabaseService:
             )
             self._writer_conn.commit()
 
+    def reset_embed_status_for_collection(self, collection_name: str) -> None:
+        """Reset embed_status to 'discovery' for entries linked to a Qdrant collection.
+
+        Called after a Qdrant collection is deleted and recreated, so workers
+        re-process entries whose vectors were dropped.
+        """
+        with self._lock:
+            if collection_name == "sigmaref":
+                self._writer_conn.execute(
+                    "UPDATE doc_sigma_ref SET embed_status = 'discovery' WHERE org = 'sigmaref'"
+                )
+            elif collection_name == "local":
+                self._writer_conn.execute(
+                    "UPDATE doc_registry SET embed_status = 'discovery' WHERE org = 'local'"
+                )
+            elif "/" in collection_name:
+                parts = collection_name.split("/", 2)
+                if len(parts) == 2:
+                    org, repo = parts
+                    self._writer_conn.execute(
+                        "UPDATE doc_sigma_ref SET embed_status = 'discovery' WHERE org = ? AND repo = ?",
+                        (org, repo),
+                    )
+                    self._writer_conn.execute(
+                        "UPDATE doc_registry SET embed_status = 'discovery' WHERE org = ? AND repo = ?",
+                        (org, repo),
+                    )
+            self._writer_conn.commit()
+
     def delete_doc_registry_by_repo(self, org: str, repo: str) -> None:
         """Clear registry records for a specific repository."""
         with self._lock:
@@ -532,12 +563,148 @@ class DatabaseService:
             ).fetchone()
         return result[0]
 
-    # =========================================================================
-    # GIT_METADATA TABLE
-    # =========================================================================
+    def resync_local_file_sizes(self, base_path: str) -> dict[str, int]:
+        """Resync file_size for local files in doc_registry and doc_sigma_ref.
 
-    # =========================================================================
-    # GIT_METADATA TABLE
+        Scans all local records (org='local') in both tables and updates file_size
+        from the actual file on disk when file_size is NULL or 0 and the file exists.
+        Also recomputes content_sha256 if missing.
+
+        Args:
+            base_path: Base path to the local documents directory.
+
+        Returns:
+            Dict with 'updated', 'skipped', 'error' counts.
+        """
+        updated = 0
+        skipped = 0
+        errors = 0
+        incomplete = 0
+
+        try:
+            base_dir = Path(base_path).resolve()
+        except Exception as e:
+            logger.warning(f"[resync_local_file_sizes] Invalid base path '{base_path}': {e}")
+            return {"updated": 0, "skipped": 0, "error": 0, "incomplete": 0}
+
+        if not base_dir.exists():
+            msg = f"[resync_local_file_sizes] Base directory does not exist: {base_dir}"
+            logger.warning(msg)
+            return {"updated": 0, "skipped": 0, "error": 0, "incomplete": 0}
+
+        def _hash_file(path: Path) -> str | None:
+            h = hashlib.sha256()
+            try:
+                with open(path, "rb") as f:
+                    while True:
+                        chunk = f.read(8192)
+                        if not chunk:
+                            break
+                        h.update(chunk)
+                return h.hexdigest()
+            except OSError as e:
+                logger.warning(f"[resync_local_file_sizes] Cannot read {path}: {e}")
+                return None
+
+        tables = ["doc_registry", "doc_sigma_ref"]
+
+        # Phase 1: Snapshot — gather file data under lock only for SELECT (minimal critical section)
+        snapshot: list[
+            tuple[str, str, str | None]
+        ] = []  # (table, url_hash, file_name, existing_hash)
+        with self._lock:
+            for table in tables:
+                query = (
+                    f"SELECT url_hash, file_name, content_sha256 FROM {table} "
+                    "WHERE org = 'local' AND repo = 'local' "
+                    "AND (file_size IS NULL OR file_size = 0) ORDER BY url_hash"
+                )
+                results = self._writer_conn.execute(query).fetchall()
+                for row in results:
+                    snapshot.append((table, row[0], row[1], row[2]))
+
+        # Phase 2: compute sizes and hashes OUTSIDE the lock (I/O-heavy, avoid blocking writers)
+        updates_by_table_col: dict[tuple[str, str], list[tuple]] = {
+            ("doc_registry", "file_size"): [],
+            ("doc_sigma_ref", "file_size"): [],
+            ("doc_registry", "content_sha256"): [],
+            ("doc_sigma_ref", "content_sha256"): [],
+        }
+
+        for table, url_hash, file_name, existing_hash in snapshot:
+            if not file_name or not isinstance(file_name, str):
+                skipped += 1
+                continue
+
+            try:
+                file_path = (base_dir / Path(file_name)).resolve()
+            except Exception:
+                errors += 1
+                continue
+
+            # Fix HIGH #5: Use os.path.commonpath to avoid prefix collision
+            try:
+                if os.path.commonpath([str(base_dir), str(file_path)]) != str(base_dir):
+                    logger.warning(
+                        f"[resync_local_file_sizes] Path traversal detected for {file_name}"
+                    )
+                    skipped += 1
+                    continue
+            except ValueError:
+                # commonpath raises ValueError on Windows when paths are on different drives
+                logger.warning(
+                    f"[resync_local_file_sizes] Cross-drive path detected for {file_name}"
+                )
+                skipped += 1
+                continue
+
+            try:
+                stat = file_path.stat()
+                new_size = stat.st_size
+            except OSError as e:
+                logger.warning(f"[resync_local_file_sizes] Cannot stat {file_name}: {e}")
+                errors += 1
+                continue
+
+            new_hash = existing_hash
+            if not existing_hash:
+                computed = _hash_file(file_path)
+                if computed:
+                    new_hash = computed
+                else:
+                    logger.warning(
+                        f"[resync_local_file_sizes] Hash failed for {file_name} "
+                        f"(url_hash={url_hash}), file_size updated but content_sha256 unchanged"
+                    )
+
+            # Always update file_size — store actual value (0 for empty files, no sentinel)
+            updates_by_table_col[(table, "file_size")].append((new_size, url_hash))
+
+            # Only update content_sha256 if hash was computed and differs from existing
+            if new_hash and new_hash != existing_hash:
+                updates_by_table_col[(table, "content_sha256")].append((new_hash, url_hash))
+
+            # Categorize the record
+            if existing_hash or new_hash:
+                updated += 1
+            else:
+                incomplete += 1
+
+        # Phase 3: execute batched updates with transaction safety (HIGH #2)
+        with self._lock:
+            try:
+                for (tbl, col), params in updates_by_table_col.items():
+                    if params:
+                        self._writer_conn.executemany(
+                            f"UPDATE {tbl} SET {col} = ? WHERE url_hash = ?",
+                            params,
+                        )
+                self._writer_conn.commit()
+            except Exception as e:
+                logger.error(f"[resync_local_file_sizes] Batch update failed, rolling back: {e}")
+
+        return {"updated": updated, "skipped": skipped, "error": errors, "incomplete": incomplete}
+
     # =========================================================================
     # GIT_METADATA TABLE
     # =========================================================================
