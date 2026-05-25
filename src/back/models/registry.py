@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from pathlib import Path
 
 from src.back.database import DatabaseService
@@ -65,6 +66,7 @@ class UnifiedRegistry:
         self._ensure_loaded(db)
 
     def _save(self, db: DatabaseService) -> None:
+        now = datetime.now(timezone.utc).isoformat()
         for model_type in ("llm", "embeddings"):
             for repo_id, record in self._registry[model_type].items():
                 data = {
@@ -73,8 +75,13 @@ class UnifiedRegistry:
                     "local_path": record.get("local_path"),
                     "file_size": record.get("file_size", 0),
                     "status": record.get("status", "ready"),
+                    "updated_at": now,
                 }
-                if model_type == "embeddings":
+                if model_type == "llm":
+                    files = record.get("files")
+                    if files:
+                        data["files"] = files
+                elif model_type == "embeddings":
                     data["dimension"] = record.get("dimension")
                     data["index_path"] = record.get("index_path")
                 db.upsert_model(data)
@@ -159,11 +166,12 @@ class UnifiedRegistry:
                     }
 
                 if files:
-                    if repo_id not in self._registry["llm"]:
-                        self._registry["llm"][repo_id] = {
-                            "local_path": str(sub_dir),
-                            "files": files,
-                        }
+                    self._registry["llm"][repo_id] = {
+                        "local_path": str(sub_dir),
+                        "file_size": total_size,
+                        "status": "ready",
+                        "files": files,
+                    }
 
         if save:
             self._save(db)
@@ -188,13 +196,24 @@ class UnifiedRegistry:
                     continue
 
                 repo_id = f"{model_dir.name}/{sub_dir.name}"
-                if repo_id not in self._registry["embeddings"]:
-                    files = list(sub_dir.rglob("*"))
-                    file_count = sum(1 for f in files if f.is_file())
-                    if file_count > 0:
-                        self._registry["embeddings"][repo_id] = {
-                            "local_path": str(sub_dir),
-                        }
+                total_size = 0
+                file_count = 0
+
+                for f in sub_dir.rglob("*"):
+                    if not f.is_file() or f.name.startswith("."):
+                        continue
+                    total_size += f.stat().st_size
+                    file_count += 1
+
+                if file_count > 0:
+                    existing = self._registry["embeddings"].get(repo_id, {})
+                    self._registry["embeddings"][repo_id] = {
+                        "local_path": str(sub_dir),
+                        "file_size": total_size,
+                        "status": "ready",
+                        "dimension": existing.get("dimension"),
+                        "index_path": existing.get("index_path"),
+                    }
 
         if save:
             self._save(db)

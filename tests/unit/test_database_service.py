@@ -40,35 +40,35 @@ class TestConfig:
 
 
 class TestEmbeddingConfig:
+    """Tests for the new single global embedding config (replaced per-type mapping)."""
+
     def test_empty(self, db: DatabaseService) -> None:
         cfg = db.get_embedding_config()
-        assert "markdown" in cfg
+        assert isinstance(cfg, dict)
 
     def test_set_and_get(self, db: DatabaseService) -> None:
-        db.set_embedding_config("markdown", {"model": "org/model", "chunk_size": 512})
+        db.set_embedding_config("org/model")
         cfg = db.get_embedding_config()
-        assert "markdown" in cfg
-        assert cfg["markdown"]["model"] == "org/model"
-        assert cfg["markdown"]["chunk_size"] == 512
+        assert cfg["model"] == "org/model"
 
     def test_overwrite(self, db: DatabaseService) -> None:
-        db.set_embedding_config("markdown", {"model": "m1"})
-        db.set_embedding_config("markdown", {"model": "m2"})
+        db.set_embedding_config("m1")
+        db.set_embedding_config("m2")
         cfg = db.get_embedding_config()
-        assert cfg["markdown"]["model"] == "m2"
+        assert cfg["model"] == "m2"
 
     def test_delete(self, db: DatabaseService) -> None:
-        db.set_embedding_config("markdown", {"model": "m1"})
-        db.delete_embedding_config("markdown")
+        db.set_embedding_config("m1")
+        db.delete_embedding_config()
         cfg = db.get_embedding_config()
-        assert "markdown" not in cfg
+        assert "model" not in cfg or cfg["model"] == ""
 
-    def test_multiple_types(self, db: DatabaseService) -> None:
-        db.set_embedding_config("a", {"model": "m1"})
-        db.set_embedding_config("b", {"model": "m2"})
+    def test_single_model_only(self, db: DatabaseService) -> None:
+        """There should be only one global model, not per-type mapping."""
+        db.set_embedding_config("unique-model")
         cfg = db.get_embedding_config()
-        assert "a" in cfg
-        assert "b" in cfg
+        assert "model" in cfg
+        assert len(cfg) == 1  # Only 'model' key, no type keys
 
 
 class TestSystemPrompts:
@@ -721,8 +721,9 @@ class TestRoundtrip:
         db.set_config("ck", {"v": 1})
         assert db.get_config("ck") == {"v": 1}
 
-        db.set_embedding_config("t1", {"model": "m1"})
-        assert "t1" in db.get_embedding_config()
+        db.set_embedding_config("m1")
+        cfg = db.get_embedding_config()
+        assert cfg.get("model") == "m1"
 
         db.upsert_prompt({"id": "pid", "name": "n", "description": "d", "content": "c"})
         assert len(db.get_prompts()) >= 1

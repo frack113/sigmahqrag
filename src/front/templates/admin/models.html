@@ -65,19 +65,26 @@ function loadModels() {
                 return;
             }
             let html = '<table><tr><th>Model</th><th>Size</th><th>Actions</th></tr>';
+            let hasRows = false;
             models.forEach(m => {
-                for (const [filename, f] of Object.entries(m.files)) {
+                (m.files || []).forEach(f => {
+                    hasRows = true;
+                    const filename = f.filename;
                     const safeRepoId = escAttr(m.repo_id);
                     const safeFilename = escAttr(filename);
                     html += `<tr>
-                        <td>${escHtml(f.filename || filename)}</td>
+                        <td>${escHtml(filename)}</td>
                         <td class="num">${Math.round((f.file_size || f.size || 0) / 1024 / 1024)}MB</td>
                         <td><button class="btn btn-danger btn-sm" onclick="deleteModel('${safeRepoId}', '${safeFilename}')">Delete</button></td>
                     </tr>`;
-                }
+                });
             });
-            html += '</table>';
-            document.getElementById('llm-models').innerHTML = html;
+            if (hasRows) {
+                html += '</table>';
+                document.getElementById('llm-models').innerHTML = html;
+            } else {
+                document.getElementById('llm-models').innerHTML = '<p>No models installed.</p>';
+            }
         })
         .catch(err => {
             document.getElementById('llm-models').innerHTML = '<p class="error">Failed to load models</p>';
@@ -184,7 +191,7 @@ function downloadModel() {
 
     // Start polling for progress
     const progressInterval = setInterval(() => {
-        fetch(`${basePath}/progress/${encodeURIComponent(repoId)}`)
+        fetch(`${basePath}/progress?repo_id=${encodeURIComponent(repoId)}`)
             .then(r => {
                 if (!r.ok) {
                     console.error('Progress endpoint error:', r.status);
@@ -242,12 +249,14 @@ function escAttr(s) {
 function deleteModel(repoId, filename) {
     if (!confirm(`Delete ${repoId}/${filename}?`)) return;
 
-    fetch(`/api/v1/models/llm/${encodeURIComponent(repoId)}/file/${encodeURIComponent(filename)}`, {
-        method: 'DELETE'
+    fetch('/api/v1/admin/models/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ repo_id: repoId, filename: filename }),
     })
     .then(r => r.json())
     .then(data => {
-        alert(data.success ? 'Deleted' : data.error);
+        alert(data.status === 'success' ? 'Deleted' : (data.error || 'Unknown error'));
         loadModels();
     })
     .catch(err => {
@@ -258,12 +267,14 @@ function deleteModel(repoId, filename) {
 function deleteEmbedding(repoId) {
     if (!confirm(`Delete embedding ${repoId}?`)) return;
 
-    fetch(`/api/v1/models/embedding/${encodeURIComponent(repoId)}`, {
-        method: 'DELETE'
+    fetch('/api/v1/admin/models/delete-embedding', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ repo_id: repoId }),
     })
     .then(r => r.json())
     .then(data => {
-        alert(data.success ? 'Deleted' : data.error);
+        alert(data.status === 'success' ? 'Deleted' : (data.error || 'Unknown error'));
         loadModels();
     })
     .catch(err => {

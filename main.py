@@ -1,7 +1,18 @@
+import logging
+import re
 import sys
 from pathlib import Path
 
 from src.back.database import DatabaseService
+
+
+class _Filter2xx(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        if record.levelname != "INFO":
+            return True
+        msg = record.getMessage()
+        # Uvicorn access log format: '127.0.0.1 - "GET /path HTTP/1.1" 200 OK'
+        return not bool(re.search(r'"\s+2\d{2}\s+\d{3}', msg))
 
 
 def _ensure_data_folders() -> None:
@@ -60,8 +71,9 @@ def _ensure_duckdb_tables() -> None:
 
 if __name__ == "__main__":
     import asyncio
-    import sys
+    import copy
     import uvicorn
+    from uvicorn.config import LOGGING_CONFIG
 
     if sys.platform == "win32":
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
@@ -69,4 +81,12 @@ if __name__ == "__main__":
     _ensure_data_folders()
     _ensure_duckdb_tables()
 
-    uvicorn.run("src.main:create_app", host="0.0.0.0", port=7860, factory=True)
+    log_config = copy.deepcopy(LOGGING_CONFIG)
+    log_config["filters"] = {
+        "filter2xx": {"()": _Filter2xx},
+    }
+    log_config["handlers"]["access"]["filters"] = ["filter2xx"]
+
+    uvicorn.run(
+        "src.main:create_app", host="0.0.0.0", port=7860, factory=True, log_config=log_config
+    )

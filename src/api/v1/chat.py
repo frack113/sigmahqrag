@@ -26,8 +26,8 @@ async def get_chat_history() -> list[dict]:
 
 @router.delete("/history", status_code=status.HTTP_204_NO_CONTENT)
 async def clear_chat_history() -> None:
-    """Clear chat history."""
-    chat_service.clear_history()
+    """Clear chat history and llama.cpp KV cache."""
+    await chat_service.clear_history()
 
 
 @router.post("/message", response_model=ChatMessageResponse)

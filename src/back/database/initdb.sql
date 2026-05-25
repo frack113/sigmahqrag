@@ -12,13 +12,10 @@ CREATE TABLE IF NOT EXISTS config (
     value TEXT NOT NULL
 );
 
--- embedding_config
+-- embedding_config (single global config — one embedding model for all file types)
 CREATE TABLE IF NOT EXISTS embedding_config (
-    doc_type TEXT PRIMARY KEY,
-    model TEXT NOT NULL DEFAULT '',
-    chunk_size INTEGER DEFAULT 512,
-    overlap INTEGER DEFAULT 50,
-    chunk_strategy TEXT DEFAULT 'recursive'
+    key TEXT PRIMARY KEY DEFAULT 'global',
+    model TEXT NOT NULL DEFAULT 'intfloat/multilingual-e5-small'
 );
 
 -- system_prompts
@@ -120,9 +117,9 @@ CREATE INDEX IF NOT EXISTS idx_doc_registry_org_repo ON doc_registry(org, repo);
 -- SEED DATA
 -- =========================================================================
 
--- Embedding config defaults
-INSERT OR IGNORE INTO embedding_config (doc_type, model, chunk_size, overlap, chunk_strategy) VALUES
-    ('markdown', 'sentence-transformers/all-MiniLM-L6-v2', 512, 50, 'recursive');
+-- Embedding config defaults (single global model)
+INSERT OR IGNORE INTO embedding_config (key, model) VALUES
+    ('global', 'intfloat/multilingual-e5-small');
 
 -- Default app config
 INSERT OR IGNORE INTO config (key, value) VALUES

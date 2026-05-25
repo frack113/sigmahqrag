@@ -57,7 +57,7 @@ def get_embedding_model() -> Any:
     if env_mode == "huggingface":
         logger.info("Using HuggingFace Hub for embeddings (SIGMA_RAG_EMBED_MODEL=huggingface)")
         _embed_model = HuggingFaceEmbedding(
-            model_name="BAAI/bge-small-en-v1.5",
+            model_name="intfloat/multilingual-e5-small",
             embed_batch_size=BATCH_SIZE,
         )
         return _embed_model
@@ -76,7 +76,7 @@ def get_embedding_model() -> Any:
     if _check_hf_available():
         logger.info("No local GGUF found, falling back to HuggingFace Hub")
         _embed_model = HuggingFaceEmbedding(
-            model_name="BAAI/bge-small-en-v1.5",
+            model_name="intfloat/multilingual-e5-small",
             embed_batch_size=BATCH_SIZE,
         )
         return _embed_model

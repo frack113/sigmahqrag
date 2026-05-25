@@ -12,7 +12,6 @@ from fastapi.responses import JSONResponse
 from src.api.dependencies import get_database_service, get_embedding_manager, get_unified_registry
 from src.back.embedding_config import EmbeddingTypeConfig
 from src.back.models import EmbeddingManager, HFRepo
-from src.back.utils.identify_file_type import FileType
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +26,7 @@ def set_progress(repo_id: str, progress: int, status: str = "downloading"):
     _download_progress[repo_id] = {"progress": progress, "status": status}
 
 
-@router.get("/llm/progress/{repo_id}")
+@router.get("/llm/progress")
 async def get_download_progress(repo_id: str) -> JSONResponse:
     """Get download progress for a model."""
     progress = _download_progress.get(repo_id, {"progress": 0, "status": "idle"})
@@ -227,7 +226,10 @@ async def delete_llm_model_file(repo_id: str, filename: str) -> JSONResponse:
         if path.exists():
             path.unlink()
         del record["files"][filename]
-        reg._save(db)
+        if record["files"]:
+            reg._save(db)
+        else:
+            reg.remove_llm(repo_id, db)
         return JSONResponse(content={"success": True, "repo_id": repo_id, "filename": filename})
     except ModelNotFoundError as e:
         return JSONResponse(status_code=404, content={"error": str(e)})
@@ -255,7 +257,7 @@ async def list_installed_embedding_models() -> JSONResponse:
         return JSONResponse(status_code=500, content={"error": "An internal error occurred"})
 
 
-@router.get("/embedding/progress/{repo_id}")
+@router.get("/embedding/progress")
 async def get_embedding_progress(repo_id: str) -> JSONResponse:
     """Get embedding download progress."""
     progress = _download_progress.get(f"emb_{repo_id}", {"progress": 0, "status": "idle"})
@@ -347,32 +349,25 @@ async def search_embedding_models(
         return JSONResponse(status_code=500, content={"error": "An internal error occurred"})
 
 
-# ============= Embedding Config =============
+# ============= Embedding Config (single global model) =============
 _config_manager = EmbeddingTypeConfig()
 MODEL_ID_RE = re.compile(r"^[\w.-]+/[\w.-]+$")
-VALID_TYPE_KEYS = {ft.value for ft in FileType}
 
 
 @router.get("/embeddings/config")
 async def get_embedding_config() -> JSONResponse:
-    """Get the full embedding type configuration."""
+    """Get the global embedding model configuration."""
     config = _config_manager.load()
     return JSONResponse(content=json.loads(json.dumps(config, default=str)))
 
 
-@router.put("/embeddings/config/{type_key}")
-async def update_type_config(type_key: str, body: dict) -> JSONResponse:
-    """Update or remove a type's embedding config.
+@router.put("/embeddings/config")
+async def update_embedding_config(body: dict) -> JSONResponse:
+    """Update the global embedding model.
 
-    Sending model="" removes the type from config.
-    Accepts a generic dict for forward-compatibility.
+    Sending model="" resets to default.
+    This replaces the old per-type config with a single shared model.
     """
-    if not type_key.strip():
-        return JSONResponse(status_code=400, content={"error": "type_key must not be empty"})
-
-    if type_key not in VALID_TYPE_KEYS:
-        return JSONResponse(status_code=400, content={"error": f"Unknown type_key: {type_key}"})
-
     if "model" not in body:
         return JSONResponse(status_code=400, content={"error": "model is required"})
 
@@ -383,7 +378,7 @@ async def update_type_config(type_key: str, body: dict) -> JSONResponse:
             content={"error": "Invalid model ID format (expected: org/model)"},
         )
 
-    config = _config_manager.update_type(type_key, body)
+    config = _config_manager.update_type("global", body)
     if config is None:
         return JSONResponse(status_code=500, content={"error": "Failed to save config"})
     return JSONResponse(content=json.loads(json.dumps(config, default=str)))

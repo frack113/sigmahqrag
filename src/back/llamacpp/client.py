@@ -172,3 +172,34 @@ class LlamaClient:
                 return content if content is not None else ""
             except Exception as e:
                 raise RuntimeError(f"Llama.cpp chat failed: {e}") from e
+
+    async def erase_slot_cache(self, slot_id: int = 0) -> bool:
+        """Erase the KV cache for a given slot via ``/slots/{id}?action=erase``.
+
+        This forces llama.cpp to start with a fresh KV cache on the next
+        request, effectively resetting the conversation context.
+
+        Returns ``True`` on success, ``False`` if the endpoint is unavailable
+        (e.g. older server binary without slot management).
+        """
+        async with httpx.AsyncClient(timeout=httpx.Timeout(10.0)) as client:
+            try:
+                response = await client.post(
+                    f"{self.base_url}/slots/{slot_id}?action=erase",
+                    content=b"",
+                )
+                if response.status_code == 200:
+                    logger.info("KV cache erased for slot %d", slot_id)
+                    return True
+                logger.warning(
+                    "erase_slot_cache returned %d for slot %d",
+                    response.status_code,
+                    slot_id,
+                )
+                return False
+            except httpx.ConnectError:
+                logger.debug("llama.cpp not reachable — cannot erase slot cache")
+                return False
+            except Exception:
+                logger.exception("Failed to erase llama.cpp slot cache")
+                return False
