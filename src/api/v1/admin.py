@@ -247,6 +247,13 @@ async def start_download(service: str | None = None, target: str | None = None) 
 
     if target_service == "llama":
         try:
+            from src.back.llamacpp.auto_start import stop_llamacpp
+
+            await stop_llamacpp()
+        except Exception:
+            pass
+
+        try:
             manager = create_download_manager()
             result = await manager.start_download("llama.cpp", "latest")
             download_id = result.get("download_id")
