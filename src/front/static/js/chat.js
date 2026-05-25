@@ -27,21 +27,96 @@
 
         if (!messagesEl || !chatForm || !input || !sendBtn) return;
 
+        /* ---- Config ---- */
+        var config = window.__CONFIG || {};
+        var manageInternally = config.llama_manage_internally !== false;
+        var currentModel = config.current_model || "";
+        var _modelsData = [];
+
         /* ---- Model selector ---- */
         function populateModelSelect(models) {
             if (!llmSelect) return;
+            _modelsData = models;
             llmSelect.innerHTML = "";
-            var emptyOpt = document.createElement("option");
-            emptyOpt.value = "";
-            emptyOpt.textContent = "— Select a model —";
-            llmSelect.appendChild(emptyOpt);
+
+            if (models.length === 0) {
+                var emptyOpt = document.createElement("option");
+                emptyOpt.value = "";
+                emptyOpt.textContent = "— No models —";
+                llmSelect.appendChild(emptyOpt);
+                llmSelect.disabled = true;
+                return;
+            }
+
+            if (!manageInternally) {
+                var disabledOpt = document.createElement("option");
+                disabledOpt.value = "";
+                disabledOpt.textContent = "— External service —";
+                llmSelect.appendChild(disabledOpt);
+                llmSelect.disabled = true;
+                return;
+            }
 
             models.forEach(function (m) {
                 var opt = document.createElement("option");
                 opt.value = m.repo_id + "/" + m.filename;
                 opt.textContent = m.repo_id + " — " + m.filename + " (" + m.size_mb + " MB)";
+                if (opt.value === currentModel) {
+                    opt.selected = true;
+                }
                 llmSelect.appendChild(opt);
             });
+
+            if (!currentModel && models.length > 0) {
+                llmSelect.selectedIndex = 0;
+                currentModel = llmSelect.value;
+            }
+
+            llmSelect.addEventListener("change", onModelChange);
+        }
+
+        function onModelChange() {
+            var newValue = llmSelect.value;
+            if (!newValue || newValue === currentModel) return;
+
+            var selected = _modelsData.find(function (m) {
+                return (m.repo_id + "/" + m.filename) === newValue;
+            });
+            if (!selected || !selected.local_path) {
+                showToast("Cannot switch model: path not found");
+                llmSelect.value = currentModel;
+                return;
+            }
+
+            var oldValue = currentModel;
+            showToast("Switching model…");
+            llmSelect.disabled = true;
+
+            var params = new URLSearchParams();
+            params.set("model_path", selected.local_path);
+            params.set("port", "8080");
+            params.set("context_size", "4096");
+
+            fetch("/api/v1/llamacpp/restart?" + params.toString(), { method: "POST" })
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    if (data.success || data.status === "success") {
+                        currentModel = newValue;
+                        showToast("Model switched to " + selected.filename);
+                    } else {
+                        currentModel = oldValue;
+                        llmSelect.value = oldValue;
+                        showToast("Failed to switch model: " + (data.error || "unknown"));
+                    }
+                })
+                .catch(function (err) {
+                    currentModel = oldValue;
+                    llmSelect.value = oldValue;
+                    showToast("Error switching model: " + err.message);
+                })
+                .finally(function () {
+                    llmSelect.disabled = false;
+                });
         }
 
         /* Load from server-side injected data or fetch */
@@ -61,6 +136,7 @@
                                 repo_id: entry.repo_id,
                                 filename: f.filename,
                                 size_mb: f.size ? (f.size / (1024 * 1024)).toFixed(1) : "?",
+                                local_path: f.path || "",
                             });
                         });
                     });
@@ -69,6 +145,7 @@
                 .catch(function () {
                     if (llmSelect) {
                         llmSelect.innerHTML = "<option value=\"\">— No models found —</option>";
+                        llmSelect.disabled = true;
                     }
                 });
         }
@@ -82,10 +159,14 @@
         function populatePromptSelect(prompts) {
             if (!promptSelect) return;
             promptSelect.innerHTML = "";
-            var defaultOpt = document.createElement("option");
-            defaultOpt.value = "";
-            defaultOpt.textContent = "— Default (none) —";
-            promptSelect.appendChild(defaultOpt);
+
+            if (!prompts || prompts.length === 0) {
+                var emptyOpt = document.createElement("option");
+                emptyOpt.value = "";
+                emptyOpt.textContent = "— No prompts —";
+                promptSelect.appendChild(emptyOpt);
+                return;
+            }
 
             prompts.forEach(function (p) {
                 var opt = document.createElement("option");
@@ -93,6 +174,15 @@
                 opt.textContent = p.name + (p.is_active ? " (active)" : "");
                 promptSelect.appendChild(opt);
             });
+
+            var activeIdx = -1;
+            for (var i = 0; i < prompts.length; i++) {
+                if (prompts[i].is_active) {
+                    activeIdx = i;
+                    break;
+                }
+            }
+            promptSelect.selectedIndex = activeIdx >= 0 ? activeIdx : 0;
         }
 
         function loadPrompts() {

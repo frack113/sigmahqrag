@@ -60,6 +60,10 @@
 <script>
     window.__INITIAL_MODELS = {{ models | tojson | safe }};
     window.__INITIAL_PROMPTS = {{ prompts | tojson | safe }};
+    window.__CONFIG = {
+        llama_manage_internally: {{ llama_manage_internally | tojson }},
+        current_model: {{ current_model | tojson | safe }},
+    };
 </script>
 <script src="{{ url_for('static', path='/js/chat.js') }}"></script>
 {% endblock %}
