@@ -196,10 +196,17 @@ class ChatService:
             yield f"__CITATIONS__:{json.dumps(self._last_citations)}"
 
         try:
+            found = False
             async for token in self.rag_pipeline.answer_search_query_stream(
                 message, results, system_prompt_id=self._current_prompt_id
             ):
                 yield token
+                found = True
+            if not found:
+                logger.warning("RAG stream returned no tokens — falling back to search results")
+                fallback = self._fallback_search_results(results)
+                for t in fallback:
+                    yield t
         except Exception as e:
             logger.error(f"RAG pipeline failed: {e}")
             fallback = self._fallback_search_results(results)

@@ -232,9 +232,20 @@ def sync_prompts_from_files() -> int:
         return 0
 
     _ensure_loaded()
-    current_active_id = get_active_prompt().id if get_active_prompt() else None
+    # Collect all file-synced names for this sync cycle
+    file_names = {md_file.stem.replace("_", "-") for md_file in md_files}
+
+    active = get_active_prompt()
+    current_active_id = active.id if active else None
 
     count = 0
+    # If the active prompt was API-created (UUID outside file set), preserve it.
+    _DEFAULT_PROMPT_NAME = "general-search"
+    preferred_active_name = (
+        current_active_id
+        if current_active_id and current_active_id not in file_names
+        else _DEFAULT_PROMPT_NAME
+    )
     for i, md_file in enumerate(md_files):
         name = md_file.stem.replace("_", "-")
 
@@ -249,7 +260,7 @@ def sync_prompts_from_files() -> int:
 
         content = md_file.read_text(encoding="utf-8")
         desc = f"Prompt template: {name}"
-        is_active = name == current_active_id or (current_active_id is None and i == 0)
+        is_active = name == preferred_active_name
         db.upsert_prompt(
             {
                 "id": name,

@@ -237,7 +237,7 @@ class Config:
             return
 
         try:
-            template_path = Path("templates/config.yaml.j2")
+            template_path = Path("templates/qdrant/config.yaml.j2")
             if template_path.exists():
                 import jinja2
 

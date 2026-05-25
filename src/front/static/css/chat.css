@@ -130,9 +130,7 @@ main {
     display: flex;
     flex-direction: column;
     flex: 1;
-    max-width: 800px;
-    width: 100%;
-    margin: 0 auto;
+    min-width: 0;
 }
 
 .chat-header-bar {
@@ -200,7 +198,7 @@ main {
 }
 
 .message {
-    max-width: 85%;
+    max-width: min(85%, 720px);
     padding: 12px 16px;
     line-height: 1.6;
     word-wrap: break-word;
@@ -392,6 +390,67 @@ main {
     border-top: 1px solid #333;
 }
 
+/* ===== Thinking block ===== */
+.thinking-block {
+    margin: 0 0 0.75em 0;
+    border: 1px solid #444;
+    border-radius: 8px;
+    background: #1e1e1e;
+    overflow: hidden;
+}
+
+.thinking-block summary {
+    padding: 8px 12px;
+    cursor: pointer;
+    color: #999;
+    font-size: 0.85em;
+    user-select: none;
+    font-weight: 500;
+    letter-spacing: 0.3px;
+}
+
+.thinking-block summary:hover {
+    color: #ccc;
+    background: #2a2a2a;
+}
+
+.thinking-block[open] summary {
+    border-bottom: 1px solid #333;
+    color: #ccc;
+}
+
+.thinking-content {
+    padding: 0 12px 12px;
+    color: #888;
+    font-size: 0.9em;
+    line-height: 1.5;
+}
+
+.thinking-content p {
+    margin: 0.3em 0;
+}
+
+.thinking-content code {
+    background: #151515;
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-size: 0.9em;
+    color: #c07a5f;
+}
+
+/* ===== Answer content ===== */
+.answer-content {
+    min-width: 0;
+}
+
+/* ===== Message timestamp ===== */
+.message-timestamp {
+    font-size: 0.7em;
+    color: #555;
+    margin-top: 4px;
+    text-align: right;
+}
+
 .chat-input-bar {
     padding: 16px;
     border-top: 1px solid #333;
@@ -492,14 +551,4 @@ main {
 
 .copy-toast.show {
     opacity: 1;
-}
-
-@media (max-width: 600px) {
-    .message {
-        max-width: 95%;
-    }
-    .chat-header-btn {
-        font-size: 0.8em;
-        padding: 4px 10px;
-    }
 }
