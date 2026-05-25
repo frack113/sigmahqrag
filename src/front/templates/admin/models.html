@@ -65,19 +65,26 @@ function loadModels() {
                 return;
             }
             let html = '<table><tr><th>Model</th><th>Size</th><th>Actions</th></tr>';
+            let hasRows = false;
             models.forEach(m => {
-                for (const [filename, f] of Object.entries(m.files)) {
+                (m.files || []).forEach(f => {
+                    hasRows = true;
+                    const filename = f.filename;
                     const safeRepoId = escAttr(m.repo_id);
                     const safeFilename = escAttr(filename);
                     html += `<tr>
-                        <td>${escHtml(f.filename || filename)}</td>
+                        <td>${escHtml(filename)}</td>
                         <td class="num">${Math.round((f.file_size || f.size || 0) / 1024 / 1024)}MB</td>
                         <td><button class="btn btn-danger btn-sm" onclick="deleteModel('${safeRepoId}', '${safeFilename}')">Delete</button></td>
                     </tr>`;
-                }
+                });
             });
-            html += '</table>';
-            document.getElementById('llm-models').innerHTML = html;
+            if (hasRows) {
+                html += '</table>';
+                document.getElementById('llm-models').innerHTML = html;
+            } else {
+                document.getElementById('llm-models').innerHTML = '<p>No models installed.</p>';
+            }
         })
         .catch(err => {
             document.getElementById('llm-models').innerHTML = '<p class="error">Failed to load models</p>';
