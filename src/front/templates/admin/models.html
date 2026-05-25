@@ -249,12 +249,14 @@ function escAttr(s) {
 function deleteModel(repoId, filename) {
     if (!confirm(`Delete ${repoId}/${filename}?`)) return;
 
-    fetch(`/api/v1/models/llm/${encodeURIComponent(repoId)}/file/${encodeURIComponent(filename)}`, {
-        method: 'DELETE'
+    fetch('/api/v1/admin/models/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ repo_id: repoId, filename: filename }),
     })
     .then(r => r.json())
     .then(data => {
-        alert(data.success ? 'Deleted' : data.error);
+        alert(data.status === 'success' ? 'Deleted' : (data.error || 'Unknown error'));
         loadModels();
     })
     .catch(err => {
@@ -265,12 +267,14 @@ function deleteModel(repoId, filename) {
 function deleteEmbedding(repoId) {
     if (!confirm(`Delete embedding ${repoId}?`)) return;
 
-    fetch(`/api/v1/models/embedding/${encodeURIComponent(repoId)}`, {
-        method: 'DELETE'
+    fetch('/api/v1/admin/models/delete-embedding', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ repo_id: repoId }),
     })
     .then(r => r.json())
     .then(data => {
-        alert(data.success ? 'Deleted' : data.error);
+        alert(data.status === 'success' ? 'Deleted' : (data.error || 'Unknown error'));
         loadModels();
     })
     .catch(err => {

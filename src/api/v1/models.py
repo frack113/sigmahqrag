@@ -227,7 +227,10 @@ async def delete_llm_model_file(repo_id: str, filename: str) -> JSONResponse:
         if path.exists():
             path.unlink()
         del record["files"][filename]
-        reg._save(db)
+        if record["files"]:
+            reg._save(db)
+        else:
+            reg.remove_llm(repo_id, db)
         return JSONResponse(content={"success": True, "repo_id": repo_id, "filename": filename})
     except ModelNotFoundError as e:
         return JSONResponse(status_code=404, content={"error": str(e)})
