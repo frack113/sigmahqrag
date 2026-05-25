@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
@@ -191,6 +192,9 @@ class ChatService:
             if self.search_engine.get_citation(r)
         ]
 
+        if self._last_citations:
+            yield f"__CITATIONS__:{json.dumps(self._last_citations)}"
+
         try:
             async for token in self.rag_pipeline.answer_search_query_stream(
                 message, results, system_prompt_id=self._current_prompt_id
@@ -280,8 +284,12 @@ class ChatService:
         """Get chat history."""
         return self._history.copy()
 
-    def clear_history(self) -> None:
-        """Clear chat history and uploaded rule."""
+    async def clear_history(self) -> None:
+        """Clear chat history, uploaded rule, and llama.cpp KV cache."""
         self._history.clear()
         self._uploaded_rule = None
         self._last_citations.clear()
+        try:
+            await self.rag_pipeline.llm_client.erase_slot_cache()
+        except Exception:
+            logger.warning("Failed to clear llama.cpp KV cache")
