@@ -129,8 +129,8 @@ async def get_backend() -> JSONResponse:
         data = {
             "services": health,
             "config": config.to_dict(),
-            "llama_mode": config.llama_mode,
-            "qdrant_mode": config.qdrant_mode,
+            "llama_mode": "managed" if config.llama_manage_internally else "external",
+            "qdrant_mode": "managed" if config.qdrant_manage_internally else "external",
         }
         return JSONResponse(content={"data": data, "status": "success"})
     except Exception as e:
@@ -246,6 +246,13 @@ async def start_download(service: str | None = None, target: str | None = None) 
     job_id = f"job-{uuid.uuid4().hex[:8]}"
 
     if target_service == "llama":
+        try:
+            from src.back.llamacpp.auto_start import stop_llamacpp
+
+            await stop_llamacpp()
+        except Exception:
+            pass
+
         try:
             manager = create_download_manager()
             result = await manager.start_download("llama.cpp", "latest")

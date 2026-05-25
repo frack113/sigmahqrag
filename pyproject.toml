@@ -56,10 +56,6 @@ ignore_missing_imports = true
 
 
 [[tool.mypy.overrides]]
-module = "gradio"
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
 module = "fastapi"
 ignore_missing_imports = true
 

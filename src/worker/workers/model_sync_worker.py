@@ -3,12 +3,11 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from src.shared.config import get_config
 from src.worker.base import BaseWorker
 from src.worker.enums import WorkerName, WorkerStatus
 
 logger = logging.getLogger(__name__)
-
-REGISTRY_PATH = Path("data/models/registry.json")
 
 
 class ModelSyncWorker(BaseWorker):
@@ -22,8 +21,9 @@ class ModelSyncWorker(BaseWorker):
     def process(self, task: dict) -> None:
         assert self.dispatcher is not None
         task_id = task.get("task_id", "")
-        llm_dir = Path(task.get("llm_dir", "data/models/llm"))
-        embeddings_dir = Path(task.get("embeddings_dir", "data/models/embeddings"))
+        cfg = get_config()
+        llm_dir = Path(task.get("llm_dir", cfg.llm_dir))
+        embeddings_dir = Path(task.get("embeddings_dir", cfg.embeddings_dir))
 
         logger.info(
             f"[ModelSyncWorker] Starting model sync: LLM={llm_dir}, EMBEDDINGS={embeddings_dir}"
@@ -79,16 +79,18 @@ class ModelSyncWorker(BaseWorker):
         logger.info(f"[ModelSyncWorker] Complete (error={error_msg or 'none'}).")
 
     def _load_registry(self) -> dict[str, Any]:
-        if REGISTRY_PATH.exists():
+        registry_path = Path(get_config().paths_model_registry)
+        if registry_path.exists():
             try:
-                return json.loads(REGISTRY_PATH.read_text())  # type: ignore[no-any-return]
+                return json.loads(registry_path.read_text())  # type: ignore[no-any-return]
             except Exception:
                 pass
         return {"llm": {}, "embeddings": {}}
 
     def _save_registry(self, registry: dict) -> None:
-        REGISTRY_PATH.parent.mkdir(parents=True, exist_ok=True)
-        REGISTRY_PATH.write_text(json.dumps(registry, indent=2))
+        registry_path = Path(get_config().paths_model_registry)
+        registry_path.parent.mkdir(parents=True, exist_ok=True)
+        registry_path.write_text(json.dumps(registry, indent=2))
 
     def _scan_llm_folder(self, registry: dict, llm_dir: Path) -> None:
         if not llm_dir.exists():

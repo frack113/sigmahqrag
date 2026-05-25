@@ -9,6 +9,7 @@
 <div class="card">
     <div class="github-actions">
         <button id="add-repo-btn" class="btn btn-primary">Add Repository</button>
+        <button id="sync-all-btn" class="btn btn-success" onclick="syncAllRepos()">Sync All</button>
         <button id="refresh-btn" class="btn btn-primary" onclick="loadRepos()">Refresh list</button>
         <button id="list-document-btn" class="btn btn-primary" onclick="listDocuments()">List document</button>
     </div>
@@ -65,6 +66,25 @@
 const API_BASE = '/api/v1/github';
 let currentRepo = null;
 
+function escAttr(s) {
+    if (s == null) return '';
+    return String(s)
+        .replace(/&/g, '&' + 'amp;')
+        .replace(/"/g, '&' + 'quot;')
+        .replace(/'/g, '&' + '#39;')
+        .replace(/</g, '&' + 'lt;')
+        .replace(/>/g, '&' + 'gt;');
+}
+function escHtml(s) {
+    if (s == null) return '';
+    return String(s)
+        .replace(/&/g, '&' + 'amp;')
+        .replace(/</g, '&' + 'lt;')
+        .replace(/>/g, '&' + 'gt;')
+        .replace(/"/g, '&' + 'quot;')
+        .replace(/'/g, '&' + '#39;');
+}
+
 function formatDate(isoString) {
     if (!isoString) return 'Unknown';
     try {
@@ -93,24 +113,6 @@ async function loadRepos() {
         
         prompt.style.display = 'block';
         
-        function escAttr(s) {
-            if (s == null) return '';
-            return String(s)
-                .replace(/&/g, '&' + 'amp;')
-                .replace(/"/g, '&' + 'quot;')
-                .replace(/'/g, '&' + '#39;')
-                .replace(/</g, '&' + 'lt;')
-                .replace(/>/g, '&' + 'gt;');
-        }
-        function escHtml(s) {
-            if (s == null) return '';
-            return String(s)
-                .replace(/&/g, '&' + 'amp;')
-                .replace(/</g, '&' + 'lt;')
-                .replace(/>/g, '&' + 'gt;')
-                .replace(/"/g, '&' + 'quot;')
-                .replace(/'/g, '&' + '#39;');
-        }
         container.innerHTML = repos.map(repo => `
             <div class="repo-card">
                 <h3>${escHtml(repo.org)}/${escHtml(repo.name)}</h3>
@@ -149,11 +151,18 @@ async function loadDirectoryTree(org, name) {
     
     try {
         const response = await fetch(API_BASE + '/repos/' + org + '/' + name + '/tree');
-        if (!response.ok) throw new Error('API error');
+        if (!response.ok) {
+            let reason = `HTTP ${response.status}`;
+            try {
+                const errData = await response.json();
+                if (errData.error) reason = errData.error;
+            } catch {}
+            throw new Error(reason);
+        }
         const data = await response.json();
         
         if (!data.success) {
-            container.innerHTML = '<p class="info-message">Repository not cloned yet.</p>';
+            container.innerHTML = '<p class="info-message">' + escHtml(data.error || 'Repository not cloned yet.') + '</p>';
             return;
         }
         
@@ -165,7 +174,7 @@ async function loadDirectoryTree(org, name) {
         container.innerHTML = '<ul class="tree-root">' + renderTreeNodes(data.tree) + '</ul>';
     } catch (error) {
         console.error('Failed to load directory tree:', error);
-        container.innerHTML = '<p>Error loading directory structure</p>';
+        container.innerHTML = '<p class="info-message">Failed to load: ' + escHtml(error.message || error) + '</p>';
     }
 }
 
@@ -259,6 +268,31 @@ async function syncRepo(org, name) {
         }
     } catch (error) {
         alert('Failed to sync repository');
+    }
+}
+
+async function syncAllRepos() {
+    const btn = document.getElementById('sync-all-btn');
+    if (!btn) return;
+    btn.disabled = true;
+    btn.textContent = 'Syncing...';
+    try {
+        const response = await fetch(API_BASE + '/repos/sync-all', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'}
+        });
+        const result = await response.json();
+        if (result.success) {
+            alert('Sync started for all repositories...');
+            loadRepos();
+        } else {
+            alert(result.error || 'Failed to sync all');
+        }
+    } catch (error) {
+        alert('Failed to sync all repositories');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Sync All';
     }
 }
 

@@ -148,9 +148,11 @@ async def index_sigma_ref(
     request: IngestRequest | None = None,
 ) -> JSONResponse:
     """Download and prepare Sigma reference documents."""
-    # For now, we use default paths for sigma ref
-    rules_dir = os.environ.get("SIGMA_RULES_DIR", "data/sigma_rules")
-    output_dir = "data/sigma_ref_docs"
+    from src.shared.config import get_config
+
+    cfg = get_config()
+    rules_dir = os.environ.get("SIGMA_RULES_DIR", cfg.paths_sigma_rules_dir)
+    output_dir = cfg.paths_sigma_ref_docs_dir
 
     try:
         db = DatabaseService.get_instance()

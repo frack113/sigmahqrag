@@ -1,6 +1,7 @@
 import logging
 from pathlib import Path
 
+from src.shared.config import get_config
 from src.worker.workers.embedding_base import EmbeddingWorker
 from src.worker.enums import WorkerName
 
@@ -15,17 +16,13 @@ class LocalEmbeddingWorker(EmbeddingWorker):
 
     def _get_entries(self, task: dict) -> list[dict]:
         collection_name = task.get("collection_name", self.collection_name)
-        all_entries = self.db.get_doc_sigma_ref(limit=10000)
-        return [
-            e
-            for e in all_entries
-            if e.get("org") == "local"
-            and e.get("repo") == collection_name
-            and e.get("embed_status") == "discovered"
-        ]
+        return self.db.get_pending_doc_registry(org="local", repo=collection_name)
 
     def _resolve_file_path(self, entry: dict) -> Path | None:
-        base_path = Path(self._task.get("base_path", "data/documents/local"))
+        cfg = get_config()
+        config_base_path = Path(cfg.local_documents_path).resolve()
+        task_base_path = self._task.get("base_path")
+        base_path = Path(task_base_path) if task_base_path else config_base_path
         file_name = entry.get("file_name", "")
         return base_path / file_name if file_name else None
 
@@ -38,4 +35,4 @@ class LocalEmbeddingWorker(EmbeddingWorker):
         }
 
     def _update_status(self, entry: dict, status: str) -> None:
-        pass  # Local embedding status not tracked in DB
+        self.db.update_doc_registry_embed_status(entry["url_hash"], status)

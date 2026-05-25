@@ -2,6 +2,7 @@ import hashlib
 import logging
 from pathlib import Path
 
+from src.shared.config import get_config
 from src.worker.base import BaseWorker
 from src.worker.utils import iso_now
 from src.back.utils.identify_file_type import SUPPORTED_DOC_EXTENSION_MAP, identify
@@ -13,7 +14,9 @@ class LocalDiscoveryWorker(BaseWorker):
     """Scans a local directory for supported documents."""
 
     def process(self, task: dict) -> None:
-        base_path = Path(task.get("base_path", "data/documents/local"))
+        cfg = get_config()
+        config_base_path = Path(cfg.local_documents_path).resolve()
+        base_path = Path(task.get("base_path", config_base_path))
         collection_name = task.get("collection_name", "local")
 
         logger.debug(f"[LocalDiscoveryWorker] Scanning {base_path}")

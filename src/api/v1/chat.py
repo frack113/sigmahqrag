@@ -18,6 +18,18 @@ router = APIRouter(prefix="/api/v1/chat", tags=["v1-chat"])
 chat_service = ChatService()
 
 
+@router.get("/history")
+async def get_chat_history() -> list[dict]:
+    """Get chat message history."""
+    return chat_service.get_history()
+
+
+@router.delete("/history", status_code=status.HTTP_204_NO_CONTENT)
+async def clear_chat_history() -> None:
+    """Clear chat history."""
+    chat_service.clear_history()
+
+
 @router.post("/message", response_model=ChatMessageResponse)
 async def send_chat_message(req: ChatMessageRequest) -> ChatMessageResponse:
     """Process a chat message and return AI response."""
@@ -28,7 +40,9 @@ async def send_chat_message(req: ChatMessageRequest) -> ChatMessageResponse:
         )
 
     try:
-        response_text = await chat_service.process_message(req.message, req.mode)
+        response_text = await chat_service.process_message(
+            req.message, req.mode, req.model, prompt_id=req.prompt_id
+        )
         citations = chat_service.get_last_citations()
 
         # Format citations as [sigma:rule_id] in response
@@ -107,11 +121,12 @@ async def send_chat_message_stream(req: ChatMessageRequest):
     async def generate():
         """Generate SSE events from LLM stream."""
         try:
-            response_text = await chat_service.process_message(req.message, req.mode)
-            yield f"data: {response_text}\n\n"
+            async for token in chat_service.process_message_stream(
+                req.message, req.mode, req.model, prompt_id=req.prompt_id
+            ):
+                yield f"data: {token}\n\n"
             yield "data: [DONE]\n\n"
         except Exception as e:
-            logger.error(f"Stream error: {e}")
             logger.error(f"Stream error: {e}")
             yield "data: Error: An internal error occurred\n\n"
             yield "data: [DONE]\n\n"

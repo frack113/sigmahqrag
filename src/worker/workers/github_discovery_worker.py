@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 class GithubDiscoveryWorker(BaseWorker):
     """Scans all cloned GitHub repositories with selected directories for supported documents."""
 
-    github_base_dir: str = "data/github"
+    github_base_dir: str = ""
     default_branch: str = "main"
 
     def _build_urls(self, org: str, repo: str, file_rel_path: str) -> tuple[str, str]:
@@ -83,7 +83,10 @@ class GithubDiscoveryWorker(BaseWorker):
             return False
 
     def process(self, task: dict) -> None:
+        from src.shared.config import get_config
         from src.worker.enums import WorkerName
+
+        base_dir = task.get("github_base_dir") or get_config().paths_github_dir or "data/github"
 
         try:
             repo_keys = self.db.get_repos_with_selected_dirs()
@@ -105,7 +108,7 @@ class GithubDiscoveryWorker(BaseWorker):
                     continue
 
                 org, repo = parts
-                base_path = Path(self.github_base_dir) / org / repo
+                base_path = Path(base_dir) / org / repo
                 if not base_path.exists():
                     logger.warning(f"[GithubDiscoveryWorker] Repo not found: {base_path}")
                     continue

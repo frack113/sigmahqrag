@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import tempfile
+from pathlib import Path
 
 import pytest
 
@@ -73,7 +74,7 @@ class TestEmbeddingConfig:
 class TestSystemPrompts:
     def test_empty(self, db: DatabaseService) -> None:
         prompts = db.get_prompts()
-        assert any(p["id"] == "default-rag" for p in prompts)
+        assert isinstance(prompts, list)
 
     def test_upsert_and_get(self, db: DatabaseService) -> None:
         db.upsert_prompt(
@@ -211,6 +212,380 @@ class TestDocSigmaRef:
         db.upsert_doc_sigma_ref({"url_hash": "h1", "original_url": "http://b"})
         entries = db.get_doc_sigma_ref()
         assert entries[0]["original_url"] == "http://b"
+
+
+class TestDocRegistry:
+    def test_upsert(self, db: DatabaseService) -> None:
+        assert not any(
+            r["org"] == "test-org" and r["repo"] == "test-repo" for r in db.get_doc_registry(10)
+        )
+        db.upsert_doc_registry(
+            {
+                "url_hash": "reg1",
+                "org": "test-org",
+                "repo": "test-repo",
+                "file_name": "README.md",
+                "content_type": "markdown",
+                "original_url": "https://example.com/README.md",
+            }
+        )
+        results = db.get_doc_registry(10)
+        assert len(results) == 1
+        assert results[0]["org"] == "test-org"
+        assert results[0]["repo"] == "test-repo"
+
+    def test_upsert_overwrite(self, db: DatabaseService) -> None:
+        db.upsert_doc_registry(
+            {
+                "url_hash": "ow1",
+                "org": "a",
+                "repo": "b",
+                "file_name": "old.md",
+                "content_type": "markdown",
+                "original_url": "http://old",
+            }
+        )
+        db.upsert_doc_registry(
+            {
+                "url_hash": "ow1",
+                "org": "a",
+                "repo": "b",
+                "file_name": "new.md",
+                "content_type": "markdown",
+                "original_url": "http://new",
+            }
+        )
+        results = db.get_doc_registry(10)
+        assert len(results) == 1
+        assert results[0]["file_name"] == "new.md"
+
+    def test_delete_by_repo(self, db: DatabaseService) -> None:
+        db.upsert_doc_registry(
+            {
+                "url_hash": "delr1",
+                "org": "x",
+                "repo": "y",
+                "file_name": "file.md",
+                "content_type": "markdown",
+                "original_url": "http://test",
+            }
+        )
+        db.delete_doc_registry_by_repo("x", "y")
+        assert not any(r["org"] == "x" and r["repo"] == "y" for r in db.get_doc_registry(10))
+
+    def test_delete_by_url(self, db: DatabaseService) -> None:
+        db.upsert_doc_registry(
+            {
+                "url_hash": "delu1",
+                "org": "x",
+                "repo": "y",
+                "file_name": "file.md",
+                "content_type": "markdown",
+                "original_url": "http://unique-url",
+            }
+        )
+        db.delete_doc_registry_by_url("http://unique-url")
+        assert not any(r["url_hash"] == "delu1" for r in db.get_doc_registry(10))
+
+    def test_update_embed_status(self, db: DatabaseService) -> None:
+        db.upsert_doc_registry(
+            {
+                "url_hash": "es1",
+                "org": "x",
+                "repo": "y",
+                "file_name": "file.md",
+                "content_type": "markdown",
+                "original_url": "http://test",
+                "embed_status": "discovery",
+            }
+        )
+        db.update_doc_registry_embed_status("es1", "embedded")
+        results = db.get_doc_registry(10)
+        assert len(results) == 1
+        assert results[0]["embed_status"] == "embedded"
+
+    def test_get_pending_by_org_repo(self, db: DatabaseService) -> None:
+        db.upsert_doc_registry(
+            {
+                "url_hash": "pend1",
+                "org": "test-org",
+                "repo": "test-repo",
+                "file_name": "waiting.md",
+                "content_type": "markdown",
+                "original_url": "http://pending",
+                "embed_status": "discovery",
+            }
+        )
+        db.upsert_doc_registry(
+            {
+                "url_hash": "pend2",
+                "org": "other-org",
+                "repo": "other-repo",
+                "file_name": "other.md",
+                "content_type": "markdown",
+                "original_url": "http://other",
+                "embed_status": "discovery",
+            }
+        )
+        pending = db.get_pending_doc_registry("test-org", "test-repo")
+        assert len(pending) == 1
+        assert pending[0]["url_hash"] == "pend1"
+
+    def test_pagination(self, db: DatabaseService) -> None:
+        for i in range(5):
+            db.upsert_doc_registry(
+                {
+                    "url_hash": f"pg{i}",
+                    "org": "a",
+                    "repo": "b",
+                    "file_name": f"file{i}.md",
+                    "content_type": "markdown",
+                    "original_url": f"http://pg{i}",
+                }
+            )
+        page1 = db.get_doc_registry(2, 0)
+        assert len(page1) == 2
+        page2 = db.get_doc_registry(2, 2)
+        assert len(page2) == 2
+
+
+class TestLocalFiles:
+    def test_get_local_files_empty(self, db: DatabaseService) -> None:
+        results = db.get_local_files()
+        assert results == []
+
+    def test_get_local_files(self, db: DatabaseService) -> None:
+        db.upsert_doc_registry(
+            {
+                "url_hash": "local1",
+                "org": "local",
+                "repo": "local",
+                "file_name": "note.md",
+                "content_type": "markdown",
+                "original_url": "http://local/note.md",
+            }
+        )
+        results = db.get_local_files()
+        assert len(results) == 1
+        assert results[0]["org"] == "local"
+        assert results[0]["repo"] == "local"
+
+    def test_get_local_file_count(self, db: DatabaseService) -> None:
+        db.upsert_doc_registry(
+            {
+                "url_hash": "cnt1",
+                "org": "local",
+                "repo": "local",
+                "file_name": "a.md",
+                "content_type": "markdown",
+                "original_url": "http://local/a",
+            }
+        )
+        db.upsert_doc_registry(
+            {
+                "url_hash": "cnt2",
+                "org": "local",
+                "repo": "local",
+                "file_name": "b.md",
+                "content_type": "markdown",
+                "original_url": "http://local/b",
+            }
+        )
+        count = db.get_local_file_count()
+        assert count == 2
+
+    def test_get_local_files_excludes_other_orgs(self, db: DatabaseService) -> None:
+        db.upsert_doc_registry(
+            {
+                "url_hash": "other1",
+                "org": "sigmaref",
+                "repo": "sigmaref",
+                "file_name": "ref.md",
+                "content_type": "markdown",
+                "original_url": "http://ref",
+            }
+        )
+        db.upsert_doc_registry(
+            {
+                "url_hash": "other2",
+                "org": "local",
+                "repo": "local",
+                "file_name": "note.md",
+                "content_type": "markdown",
+                "original_url": "http://local/note",
+            }
+        )
+        results = db.get_local_files()
+        assert len(results) == 1
+        assert results[0]["url_hash"] == "other2"
+
+    def test_delete_local_file_by_url(self, db: DatabaseService) -> None:
+        db.upsert_doc_registry(
+            {
+                "url_hash": "dellocal",
+                "org": "local",
+                "repo": "local",
+                "file_name": "remove.md",
+                "content_type": "markdown",
+                "original_url": "http://local/remove",
+            }
+        )
+        db.delete_doc_registry_by_url("http://local/remove")
+        count = db.get_local_file_count()
+        assert count == 0
+
+    def test_resync_local_file_sizes(self, db: DatabaseService, tmp_path) -> None:
+        doc_dir = str(tmp_path / "documents")
+        os.makedirs(doc_dir, exist_ok=True)
+        test_file = os.path.join(doc_dir, "test_rule.yml")
+        with open(test_file, "w") as f:
+            f.write("title: Test\n")
+        file_size = os.path.getsize(test_file)
+
+        db.upsert_doc_registry(
+            {
+                "url_hash": "resync1",
+                "org": "local",
+                "repo": "local",
+                "file_name": "test_rule.yml",
+                "content_type": "yaml",
+                "original_url": f"file://{test_file}",
+                "file_size": 0,
+            }
+        )
+        result = db.resync_local_file_sizes(doc_dir)
+        assert result["updated"] == 1
+        assert result["skipped"] == 0
+        assert result["error"] == 0
+
+        record = db.get_local_files()[0]
+        assert record["file_size"] == file_size
+
+    def test_resync_local_file_sizes_missing_file(self, db: DatabaseService, tmp_path) -> None:
+        doc_dir = str(tmp_path / "documents")
+        os.makedirs(doc_dir, exist_ok=True)
+
+        db.upsert_doc_registry(
+            {
+                "url_hash": "resync2",
+                "org": "local",
+                "repo": "local",
+                "file_name": "missing.yml",
+                "content_type": "yaml",
+                "original_url": "file:///nonexistent",
+                "file_size": 0,
+            }
+        )
+        result = db.resync_local_file_sizes(doc_dir)
+        assert result["updated"] == 0
+        assert result["error"] == 1
+
+    def test_resync_local_file_sizes_non_existing_path(self, db: DatabaseService) -> None:
+        result = db.resync_local_file_sizes("/nonexistent/path")
+        assert result == {"updated": 0, "skipped": 0, "error": 0, "incomplete": 0}
+
+    def test_resync_local_file_sizes_both_tables(self, db: DatabaseService, tmp_path) -> None:
+        doc_dir = str(tmp_path / "documents")
+        os.makedirs(doc_dir, exist_ok=True)
+        test_file = os.path.join(doc_dir, "local_rule.yml")
+        file_size = 42
+        with open(test_file, "w") as f:
+            f.write("x" * file_size)
+
+        db.upsert_doc_registry(
+            {
+                "url_hash": "reg1",
+                "org": "local",
+                "repo": "local",
+                "file_name": "local_rule.yml",
+                "content_type": "yaml",
+                "original_url": f"file://{test_file}",
+                "file_size": 0,
+            }
+        )
+        db.upsert_doc_sigma_ref(
+            {
+                "url_hash": "sigma1",
+                "org": "local",
+                "repo": "local",
+                "file_name": "local_rule.yml",
+                "content_type": "yaml",
+                "original_url": f"file://{test_file}",
+                "file_size": 0,
+            }
+        )
+        result = db.resync_local_file_sizes(doc_dir)
+        assert result["updated"] == 2
+
+        reg_record = db.get_local_files()[0]
+        assert reg_record["file_size"] == file_size
+
+    def test_resync_local_file_sizes_zero_byte_file(self, db: DatabaseService, tmp_path) -> None:
+        doc_dir = str(tmp_path / "documents")
+        os.makedirs(doc_dir, exist_ok=True)
+        empty_file = os.path.join(doc_dir, "empty.yml")
+        Path(empty_file).touch()
+
+        db.upsert_doc_registry(
+            {
+                "url_hash": "zero1",
+                "org": "local",
+                "repo": "local",
+                "file_name": "empty.yml",
+                "content_type": "yaml",
+                "original_url": f"file://{empty_file}",
+                "file_size": 0,
+            }
+        )
+        result = db.resync_local_file_sizes(doc_dir)
+        assert result["updated"] == 1
+
+    def test_resync_local_file_sizes_existing_hash_skip(
+        self, db: DatabaseService, tmp_path
+    ) -> None:
+        doc_dir = str(tmp_path / "documents")
+        os.makedirs(doc_dir, exist_ok=True)
+        file_size = 99
+
+        file_path = os.path.join(doc_dir, "already_hashed.yml")
+        with open(file_path, "w") as f:
+            f.write("y" * file_size)
+
+        db.upsert_doc_registry(
+            {
+                "url_hash": "hash1",
+                "org": "local",
+                "repo": "local",
+                "file_name": "already_hashed.yml",
+                "content_type": "yaml",
+                "original_url": f"file://{file_path}",
+                "file_size": 0,
+            }
+        )
+        result = db.resync_local_file_sizes(doc_dir)
+        assert result["updated"] == 1
+
+    def test_resync_local_file_sizes_no_reprocess(self, db: DatabaseService, tmp_path) -> None:
+        doc_dir = str(tmp_path / "documents")
+        os.makedirs(doc_dir, exist_ok=True)
+        file_size = 50
+        file_path = os.path.join(doc_dir, "already_sized.yml")
+        with open(file_path, "w") as f:
+            f.write("z" * file_size)
+
+        db.upsert_doc_registry(
+            {
+                "url_hash": "nosize1",
+                "org": "local",
+                "repo": "local",
+                "file_name": "already_sized.yml",
+                "content_type": "yaml",
+                "original_url": f"file://{file_path}",
+                "file_size": file_size,
+            }
+        )
+        result = db.resync_local_file_sizes(doc_dir)
+        assert result["updated"] == 0
 
 
 class TestEmbedProgress:

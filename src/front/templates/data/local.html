@@ -1,0 +1,409 @@
+{% extends "data/base.html" %}
+
+{% block title %}Local Files - Data Sources{% endblock %}
+
+{% block styles %}
+{{ super() }}
+<style>
+    .file-stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+
+    .stat-card {
+        background: white;
+        border-radius: 8px;
+        padding: 16px;
+        text-align: center;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .stat-card .stat-value {
+        font-size: 28px;
+        font-weight: bold;
+        color: #2c3e50;
+    }
+
+    .stat-card .stat-label {
+        font-size: 14px;
+        color: #7f8c8d;
+        margin-top: 4px;
+    }
+
+    .upload-section {
+        background: white;
+        border: 2px dashed #bdc3c7;
+        border-radius: 8px;
+        padding: 40px 20px;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s;
+        margin-bottom: 24px;
+    }
+
+    .upload-section:hover,
+    .upload-section.dragover {
+        border-color: #3498db;
+        background: #f7fbff;
+    }
+
+    .upload-section h3 {
+        margin: 0 0 8px 0;
+        color: #2c3e50;
+    }
+
+    .upload-section p {
+        margin: 0;
+        color: #7f8c8d;
+        font-size: 14px;
+    }
+
+    #file-input {
+        display: none;
+    }
+
+    .files-table {
+        background: white;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .files-table table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .files-table th {
+        background: #2c3e50;
+        color: white;
+        padding: 12px 16px;
+        text-align: left;
+        font-weight: 600;
+        font-size: 14px;
+    }
+
+    .files-table td {
+        padding: 12px 16px;
+        border-bottom: 1px solid #ecf0f1;
+        font-size: 14px;
+    }
+
+    .files-table tr:hover {
+        background: #f8f9fa;
+    }
+
+    .status-badge {
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    .status-badge.discovery {
+        background: #fff3cd;
+        color: #856404;
+    }
+
+    .status-badge.embedded {
+        background: #d4edda;
+        color: #155724;
+    }
+
+    .status-badge.error {
+        background: #f8d7da;
+        color: #721c24;
+    }
+
+    .btn-delete {
+        background: #e74c3c;
+        color: white;
+        border: none;
+        padding: 6px 12px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 13px;
+        transition: background 0.2s;
+    }
+
+    .btn-delete:hover {
+        background: #c0392b;
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+        color: #7f8c8d;
+    }
+
+    .empty-state svg {
+        width: 64px;
+        height: 64px;
+        margin-bottom: 16px;
+        opacity: 0.5;
+    }
+
+    #upload-progress {
+        display: none;
+        background: white;
+        border-radius: 8px;
+        padding: 16px;
+        margin-bottom: 24px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .progress-bar {
+        width: 100%;
+        height: 8px;
+        background: #ecf0f1;
+        border-radius: 4px;
+        overflow: hidden;
+        margin-top: 8px;
+    }
+
+    .progress-fill {
+        height: 100%;
+        background: #3498db;
+        width: 0%;
+        transition: width 0.3s;
+    }
+
+    #status-message {
+        margin-top: 12px;
+        font-size: 14px;
+    }
+</style>
+{% endblock %}
+
+{% block page_content %}
+<h1>Local Files</h1>
+<p>Upload and manage local Sigma detection rules for RAG processing.</p>
+
+<div class="file-stats-grid">
+    <div class="stat-card">
+        <div class="stat-value" id="total-count">0</div>
+        <div class="stat-label">Total Files</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value" id="pending-count">0</div>
+        <div class="stat-label">Pending Embedding</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value" id="embedded-count">0</div>
+        <div class="stat-label">Embedded in Vector DB</div>
+    </div>
+</div>
+
+<div class="upload-section" id="upload-zone">
+    <h3>📁 Drag & Drop files here</h3>
+    <p>or click to browse (supported: .md, .txt, .yml, .yaml, .json, etc.)</p>
+    <input type="file" id="file-input" multiple accept=".md,.txt,.yml,.yaml,.json,.csv,.toml">
+</div>
+
+<div id="upload-progress">
+    <div id="status-message">Uploading...</div>
+    <div class="progress-bar">
+        <div class="progress-fill" id="progress-fill"></div>
+    </div>
+</div>
+
+<div class="files-table">
+    <table>
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Type</th>
+                <th>Size</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="local-files-body">
+            <tr>
+                <td colspan="5" class="empty-state">Loading files...</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const uploadZone = document.getElementById('upload-zone');
+const fileInput = document.getElementById('file-input');
+const localFilesBody = document.getElementById('local-files-body');
+const totalCount = document.getElementById('total-count');
+const pendingCount = document.getElementById('pending-count');
+const embeddedCount = document.getElementById('embedded-count');
+
+// Drag and drop handlers
+uploadZone.addEventListener('click', () => fileInput.click());
+
+uploadZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    uploadZone.classList.add('dragover');
+});
+
+uploadZone.addEventListener('dragleave', () => {
+    uploadZone.classList.remove('dragover');
+});
+
+uploadZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    uploadZone.classList.remove('dragover');
+    if (e.dataTransfer.files.length > 0) {
+        handleFiles(e.dataTransfer.files);
+    }
+});
+
+fileInput.addEventListener('change', (e) => {
+    if (e.target.files.length > 0) {
+        handleFiles(e.target.files);
+        e.target.value = '';
+    }
+});
+
+async function formatFileSize(bytes) {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+}
+
+function getFileType(contentType) {
+    if (!contentType || contentType === 'unknown') return '<span class="status-badge" style="background:#ecf0f1;color:#7f8c8d;">Unknown</span>';
+    return contentType.charAt(0).toUpperCase() + contentType.slice(1);
+}
+
+function getEmbedStatusBadge(embedStatus) {
+    const statusMap = {
+        'discovery': { class: 'discovery', label: 'Pending' },
+        'embedded': { class: 'embedded', label: 'Embedded' },
+        'error': { class: 'error', label: 'Error' },
+    };
+    const config = statusMap[embedStatus] || { class: 'discovery', label: embedStatus || 'Unknown' };
+    return `<span class="status-badge ${config.class}">${config.label}</span>`;
+}
+
+function formatTimestamp(isoStr) {
+    if (!isoStr) return '-';
+    const d = new Date(isoStr);
+    return d.toLocaleDateString('fr-FR') + ' ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+}
+
+async function loadLocalFiles() {
+    try {
+        const response = await fetch('/api/v1/files/local/list?limit=1000&offset=0');
+        const data = await response.json();
+
+        if (!data.success || !data.data) {
+            localFilesBody.innerHTML = '<tr><td colspan="5" class="empty-state">No local files found.</td></tr>';
+            totalCount.textContent = '0';
+            pendingCount.textContent = '0';
+            embeddedCount.textContent = '0';
+            return;
+        }
+
+        const files = data.data;
+        totalCount.textContent = data.total || files.length;
+        pendingCount.textContent = files.filter(f => f.embed_status === 'discovery').length;
+        embeddedCount.textContent = files.filter(f => f.embed_status === 'embedded').length;
+
+        if (files.length === 0) {
+            localFilesBody.innerHTML = '<tr><td colspan="5" class="empty-state">No local files found. Upload a file to get started.</td></tr>';
+            return;
+        }
+
+        localFilesBody.innerHTML = files.map((file, idx) => `
+            <tr>
+                <td>${file.file_name || file.title || '?'}</td>
+                <td>${getFileType(file.content_type)}</td>
+                <td>${file.file_size ? formatFileSize(file.file_size) : '0 B'}</td>
+                <td>${getEmbedStatusBadge(file.embed_status)}</td>
+                <td><button class="btn-delete" onclick="deleteFile(${idx}, '${file.original_url}')">Delete</button></td>
+            </tr>
+        `).join('');
+
+    } catch (err) {
+        console.error('Failed to load local files:', err);
+        localFilesBody.innerHTML = '<tr><td colspan="5" class="empty-state">Error loading files.</td></tr>';
+    }
+}
+
+async function deleteFile(idx, originalUrl) {
+    if (!confirm('Are you sure you want to delete this file? This cannot be undone.')) return;
+
+    try {
+        const response = await fetch(`/api/v1/files/local/delete?file_path=${encodeURIComponent(originalUrl)}&${originalUrl}`);
+        const data = await response.json();
+
+        if (data.success) {
+            loadLocalFiles();
+        } else {
+            alert('Error: ' + (data.error || 'Unknown error'));
+        }
+    } catch (err) {
+        console.error('Failed to delete file:', err);
+        alert('Error deleting file.');
+    }
+}
+
+async function handleFiles(fileList) {
+    const uploadProgress = document.getElementById('upload-progress');
+    const progressFill = document.getElementById('progress-fill');
+    const statusMessage = document.getElementById('status-message');
+
+    uploadProgress.style.display = 'block';
+    progressFill.style.width = '0%';
+    statusMessage.textContent = `Uploading ${fileList.length} file(s)...`;
+
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (let i = 0; i < fileList.length; i++) {
+        const file = fileList[i];
+        progressFill.style.width = `${((i + 1) / fileList.length) * 50}%`;
+        statusMessage.textContent = `Uploading ${i + 1}/${fileList.length}: ${file.name}`;
+
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('collection_name', 'local');
+
+            const response = await fetch('/api/v1/files/local/add', {
+                method: 'POST',
+                body: formData,
+            });
+
+            const data = await response.json();
+            if (data.success) {
+                successCount++;
+            } else {
+                errorCount++;
+                console.error('Upload failed:', data.error);
+            }
+        } catch (err) {
+            errorCount++;
+            console.error('Upload error:', err);
+        }
+    }
+
+    progressFill.style.width = '100%';
+    statusMessage.textContent = `Complete: ${successCount} uploaded, ${errorCount} errors`;
+
+    setTimeout(() => {
+        uploadProgress.style.display = 'none';
+        loadLocalFiles();
+    }, 2000);
+}
+
+// Load files on page load
+loadLocalFiles();
+setInterval(loadLocalFiles, 30000);
+</script>
+{% endblock %}

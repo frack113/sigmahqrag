@@ -83,7 +83,13 @@ class TaskDispatcher:
     def get_all_worker_states(self) -> list[dict]:
         """Return all worker states as a list of dictionaries."""
         with self._lock:
-            return [{"worker_type": k.value, **v} for k, v in self._worker_states.items()]
+            result = []
+            for k, v in self._worker_states.items():
+                entry = {"worker_type": k.value, **v}
+                if isinstance(entry.get("status"), WorkerStatus):
+                    entry["status"] = entry["status"].value
+                result.append(entry)
+            return result
 
     def update_worker_state(self, worker_type: WorkerName, **kwargs):
         """Update the in-memory state for a specific worker type (called by workers)."""

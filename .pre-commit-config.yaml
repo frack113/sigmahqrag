@@ -1,0 +1,22 @@
+# Pre-commit hooks configuration
+# Managed by pre-commit package (pre-commit.com)
+# Install: pre-commit install
+# Run all: pre-commit run --all-files
+
+repos:
+  - repo: local
+    hooks:
+      - id: check-ignored
+        name: Check for gitignored files
+        entry: python scripts/check_ignored.py
+        language: system
+        pass_filenames: false
+        always_run: true
+        verbose: true
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.12.0
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format

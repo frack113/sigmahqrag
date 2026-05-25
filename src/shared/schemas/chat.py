@@ -10,6 +10,8 @@ class ChatMessageRequest(BaseModel):
 
     message: str = Field(..., min_length=1, max_length=4000, description="User message")
     mode: str = Field("search", description="Chat mode: search, explain, coverage")
+    model: str = Field("", description="Selected LLM model (repo_id/filename)")
+    prompt_id: str = Field("", description="Selected system prompt ID")
 
 
 class ChatMessageResponse(BaseModel):

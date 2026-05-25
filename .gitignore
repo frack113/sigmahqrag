@@ -51,8 +51,12 @@ _bmad-output/
 
 # Opencode need it to not kill my code everey time I run it
 .opencode/
-AGENTS.md
+
+# PowerShell artifacts
+$null
 
 # Snyk Security
 .snyk
 .dcignore
+# AI agent guidance (local only, not tracked)
+AGENTS.md

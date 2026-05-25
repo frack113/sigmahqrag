@@ -23,21 +23,19 @@ QDRANT_UI_DOWNLOAD_URL = (
     f"https://github.com/qdrant/qdrant-web-ui/releases/download/{QDRANT_UI_VERSION}/dist-qdrant.zip"
 )
 
-QDRANT_BIN_DIR = Path("data/bin/qdrant")
-QDRANT_STATIC_DIR = Path("data/bin/qdrant/static")
-QDRANT_UI_DEST = Path("data/bin/qdrant/static")
-
 
 class QdrantInstallerService:
     """Service for downloading/installing Qdrant binary and web UI."""
 
     def __init__(
         self,
-        bin_dir: Path = QDRANT_BIN_DIR,
-        static_dir: Path = QDRANT_STATIC_DIR,
+        bin_dir: Path | None = None,
+        static_dir: Path | None = None,
     ) -> None:
-        self.bin_dir = bin_dir
-        self.static_dir = static_dir
+        from src.shared.config import get_config
+
+        self.bin_dir = bin_dir or Path(get_config().qdrant_binary_path).resolve()
+        self.static_dir = static_dir or (self.bin_dir / "static")
 
     def get_binary_path(self) -> Path:
         return self.bin_dir / "qdrant.exe"
@@ -105,7 +103,7 @@ class QdrantInstallerService:
 
     async def download_web_ui(self, progress_callback=None) -> dict[str, Any]:
         """Download Qdrant Web UI (dist-qdrant.zip)."""
-        QDRANT_UI_DEST.mkdir(parents=True, exist_ok=True)
+        self.static_dir.mkdir(parents=True, exist_ok=True)
 
         zip_path = self.static_dir / "dist-qdrant.zip"
 
@@ -120,7 +118,7 @@ class QdrantInstallerService:
             if progress_callback:
                 progress_callback(50, "Extracting web UI...")
 
-            self._safe_extract_zip(zip_path, QDRANT_UI_DEST)
+            self._safe_extract_zip(zip_path, self.static_dir)
 
             if progress_callback:
                 progress_callback(90, "Cleaning up...")
@@ -133,7 +131,7 @@ class QdrantInstallerService:
             return {
                 "success": True,
                 "ui_version": QDRANT_UI_VERSION,
-                "path": str(QDRANT_UI_DEST),
+                "path": str(self.static_dir),
             }
         except Exception as e:
             logger.error(f"Failed to download Qdrant web UI: {e}")

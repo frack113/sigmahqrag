@@ -12,7 +12,7 @@ class VectorStoreClient:
 
     def __init__(
         self,
-        collection_name: str = "sigma_doc",
+        collection_name: str = "sigmaref",
         host: str = "localhost",
         port: int = 6333,
     ) -> None:

@@ -25,7 +25,8 @@ class LocalRepoSyncWorker(BaseWorker):
 
         for repo in list_repos():
             repo_key = f"{repo['org']}/{repo['name']}"
-            if get_metadata(repo["org"], repo["name"]) is None:
+            meta = get_metadata(repo["org"], repo["name"])
+            if meta is None:
                 save_metadata(
                     repo["org"],
                     repo["name"],
@@ -35,11 +36,16 @@ class LocalRepoSyncWorker(BaseWorker):
                         "url": repo.get("remote_url", ""),
                         "branch": repo.get("branch", "main"),
                         "status": "synced",
+                        "remote_head": repo.get("remote_head", ""),
                     },
                 )
                 synced += 1
                 logger.debug("Synced repo %s", repo_key)
             else:
+                updated = dict(meta)
+                if not updated.get("remote_head"):
+                    updated["remote_head"] = repo.get("remote_head", "")
+                    save_metadata(repo["org"], repo["name"], updated)
                 skipped += 1
 
         self.dispatcher.update_worker_state(

@@ -34,6 +34,7 @@ from src.api.v1.qdrant import router as qdrant_router
 from src.api.v1.search import router as search_v1_router
 from src.api.v1.system_prompt import router as prompts_v1_router
 from src.back.database import DatabaseService
+from src.back.llamacpp.auto_start import start_llamacpp, stop_llamacpp
 from src.back.qdrant.auto_start import start_qdrant, stop_qdrant
 from src.back.service_manager import shutdown_all_services
 from src.worker.processor import TaskDispatcher
@@ -57,23 +58,24 @@ def _parse_log_size(size_str: str) -> int:
     return int(size_str)
 
 
-def _setup_logging(max_size: str = "10M", max_files: int = 5) -> None:
+def _setup_logging(level: str = "INFO", max_size: str = "10M", max_files: int = 5) -> None:
     """Setup logging to file with rotation."""
     from src.shared import LOGS_DIR
 
     log_file = LOGS_DIR / "sigmahqrag.log"
+    log_level = getattr(logging, level.upper(), logging.INFO)
 
     handler = RotatingFileHandler(
         log_file, maxBytes=_parse_log_size(max_size), backupCount=max_files, encoding="utf-8"
     )
-    handler.setLevel(logging.INFO)
+    handler.setLevel(log_level)
 
     formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
     handler.setFormatter(formatter)
 
     root_logger = logging.getLogger()
     root_logger.addHandler(handler)
-    root_logger.setLevel(logging.INFO)
+    root_logger.setLevel(log_level)
 
 
 def _clean_at_startup() -> None:
@@ -115,6 +117,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         db.initialize()
         app.state.db = db
 
+        from src.back.system_prompt import sync_prompts_from_files
+
+        sync_prompts_from_files()
+
         from src.shared import Config
 
         Config.init_app()
@@ -122,7 +128,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         from src.shared import get_config
 
         config = get_config()
-        _setup_logging(max_size=config.logging_log_max_size, max_files=config.logging_log_max_file)
+        _setup_logging(
+            level=config.logging_level,
+            max_size=config.logging_log_max_size,
+            max_files=config.logging_log_max_file,
+        )
         logger.info("=== Lifespan starting ===")
         logger.info("Database initialized.")
         logger.info("Config initialized.")
@@ -157,6 +167,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
         _validate_services()
         logger.info("Services validated.")
+        await start_llamacpp()
+        logger.info("llama.cpp started.")
         await start_qdrant()
         logger.info("Qdrant started.")
         logger.info("=== Application startup complete ===")
@@ -167,6 +179,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     if dispatcher:
         dispatcher.stop()
         logger.info("Dispatcher stopped.")
+    await stop_llamacpp()
     await shutdown_all_services()
     await stop_qdrant()
     if db:

@@ -14,10 +14,10 @@ from git import Repo
 from git.exc import InvalidGitRepositoryError
 
 from src.back.database import DatabaseService
+from src.shared.config import get_config
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_REPOS_DIR = Path("data/github")
 LOCKFILE = ".cloning"
 
 # Valid org/name pattern: alphanumeric, hyphens, underscores, dots (no path separators)
@@ -75,7 +75,7 @@ def clone_repo(
     url: str | None = None,
     org: str | None = None,
     name: str | None = None,
-    repos_dir: Path = DEFAULT_REPOS_DIR,
+    repos_dir: Path | None = None,
     branch: str | None = None,
     depth: int | None = None,
 ) -> dict[str, Any]:
@@ -105,7 +105,7 @@ def clone_repo(
             }
         url = f"https://github.com/{org}/{name}.git"
 
-    repos_dir = Path(repos_dir).resolve()
+    repos_dir = Path(repos_dir or get_config().paths_github_dir).resolve()
     repos_dir.mkdir(parents=True, exist_ok=True)
 
     # Defensive: a __temp__ left over from a previous crashed/failed clone
@@ -123,11 +123,11 @@ def clone_repo(
             # git@github.com:org/name.git or https://github.com/org/name.git
             parts = remote_url.rstrip("/").replace(".git", "").split("/")
             if remote_url.startswith("git@"):
-                org = parts[-1]
-                name = parts[-2]
+                org = parts[-1].lower()
+                name = parts[-2].lower()
             else:
-                org = parts[-2]
-                name = parts[-1]
+                org = parts[-2].lower()
+                name = parts[-1].lower()
         finally:
             shutil.rmtree(temp_dir, ignore_errors=True)
 
@@ -185,10 +185,10 @@ def update_repo(
     org: str,
     name: str,
     branch: str = "main",
-    repos_dir: Path = DEFAULT_REPOS_DIR,
+    repos_dir: Path | None = None,
 ) -> dict[str, Any]:
     """Update a local Git repository by pulling latest changes."""
-    repos_dir = Path(repos_dir).resolve()
+    repos_dir = Path(repos_dir or get_config().paths_github_dir).resolve()
     repo_path = _get_repo_path(repos_dir, org, name)
 
     repo = _get_or_create_repo(repo_path)
@@ -199,11 +199,19 @@ def update_repo(
         # gitpython provides remotes and fetch/pull natively
         origin = repo.remotes.origin
         fetch_info = origin.fetch()
+        # Try to find the remote head from fetch info
         remote_head = None
         for info in fetch_info:
-            if info.remote_ref_name == branch:
+            ref = info.remote_ref_path
+            if ref == branch or ref == f"refs/heads/{branch}":
                 remote_head = info.commit.hexsha
                 break
+        # Fallback: access the remote tracking ref after fetch
+        if remote_head is None:
+            try:
+                remote_head = repo.refs[f"origin/{branch}"].commit.hexsha
+            except Exception:
+                pass
         # Pull with rebase or merge based on config
         origin.pull(branch)
         logger.info(f"Updated repository: {org}/{name} on branch {branch}")
@@ -213,16 +221,16 @@ def update_repo(
             "name": name,
             "path": str(repo_path),
             "branch": branch,
-            "remote_head": remote_head,
+            "remote_head": remote_head or "",
         }
     except Exception as e:
         logger.error(f"Failed to update {org}/{name}: {e}")
         return {"success": False, "error": str(e)}
 
 
-def delete_repo(org: str, name: str, repos_dir: Path = DEFAULT_REPOS_DIR) -> dict[str, Any]:
+def delete_repo(org: str, name: str, repos_dir: Path | None = None) -> dict[str, Any]:
     """Delete a local repository."""
-    repos_dir = Path(repos_dir).resolve()
+    repos_dir = Path(repos_dir or get_config().paths_github_dir).resolve()
     repo_path = _get_repo_path(repos_dir, org, name)
     repo_key = _get_repo_key(org, name)
 
@@ -251,9 +259,9 @@ def delete_repo(org: str, name: str, repos_dir: Path = DEFAULT_REPOS_DIR) -> dic
         return {"success": False, "error": str(e)}
 
 
-def list_repos(repos_dir: Path = DEFAULT_REPOS_DIR) -> list[dict[str, Any]]:
+def list_repos(repos_dir: Path | None = None) -> list[dict[str, Any]]:
     """List all cloned repositories with their metadata."""
-    repos_dir = Path(repos_dir).resolve()
+    repos_dir = Path(repos_dir or get_config().paths_github_dir).resolve()
     repos_dir.mkdir(parents=True, exist_ok=True)
 
     repos = []
@@ -274,13 +282,23 @@ def list_repos(repos_dir: Path = DEFAULT_REPOS_DIR) -> list[dict[str, Any]]:
                     info["remote_url"] = repo.remote().url
                 except Exception:
                     info["remote_url"] = None
+                try:
+                    origin = repo.remotes.origin
+                    origin.fetch()
+                    remote_ref = f"origin/{info.get('branch')}"
+                    remote_head = (
+                        repo.refs[remote_ref].commit.hexsha if remote_ref in repo.refs else ""
+                    )
+                    info["remote_head"] = remote_head
+                except Exception:
+                    info["remote_head"] = ""
                 repos.append(info)
 
     return sorted(repos, key=lambda r: (r["org"], r["name"]))
 
 
 def save_metadata(
-    org: str, name: str, metadata: dict[str, Any], repos_dir: Path = DEFAULT_REPOS_DIR
+    org: str, name: str, metadata: dict[str, Any], repos_dir: Path | None = None
 ) -> None:
     """Save metadata for a repository to DuckDB."""
     db = DatabaseService.get_instance()
@@ -288,7 +306,7 @@ def save_metadata(
     db.set_git_metadata(repo_key, metadata)
 
 
-def get_metadata(org: str, name: str, repos_dir: Path = DEFAULT_REPOS_DIR) -> dict[str, Any] | None:
+def get_metadata(org: str, name: str, repos_dir: Path | None = None) -> dict[str, Any] | None:
     """Get metadata for a repository from DuckDB."""
     db = DatabaseService.get_instance()
     repo_key = f"{org}/{name}"
@@ -300,7 +318,7 @@ def _get_repo_key(org: str, name: str) -> str:
 
 
 def list_directory_tree(
-    org: str, name: str, repos_dir: Path = DEFAULT_REPOS_DIR, max_depth: int = 5
+    org: str, name: str, repos_dir: Path | None = None, max_depth: int = 5
 ) -> list[dict[str, Any]]:
     """List directory tree for a repository.
 
@@ -313,7 +331,7 @@ def list_directory_tree(
     Returns:
         List of folder nodes with 'path', 'name', and optional 'children'
     """
-    repos_dir = Path(repos_dir).resolve()
+    repos_dir = Path(repos_dir or get_config().paths_github_dir).resolve()
     repo_path = _get_repo_path(repos_dir, org, name)
 
     if not repo_path.exists() or not _is_valid_repo(repo_path):
@@ -344,7 +362,7 @@ def list_directory_tree(
 
 
 def save_selected_dirs(
-    org: str, name: str, selected: list[str], repos_dir: Path = DEFAULT_REPOS_DIR
+    org: str, name: str, selected: list[str], repos_dir: Path | None = None
 ) -> dict[str, Any]:
     """Save selected directories for a repository to DuckDB.
 
@@ -368,7 +386,7 @@ def save_selected_dirs(
         return {"success": False, "error": str(e)}
 
 
-def get_selected_dirs(org: str, name: str, repos_dir: Path = DEFAULT_REPOS_DIR) -> list[str]:
+def get_selected_dirs(org: str, name: str, repos_dir: Path | None = None) -> list[str]:
     """Get selected directories for a repository from DuckDB.
 
     Args:
@@ -388,9 +406,9 @@ def get_selected_dirs(org: str, name: str, repos_dir: Path = DEFAULT_REPOS_DIR) 
         return []
 
 
-def get_last_commit_date(org: str, name: str, repos_dir: Path = DEFAULT_REPOS_DIR) -> str | None:
+def get_last_commit_date(org: str, name: str, repos_dir: Path | None = None) -> str | None:
     """Get the date of the last commit in the repository."""
-    repos_dir = Path(repos_dir).resolve()
+    repos_dir = Path(repos_dir or get_config().paths_github_dir).resolve()
     repo_path = _get_repo_path(repos_dir, org, name)
 
     repo = _get_or_create_repo(repo_path)
@@ -404,9 +422,9 @@ def get_last_commit_date(org: str, name: str, repos_dir: Path = DEFAULT_REPOS_DI
         return None
 
 
-def is_repo_outdated(org: str, name: str, repos_dir: Path = DEFAULT_REPOS_DIR) -> bool:
-    """Check if local repo is behind remote using stored remote HEAD hash (no network call)."""
-    repos_dir = Path(repos_dir).resolve()
+def is_repo_outdated(org: str, name: str, repos_dir: Path | None = None) -> bool:
+    """Check if local repo is behind remote by comparing against the tracking ref."""
+    repos_dir = Path(repos_dir or get_config().paths_github_dir).resolve()
     repo_path = _get_repo_path(repos_dir, org, name)
 
     repo = _get_or_create_repo(repo_path)
@@ -415,10 +433,12 @@ def is_repo_outdated(org: str, name: str, repos_dir: Path = DEFAULT_REPOS_DIR) -
 
     try:
         local_commit = repo.head.commit.hexsha
-        metadata = get_metadata(org, name)
-        remote_head = (metadata or {}).get("remote_head")
-        if remote_head is None:
+        branch = repo.active_branch.name
+        # Compare against origin tracking ref (always up-to-date after fetch in list_repos)
+        remote_ref = f"origin/{branch}"
+        if remote_ref not in repo.refs:
             return True
-        return local_commit != remote_head  # type: ignore[no-any-return]
+        remote_commit = repo.refs[remote_ref].commit.hexsha
+        return local_commit != remote_commit  # type: ignore[no-any-return]
     except Exception:
         return False

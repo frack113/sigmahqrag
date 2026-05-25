@@ -1,6 +1,7 @@
 import logging
 from pathlib import Path
 
+from src.shared.config import get_config
 from src.worker.workers.embedding_base import EmbeddingWorker
 from src.worker.enums import WorkerName
 
@@ -11,7 +12,7 @@ class SigmaRefEmbeddingWorker(EmbeddingWorker):
     """Embeds Sigma Reference documents from doc_sigma_ref into Qdrant."""
 
     worker_type = WorkerName.SIGMAREF_EMBEDDINGS
-    collection_name = "sigma_doc"
+    collection_name = "sigmaref"
 
     def _get_entries(self, task: dict) -> list[dict]:
         raw_entries = self.db.get_pending_sigma_ref()
@@ -33,7 +34,11 @@ class SigmaRefEmbeddingWorker(EmbeddingWorker):
         return result
 
     def _resolve_file_path(self, entry: dict) -> Path | None:
-        registry_path = Path(self._task.get("registry_path", "data/documents/sigmaref"))
+        cfg = get_config()
+        task_registry = self._task.get("registry_path")
+        registry_path = (
+            Path(task_registry) if task_registry else Path(cfg.sigmaref_documents_path).resolve()
+        )
         file_hash = entry.get("hash") or ""
         file_name = entry.get("file_name") or ""
 

@@ -1,5 +1,6 @@
 import logging
 
+from src.shared.config import get_config
 from src.worker.base import BaseWorker
 from src.back.documents.sigma_ref_downloader import download_references
 
@@ -10,8 +11,9 @@ class SigmaRefDiscoveryWorker(BaseWorker):
     """Scans Sigma rule YAML files, extracts reference URLs, and downloads them."""
 
     def process(self, task: dict) -> None:
-        rules_dir = task.get("rules_dir", "data/github")
-        output_dir = task.get("output_dir", "data/documents/sigmaref")
+        cfg = get_config()
+        rules_dir = task.get("rules_dir", cfg.paths_github_dir)
+        output_dir = task.get("output_dir") or str(cfg.sigmaref_documents_path)
 
         logger.info(
             f"[SigmaRefDiscoveryWorker] Starting discovery: rules={rules_dir}, output={output_dir}"

@@ -299,7 +299,8 @@ class TestLocalEmbeddingWorker:
         worker, mock_dispatcher = _make_worker(LocalEmbeddingWorker, mock_db)
         worker.process(task)
 
-        mock_dispatcher.update_worker_state.assert_not_called()
+        # Should call get_pending_doc_registry
+        mock_db.get_pending_doc_registry.assert_called_with(org="local", repo="local")
 
     def test_process_completes_if_no_registry_entries(
         self, mock_db: MagicMock, tmp_path: Path
@@ -307,7 +308,7 @@ class TestLocalEmbeddingWorker:
         local_dir = tmp_path / "local_docs"
         local_dir.mkdir()
 
-        mock_db.get_doc_sigma_ref.return_value = []
+        mock_db.get_pending_doc_registry.return_value = []
 
         task = {
             "task_id": "local-emb-002",
@@ -319,6 +320,8 @@ class TestLocalEmbeddingWorker:
         worker, mock_dispatcher = _make_worker(LocalEmbeddingWorker, mock_db)
         worker.process(task)
 
+        # No entries means no processing and no update_worker_state calls
+        mock_db.get_pending_doc_registry.assert_called_with(org="local", repo="local")
         mock_dispatcher.update_worker_state.assert_not_called()
 
     def test_process_embeds_discovered_files(self, mock_db: MagicMock, tmp_path: Path) -> None:
@@ -326,14 +329,14 @@ class TestLocalEmbeddingWorker:
         local_dir.mkdir()
         (local_dir / "doc1.md").write_text("# Local Doc 1")
 
-        mock_db.get_doc_sigma_ref.return_value = [
+        mock_db.get_pending_doc_registry.return_value = [
             {
+                "url_hash": "hash1",
                 "org": "local",
                 "repo": "local",
                 "file_name": "doc1.md",
                 "content_type": "markdown",
-                "status": "discovered",
-                "embed_status": "discovered",
+                "embed_status": "discovery",
             }
         ]
 
@@ -355,10 +358,46 @@ class TestLocalEmbeddingWorker:
             worker.process(task)
 
         mock_builder.run.assert_called_once()
+        mock_db.update_doc_registry_embed_status.assert_any_call("hash1", "embedded")
         mock_dispatcher.update_worker_state.assert_called()
 
+    def test_process_skips_missing_files(self, mock_db: MagicMock, tmp_path: Path) -> None:
+        local_dir = tmp_path / "local_docs"
+        local_dir.mkdir()
+
+        mock_db.get_pending_doc_registry.return_value = [
+            {
+                "url_hash": "missing123",
+                "org": "local",
+                "repo": "local",
+                "file_name": "missing.md",
+                "content_type": "markdown",
+                "embed_status": "discovery",
+            }
+        ]
+
+        task = {
+            "task_id": "local-emb-004",
+            "task_type": "local_embeddings",
+            "collection_name": "local",
+            "base_path": str(local_dir),
+        }
+
+        with patch(
+            "src.worker.workers.embedding_base.IngestionPipelineBuilder"
+        ) as mock_builder_cls:
+            mock_builder = MagicMock()
+            mock_builder.run = MagicMock()
+            mock_builder_cls.return_value = mock_builder
+
+            worker, mock_dispatcher = _make_worker(LocalEmbeddingWorker, mock_db)
+            worker.process(task)
+
+        # Should mark as error when file is missing (no valid_docs so builder.run never called)
+        mock_db.update_doc_registry_embed_status.assert_any_call("missing123", "error")
+
     def test_process_uses_default_path(self, mock_db: MagicMock) -> None:
-        mock_db.get_doc_sigma_ref.return_value = []
+        mock_db.get_pending_doc_registry.return_value = []
 
         task = {
             "task_id": "local-emb-006",
@@ -369,4 +408,6 @@ class TestLocalEmbeddingWorker:
         worker, mock_dispatcher = _make_worker(LocalEmbeddingWorker, mock_db)
         worker.process(task)
 
+        # Uses default path but no entries, so nothing happens
+        mock_db.get_pending_doc_registry.assert_called_with(org="local", repo="local")
         mock_dispatcher.update_worker_state.assert_not_called()

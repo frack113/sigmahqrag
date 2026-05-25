@@ -82,17 +82,20 @@ async function recreateCollection(name) {
     if (window.isProcessing) return;
     window.isProcessing = true;
 
+    var btn = event?.target || event?.srcElement;
+    if (btn) btn.disabled = true;
+
     try {
         await deleteCollection(name);
         await createCollection(name);
 
-        alert('Collection "' + name + '" has been successfully re-created.');
         await loadVectorDB();
     } catch (e) {
         console.error('Error recreating collection:', e);
         alert('Failed to recreate collection: ' + e.message);
     } finally {
         window.isProcessing = false;
+        if (btn) btn.disabled = false;
     }
 }
 
@@ -139,11 +142,6 @@ async function startSigmaRefEmbedding() {
         var gResult = await askWorker('github_embeddings', { collection_name: 'all' });
         if (gResult.task_id) {
             tasks.push('github_embeddings');
-        }
-
-        var lResult = await askWorker('local_embeddings', { collection_name: 'local' });
-        if (lResult.task_id) {
-            tasks.push('local_embeddings');
         }
 
         var sResult = await askWorker('sigmaref_embeddings', { collection_name: 'sigmaref' });

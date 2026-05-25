@@ -2,10 +2,16 @@
 
 from __future__ import annotations
 
+import logging
 import re
 import uuid
+from pathlib import Path
 
 from src.back.database import DatabaseService
+
+logger = logging.getLogger(__name__)
+
+PROMPTS_DIR = Path(__file__).parent.parent.parent / "templates" / "prompts"
 
 _prompts: dict[str, Prompt] = {}
 
@@ -39,6 +45,7 @@ def _save_all(prompts: dict[str, Prompt]) -> None:
                 "is_active": p.is_active,
             }
         )
+    db.persist()
 
 
 def _ensure_loaded() -> None:
@@ -206,3 +213,57 @@ def delete_prompt(prompt_id: str) -> None:
             db.delete_prompt(prompt_id)
     else:
         raise ValueError(f"Prompt ID '{prompt_id}' not found")
+
+
+def sync_prompts_from_files() -> int:
+    """Sync .md prompt files from templates/prompts/ into DuckDB.
+
+    Existing active prompt is preserved. API-created prompts (UUID id)
+    are not overwritten. Returns number of prompts synced.
+    """
+    md_files = sorted(PROMPTS_DIR.glob("*.md"))
+    if not md_files:
+        logger.warning("No .md prompt files found in %s", PROMPTS_DIR)
+        return 0
+
+    db = DatabaseService.get_instance()
+    if db is None:
+        logger.error("Database not available for prompt sync")
+        return 0
+
+    _ensure_loaded()
+    current_active_id = get_active_prompt().id if get_active_prompt() else None
+
+    count = 0
+    for i, md_file in enumerate(md_files):
+        name = md_file.stem.replace("_", "-")
+
+        existing = get_prompt_by_name(name)
+        if existing and existing.id != name:
+            logger.warning(
+                "Skipping sync for '%s': already exists as API-created prompt (id=%s)",
+                name,
+                existing.id,
+            )
+            continue
+
+        content = md_file.read_text(encoding="utf-8")
+        desc = f"Prompt template: {name}"
+        is_active = name == current_active_id or (current_active_id is None and i == 0)
+        db.upsert_prompt(
+            {
+                "id": name,
+                "name": name,
+                "description": desc,
+                "content": content,
+                "is_active": is_active,
+            }
+        )
+        count += 1
+
+    global _prompts
+    _prompts = _load_all()
+
+    db.persist()
+    logger.info("Synced %d prompt files from %s", count, PROMPTS_DIR)
+    return count

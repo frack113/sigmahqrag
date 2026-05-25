@@ -22,7 +22,6 @@ LOGS_DIR = BASE_DIR / "logs"
 PID_DIR = BASE_DIR / "pids"
 QDRANT_STORAGE_DIR = BASE_DIR / "qdrant_storage"
 TEMP_DIR = BASE_DIR / "temp"
-DATA_DIR = BASE_DIR
 
 
 @dataclass
@@ -37,24 +36,31 @@ class Config:
     embeddings_dir: str = "data/models/embeddings"
 
     llama_base_url: str = "http://127.0.0.1:8080"
-    llama_mode: str = "managed"
+    llama_manage_internally: bool = True
     llama_model_name: str | None = None
-    llama_binary_path: str = "data/bin/llama-cpp"
+    llama_binary_path: str = "data/bin/llamacpp"
 
     qdrant_base_url: str = "http://127.0.0.1:6333"
     qdrant_host: str = "127.0.0.1"
     qdrant_port: int = 6333
-    qdrant_mode: str = "managed"
-    qdrant_collection_name: str = "sigma_doc"
+    qdrant_manage_internally: bool = True
+    qdrant_collection_name: str = "sigmaref"
     qdrant_vector_size: int = 384
     qdrant_binary_path: str = "data/bin/qdrant"
     qdrant_storage_path: str = "data/qdrant_storage/database"
     qdrant_snapshots_path: str = "data/qdrant_storage/snapshots"
 
-    paths_bin_dir: str = "data/bin"
-    paths_models_dir: str = "data/models"
     paths_logs_dir: str = "data/logs"
     paths_temp_dir: str = "data/temp"
+    paths_duckdb_path: str = "data/duckdb/sigmahq.duckdb"
+    paths_github_dir: str = "data/github"
+    paths_rag_cache_dir: str = "data/rag_cache"
+    paths_model_registry: str = "data/models/registry.json"
+    paths_sigma_rules_dir: str = "data/sigma_rules"
+    paths_sigma_ref_docs_dir: str = "data/sigma_ref_docs"
+
+    local_documents_path: str = "data/documents/local"
+    sigmaref_documents_path: str = "data/documents/sigmaref"
 
     logging_level: str = "INFO"
     logging_log_max_size: str = "10M"
@@ -86,8 +92,8 @@ class Config:
                 llama = services["llama"]
                 if "base_url" in llama:
                     self.llama_base_url = llama["base_url"]
-                if "mode" in llama:
-                    self.llama_mode = llama["mode"]
+                if "manage_internally" in llama:
+                    self.llama_manage_internally = bool(llama["manage_internally"])
             if "qdrant" in services:
                 qdrant = services["qdrant"]
                 if "base_url" in qdrant:
@@ -100,8 +106,8 @@ class Config:
                         self.qdrant_host = parsed.hostname
                     if parsed.port:
                         self.qdrant_port = parsed.port
-                if "mode" in qdrant:
-                    self.qdrant_mode = qdrant["mode"]
+                if "manage_internally" in qdrant:
+                    self.qdrant_manage_internally = bool(qdrant["manage_internally"])
 
         if "logging" in nested:
             logging_cfg = nested["logging"]
@@ -126,11 +132,11 @@ class Config:
             "services": {
                 "llama": {
                     "base_url": self.llama_base_url,
-                    "mode": self.llama_mode,
+                    "manage_internally": self.llama_manage_internally,
                 },
                 "qdrant": {
                     "base_url": self.qdrant_base_url,
-                    "mode": self.qdrant_mode,
+                    "manage_internally": self.qdrant_manage_internally,
                 },
             },
             "logging": {
@@ -207,14 +213,6 @@ class Config:
             )
             return old_path
         return path
-
-    @staticmethod
-    def get_llamacpp_bin_path() -> Path:
-        return Config().resolve_llamacpp_bin_path()
-
-    @staticmethod
-    def get_qdrant_bin_path() -> Path:
-        return Path(Config().qdrant_binary_path).resolve()
 
     @staticmethod
     def ensure_config_file() -> None:

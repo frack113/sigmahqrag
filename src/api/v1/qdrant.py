@@ -8,6 +8,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, StreamingResponse
+from src.back.database.service import DatabaseService
 from src.back.qdrant.collections import (
     list_collections,
     create_collection,
@@ -83,7 +84,7 @@ async def qdrant_status():
                 "healthy": is_healthy,
                 "current_version": version or "unknown",
                 "downloads": downloads,
-                "mode": config.qdrant_mode,
+                "mode": "managed" if config.qdrant_manage_internally else "external",
                 "base_url": qdrant_base_url,
             }
         )
@@ -177,12 +178,15 @@ async def qdrant_action(
 
         elif isinstance(payload, CollectionManagementPayload):
             op = payload.operation
-            name = payload.collection_name
-            assert name is not None
             if op == "list":
                 data = await list_collections(host, port)
                 return QdrantActionResponse(status="success", action=action, data=data)
-            elif op == "create":
+            name = payload.collection_name
+            if op not in ("create", "delete", "get"):
+                raise ValueError(f"Unknown operation: {op}")
+            if name is None:
+                raise ValueError(f"collection_name is required for operation '{op}'")
+            if op == "create":
                 v_size = payload.config.get("vector_size", 384) if payload.config else 384
                 await create_collection(host, port, name, v_size)
                 return QdrantActionResponse(
@@ -192,16 +196,16 @@ async def qdrant_action(
                 )
             elif op == "delete":
                 await delete_collection(host, port, name)
+                db = DatabaseService.get_instance()
+                db.reset_embed_status_for_collection(name)
                 return QdrantActionResponse(
                     status="success",
                     action=action,
-                    message=f"Collection {name} deleted",
+                    message=f"Collection {name} deleted, embed status reset to discovery",
                 )
             elif op == "get":
                 col_data = await get_collection(host, port, name)
                 return QdrantActionResponse(status="success", action=action, data=col_data)
-            else:
-                raise ValueError(f"Unknown operation: {op}")
 
         elif isinstance(payload, DataManagementPayload):
             dm_op = payload.operation
@@ -253,7 +257,13 @@ async def qdrant_action(
             )
 
     except Exception as e:
-        logger.error(f"Qdrant action error ({action}): {e}")
+        logger.error(
+            "Qdrant action error (%s): %s: %s",
+            action,
+            type(e).__name__,
+            e,
+            exc_info=True,
+        )
         return QdrantActionResponse(
             status="error",
             action=action,

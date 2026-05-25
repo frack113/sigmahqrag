@@ -1,152 +1,389 @@
 (function () {
     "use strict";
 
-    function escHtml(s) {
-        if (s == null) return '';
-        var m = { '&': '\x26amp;', '<': '\x26lt;', '>': '\x26gt;', '"': '\x26quot;', "'": '\x26#39;' };
-        return String(s).replace(/[&<>"']/g, function(c) { return m[c]; });
-    }
-
     function init() {
-        var chatHistory = document.getElementById("chat-history");
+        var messagesEl = document.getElementById("chat-messages");
         var chatForm = document.getElementById("chat-form");
-        var messageInput = document.getElementById("message-input");
-        var uploadZone = document.getElementById("upload-zone");
-        var fileInput = document.getElementById("sigma-file-input");
-        var uploadedFilename = document.getElementById("uploaded-filename");
-        var clearBtn = document.getElementById("clear-btn");
-        var chatStatus = document.getElementById("chat-status");
+        var input = document.getElementById("message-input");
+        var sendBtn = document.getElementById("send-btn");
+        var welcome = document.getElementById("chat-welcome");
+        var newChatBtn = document.getElementById("new-chat-btn");
+        var typingEl = document.getElementById("typing-indicator");
+        var llmSelect = document.getElementById("llm-select");
+        var promptSelect = document.getElementById("prompt-select");
 
-        if (!chatHistory || !chatForm || !messageInput || !uploadZone || !fileInput || !clearBtn || !chatStatus) {
-            return;
+        if (typeof marked !== "undefined") {
+            marked.setOptions({ gfm: true, breaks: true });
         }
 
-        var chatMessages = [];
-        var uploadedFile = null;
-
-        function getTimestamp() {
-            return new Date().toLocaleTimeString();
-        }
-
-        function getCurrentMode() {
-            var checked = document.querySelector('input[name="mode"]:checked');
-            return checked ? checked.value : "search";
-        }
-
-        function addBubble(role, content) {
-            var bubble = document.createElement("div");
-            bubble.className = "chat-bubble " + role;
-            // Always escape content to prevent DOM-based XSS.
-            var safeContent = escHtml(content);
-            bubble.innerHTML = safeContent + '<span class="timestamp">' + getTimestamp() + '</span>';
-            chatHistory.appendChild(bubble);
-            chatHistory.scrollTop = chatHistory.scrollHeight;
-            chatMessages.push({ role: role, content: content, timestamp: getTimestamp() });
-            if (chatMessages.length > 50) {
-                chatMessages = chatMessages.slice(-50);
+        function renderMarkdown(text) {
+            if (typeof marked !== "undefined") {
+                return marked.parse(text);
             }
-            return bubble;
+            var div = document.createElement("div");
+            div.textContent = text;
+            return div.innerHTML;
         }
 
-        function setStatus(msg) {
-            chatStatus.textContent = msg;
-        }
+        if (!messagesEl || !chatForm || !input || !sendBtn) return;
 
-        uploadZone.addEventListener("click", function () {
-            fileInput.click();
-        });
+        /* ---- Config ---- */
+        var config = window.__CONFIG || {};
+        var manageInternally = config.llama_manage_internally !== false;
+        var currentModel = config.current_model || "";
+        var _modelsData = [];
 
-        uploadZone.addEventListener("dragover", function (e) {
-            e.preventDefault();
-            uploadZone.classList.add("dragover");
-        });
+        /* ---- Model selector ---- */
+        function populateModelSelect(models) {
+            if (!llmSelect) return;
+            _modelsData = models;
+            llmSelect.innerHTML = "";
 
-        uploadZone.addEventListener("dragleave", function () {
-            uploadZone.classList.remove("dragover");
-        });
-
-        uploadZone.addEventListener("drop", function (e) {
-            e.preventDefault();
-            uploadZone.classList.remove("dragover");
-            var files = e.dataTransfer.files;
-            if (files.length > 0) {
-                handleFile(files[0]);
-            }
-        });
-
-        fileInput.addEventListener("change", function () {
-            if (fileInput.files.length > 0) {
-                handleFile(fileInput.files[0]);
-            }
-        });
-
-        async function handleFile(file) {
-            var validExts = [".yaml", ".yml"];
-            var ext = file.name.substring(file.name.lastIndexOf("."));
-            if (!validExts.includes(ext)) {
-                addBubble("assistant", "Please upload a .yaml or .yml Sigma rule file.");
+            if (models.length === 0) {
+                var emptyOpt = document.createElement("option");
+                emptyOpt.value = "";
+                emptyOpt.textContent = "— No models —";
+                llmSelect.appendChild(emptyOpt);
+                llmSelect.disabled = true;
                 return;
             }
 
-            uploadedFile = file;
-            uploadedFilename.textContent = file.name;
-            setStatus("Uploaded: " + file.name);
+            if (!manageInternally) {
+                var disabledOpt = document.createElement("option");
+                disabledOpt.value = "";
+                disabledOpt.textContent = "— External service —";
+                llmSelect.appendChild(disabledOpt);
+                llmSelect.disabled = true;
+                return;
+            }
 
-            var formData = new FormData();
-            formData.append("file", file);
-
-            try {
-                var resp = await fetch("/api/v1/chat/upload", {
-                    method: "POST",
-                    body: formData,
-                });
-                var data = await resp.json();
-                if (resp.ok) {
-                    addBubble(
-                        "assistant",
-                        'Rule "<strong>' + escHtml(data.rule_name) + '</strong>" validated successfully. Switch to Explain mode for analysis.'
-                    );
-                } else {
-                    addBubble("error", "Upload failed: " + escHtml(data.detail || JSON.stringify(data)));
+            models.forEach(function (m) {
+                var opt = document.createElement("option");
+                opt.value = m.repo_id + "/" + m.filename;
+                opt.textContent = m.repo_id + " — " + m.filename + " (" + m.size_mb + " MB)";
+                if (opt.value === currentModel) {
+                    opt.selected = true;
                 }
-            } catch (err) {
-                addBubble("error", "Upload error: " + escHtml(err.message));
+                llmSelect.appendChild(opt);
+            });
+
+            if (!currentModel && models.length > 0) {
+                llmSelect.selectedIndex = 0;
+                currentModel = llmSelect.value;
+            }
+
+            llmSelect.addEventListener("change", onModelChange);
+        }
+
+        function onModelChange() {
+            var newValue = llmSelect.value;
+            if (!newValue || newValue === currentModel) return;
+
+            var selected = _modelsData.find(function (m) {
+                return (m.repo_id + "/" + m.filename) === newValue;
+            });
+            if (!selected || !selected.local_path) {
+                showToast("Cannot switch model: path not found");
+                llmSelect.value = currentModel;
+                return;
+            }
+
+            var oldValue = currentModel;
+            showToast("Switching model…");
+            llmSelect.disabled = true;
+
+            var params = new URLSearchParams();
+            params.set("model_path", selected.local_path);
+            params.set("port", "8080");
+            params.set("context_size", "4096");
+
+            fetch("/api/v1/llamacpp/restart?" + params.toString(), { method: "POST" })
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    if (data.success || data.status === "success") {
+                        currentModel = newValue;
+                        showToast("Model switched to " + selected.filename);
+                    } else {
+                        currentModel = oldValue;
+                        llmSelect.value = oldValue;
+                        showToast("Failed to switch model: " + (data.error || "unknown"));
+                    }
+                })
+                .catch(function (err) {
+                    currentModel = oldValue;
+                    llmSelect.value = oldValue;
+                    showToast("Error switching model: " + err.message);
+                })
+                .finally(function () {
+                    llmSelect.disabled = false;
+                });
+        }
+
+        /* Load from server-side injected data or fetch */
+        function loadModels() {
+            if (window.__INITIAL_MODELS && window.__INITIAL_MODELS.length > 0) {
+                populateModelSelect(window.__INITIAL_MODELS);
+                return;
+            }
+            fetch("/api/v1/models/llm/installed")
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    var models = data.models || [];
+                    var flat = [];
+                    models.forEach(function (entry) {
+                        (entry.files || []).forEach(function (f) {
+                            flat.push({
+                                repo_id: entry.repo_id,
+                                filename: f.filename,
+                                size_mb: f.size ? (f.size / (1024 * 1024)).toFixed(1) : "?",
+                                local_path: f.path || "",
+                            });
+                        });
+                    });
+                    populateModelSelect(flat);
+                })
+                .catch(function () {
+                    if (llmSelect) {
+                        llmSelect.innerHTML = "<option value=\"\">— No models found —</option>";
+                        llmSelect.disabled = true;
+                    }
+                });
+        }
+
+        function getSelectedModel() {
+            if (llmSelect) return llmSelect.value || "";
+            return "";
+        }
+
+        /* ---- Prompt selector ---- */
+        function populatePromptSelect(prompts) {
+            if (!promptSelect) return;
+            promptSelect.innerHTML = "";
+
+            if (!prompts || prompts.length === 0) {
+                var emptyOpt = document.createElement("option");
+                emptyOpt.value = "";
+                emptyOpt.textContent = "— No prompts —";
+                promptSelect.appendChild(emptyOpt);
+                return;
+            }
+
+            prompts.forEach(function (p) {
+                var opt = document.createElement("option");
+                opt.value = p.id;
+                opt.textContent = p.name + (p.is_active ? " (active)" : "");
+                promptSelect.appendChild(opt);
+            });
+
+            var activeIdx = -1;
+            for (var i = 0; i < prompts.length; i++) {
+                if (prompts[i].is_active) {
+                    activeIdx = i;
+                    break;
+                }
+            }
+            promptSelect.selectedIndex = activeIdx >= 0 ? activeIdx : 0;
+        }
+
+        function loadPrompts() {
+            if (window.__INITIAL_PROMPTS && window.__INITIAL_PROMPTS.length > 0) {
+                populatePromptSelect(window.__INITIAL_PROMPTS);
+                return;
+            }
+            fetch("/api/v1/admin/prompts")
+                .then(function (r) { return r.json(); })
+                .then(function (prompts) {
+                    populatePromptSelect(prompts);
+                })
+                .catch(function () {
+                    if (promptSelect) {
+                        promptSelect.innerHTML = "<option value=\"\">— No prompts —</option>";
+                    }
+                });
+        }
+
+        function getSelectedPrompt() {
+            if (promptSelect) return promptSelect.value || "";
+            return "";
+        }
+
+        /* ---- Chat ---- */
+        function showTyping() {
+            if (typingEl) typingEl.hidden = false;
+        }
+
+        function hideTyping() {
+            if (typingEl) typingEl.hidden = true;
+        }
+
+        function createMessageHeader(role) {
+            var header = document.createElement("div");
+            header.className = "message-header";
+            var icon = document.createElement("span");
+            icon.className = "message-role-icon";
+            icon.textContent = role === "user" ? "\u{1F464}" : "\u{1F916}";
+            header.appendChild(icon);
+            var label = document.createElement("span");
+            label.textContent = role === "user" ? "Vous" : "SigmaHQ RAG";
+            header.appendChild(label);
+            return header;
+        }
+
+        function createMessageActions(role, contentEl) {
+            var actions = document.createElement("div");
+            actions.className = "message-actions";
+            var copyBtn = document.createElement("button");
+            copyBtn.className = "message-action-btn";
+            copyBtn.textContent = "\u{1F4CB} Copier";
+            copyBtn.addEventListener("click", function () {
+                var text = contentEl.textContent || contentEl.innerText || "";
+                navigator.clipboard.writeText(text).then(function () {
+                    showToast("Copi\u00E9 !");
+                }).catch(function () {
+                    showToast("Erreur de copie");
+                });
+            });
+            actions.appendChild(copyBtn);
+            return actions;
+        }
+
+        function showToast(msg) {
+            var existing = document.querySelector(".copy-toast");
+            if (existing) existing.remove();
+            var toast = document.createElement("div");
+            toast.className = "copy-toast show";
+            toast.textContent = msg;
+            document.body.appendChild(toast);
+            setTimeout(function () {
+                toast.classList.remove("show");
+                setTimeout(function () { toast.remove(); }, 300);
+            }, 1500);
+        }
+
+        function addMessage(role, content) {
+            var div = document.createElement("div");
+            div.className = "message " + role;
+
+            var header = createMessageHeader(role);
+            div.appendChild(header);
+
+            var body = document.createElement("div");
+            body.className = "message-body";
+            if (role === "user") {
+                body.textContent = content;
+            } else {
+                body.innerHTML = renderMarkdown(content);
+            }
+            div.appendChild(body);
+
+            var actions = createMessageActions(role, body);
+            div.appendChild(actions);
+
+            messagesEl.appendChild(div);
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+            return div;
+        }
+
+        function setLoading(loading) {
+            sendBtn.disabled = loading;
+            sendBtn.textContent = loading ? "Envoi..." : "Send";
+            if (loading) {
+                showTyping();
+            } else {
+                hideTyping();
             }
         }
 
+        function loadHistory() {
+            fetch("/api/v1/chat/history")
+                .then(function (resp) { return resp.json(); })
+                .then(function (history) {
+                    if (history && history.length > 0) {
+                        if (welcome) { welcome.remove(); welcome = null; }
+                        history.forEach(function (msg) {
+                            addMessage(msg.role, msg.content);
+                        });
+                    }
+                })
+                .catch(function () {});
+        }
+
+        function clearChat() {
+            fetch("/api/v1/chat/history", { method: "DELETE" })
+                .then(function () {
+                    messagesEl.querySelectorAll(".message").forEach(function (el) { el.remove(); });
+                    if (!welcome) {
+                        var w = document.createElement("div");
+                        w.className = "chat-welcome";
+                        w.innerHTML = "<h2>SigmaHQ RAG</h2><p>Posez vos questions sur les r\u00E8gles Sigma</p>";
+                        messagesEl.appendChild(w);
+                        welcome = w;
+                    } else {
+                        welcome.hidden = false;
+                    }
+                    hideTyping();
+                })
+                .catch(function () {
+                    showToast("Erreur lors de l'effacement");
+                });
+        }
+
+        if (newChatBtn) {
+            newChatBtn.addEventListener("click", clearChat);
+        }
+
+        loadModels();
+        loadPrompts();
+        loadHistory();
+
         chatForm.addEventListener("submit", async function (e) {
             e.preventDefault();
-            var message = messageInput.value.trim();
-            if (!message) return;
+            var text = input.value.trim();
+            if (!text) return;
 
-            addBubble("user", message);
-            messageInput.value = "";
-            setStatus("Thinking...");
+            addMessage("user", text);
+            input.value = "";
+            input.style.height = "auto";
+            setLoading(true);
 
-            await handleStreamingMessage(message);
-        });
+            if (welcome) { welcome.remove(); welcome = null; }
 
-        async function handleStreamingMessage(message) {
+            var model = getSelectedModel();
+            var promptId = getSelectedPrompt();
+            var resp;
             try {
-                var resp = await fetch("/api/v1/chat/message/stream", {
+                resp = await fetch("/api/v1/chat/message/stream", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ message: message, mode: getCurrentMode() }),
+                    body: JSON.stringify({ message: text, mode: "search", model: model, prompt_id: promptId }),
                 });
+            } catch (err) {
+                addMessage("error", "Erreur réseau: " + err.message);
+                setLoading(false);
+                return;
+            }
 
-                if (!resp.ok) {
-                    addBubble("error", "Stream request failed.");
-                    setStatus("");
-                    return;
-                }
+            if (!resp.ok) {
+                addMessage("error", "Request failed with status " + resp.status);
+                setLoading(false);
+                return;
+            }
 
-                var reader = resp.body.getReader();
-                var decoder = new TextDecoder();
-                var accumulated = "";
-                var bubble = null;
+            var reader = resp.body.getReader();
+            var decoder = new TextDecoder();
+            var accumulated = "";
+            var bubble = null;
+            var gotToken = false;
 
+            try {
                 while (true) {
-                    var result = await reader.read();
+                    var result;
+                    try {
+                        result = await reader.read();
+                    } catch (err) {
+                        addMessage("error", "Erreur de lecture du flux: " + err.message);
+                        break;
+                    }
                     if (result.done) break;
 
                     var chunk = decoder.decode(result.value, { stream: true });
@@ -157,42 +394,42 @@
                         if (line.startsWith("data: ")) {
                             var data = line.slice(6);
                             if (data === "[DONE]") {
-                                setStatus("");
+                                if (!gotToken && !bubble) {
+                                    addMessage("assistant", "(aucune réponse du LLM)");
+                                }
+                                setLoading(false);
                                 return;
                             }
                             accumulated += data;
-
+                            gotToken = true;
                             if (!bubble) {
-                                bubble = addBubble("assistant", "");
+                                hideTyping();
+                                bubble = addMessage("assistant", "");
                             }
-                            bubble.innerText = formatResponse({ response: accumulated }) +
-                                '<span class="timestamp">' + getTimestamp() + '</span>';
-                            chatHistory.scrollTop = chatHistory.scrollHeight;
+                            bubble.querySelector(".message-body").innerHTML = renderMarkdown(accumulated);
+                            messagesEl.scrollTop = messagesEl.scrollHeight;
                         }
                     }
                 }
-                setStatus("");
+                if (!gotToken && !bubble) {
+                    addMessage("assistant", "(aucune réponse du LLM)");
+                }
             } catch (err) {
-                addBubble("error", "Stream error: " + escHtml(err.message));
-                setStatus("");
+                addMessage("error", "Error: " + err.message);
             }
-        }
+            setLoading(false);
+        });
 
-        function formatResponse(data) {
-            if (!data.response) return "";
-            var html = escHtml(data.response).replace(/\n/g, "<br>");
-            if (data.citations && data.citations.length > 0) {
-                html += "<br><em>Sources: " + data.citations.map(function(c) { return '[' + escHtml(c) + ']'; }).join(" ") + "</em>";
+        input.addEventListener("input", function () {
+            this.style.height = "auto";
+            this.style.height = this.scrollHeight + "px";
+        });
+
+        input.addEventListener("keydown", function (e) {
+            if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                chatForm.dispatchEvent(new Event("submit"));
             }
-            return html;
-        }
-
-        clearBtn.addEventListener("click", function () {
-            chatHistory.innerHTML = "";
-            chatMessages = [];
-            uploadedFile = null;
-            uploadedFilename.textContent = "No file selected";
-            setStatus("Chat cleared.");
         });
     }
 

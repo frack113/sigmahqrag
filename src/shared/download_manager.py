@@ -173,6 +173,7 @@ class DownloadManager:
         """
         task = self.active_downloads.get(download_id)
         if not task:
+            logger.warning(f"Download task {download_id} not found for download")
             return
 
         headers = {}
@@ -236,10 +237,11 @@ class DownloadManager:
                                 )
                                 last_update = current_time
 
-                    task.status = "completed"
                     task.bytes_downloaded = downloaded
 
                     await self._extract_and_install(task.temp_path, task.target_path, task.service)
+
+                    task.status = "completed"
 
                     if task.post_install_callback:
                         await task.post_install_callback(task.target_path)
@@ -269,7 +271,7 @@ class DownloadManager:
 
                     logger.info(f"Download {download_id} completed: {task.target_path}")
 
-        except Exception as e:
+        except BaseException as e:
             error_msg = str(e)
             logger.error(f"Download {download_id} failed: {error_msg}")
             task.status = "failed"
@@ -292,7 +294,9 @@ class DownloadManager:
             service: Service name (llama.cpp, qdrant)
         """
 
-        service_dir = BIN_DIR / service.replace(".", "-")
+        service_dir = BIN_DIR / (
+            "llamacpp" if service == "llama.cpp" else service.replace(".", "-")
+        )
 
         # Clean up existing service directory
         if service_dir.exists():
