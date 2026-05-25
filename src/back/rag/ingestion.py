@@ -16,7 +16,6 @@ from llama_index.core.storage.docstore import SimpleDocumentStore
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.vector_stores.qdrant import QdrantVectorStore
 
-from src.back.embedding_config import EmbeddingTypeConfig
 from src.shared.config import get_config
 
 logger = logging.getLogger(__name__)
@@ -74,13 +73,6 @@ def _get_chunker_for_collection(collection_name: str) -> tuple[Any, dict[str, An
 _pipeline_registry: dict[tuple[str, str], IngestionPipeline] = {}
 
 
-def _first_configured_model(config: dict) -> str | None:
-    for _type_key, type_config in config.items():
-        if isinstance(type_config, dict) and "model" in type_config:
-            return type_config["model"]  # type: ignore[no-any-return]
-    return None
-
-
 def build_embed_model(model_name: str) -> BaseEmbedding:
     local_path = Path(get_config().embeddings_dir) / model_name
     model_path = str(local_path) if local_path.exists() else model_name
@@ -110,8 +102,13 @@ class IngestionPipelineBuilder:
         collection_name: str | None = None,
         num_workers: int = DEFAULT_NUM_WORKERS,
     ) -> None:
-        config_data = EmbeddingTypeConfig().load()
-        self._model_name = model_name or _first_configured_model(config_data) or DEFAULT_MODEL
+        if model_name is None:
+            from src.back.embedding_config import EmbeddingTypeConfig
+
+            config_data = EmbeddingTypeConfig().load()
+            self._model_name = (config_data.get("model") or "") or DEFAULT_MODEL
+        else:
+            self._model_name = model_name
         self._collection_name = collection_name or "sigmaref"
         self._num_workers = num_workers
         self._embed_model = build_embed_model(self._model_name)
@@ -281,8 +278,12 @@ def get_pipeline(
     collection_name: str | None = None,
 ) -> IngestionPipeline:
     """Get or create a cached IngestionPipeline keyed by (model, collection)."""
-    config_data = EmbeddingTypeConfig().load()
-    model = model_name or _first_configured_model(config_data) or DEFAULT_MODEL
+    if model_name is None:
+        from src.back.embedding_config import EmbeddingTypeConfig
+
+        config_data = EmbeddingTypeConfig().load()
+        model_name = config_data.get("model") or DEFAULT_MODEL
+    model = model_name
     collection = collection_name or "sigmaref"
     key = (model, collection)
     if key not in _pipeline_registry:

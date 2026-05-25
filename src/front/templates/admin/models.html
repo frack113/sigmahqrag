@@ -191,7 +191,7 @@ function downloadModel() {
 
     // Start polling for progress
     const progressInterval = setInterval(() => {
-        fetch(`${basePath}/progress/${encodeURIComponent(repoId)}`)
+        fetch(`${basePath}/progress?repo_id=${encodeURIComponent(repoId)}`)
             .then(r => {
                 if (!r.ok) {
                     console.error('Progress endpoint error:', r.status);

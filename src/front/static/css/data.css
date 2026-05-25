@@ -323,3 +323,26 @@
     border-color: #3498db;
     box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
 }
+
+.status-badge.configured {
+    background: #27ae60;
+    color: #ffffff;
+}
+
+/* Global embedding config card */
+.config-card .type-body {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.model-hint {
+    font-size: 13px;
+    color: #7f8c8d;
+    margin: 0;
+    font-style: italic;
+}
+
+.config-card .btn-primary {
+    align-self: flex-start;
+}

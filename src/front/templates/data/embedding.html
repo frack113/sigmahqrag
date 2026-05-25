@@ -1,62 +1,29 @@
 {% extends "data/base.html" %}
 
-{% block title %}Embedding Config - Sigmahqrag{% endblock %}
+{% block title %}Embedding Model - Sigmahqrag{% endblock %}
 
 {% block page_content %}
-<h1>Embedding Model Configuration</h1>
-<p>Configure which embedding model to use for each document type.</p>
+<h1>Embedding Model</h1>
+<p>Select the embedding model used for all document types. A single shared model ensures consistent vector representations across the entire knowledge base.</p>
 
 <div class="embedding-config" id="embedding_config">
-    <div class="type-cards">
-        {% for ft in file_types %}
-        {% set type_config = config.get(ft.value, {}) %}
-        <div class="card" data-type="{{ ft.value }}">
-            <div class="type-header">
-                <span class="type-name">{{ ft.name }}</span>
-                <span class="type-extensions">{{ ft.extensions | join(', ') }}</span>
-                <span class="status-badge supported">Configured</span>
-            </div>
-            <div class="type-body">
-                <label>Embedding Model</label>
-                <div class="model-input-group">
-                    <select class="model-input">
-                        <option value="">-- Select a model --</option>
-                        {% for m in models %}
-                        <option value="{{ m }}" {{ 'selected' if type_config.get('model', '') == m }}>{{ m }}</option>
-                        {% endfor %}
-                    </select>
-                    <button class="btn btn-primary save-btn" onclick="saveTypeConfig('{{ ft.value }}')">Save</button>
-                </div>
-
-                <details class="advanced-params" open>
-                    <summary>Advanced parameters</summary>
-                    <div class="advanced-grid">
-                        <div class="param-field">
-                            <label>Chunk Size (tokens)</label>
-                            <input type="number" class="param-chunk-size"
-                                   value="{{ type_config.get('chunk_size', '512') }}"
-                                   min="64" max="8192" step="64">
-                        </div>
-                        <div class="param-field">
-                            <label>Chunk Overlap (tokens)</label>
-                            <input type="number" class="param-chunk-overlap"
-                                   value="{{ type_config.get('chunk_overlap', '50') }}"
-                                   min="0" max="2048" step="8">
-                        </div>
-                        <div class="param-field">
-                            <label>Chunk Strategy</label>
-                            <select class="param-chunk-strategy">
-                                <option value="recursive" {{ 'selected' if type_config.get('chunk_strategy', 'recursive') == 'recursive' }}>Recursive</option>
-                                <option value="heading" {{ 'selected' if type_config.get('chunk_strategy') == 'heading' }}>Heading-aware</option>
-                                <option value="semantic" {{ 'selected' if type_config.get('chunk_strategy') == 'semantic' }}>Semantic</option>
-                                <option value="fixed" {{ 'selected' if type_config.get('chunk_strategy') == 'fixed' }}>Fixed</option>
-                            </select>
-                        </div>
-                    </div>
-                </details>
-            </div>
+    <div class="card config-card">
+        <div class="type-header">
+            <span class="type-name">Global Embedding Model</span>
+            <span class="status-badge configured" id="config-status">Saved</span>
         </div>
-        {% endfor %}
+        <div class="type-body">
+            <label for="embed-model-select">Model</label>
+            <select id="embed-model-select" class="model-input">
+                {% for m in models %}
+                <option value="{{ m }}" {{ 'selected' if config.get('model', '') == m }}>{{ m }}</option>
+                {% endfor %}
+            </select>
+
+            <p class="model-hint">Default: intfloat/multilingual-e5-small</p>
+
+            <button class="btn btn-primary save-btn" onclick="saveGlobalConfig()">Save Model</button>
+        </div>
     </div>
 </div>
 {% endblock %}
@@ -64,63 +31,25 @@
 {% block scripts %}
 {{ super() }}
 <script>
-function getTypeConfig(card) {
-    const model = card.querySelector('.model-input').value.trim();
-    const chunkSize = card.querySelector('.param-chunk-size');
-    const chunkOverlap = card.querySelector('.param-chunk-overlap');
-    const chunkStrategy = card.querySelector('.param-chunk-strategy');
-    const body = { model };
-    if (chunkSize) body.chunk_size = parseInt(chunkSize.value, 10) || 512;
-    if (chunkOverlap) body.chunk_overlap = parseInt(chunkOverlap.value, 10) || 50;
-    if (chunkStrategy) body.chunk_strategy = chunkStrategy.value;
-    return body;
-}
+async function saveGlobalConfig() {
+    const select = document.getElementById('embed-model-select');
+    const btn = document.querySelector('.save-btn');
+    const badge = document.getElementById('config-status');
+    const model = select.value.trim();
 
-function savePrevious(card) {
-    const model = card.querySelector('.model-input');
-    const chunkSize = card.querySelector('.param-chunk-size');
-    const chunkOverlap = card.querySelector('.param-chunk-overlap');
-    const chunkStrategy = card.querySelector('.param-chunk-strategy');
-    model.dataset.previous = model.value;
-    if (chunkSize) chunkSize.dataset.previous = chunkSize.value;
-    if (chunkOverlap) chunkOverlap.dataset.previous = chunkOverlap.value;
-    if (chunkStrategy) chunkStrategy.dataset.previous = chunkStrategy.value;
-}
-
-function restorePrevious(card) {
-    const model = card.querySelector('.model-input');
-    const chunkSize = card.querySelector('.param-chunk-size');
-    const chunkOverlap = card.querySelector('.param-chunk-overlap');
-    const chunkStrategy = card.querySelector('.param-chunk-strategy');
-    model.value = model.dataset.previous || '';
-    if (chunkSize) chunkSize.value = chunkSize.dataset.previous || '512';
-    if (chunkOverlap) chunkOverlap.value = chunkOverlap.dataset.previous || '50';
-    if (chunkStrategy) chunkStrategy.value = chunkStrategy.dataset.previous || 'recursive';
-}
-
-async function saveTypeConfig(typeKey) {
-    const card = document.querySelector(`.type-cards .card[data-type="${typeKey}"]`);
-    if (!card) {
-        showToast('Configuration card not found', 'error');
+    if (!model) {
+        showToast('Please select a model', 'error');
         return;
     }
-    const modelInput = card.querySelector('.model-input');
-    const btn = card.querySelector('.save-btn');
-    const badge = card.querySelector('.status-badge');
-    if (!modelInput || !btn || !badge) {
-        showToast('Configuration elements not found', 'error');
-        return;
-    }
-    const body = getTypeConfig(card);
 
     btn.disabled = true;
     btn.textContent = 'Saving...';
 
     try {
-        const response = await fetch('/api/v1/models/embeddings/config/' + encodeURIComponent(typeKey), {
+        const response = await fetch('/api/v1/models/embeddings/config', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body)
+            body: JSON.stringify({ model })
         });
         const text = await response.text();
         if (!response.ok) {
@@ -128,21 +57,30 @@ async function saveTypeConfig(typeKey) {
             try { const err = JSON.parse(text); msg = err.error || msg; } catch (_) {}
             throw new Error(msg);
         }
-        savePrevious(card);
-        showToast('Configuration saved', 'success');
+        badge.textContent = 'Configured ✓';
+        badge.className = 'status-badge configured';
+        showToast('Model saved successfully', 'success');
     } catch (error) {
-        restorePrevious(card);
         showToast(error.message || 'Failed to save configuration', 'error');
+        badge.textContent = 'Unsaved';
+        badge.className = 'status-badge';
     } finally {
         btn.disabled = false;
-        btn.textContent = 'Save';
+        btn.textContent = 'Save Model';
     }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    document.querySelectorAll('.type-cards .card').forEach(card => {
-        savePrevious(card);
-    });
+    const badge = document.getElementById('config-status');
+    if (badge) {
+        const currentModel = document.getElementById('embed-model-select').value.trim();
+        if (currentModel) {
+            badge.textContent = 'Configured ✓';
+        } else {
+            badge.textContent = 'Unsaved';
+            badge.className = 'status-badge';
+        }
+    }
 });
 </script>
 {% endblock %}

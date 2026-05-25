@@ -614,9 +614,9 @@ class DatabaseService:
         tables = ["doc_registry", "doc_sigma_ref"]
 
         # Phase 1: Snapshot — gather file data under lock only for SELECT (minimal critical section)
-        snapshot: list[tuple[str, str, str | None]] = (
-            []
-        )  # (table, url_hash, file_name, existing_hash)
+        snapshot: list[
+            tuple[str, str, str | None]
+        ] = []  # (table, url_hash, file_name, existing_hash)
         with self._lock:
             for table in tables:
                 query = (
@@ -872,54 +872,31 @@ class DatabaseService:
             self._writer_conn.commit()
 
     # =========================================================================
-    # EMBEDDING_CONFIG TABLE
+    # EMBEDDING_CONFIG TABLE (single global config)
     # =========================================================================
 
     def get_embedding_config(self) -> dict:
-        """Get all embedding configurations."""
+        """Get the global embedding configuration."""
         with self._lock:
-            results = self._writer_conn.execute(
-                "SELECT doc_type, model, chunk_size, overlap, chunk_strategy FROM embedding_config ORDER BY doc_type"
-            ).fetchall()
-        config: dict[str, dict[str, Any]] = {}
-        for row in results:
-            config[row[0]] = {
-                "model": row[1],
-                "chunk_size": row[2],
-                "chunk_overlap": row[3],
-                "chunk_strategy": row[4],
-            }
-        return config
+            row = self._writer_conn.execute(
+                "SELECT key, model FROM embedding_config LIMIT 1"
+            ).fetchone()
+        if row is None:
+            return {}
+        return {"model": row[1]}
 
-    def set_embedding_config(self, doc_type: str, cfg: dict) -> None:
-        """Set embedding configuration for a document type."""
+    def set_embedding_config(self, model: str) -> None:
+        """Set the global embedding model."""
         with self._lock:
             self._writer_conn.execute(
-                """INSERT INTO embedding_config (doc_type, model, chunk_size, overlap, chunk_strategy)
-                  VALUES (?, ?, ?, ?, ?)
-                  ON CONFLICT (doc_type) DO UPDATE SET
-                      model = EXCLUDED.model,
-                      chunk_size = EXCLUDED.chunk_size,
-                      overlap = EXCLUDED.overlap,
-                      chunk_strategy = EXCLUDED.chunk_strategy""",
-                (
-                    doc_type,
-                    cfg.get("model", ""),
-                    cfg.get("chunk_size", 512),
-                    cfg.get("overlap") if "overlap" in cfg else cfg.get("chunk_overlap", 50),
-                    cfg.get("chunk_strategy", "recursive"),
-                ),
+                """INSERT INTO embedding_config (key, model) VALUES ('global', ?)
+                  ON CONFLICT (key) DO UPDATE SET model = EXCLUDED.model""",
+                (model,),
             )
             self._writer_conn.commit()
 
-    def delete_embedding_config(self, doc_type: str) -> None:
-        """Delete embedding configuration for a document type."""
+    def delete_embedding_config(self) -> None:
+        """Reset the global embedding config to default."""
         with self._lock:
-            self._writer_conn.execute(
-                "DELETE FROM embedding_config WHERE doc_type = ?", (doc_type,)
-            )
+            self._writer_conn.execute("DELETE FROM embedding_config WHERE key = 'global'")
             self._writer_conn.commit()
-
-    # =========================================================================
-    # EMBEDDING_CONFIG TABLE
-    # =========================================================================
