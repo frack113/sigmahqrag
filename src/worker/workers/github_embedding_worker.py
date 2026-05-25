@@ -1,6 +1,7 @@
 import logging
 from pathlib import Path
 
+from src.shared.config import get_config
 from src.worker.workers.embedding_base import EmbeddingWorker
 from src.worker.enums import WorkerName
 
@@ -28,7 +29,7 @@ class GithubEmbeddingWorker(EmbeddingWorker):
             raise ValueError(f"Invalid collection_name format: {collection_name}")
         org, repo = parts[0], parts[1]
 
-        base_path = Path("data/github") / org / repo
+        base_path = Path(get_config().paths_github_dir) / org / repo
         if not base_path.exists():
             raise FileNotFoundError(f"Repository path does not exist: {base_path}")
 
@@ -40,7 +41,7 @@ class GithubEmbeddingWorker(EmbeddingWorker):
         file_name = entry.get("file_name") or ""
         if not org or not repo or not file_name:
             return None
-        return Path("data/github") / org / repo / file_name
+        return Path(get_config().paths_github_dir) / org / repo / file_name
 
     def _build_metadata(self, entry: dict, collection_name: str) -> dict:
         parts = collection_name.split("/")

@@ -6,6 +6,8 @@ import logging
 import os
 from pathlib import Path
 
+from src.shared.config import get_config
+
 logger = logging.getLogger(__name__)
 
 
@@ -18,7 +20,9 @@ class TempManager:
         Args:
             temp_dir: Directory for temporary files
         """
-        self.temp_dir = temp_dir or Path("data/temp")
+        if temp_dir is None:
+            temp_dir = Path(get_config().paths_temp_dir).resolve()
+        self.temp_dir = temp_dir
 
     def create_temp_file(self, download_id: str, extension: str = ".tmp") -> Path:
         """Create a temporary file for downloading.

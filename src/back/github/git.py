@@ -14,10 +14,10 @@ from git import Repo
 from git.exc import InvalidGitRepositoryError
 
 from src.back.database import DatabaseService
+from src.shared.config import get_config
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_REPOS_DIR = Path("data/github")
 LOCKFILE = ".cloning"
 
 # Valid org/name pattern: alphanumeric, hyphens, underscores, dots (no path separators)
@@ -75,7 +75,7 @@ def clone_repo(
     url: str | None = None,
     org: str | None = None,
     name: str | None = None,
-    repos_dir: Path = DEFAULT_REPOS_DIR,
+    repos_dir: Path | None = None,
     branch: str | None = None,
     depth: int | None = None,
 ) -> dict[str, Any]:
@@ -105,7 +105,7 @@ def clone_repo(
             }
         url = f"https://github.com/{org}/{name}.git"
 
-    repos_dir = Path(repos_dir).resolve()
+    repos_dir = Path(repos_dir or get_config().paths_github_dir).resolve()
     repos_dir.mkdir(parents=True, exist_ok=True)
 
     # Defensive: a __temp__ left over from a previous crashed/failed clone
@@ -185,10 +185,10 @@ def update_repo(
     org: str,
     name: str,
     branch: str = "main",
-    repos_dir: Path = DEFAULT_REPOS_DIR,
+    repos_dir: Path | None = None,
 ) -> dict[str, Any]:
     """Update a local Git repository by pulling latest changes."""
-    repos_dir = Path(repos_dir).resolve()
+    repos_dir = Path(repos_dir or get_config().paths_github_dir).resolve()
     repo_path = _get_repo_path(repos_dir, org, name)
 
     repo = _get_or_create_repo(repo_path)
@@ -228,9 +228,9 @@ def update_repo(
         return {"success": False, "error": str(e)}
 
 
-def delete_repo(org: str, name: str, repos_dir: Path = DEFAULT_REPOS_DIR) -> dict[str, Any]:
+def delete_repo(org: str, name: str, repos_dir: Path | None = None) -> dict[str, Any]:
     """Delete a local repository."""
-    repos_dir = Path(repos_dir).resolve()
+    repos_dir = Path(repos_dir or get_config().paths_github_dir).resolve()
     repo_path = _get_repo_path(repos_dir, org, name)
     repo_key = _get_repo_key(org, name)
 
@@ -259,9 +259,9 @@ def delete_repo(org: str, name: str, repos_dir: Path = DEFAULT_REPOS_DIR) -> dic
         return {"success": False, "error": str(e)}
 
 
-def list_repos(repos_dir: Path = DEFAULT_REPOS_DIR) -> list[dict[str, Any]]:
+def list_repos(repos_dir: Path | None = None) -> list[dict[str, Any]]:
     """List all cloned repositories with their metadata."""
-    repos_dir = Path(repos_dir).resolve()
+    repos_dir = Path(repos_dir or get_config().paths_github_dir).resolve()
     repos_dir.mkdir(parents=True, exist_ok=True)
 
     repos = []
@@ -298,7 +298,7 @@ def list_repos(repos_dir: Path = DEFAULT_REPOS_DIR) -> list[dict[str, Any]]:
 
 
 def save_metadata(
-    org: str, name: str, metadata: dict[str, Any], repos_dir: Path = DEFAULT_REPOS_DIR
+    org: str, name: str, metadata: dict[str, Any], repos_dir: Path | None = None
 ) -> None:
     """Save metadata for a repository to DuckDB."""
     db = DatabaseService.get_instance()
@@ -306,7 +306,7 @@ def save_metadata(
     db.set_git_metadata(repo_key, metadata)
 
 
-def get_metadata(org: str, name: str, repos_dir: Path = DEFAULT_REPOS_DIR) -> dict[str, Any] | None:
+def get_metadata(org: str, name: str, repos_dir: Path | None = None) -> dict[str, Any] | None:
     """Get metadata for a repository from DuckDB."""
     db = DatabaseService.get_instance()
     repo_key = f"{org}/{name}"
@@ -318,7 +318,7 @@ def _get_repo_key(org: str, name: str) -> str:
 
 
 def list_directory_tree(
-    org: str, name: str, repos_dir: Path = DEFAULT_REPOS_DIR, max_depth: int = 5
+    org: str, name: str, repos_dir: Path | None = None, max_depth: int = 5
 ) -> list[dict[str, Any]]:
     """List directory tree for a repository.
 
@@ -331,7 +331,7 @@ def list_directory_tree(
     Returns:
         List of folder nodes with 'path', 'name', and optional 'children'
     """
-    repos_dir = Path(repos_dir).resolve()
+    repos_dir = Path(repos_dir or get_config().paths_github_dir).resolve()
     repo_path = _get_repo_path(repos_dir, org, name)
 
     if not repo_path.exists() or not _is_valid_repo(repo_path):
@@ -362,7 +362,7 @@ def list_directory_tree(
 
 
 def save_selected_dirs(
-    org: str, name: str, selected: list[str], repos_dir: Path = DEFAULT_REPOS_DIR
+    org: str, name: str, selected: list[str], repos_dir: Path | None = None
 ) -> dict[str, Any]:
     """Save selected directories for a repository to DuckDB.
 
@@ -386,7 +386,7 @@ def save_selected_dirs(
         return {"success": False, "error": str(e)}
 
 
-def get_selected_dirs(org: str, name: str, repos_dir: Path = DEFAULT_REPOS_DIR) -> list[str]:
+def get_selected_dirs(org: str, name: str, repos_dir: Path | None = None) -> list[str]:
     """Get selected directories for a repository from DuckDB.
 
     Args:
@@ -406,9 +406,9 @@ def get_selected_dirs(org: str, name: str, repos_dir: Path = DEFAULT_REPOS_DIR) 
         return []
 
 
-def get_last_commit_date(org: str, name: str, repos_dir: Path = DEFAULT_REPOS_DIR) -> str | None:
+def get_last_commit_date(org: str, name: str, repos_dir: Path | None = None) -> str | None:
     """Get the date of the last commit in the repository."""
-    repos_dir = Path(repos_dir).resolve()
+    repos_dir = Path(repos_dir or get_config().paths_github_dir).resolve()
     repo_path = _get_repo_path(repos_dir, org, name)
 
     repo = _get_or_create_repo(repo_path)
@@ -422,9 +422,9 @@ def get_last_commit_date(org: str, name: str, repos_dir: Path = DEFAULT_REPOS_DI
         return None
 
 
-def is_repo_outdated(org: str, name: str, repos_dir: Path = DEFAULT_REPOS_DIR) -> bool:
+def is_repo_outdated(org: str, name: str, repos_dir: Path | None = None) -> bool:
     """Check if local repo is behind remote by comparing against the tracking ref."""
-    repos_dir = Path(repos_dir).resolve()
+    repos_dir = Path(repos_dir or get_config().paths_github_dir).resolve()
     repo_path = _get_repo_path(repos_dir, org, name)
 
     repo = _get_or_create_repo(repo_path)

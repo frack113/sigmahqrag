@@ -4,6 +4,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+from src.shared.config import get_config
+
 
 class DownloadUpdatePayload(BaseModel):
     action: Literal["download_update"] = "download_update"
@@ -51,7 +53,7 @@ class VectorSearchPayload(BaseModel):
 
 class EmbedSigmaRefPayload(BaseModel):
     action: Literal["embed_sigmaref"] = "embed_sigmaref"
-    registry_path: str = "data/documents/sigmaref"
+    registry_path: str = Field(default_factory=lambda: get_config().sigmaref_documents_path)
     collection_name: str = "sigmaref"
 
 

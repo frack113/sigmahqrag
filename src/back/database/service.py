@@ -15,7 +15,12 @@ import duckdb
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_DB_PATH = "data/duckdb/sigmahq.duckdb"
+
+def _default_db_path() -> str:
+    from src.shared.config import get_config
+
+    return get_config().paths_duckdb_path
+
 
 _VALID_TABLES = frozenset(
     {
@@ -47,7 +52,7 @@ class DatabaseService:
     _lock: threading.RLock = threading.RLock()
 
     def __init__(self, db_path: str | None = None) -> None:
-        self.db_path = Path(db_path or DEFAULT_DB_PATH)
+        self.db_path = Path(db_path or _default_db_path())
         # Close previous singleton if re-created (e.g. hot-reload, tests)
         prev = DatabaseService._instance
         if prev is not None:

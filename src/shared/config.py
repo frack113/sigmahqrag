@@ -22,7 +22,6 @@ LOGS_DIR = BASE_DIR / "logs"
 PID_DIR = BASE_DIR / "pids"
 QDRANT_STORAGE_DIR = BASE_DIR / "qdrant_storage"
 TEMP_DIR = BASE_DIR / "temp"
-DATA_DIR = BASE_DIR
 
 
 @dataclass
@@ -51,10 +50,14 @@ class Config:
     qdrant_storage_path: str = "data/qdrant_storage/database"
     qdrant_snapshots_path: str = "data/qdrant_storage/snapshots"
 
-    paths_bin_dir: str = "data/bin"
-    paths_models_dir: str = "data/models"
     paths_logs_dir: str = "data/logs"
     paths_temp_dir: str = "data/temp"
+    paths_duckdb_path: str = "data/duckdb/sigmahq.duckdb"
+    paths_github_dir: str = "data/github"
+    paths_rag_cache_dir: str = "data/rag_cache"
+    paths_model_registry: str = "data/models/registry.json"
+    paths_sigma_rules_dir: str = "data/sigma_rules"
+    paths_sigma_ref_docs_dir: str = "data/sigma_ref_docs"
 
     local_documents_path: str = "data/documents/local"
     sigmaref_documents_path: str = "data/documents/sigmaref"
@@ -210,14 +213,6 @@ class Config:
             )
             return old_path
         return path
-
-    @staticmethod
-    def get_llamacpp_bin_path() -> Path:
-        return Config().resolve_llamacpp_bin_path()
-
-    @staticmethod
-    def get_qdrant_bin_path() -> Path:
-        return Path(Config().qdrant_binary_path).resolve()
 
     @staticmethod
     def ensure_config_file() -> None:

@@ -1,5 +1,6 @@
 """GitHub Repository Management API v1."""
 
+from pathlib import Path
 import re
 from datetime import datetime
 from typing import Any
@@ -11,7 +12,6 @@ from threading import Lock
 import logging
 
 from src.back.github.git import (
-    DEFAULT_REPOS_DIR,
     _get_repo_path,
     _is_valid_repo,
     clone_repo,
@@ -26,6 +26,8 @@ from src.back.github.git import (
     save_selected_dirs,
     update_repo,
 )
+
+from src.shared.config import get_config
 
 logger = logging.getLogger(__name__)
 
@@ -353,7 +355,8 @@ async def get_repo_tree(
         return DirectoryTreeResponse(success=False, error=e.detail)
     try:
         # Check repo exists on filesystem directly (avoids fetching all repos)
-        repo_path = _get_repo_path(DEFAULT_REPOS_DIR, org, name)
+        repos_dir = Path(get_config().paths_github_dir)
+        repo_path = _get_repo_path(repos_dir, org, name)
         if not repo_path.exists() or not _is_valid_repo(repo_path):
             # Check DB — registered but not cloned locally?
             try:
@@ -422,7 +425,7 @@ async def select_dirs(
     except HTTPException as e:
         return SelectDirsResponse(success=False, error=e.detail)
     try:
-        repo_path = _get_repo_path(DEFAULT_REPOS_DIR, org, name)
+        repo_path = _get_repo_path(Path(get_config().paths_github_dir), org, name)
         if not repo_path.exists() or not _is_valid_repo(repo_path):
             return SelectDirsResponse(success=False, error=f"Repository '{org}/{name}' not found")
     except Exception as e:

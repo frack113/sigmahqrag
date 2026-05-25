@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import logging
-import os
 from pathlib import Path
 
 from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
+
+from src.shared.config import get_config
 
 logger = logging.getLogger(__name__)
 
@@ -15,8 +16,7 @@ router = APIRouter(prefix="/api/v1/logs", tags=["v1-logs"])
 
 
 def get_logs_dir() -> Path:
-    base = os.environ.get("DATA_DIR", "data")
-    return Path(base) / "logs"
+    return Path(get_config().paths_logs_dir).resolve()
 
 
 LOG_FILES = {

@@ -17,6 +17,7 @@ from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.vector_stores.qdrant import QdrantVectorStore
 
 from src.back.embedding_config import EmbeddingTypeConfig
+from src.shared.config import get_config
 
 logger = logging.getLogger(__name__)
 
@@ -26,8 +27,7 @@ DEFAULT_CHUNK_OVERLAP = 100
 DEFAULT_EMBED_BATCH_SIZE = 8
 DEFAULT_NUM_WORKERS = 4
 DEFAULT_SIMILARITY_TOP_K = 5
-CACHE_DIR = Path("data/rag_cache")
-LOCAL_EMBEDDINGS_DIR = Path("data/models/embeddings")
+
 
 # Chunkers optimized per source type
 SOURCE_CHUNK_CONFIG: dict[str, dict[str, Any]] = {
@@ -82,7 +82,7 @@ def _first_configured_model(config: dict) -> str | None:
 
 
 def build_embed_model(model_name: str) -> BaseEmbedding:
-    local_path = LOCAL_EMBEDDINGS_DIR / model_name
+    local_path = Path(get_config().embeddings_dir) / model_name
     model_path = str(local_path) if local_path.exists() else model_name
     try:
         logger.info("Loading embedding model from %s", model_path)
@@ -150,7 +150,8 @@ class IngestionPipelineBuilder:
         if qdrant_healthy:
             self._vector_store = self._get_qdrant_store()
 
-        CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        cache_dir = Path(get_config().paths_rag_cache_dir)
+        cache_dir.mkdir(parents=True, exist_ok=True)
 
         md_parser, splitter = _get_chunker_for_collection(self._collection_name)
 
@@ -166,7 +167,7 @@ class IngestionPipelineBuilder:
             docstore=SimpleDocumentStore(),
         )
 
-        cache_path = CACHE_DIR / self._collection_name
+        cache_path = cache_dir / self._collection_name
         lock_path = cache_path / "pipeline.lock"
         if cache_path.exists():
             try:
@@ -200,7 +201,8 @@ class IngestionPipelineBuilder:
         )
 
         if self._cached:
-            cache_path = CACHE_DIR / self._collection_name
+            cache_dir = Path(get_config().paths_rag_cache_dir)
+            cache_path = cache_dir / self._collection_name
             cache_path.mkdir(parents=True, exist_ok=True)
             lock_path = cache_path / "pipeline.lock"
             try:
@@ -232,7 +234,8 @@ class IngestionPipelineBuilder:
         )
 
         if self._cached:
-            cache_path = CACHE_DIR / self._collection_name
+            cache_dir = Path(get_config().paths_rag_cache_dir)
+            cache_path = cache_dir / self._collection_name
             cache_path.mkdir(parents=True, exist_ok=True)
             lock_path = cache_path / "pipeline.lock"
             try:

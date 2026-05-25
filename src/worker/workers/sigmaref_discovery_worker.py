@@ -12,7 +12,7 @@ class SigmaRefDiscoveryWorker(BaseWorker):
 
     def process(self, task: dict) -> None:
         cfg = get_config()
-        rules_dir = task.get("rules_dir", "data/github")
+        rules_dir = task.get("rules_dir", cfg.paths_github_dir)
         output_dir = task.get("output_dir") or str(cfg.sigmaref_documents_path)
 
         logger.info(
