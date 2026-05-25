@@ -49,9 +49,9 @@ class TestRAGAccuracy:
                 correct += 1
 
         accuracy = (correct / total) * 100 if total > 0 else 0
-        assert accuracy >= 95.0, (
-            f"RAG accuracy {accuracy:.1f}% is below 95% threshold!\nCorrect: {correct}/{total}"
-        )
+        assert (
+            accuracy >= 95.0
+        ), f"RAG accuracy {accuracy:.1f}% is below 95% threshold!\nCorrect: {correct}/{total}"
 
     def test_detection_field_parsing(self, sigma_rules_dataset: list[dict[str, Any]]):
         """Test that detection field is correctly parsed."""
