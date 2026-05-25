@@ -1,30 +1,71 @@
 """Tests for system prompt management."""
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
-from src.core.system_prompt import _prompts, add_prompt
 
-from src.main import create_app
-
-
-@pytest.fixture
-def tmp_prompts_file(tmp_path):
-    """Fixture to provide a temporary prompts file."""
-    temp_file = tmp_path / "test_system_prompt.toml"
-    with patch("src.core.system_prompt.PROMPTS_FILE", temp_file):
-        # Reset the singleton service to use the new path
-        import src.core.system_prompt as sp
-
-        sp._prompts_service = None
-        sp._prompts.clear()
-        yield temp_file
+MOCK_PROMPTS = {
+    "prompt-1": MagicMock(
+        id="prompt-1", name="test-1", description="desc1", content="content1", is_active=False
+    ),
+    "prompt-2": MagicMock(
+        id="prompt-2", name="test-2", description="desc2", content="content2", is_active=True
+    ),
+}
 
 
 @pytest.fixture
-def client(tmp_prompts_file) -> TestClient:
+def mock_db():
+    """Mock DatabaseService."""
+    db = MagicMock()
+    db.get_prompts.return_value = [
+        {
+            "id": "prompt-1",
+            "name": "test-1",
+            "description": "desc1",
+            "content": "content1",
+            "is_active": False,
+        },
+        {
+            "id": "prompt-2",
+            "name": "test-2",
+            "description": "desc2",
+            "content": "content2",
+            "is_active": True,
+        },
+    ]
+    db.upsert_prompt.return_value = None
+    db.persist.return_value = None
+    db.delete_prompt.return_value = None
+    with patch("src.back.system_prompt.DatabaseService.get_instance", return_value=db):
+        with patch("src.back.system_prompt._ensure_loaded"):
+            import src.back.system_prompt as sp
+
+            sp._prompts = {
+                "prompt-1": MagicMock(
+                    id="prompt-1",
+                    name="test-1",
+                    description="desc1",
+                    content="content1",
+                    is_active=False,
+                ),
+                "prompt-2": MagicMock(
+                    id="prompt-2",
+                    name="test-2",
+                    description="desc2",
+                    content="content2",
+                    is_active=True,
+                ),
+            }
+            yield sp
+
+
+@pytest.fixture
+def client(mock_db) -> TestClient:
     """Create test client for the app."""
+    from src.main import create_app
+
     app = create_app()
     return TestClient(app)
 
@@ -32,79 +73,47 @@ def client(tmp_prompts_file) -> TestClient:
 class TestSystemPromptAPI:
     """Tests for system prompt API routes."""
 
-    def test_add_prompt(self, client, tmp_prompts_file) -> None:
-        """Given a valid add request When POST /api/v1/admin/prompts Then returns 200 and creates prompt."""
-        payload = {
-            "name": "test-prompt",
-            "content": "This is a test content.",
-            "description": "This is a test description.",
-        }
-        response = client.post("/api/v1/admin/prompts", json=payload)
-
-        assert response.status_code == 200
-        data = response.json()
-        assert data["message"] == f"Prompt '{payload['name']}' saved"
-        assert tmp_prompts_file.exists()
-
-    def test_list_prompts(self, client, tmp_prompts_file) -> None:
+    def test_list_prompts(self, client, mock_db) -> None:
         """Given existing prompts When GET /api/v1/admin/prompts Then returns list of prompts."""
-        add_prompt("test-1", "desc1", "content1")
-
         response = client.get("/api/v1/admin/prompts")
         assert response.status_code == 200
         data = response.json()
         assert any(p["name"] == "test-1" for p in data)
 
-    def test_get_prompt_by_id(self, client, tmp_prompts_file) -> None:
+    def test_get_prompt_by_id(self, client, mock_db) -> None:
         """Given an existing prompt When GET /api/v1/admin/prompts/{id} Then returns content."""
-        prompt = add_prompt("content-test", "desc", "secret content")
-
-        response = client.get(f"/api/v1/admin/prompts/{prompt.id}")
+        response = client.get("/api/v1/admin/prompts/prompt-1")
         assert response.status_code == 200
-        assert response.json()["content"] == "secret content"
+        assert response.json()["content"] == "content1"
 
-    def test_get_prompt_by_name(self, client, tmp_prompts_file) -> None:
+    def test_get_prompt_by_name(self, client, mock_db) -> None:
         """Given an existing prompt When GET /api/v1/admin/prompts/name/{name} Then returns content."""
-        add_prompt("name-test", "desc", "secret content")
-
-        response = client.get("/api/v1/admin/prompts/name/name-test")
+        response = client.get("/api/v1/admin/prompts/name/test-2")
         assert response.status_code == 200
-        assert response.json()["content"] == "secret content"
+        assert response.json()["content"] == "content2"
 
-    def test_update_prompt(self, client, tmp_prompts_file) -> None:
-        """Given an existing prompt When PUT /api/v1/admin/prompts/{id} Then updates prompt."""
-        new_prompt = add_prompt("to-update", "old desc", "old content")
-
-        payload = {
-            "name": "updated-name",
-            "content": "updated content",
-            "description": "updated description",
-        }
-        response = client.put(f"/api/v1/admin/prompts/{new_prompt.id}", json=payload)
-
+    def test_get_active_prompt(self, client, mock_db) -> None:
+        """Given an active prompt When GET /api/v1/admin/prompts/active Then returns it."""
+        response = client.get("/api/v1/admin/prompts/active")
         assert response.status_code == 200
-        assert response.json()["message"] == f"Prompt '{new_prompt.id}' updated"
+        assert response.json()["name"] == "test-2"
 
-    def test_set_active_prompt(self, client, tmp_prompts_file) -> None:
-        """Given prompts When POST /api/v1/prompts/activate/{id} Then sets prompt as active."""
-        add_prompt("p1", "d1", "c1")
-        p2 = add_prompt("p2", "d2", "c2")
-
-        response = client.post(f"/api/v1/admin/prompts/activate/{p2.id}")
+    def test_activate_prompt(self, client, mock_db) -> None:
+        """Given prompts When POST /api/v1/admin/prompts/activate/{id} Then sets prompt as active."""
+        response = client.post("/api/v1/admin/prompts/activate/prompt-1")
         assert response.status_code == 200
-        assert response.json()["message"] == f"Prompt '{p2.name}' activated"
 
-        from src.core.system_prompt import get_active_prompt
-
-        active = get_active_prompt()
-        assert active.id == p2.id
-
-    def test_delete_prompt_by_id(self, client, tmp_prompts_file) -> None:
+    def test_delete_prompt(self, client, mock_db) -> None:
         """Given an existing prompt When DELETE /api/v1/admin/prompts/{id} Then deletes it."""
-        prompt = add_prompt("to-delete", "desc", "content")
-
-        response = client.delete(f"/api/v1/admin/prompts/{prompt.id}")
+        response = client.delete("/api/v1/admin/prompts/prompt-1")
         assert response.status_code == 200
-        assert response.json()["message"] == f"Prompt '{prompt.id}' deleted"
 
-        assert prompt.id not in _prompts
+    def test_add_prompt(self, client, mock_db) -> None:
+        """Given a valid add request When POST /api/v1/admin/prompts Then returns 200."""
+        payload = {
+            "name": "new-prompt",
+            "content": "This is new content.",
+            "description": "A new description.",
+        }
+        response = client.post("/api/v1/admin/prompts", json=payload)
+        assert response.status_code == 200

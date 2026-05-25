@@ -1,11 +1,11 @@
 """Test Sigma rule model."""
 
-from src.models.sigma_rule import SigmaRuleModel
+from src.shared.schemas.sigma_rule import SigmaRule
 
 
 def test_sigma_rule_model_init() -> None:
-    """Test SigmaRuleModel initialization."""
-    rule = SigmaRuleModel(
+    """Test SigmaRule initialization."""
+    rule = SigmaRule(
         id="test-001",
         title="Test Rule",
         detection={"condition": "test"},
@@ -16,8 +16,8 @@ def test_sigma_rule_model_init() -> None:
 
 
 def test_sigma_rule_model_with_tags() -> None:
-    """Test SigmaRuleModel with tags."""
-    rule = SigmaRuleModel(
+    """Test SigmaRule with tags."""
+    rule = SigmaRule(
         id="test-001",
         title="Test Rule",
         detection={"condition": "test"},

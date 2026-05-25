@@ -1,6 +1,6 @@
 """Test custom exceptions."""
 
-from src.errors import ModelNotFoundError, SigmaError, ValidationError
+from src.shared.exceptions import ModelNotFoundError, SigmaError, ValidationError
 
 
 def test_sigma_error() -> None:

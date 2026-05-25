@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import pytest
-from src.core.services.sigma_validator import MAX_FILE_SIZE, SigmaValidator
-from src.errors import ValidationError
+from src.back.backend.services.sigma_validator import MAX_FILE_SIZE, SigmaValidator
+from src.shared.exceptions import ValidationError
 
 
 def test_validate_valid_yaml() -> None:
