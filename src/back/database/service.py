@@ -614,9 +614,8 @@ class DatabaseService:
         tables = ["doc_registry", "doc_sigma_ref"]
 
         # Phase 1: Snapshot — gather file data under lock only for SELECT (minimal critical section)
-        snapshot: list[
-            tuple[str, str, str | None]
-        ] = []  # (table, url_hash, file_name, existing_hash)
+        # (table, url_hash, file_name, existing_hash)
+        snapshot: list[tuple[str, str, str | None]] = []
         with self._lock:
             for table in tables:
                 query = (
