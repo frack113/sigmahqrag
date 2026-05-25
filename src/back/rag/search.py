@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_TOP_K = 15
 SIMILARITY_THRESHOLD = 0.0
-DEFAULT_EMBED_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+DEFAULT_EMBED_MODEL = "intfloat/multilingual-e5-small"
 
 
 _async_embed_model: Any | None = None
@@ -63,20 +63,28 @@ async def search(
             score = point.score if point.score else 0.0
             if score >= similarity_threshold:
                 payload = point.payload or {}
-                node_content = payload.get("_node_content", "{}")
-                if isinstance(node_content, str):
-                    import json
 
-                    try:
-                        node_data = json.loads(node_content)
-                        text = node_data.get("text", "")
-                        metadata = node_data.get("metadata", {})
-                    except (json.JSONDecodeError, KeyError):
-                        text = payload.get("_node_content", "")
-                        metadata = payload
-                else:
-                    text = node_content.get("text", "") if node_content else ""
-                    metadata = node_content.get("metadata", {}) if node_content else {}
+                # Support both flat payload format (from JSONL injection)
+                # and LlamaIndex _node_content format
+                text = payload.get("text", "")
+                metadata = {}
+
+                if not text:
+                    # Fallback: try _node_content format
+                    node_content = payload.get("_node_content", "{}")
+                    if isinstance(node_content, str):
+                        import json
+
+                        try:
+                            node_data = json.loads(node_content)
+                            text = node_data.get("text", "")
+                            metadata = node_data.get("metadata", {})
+                        except (json.JSONDecodeError, KeyError):
+                            text = ""
+                            metadata = payload
+                    else:
+                        text = node_content.get("text", "") if node_content else ""
+                        metadata = node_content.get("metadata", {}) if node_content else {}
 
                 results.append(
                     {

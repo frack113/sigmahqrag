@@ -20,7 +20,7 @@ from src.shared.config import get_config
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+DEFAULT_MODEL = "intfloat/multilingual-e5-small"
 DEFAULT_CHUNK_SIZE = 1024
 DEFAULT_CHUNK_OVERLAP = 100
 DEFAULT_EMBED_BATCH_SIZE = 8
