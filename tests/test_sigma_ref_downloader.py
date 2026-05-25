@@ -206,14 +206,12 @@ class TestDownloadFile:
 
 
 class TestRegistry:
-    @patch("src.back.documents.sigma_ref_downloader.DatabaseService.get_instance")
-    def test_load_empty(self, mock_get_instance: MagicMock, tmp_path: Path) -> None:
-        mock_get_instance.return_value = _make_db()
-        reg = _load_registry(tmp_path)
+    def test_load_empty(self, tmp_path: Path) -> None:
+        db = _make_db()
+        reg = _load_registry(tmp_path, db)
         assert reg == {}
 
-    @patch("src.back.documents.sigma_ref_downloader.DatabaseService.get_instance")
-    def test_load_valid(self, mock_get_instance: MagicMock, tmp_path: Path) -> None:
+    def test_load_valid(self, tmp_path: Path) -> None:
         db = _make_db(
             entries=[
                 {
@@ -223,8 +221,7 @@ class TestRegistry:
                 }
             ]
         )
-        mock_get_instance.return_value = db
-        reg = _load_registry(tmp_path)
+        reg = _load_registry(tmp_path, db)
         assert reg == {
             "abc": {
                 "original_url": "https://example.com/doc.md",
@@ -237,18 +234,16 @@ class TestRegistry:
             }
         }
 
-    @patch("src.back.documents.sigma_ref_downloader.DatabaseService.get_instance")
-    def test_save(self, mock_get_instance: MagicMock, tmp_path: Path) -> None:
+    def test_save(self, tmp_path: Path) -> None:
         db = _make_db()
-        mock_get_instance.return_value = db
         data = {
             "abc": {
                 "original_url": "https://example.com/doc.md",
                 "timestamp": _iso_now(),
             }
         }
-        _save_registry(data, tmp_path)
-        reg = _load_registry(tmp_path)
+        _save_registry(data, tmp_path, db)
+        reg = _load_registry(tmp_path, db)
         assert "abc" in reg
         assert reg["abc"]["original_url"] == "https://example.com/doc.md"
 
@@ -284,17 +279,12 @@ references:
   - https://example.com/valid.md
 """)
 
-        with (
-            patch(
-                "src.back.documents.sigma_ref_downloader._download_file",
-                return_value=True,
-            ),
-            patch(
-                "src.back.documents.sigma_ref_downloader.DatabaseService.get_instance",
-                return_value=_make_db(),
-            ),
+        db = _make_db()
+        with patch(
+            "src.back.documents.sigma_ref_downloader._download_file",
+            return_value=True,
         ):
-            result = download_references(str(rules_dir), str(tmp_path / "output"))
+            result = download_references(str(rules_dir), str(tmp_path / "output"), db)
             assert result["downloaded"] == 1
             assert result["total_refs"] == 1
 
@@ -313,14 +303,11 @@ references:
   - https://example.com/doc.pdf
 """)
 
-        with patch(
-            "src.back.documents.sigma_ref_downloader.DatabaseService.get_instance",
-            return_value=_make_db(),
-        ):
-            result = download_references(str(rules_dir), str(tmp_path / "output"))
-            assert result["downloaded"] == 0
-            assert result["skipped"] == 1
-            assert result["total_rules"] == 1
+        db = _make_db()
+        result = download_references(str(rules_dir), str(tmp_path / "output"), db)
+        assert result["downloaded"] == 0
+        assert result["skipped"] == 1
+        assert result["total_rules"] == 1
 
     def test_duplicate_url_skipped(self, tmp_path: Path) -> None:
         rules_dir = tmp_path / "rules"
@@ -339,20 +326,14 @@ references:
 """)
 
         db = _make_db()
-        with (
-            patch(
-                "src.back.documents.sigma_ref_downloader._download_file",
-                return_value=True,
-            ),
-            patch(
-                "src.back.documents.sigma_ref_downloader.DatabaseService.get_instance",
-                return_value=db,
-            ),
+        with patch(
+            "src.back.documents.sigma_ref_downloader._download_file",
+            return_value=True,
         ):
-            first = download_references(str(rules_dir), str(output_dir))
+            first = download_references(str(rules_dir), str(output_dir), db)
             assert first["downloaded"] == 1
 
-            second = download_references(str(rules_dir), str(output_dir))
+            second = download_references(str(rules_dir), str(output_dir), db)
             assert second["downloaded"] == 0
             assert second["skipped"] >= 1
 
@@ -379,17 +360,11 @@ references:
             return True
 
         db = _make_db()
-        with (
-            patch(
-                "src.back.documents.sigma_ref_downloader._download_file",
-                check_normalized_url,
-            ),
-            patch(
-                "src.back.documents.sigma_ref_downloader.DatabaseService.get_instance",
-                return_value=db,
-            ),
+        with patch(
+            "src.back.documents.sigma_ref_downloader._download_file",
+            check_normalized_url,
         ):
-            result = download_references(str(rules_dir), str(output_dir))
+            result = download_references(str(rules_dir), str(output_dir), db)
             assert result["downloaded"] == 1
 
             entries = db.get_doc_sigma_ref()
@@ -400,13 +375,10 @@ references:
     def test_empty_rules_dir(self, tmp_path: Path) -> None:
         empty_dir = tmp_path / "empty"
         empty_dir.mkdir()
-        with patch(
-            "src.back.documents.sigma_ref_downloader.DatabaseService.get_instance",
-            return_value=_make_db(),
-        ):
-            result = download_references(str(empty_dir), str(tmp_path / "output"))
-            assert result["total_rules"] == 0
-            assert result["downloaded"] == 0
+        db = _make_db()
+        result = download_references(str(empty_dir), str(tmp_path / "output"), db)
+        assert result["total_rules"] == 0
+        assert result["downloaded"] == 0
 
     def test_output_dir_created(self, tmp_path: Path) -> None:
         rules_dir = tmp_path / "rules"
@@ -424,17 +396,12 @@ references:
   - https://example.com/test.md
 """)
 
-        with (
-            patch(
-                "src.back.documents.sigma_ref_downloader._download_file",
-                return_value=True,
-            ),
-            patch(
-                "src.back.documents.sigma_ref_downloader.DatabaseService.get_instance",
-                return_value=_make_db(),
-            ),
+        db = _make_db()
+        with patch(
+            "src.back.documents.sigma_ref_downloader._download_file",
+            return_value=True,
         ):
-            result = download_references(str(rules_dir), str(output_dir))
+            result = download_references(str(rules_dir), str(output_dir), db)
             assert result["downloaded"] == 1
             assert output_dir.exists()
 
@@ -455,17 +422,11 @@ references:
 """)
 
         db = _make_db()
-        with (
-            patch(
-                "src.back.documents.sigma_ref_downloader._download_file",
-                return_value=False,
-            ),
-            patch(
-                "src.back.documents.sigma_ref_downloader.DatabaseService.get_instance",
-                return_value=db,
-            ),
+        with patch(
+            "src.back.documents.sigma_ref_downloader._download_file",
+            return_value=False,
         ):
-            result = download_references(str(rules_dir), str(output_dir))
+            result = download_references(str(rules_dir), str(output_dir), db)
             assert result["failed"] == 1
             assert result["downloaded"] == 0
             assert len(db.get_doc_sigma_ref()) == 0
@@ -497,14 +458,8 @@ references:
             return True
 
         db = _make_db()
-        with (
-            patch("src.back.documents.sigma_ref_downloader._download_file", capture_url),
-            patch(
-                "src.back.documents.sigma_ref_downloader.DatabaseService.get_instance",
-                return_value=db,
-            ),
-        ):
-            result = download_references(str(rules_dir), str(output_dir))
+        with patch("src.back.documents.sigma_ref_downloader._download_file", capture_url):
+            result = download_references(str(rules_dir), str(output_dir), db)
             assert result["downloaded"] == 2
             assert len(urls_downloaded) == 2
             assert urls_downloaded[0] != urls_downloaded[1]
@@ -544,12 +499,8 @@ references:
                 write_on_download,
             ),
             patch("time.sleep"),
-            patch(
-                "src.back.documents.sigma_ref_downloader.DatabaseService.get_instance",
-                return_value=db,
-            ),
         ):
-            result = download_references(str(rules_dir), str(output_dir), request_delay=0)
+            result = download_references(str(rules_dir), str(output_dir), db, request_delay=0)
             assert result["downloaded"] == 1
             entries = db.get_doc_sigma_ref()
             entry = list(entries)[0]
@@ -606,12 +557,8 @@ references:
                 tracking_download,
             ),
             patch("time.sleep"),
-            patch(
-                "src.back.documents.sigma_ref_downloader.DatabaseService.get_instance",
-                return_value=db,
-            ),
         ):
-            result = download_references(str(rules_dir), str(output_dir), request_delay=0)
+            result = download_references(str(rules_dir), str(output_dir), db, request_delay=0)
             assert result["downloaded"] == 1
             assert len(download_calls) == 1
 
@@ -663,12 +610,8 @@ references:
                 "src.back.documents.sigma_ref_downloader._download_file",
                 tracking_download,
             ),
-            patch(
-                "src.back.documents.sigma_ref_downloader.DatabaseService.get_instance",
-                return_value=db,
-            ),
         ):
-            result = download_references(str(rules_dir), str(output_dir), request_delay=0)
+            result = download_references(str(rules_dir), str(output_dir), db, request_delay=0)
             assert result["skipped"] >= 1
             assert len(download_calls) == 0
 
@@ -718,12 +661,8 @@ references:
                 "src.back.documents.sigma_ref_downloader._download_file",
                 tracking_download,
             ),
-            patch(
-                "src.back.documents.sigma_ref_downloader.DatabaseService.get_instance",
-                return_value=db,
-            ),
         ):
-            result = download_references(str(rules_dir), str(output_dir), request_delay=0)
+            result = download_references(str(rules_dir), str(output_dir), db, request_delay=0)
             assert result["skipped"] >= 1
             assert len(download_calls) == 0
 
@@ -749,18 +688,15 @@ references:
   - HTTP://example.com/test.md
 """)
 
+        db = _make_db()
         with (
             patch(
                 "src.back.documents.sigma_ref_downloader._download_file",
                 return_value=True,
             ),
             patch("time.sleep"),
-            patch(
-                "src.back.documents.sigma_ref_downloader.DatabaseService.get_instance",
-                return_value=_make_db(),
-            ),
         ):
-            result = download_references(str(rules_dir), str(output_dir), request_delay=0)
+            result = download_references(str(rules_dir), str(output_dir), db, request_delay=0)
             assert result["downloaded"] == 1
 
     def test_uppercase_github_blob(self) -> None:
