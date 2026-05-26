@@ -36,30 +36,28 @@ class TestAdminHealthEndpoint:
             }
             mock_service_class.return_value = mock_instance
 
-            response = client.get("/admin/health")
+            response = client.get("/api/v1/admin/backend")
 
             assert response.status_code == 200
             data = response.json()
-            assert "services" in data
+            assert "data" in data
+            assert "services" in data["data"]
 
     def test_health_endpoint_with_inactive_service(
         self,
         client: TestClient,
     ) -> None:
-        """Given one stopped service When GET /admin/health Then returns all statuses."""
+        """Given one stopped service When GET /api/v1/admin/backend Then returns all statuses."""
         with patch(
-            "src.back.backend.services.health_check.HealthCheckService"
-        ) as mock_service_class:
-            mock_instance = AsyncMock()
-            mock_instance.check_all.return_value = {
-                "llamacpp": {"status": "error", "url": "http://localhost:8080"},
-                "qdrant": {"status": "ok", "host": "localhost:6333"},
-                "timestamp": 1234567890.0,
+            "src.api.v1.admin.check_service_health", new_callable=AsyncMock
+        ) as mock_check:
+            mock_check.return_value = {
+                "llama_cpp": {"status": "inactive", "port": 8080, "version": "v1.0.0"},
+                "qdrant": {"status": "active", "port": 6333, "version": "v1.0.0"},
             }
-            mock_service_class.return_value = mock_instance
 
-            response = client.get("/admin/health")
+            response = client.get("/api/v1/admin/backend")
 
             assert response.status_code == 200
             data = response.json()
-            assert len(data["services"]) == 2
+            assert len(data["data"]["services"]) == 2

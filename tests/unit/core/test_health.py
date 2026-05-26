@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 from src.back.backend.services.health_check import HealthCheckService
@@ -11,12 +11,18 @@ from src.back.backend.services.health_check import HealthCheckService
 class TestHealthCheckServiceLlamaCpp:
     """Test llama.cpp health check via service."""
 
-    @patch("src.shared.httpx")
-    async def test_llama_cpp_healthy(self, mock_httpx: AsyncMock) -> None:
+    @patch("httpx.AsyncClient")
+    async def test_llama_cpp_healthy(self, mock_async_client: AsyncMock) -> None:
         """Given llama.cpp is running, when health checked, then returns active status (FR18, NFR4)."""
-        mock_resp = AsyncMock()
+        mock_resp = MagicMock()
         mock_resp.status_code = 200
-        mock_httpx.AsyncClient.return_value.__aenter__.return_value.get.return_value = mock_resp
+
+        async def mock_get(*args: object, **kwargs: object) -> MagicMock:
+            return mock_resp
+
+        mock_client = MagicMock()
+        mock_client.get = mock_get
+        mock_async_client.return_value.__aenter__.return_value = mock_client
 
         service = HealthCheckService()
         result = await service._check_llamacpp()
@@ -24,12 +30,12 @@ class TestHealthCheckServiceLlamaCpp:
         assert result["status"] == "active"
         assert "url" in result
 
-    @patch("src.shared.httpx")
-    async def test_llama_cpp_down(self, mock_httpx: AsyncMock) -> None:
+    @patch("httpx.AsyncClient")
+    async def test_llama_cpp_down(self, mock_async_client: AsyncMock) -> None:
         """Given llama.cpp is down, when health checked, then returns inactive status (NFR14)."""
-        mock_httpx.AsyncClient.return_value.__aenter__.return_value.get.side_effect = (
-            httpx.ConnectError("Connection refused")
-        )
+        mock_client = MagicMock()
+        mock_client.get.side_effect = httpx.ConnectError("Connection refused")
+        mock_async_client.return_value.__aenter__.return_value = mock_client
 
         service = HealthCheckService()
         result = await service._check_llamacpp()
@@ -41,7 +47,7 @@ class TestHealthCheckServiceLlamaCpp:
 class TestHealthCheckServiceQdrant:
     """Test Qdrant health check via service."""
 
-    @patch("src.back.backend.services.health_check.check_health", new_callable=AsyncMock)
+    @patch("src.back.qdrant.health.check_health", new_callable=AsyncMock)
     async def test_qdrant_healthy(self, mock_check: AsyncMock) -> None:
         """Given Qdrant is running, when health checked, then returns active status."""
         mock_check.return_value = {"status": "active"}

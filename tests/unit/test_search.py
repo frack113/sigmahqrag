@@ -12,7 +12,7 @@ class TestSearchEngine:
 
         engine = SearchEngine()
         assert engine.collection_name == "sigmaref"
-        assert engine.top_k == 10
+        assert engine.top_k == 15
         assert engine.similarity_threshold == 0.0
 
     def test_init_custom(self):

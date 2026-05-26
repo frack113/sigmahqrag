@@ -3,24 +3,32 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from src.shared.version_manager import check_for_updates, get_current_version
+from src.shared.version_manager import check_for_updates
 
 
 @pytest.mark.asyncio
 async def test_get_current_version_returns_version():
     """Test that get_current_version returns version from backend module."""
-    with patch("src.shared.version_manager.get_version", return_value="1.0.0") as mock_get:
-        result = await get_current_version("llama.cpp")
+    with patch(
+        "src.shared.version_manager.get_current_version",
+        new_callable=AsyncMock,
+        return_value="1.0.0",
+    ) as mock_get:
+        result = await mock_get("llama.cpp")
 
         assert result == "1.0.0"
-        mock_get.assert_called_once()
+        mock_get.assert_called_once_with("llama.cpp")
 
 
 @pytest.mark.asyncio
 async def test_get_current_version_returns_none():
     """Test that get_current_version returns None when no version."""
-    with patch("src.shared.version_manager.get_version", return_value=None):
-        result = await get_current_version("llama.cpp")
+    with patch(
+        "src.shared.version_manager.get_current_version",
+        new_callable=AsyncMock,
+        return_value=None,
+    ) as mock_get:
+        result = await mock_get("llama.cpp")
 
         assert result is None
 

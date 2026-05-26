@@ -18,6 +18,8 @@ MOCK_PROMPTS = {
 @pytest.fixture
 def mock_db():
     """Mock DatabaseService."""
+    from src.back.system_prompt import Prompt
+
     db = MagicMock()
     db.get_prompts.return_value = [
         {
@@ -43,15 +45,15 @@ def mock_db():
             import src.back.system_prompt as sp
 
             sp._prompts = {
-                "prompt-1": MagicMock(
-                    id="prompt-1",
+                "prompt-1": Prompt(
+                    prompt_id="prompt-1",
                     name="test-1",
                     description="desc1",
                     content="content1",
                     is_active=False,
                 ),
-                "prompt-2": MagicMock(
-                    id="prompt-2",
+                "prompt-2": Prompt(
+                    prompt_id="prompt-2",
                     name="test-2",
                     description="desc2",
                     content="content2",

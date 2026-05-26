@@ -98,11 +98,36 @@ async def test_check_all_qdrant_failure(health_service):
         mock_httpx.AsyncClient.return_value.__aenter__.return_value = mock_client
         mock_httpx.AsyncClient.return_value.__aexit__ = AsyncMock()
 
-        # Qdrant client raises an error
+        # Qdrant client raises an error (warnings check passes, but gRPC client fails)
         mock_qdrant_cls.side_effect = Exception("Connection refused")
 
         result = await health_service.check_all()
+        assert result["qdrant"]["status"] == "warning"
+        assert "Connection refused" in result["qdrant"].get("error", "")
+
+
+@pytest.mark.asyncio
+async def test_check_all_qdrant_healthz_failure(health_service):
+    """Test qdrant healthz endpoint failure -> status: error."""
+    with (
+        patch("src.shared.health.httpx") as mock_httpx,
+    ):
+        # Mock httpx health check response - failure for the /healthz endpoint
+        mock_response = MagicMock()
+        mock_response.status_code = 503
+
+        async def mock_get(*args: Any, **kwargs: Any) -> MagicMock:
+            return mock_response
+
+        mock_client = MagicMock()
+        mock_client.get = mock_get
+
+        mock_httpx.AsyncClient.return_value.__aenter__.return_value = mock_client
+        mock_httpx.AsyncClient.return_value.__aexit__ = AsyncMock()
+
+        result = await health_service.check_all()
         assert result["qdrant"]["status"] == "error"
+        assert "HTTP 503" in result["qdrant"].get("error", "")
 
 
 @pytest.mark.asyncio

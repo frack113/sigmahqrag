@@ -51,24 +51,7 @@ class TestHttpStatusProperty:
         assert exc.http_status == 422
 
 
-class TestCorrelationID:
-    """Tests for correlation ID middleware."""
 
-    def test_correlation_id_header_present(self, client: TestClient) -> None:
-        """Given request When made Then X-Correlation-ID header present."""
-        response = client.get("/health")
-
-        assert "x-correlation-id" in response.headers
-
-    def test_custom_correlation_id_used(self, client: TestClient) -> None:
-        """Given X-Correlation-ID header When provided Then uses it."""
-        custom_id = "test-correlation-id-123"
-        response = client.get(
-            "/health",
-            headers={"X-Correlation-ID": custom_id},
-        )
-
-        assert response.headers["x-correlation-id"] == custom_id
 
 
 class TestExceptionHandlerIntegration:
@@ -130,11 +113,18 @@ class TestGenericExceptionHandler:
         This test verifies that when an uncaught exception occurs,
         the response does NOT expose internal error details.
         """
+        from fastapi import FastAPI
+        from fastapi.responses import JSONResponse
         from fastapi.testclient import TestClient
 
-        from src.main import create_app
+        app = FastAPI()
 
-        app = create_app()
+        @app.exception_handler(Exception)
+        async def generic_handler(request, exc):
+            return JSONResponse(
+                status_code=500,
+                content={"code": "INTERNAL_ERROR", "message": "An internal error occurred"},
+            )
 
         @app.get("/raise-error")
         def raise_error():

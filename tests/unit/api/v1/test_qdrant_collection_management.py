@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from fastapi.testclient import TestClient
 from src.api.v1.qdrant import router
 from fastapi import FastAPI
@@ -9,8 +9,17 @@ app.include_router(router)
 client = TestClient(app)
 
 
+@pytest.fixture(autouse=True)
+def mock_db():
+    """Mock DatabaseService.get_instance for all tests."""
+    db = MagicMock()
+    db.reset_embed_status_for_collection.return_value = None
+    with patch("src.api.v1.qdrant.DatabaseService.get_instance", return_value=db):
+        yield
+
+
 @pytest.mark.asyncio
-async def test_list_collections():
+async def test_list_collections(mock_db):
     with patch("src.api.v1.qdrant.list_collections", new_callable=AsyncMock) as mock_list:
         mock_list.return_value = [{"name": "test_collection"}]
         response = client.post(

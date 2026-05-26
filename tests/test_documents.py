@@ -156,14 +156,14 @@ class TestDocumentsEndpoint:
     ) -> None:
         """Test successful ingestion (open in v0.1.0)."""
         mock_scan.return_value = []
-        response = client.post("/documents/ingest")
+        response = client.post("/api/v1/documents/ingest")
 
         assert response.status_code == 200
         data = response.json()
         # Accept any valid response
         assert "results" in data or "total_files" in data
 
-    @patch("src.api.routes.documents.scan_directory")
+    @patch("src.api.v1.documents.scan_directory")
     def test_ingest_no_files(
         self,
         mock_scan: AsyncMock,
@@ -173,8 +173,10 @@ class TestDocumentsEndpoint:
         mock_scan.return_value = []
 
         response = client.post(
-            "/documents/ingest",
+            "/api/v1/documents/ingest",
             json={"directory": str(FIXTURES_DIR), "recursive": False},
         )
 
         assert response.status_code == 200
+        data = response.json()
+        assert "results" in data or "total_files" in data
