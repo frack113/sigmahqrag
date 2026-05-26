@@ -48,9 +48,7 @@ class TestAdminHealthEndpoint:
         client: TestClient,
     ) -> None:
         """Given one stopped service When GET /api/v1/admin/backend Then returns all statuses."""
-        with patch(
-            "src.api.v1.admin.check_service_health", new_callable=AsyncMock
-        ) as mock_check:
+        with patch("src.api.v1.admin.check_service_health", new_callable=AsyncMock) as mock_check:
             mock_check.return_value = {
                 "llama_cpp": {"status": "inactive", "port": 8080, "version": "v1.0.0"},
                 "qdrant": {"status": "active", "port": 6333, "version": "v1.0.0"},

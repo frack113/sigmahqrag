@@ -223,9 +223,7 @@ class TestGithubEmbeddingWorker:
             file_name = entry.get("file_name", "")
             return tmp_path / "test-org" / "test-repo" / file_name
 
-        with patch.object(
-            GithubEmbeddingWorker, "_resolve_file_path", side_effect=mock_resolve
-        ):
+        with patch.object(GithubEmbeddingWorker, "_resolve_file_path", side_effect=mock_resolve):
             with patch(
                 "src.worker.workers.embedding_base.IngestionPipelineBuilder"
             ) as mock_builder_cls:

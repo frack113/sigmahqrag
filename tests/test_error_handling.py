@@ -51,9 +51,6 @@ class TestHttpStatusProperty:
         assert exc.http_status == 422
 
 
-
-
-
 class TestExceptionHandlerIntegration:
     """Integration tests for exception handlers."""
 

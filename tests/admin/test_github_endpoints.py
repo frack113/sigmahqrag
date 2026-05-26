@@ -446,7 +446,9 @@ class TestGitHubApiV1Sync:
 
     def test_sync_all_repos_empty(self, client):
         """Test syncing all repos when none exist."""
-        with (patch("src.api.v1.github.list_repos", return_value=[]),):
+        with (
+            patch("src.api.v1.github.list_repos", return_value=[]),
+        ):
             response = client.post("/api/v1/github/repos/sync-all")
 
         assert response.status_code == 200
