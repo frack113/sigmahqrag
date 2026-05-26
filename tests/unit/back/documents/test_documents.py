@@ -12,7 +12,7 @@ from src.back.documents.parser import parse_sigma_rule, scan_directory
 from src.back.documents.validator import validate_sigma_rule
 from src.main import create_app
 
-FIXTURES_DIR = Path(__file__).parent / "fixtures"
+FIXTURES_DIR = (Path(__file__).parent / ".." / ".." / ".." / "fixtures").resolve()
 
 os.environ.setdefault("SIGMA_RULES_DIR", str(FIXTURES_DIR))
 
