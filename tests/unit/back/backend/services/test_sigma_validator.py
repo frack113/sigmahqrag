@@ -88,3 +88,143 @@ detection: "not a dict"
     with pytest.raises(ValidationError) as exc_info:
         validator.validate(content)
     assert exc_info.value.details["field"] == "detection"
+
+
+def test_validate_yaml_not_dict() -> None:
+    """Test validation fails when YAML is not a mapping."""
+    validator = SigmaValidator()
+    content = b"just a string"
+    with pytest.raises(ValidationError) as exc_info:
+        validator.validate(content)
+    assert exc_info.value.details["field"] == "yaml_structure"
+
+
+def test_validate_detection_empty_dict() -> None:
+    """Test validation fails when detection is empty."""
+    validator = SigmaValidator()
+    content = b"""
+id: test_rule_005
+name: Rule
+description: desc
+detection: {}
+"""
+    with pytest.raises(ValidationError) as exc_info:
+        validator.validate(content)
+    assert exc_info.value.details["field"] == "detection"
+
+
+def test_validate_empty_id() -> None:
+    """Test validation fails when id is empty string."""
+    validator = SigmaValidator()
+    content = b"""
+id: ""
+name: Rule
+description: desc
+detection:
+    selection:
+        EventID: 4625
+"""
+    with pytest.raises(ValidationError) as exc_info:
+        validator.validate(content)
+    assert exc_info.value.details["field"] == "id"
+
+
+def test_validate_empty_name() -> None:
+    """Test validation fails when name is missing or empty."""
+    validator = SigmaValidator()
+    content = b"""
+id: rule_001
+name: ""
+description: desc
+detection:
+    selection:
+        EventID: 4625
+"""
+    with pytest.raises(ValidationError) as exc_info:
+        validator.validate(content)
+    assert exc_info.value.details["field"] == "name"
+
+
+def test_validate_empty_description() -> None:
+    """Test validation fails when description is missing or empty."""
+    validator = SigmaValidator()
+    content = b"""
+id: rule_001
+name: Rule
+description: ""
+detection:
+    selection:
+        EventID: 4625
+"""
+    with pytest.raises(ValidationError) as exc_info:
+        validator.validate(content)
+    assert exc_info.value.details["field"] == "description"
+
+
+def test_validate_deprecated_fields(caplog: pytest.LogCaptureFixture) -> None:
+    """Test that deprecated fields log a warning."""
+    validator = SigmaValidator()
+    content = b"""
+id: rule_001
+name: Rule
+description: desc
+detection:
+    selection:
+        EventID: 4625
+level: high
+falsepositives:
+    - none
+"""
+    with caplog.at_level("WARNING"):
+        validator.validate(content)
+    assert "Deprecated field 'level'" in caplog.text
+    assert "Deprecated field 'falsepositives'" in caplog.text
+
+
+def test_validate_condition_bad_reference(caplog: pytest.LogCaptureFixture) -> None:
+    """Test condition referencing non-existent detection key logs warning."""
+    validator = SigmaValidator()
+    content = b"""
+id: rule_001
+name: Rule
+description: desc
+detection:
+    selection:
+        EventID: 4625
+condition: bad_ref
+"""
+    with caplog.at_level("WARNING"):
+        validator.validate(content)
+    assert "non-existent detection keys" in caplog.text
+
+
+def test_validate_condition_ok() -> None:
+    """Test valid condition passes without warning."""
+    validator = SigmaValidator()
+    content = b"""
+id: rule_001
+name: Rule
+description: desc
+detection:
+    selection:
+        EventID: 4625
+condition: selection
+"""
+    result = validator.validate(content)
+    assert result["condition"] == "selection"
+
+
+def test_validate_condition_non_string() -> None:
+    """Test non-string condition is silently accepted."""
+    validator = SigmaValidator()
+    content = b"""
+id: rule_001
+name: Rule
+description: desc
+detection:
+    selection:
+        EventID: 4625
+condition: true
+"""
+    result = validator.validate(content)
+    assert result["condition"] is True

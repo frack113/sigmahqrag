@@ -112,6 +112,18 @@ class TestParseSigmaRule:
         rule = parse_sigma_rule(str(f))
         assert rule is None
 
+    def test_returns_none_on_wrong_types(self, tmp_path: Path) -> None:
+        f = tmp_path / "rule.yaml"
+        data = {
+            "title": "Bad Types",
+            "detection": {"selection": {"field": "val"}, "condition": "selection"},
+            "condition": "selection",
+            "references": "not_a_list",
+        }
+        f.write_text(yaml.dump(data), encoding="utf-8")
+        rule = parse_sigma_rule(str(f))
+        assert rule is None
+
 
 class TestScanDirectory:
     def test_scans_yaml_files(self, tmp_path: Path) -> None:

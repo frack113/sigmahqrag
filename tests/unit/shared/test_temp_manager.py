@@ -1,6 +1,7 @@
 """Tests for temporary file manager."""
 
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 
 from src.shared.temp_manager import TempManager, create_temp_manager
@@ -64,11 +65,33 @@ class TestTempManager:
         count = mgr.cleanup_all()
         assert count == 0
 
+    def test_init_with_none_uses_config(self) -> None:
+        mock_cfg = MagicMock()
+        mock_cfg.paths_temp_dir = "/tmp/sigma_temp"
+        with patch("src.shared.temp_manager.get_config", return_value=mock_cfg):
+            mgr = TempManager()
+            assert mgr.temp_dir == Path("/tmp/sigma_temp").resolve()
+
     def test_create_temp_file_creates_dir(self, tmp_path: Path) -> None:
         nested = tmp_path / "sub" / "nested"
         mgr = TempManager(temp_dir=nested)
         result = mgr.create_temp_file("test", ".txt")
         assert result.exists() or result.parent.exists()
+
+    def test_cleanup_os_error(self, tmp_path: Path) -> None:
+        mgr = TempManager(temp_dir=tmp_path)
+        test_file = tmp_path / "locked.tmp"
+        test_file.write_text("data")
+        with patch("os.remove", side_effect=OSError("permission denied")):
+            result = mgr.cleanup(test_file)
+            assert result is False
+
+    def test_cleanup_all_os_error(self, tmp_path: Path) -> None:
+        mgr = TempManager(temp_dir=tmp_path)
+        (tmp_path / "bad.tmp").write_text("x")
+        with patch("os.remove", side_effect=OSError("access denied")):
+            count = mgr.cleanup_all()
+            assert count == 0
 
 
 class TestCreateTempManager:

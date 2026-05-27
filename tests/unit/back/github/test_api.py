@@ -118,6 +118,15 @@ class TestInfoRelease:
             call_url = mock_client.get.call_args[0][0]
             assert "v2.0.0" in call_url
 
+    @pytest.mark.asyncio
+    async def test_with_token(self, mock_client: AsyncMock, sample_release_detail: dict) -> None:
+        mock_client.get.return_value = _mock_response(sample_release_detail)
+        with patch("httpx.AsyncClient", return_value=mock_client):
+            await info_release("owner", "repo", "v1.0.0", github_token="token-789")
+            call_kwargs = mock_client.get.call_args
+            headers = call_kwargs[1]["headers"]
+            assert headers["Authorization"] == "Bearer token-789"
+
 
 class TestListReleaseFiles:
     @pytest.mark.asyncio
@@ -154,6 +163,16 @@ class TestListReleaseFiles:
             result = await list_release_files("owner", "repo", "v1.0.0")
             assert result == []
 
+    @pytest.mark.asyncio
+    async def test_with_token(self, mock_client: AsyncMock) -> None:
+        data = {"tag_name": "v1.0.0", "assets": []}
+        mock_client.get.return_value = _mock_response(data)
+        with patch("httpx.AsyncClient", return_value=mock_client):
+            await list_release_files("owner", "repo", "v1.0.0", github_token="token-abc")
+            call_kwargs = mock_client.get.call_args
+            headers = call_kwargs[1]["headers"]
+            assert headers["Authorization"] == "Bearer token-abc"
+
 
 class TestDownloadReleaseFile:
     @pytest.mark.asyncio
@@ -182,3 +201,15 @@ class TestDownloadReleaseFile:
         with patch("httpx.AsyncClient", return_value=mock_client):
             with pytest.raises(ValueError, match="not found"):
                 await download_release_file("owner", "repo", "missing.zip", "v1.0.0")
+
+    @pytest.mark.asyncio
+    async def test_with_token(self, mock_client: AsyncMock, sample_release_detail: dict) -> None:
+        mock_client.get.return_value = _mock_response(sample_release_detail)
+        with patch("httpx.AsyncClient", return_value=mock_client):
+            result = await download_release_file(
+                "owner", "repo", "asset1.zip", "v1.0.0", github_token="token-456"
+            )
+            assert result["name"] == "asset1.zip"
+            call_kwargs = mock_client.get.call_args
+            headers = call_kwargs[1]["headers"]
+            assert headers["Authorization"] == "Bearer token-456"

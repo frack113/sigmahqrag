@@ -1,6 +1,7 @@
 """Tests for TOML configuration service."""
 
 from pathlib import Path
+from unittest.mock import patch
 
 
 from src.shared.toml_service import TOMLService, _remove_none_values, deep_merge
@@ -140,3 +141,16 @@ class TestTOMLService:
         svc = TOMLService(toml_file)
         svc.save({"key": "val"}, invalidate_cache=False)
         assert svc._cache is None
+
+    def test_load_returns_empty_on_corrupt_file(self, tmp_path: Path) -> None:
+        toml_file = tmp_path / "bad.toml"
+        toml_file.write_text("{invalid", encoding="utf-8")
+        svc = TOMLService(toml_file)
+        result = svc.load()
+        assert result == {}
+
+    def test_save_returns_false_on_error(self, tmp_path: Path) -> None:
+        svc = TOMLService(tmp_path / "config.toml")
+        with patch("src.shared.toml_service.tomli_w.dump", side_effect=PermissionError("denied")):
+            result = svc.save({"key": "val"})
+            assert result is False

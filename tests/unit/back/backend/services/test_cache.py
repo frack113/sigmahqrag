@@ -49,6 +49,20 @@ def test_cache_eviction() -> None:
     assert cache.get("key3") == "response3"
 
 
+def test_cache_remove_existing() -> None:
+    """Test removing an existing cache entry."""
+    cache = ResponseCache()
+    cache.set("key1", "value1")
+    cache.remove("key1")
+    assert cache.get("key1") is None
+
+
+def test_cache_remove_nonexistent() -> None:
+    """Test removing a nonexistent cache entry (no error)."""
+    cache = ResponseCache()
+    cache.remove("nonexistent")
+
+
 def test_generate_key() -> None:
     """Test cache key generation."""
     key1 = ResponseCache.generate_key(query="test", context="context")
