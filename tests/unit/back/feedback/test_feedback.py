@@ -103,6 +103,16 @@ class TestFeedbackModels:
         assert stats.helpful_percentage == 75.0
 
 
+class TestResolveDbPath:
+    def test_absolute_path(self) -> None:
+        repo = FeedbackRepository(db_path="C:\\absolute\\path.db")
+        assert str(repo._db_path) == "C:\\absolute\\path.db"
+
+    def test_relative_path(self) -> None:
+        repo = FeedbackRepository(db_path="relative.db")
+        assert "relative.db" in str(repo._db_path)
+
+
 class TestFeedbackRepository:
     """Tests for feedback repository."""
 
@@ -160,6 +170,33 @@ class TestFeedbackRepository:
         assert stats.total == 3
         assert stats.helpful_count == 2
         assert stats.not_helpful_count == 1
+
+    @pytest.mark.asyncio
+    async def test_get_by_date_range_returns_matching(
+        self,
+        feedback_repo: FeedbackRepository,
+    ) -> None:
+        """Given feedback When date range matches Then returns entries."""
+        from datetime import datetime, timedelta
+
+        now = datetime.now()
+        feedback = await feedback_repo.create(query="test", helpful=True)
+        all_in_range = await feedback_repo.get_by_date_range(
+            now - timedelta(hours=1), now + timedelta(hours=1)
+        )
+        assert any(f.id == feedback.id for f in all_in_range)
+
+    @pytest.mark.asyncio
+    async def test_get_by_date_range_empty_when_outside(
+        self,
+        feedback_repo: FeedbackRepository,
+    ) -> None:
+        """Given feedback When date range doesn't match Then returns empty."""
+        from datetime import datetime
+
+        await feedback_repo.create(query="test", helpful=True)
+        result = await feedback_repo.get_by_date_range(datetime(2020, 1, 1), datetime(2020, 1, 2))
+        assert result == []
 
 
 class TestFeedbackService:
