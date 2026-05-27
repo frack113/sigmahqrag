@@ -137,9 +137,7 @@ class TestConfigEnsureConfigFile:
 
 class TestLoadFromToml:
     def test_returns_early_when_no_file(self, tmp_path: Path) -> None:
-        with (
-            patch("src.shared.config.CONFIG_FILE", tmp_path / "nonexistent.toml"),
-        ):
+        with patch("src.shared.config.CONFIG_FILE", tmp_path / "nonexistent.toml"):
             cfg = Config()
             assert cfg.os == "windows"
 

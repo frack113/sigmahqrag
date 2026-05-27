@@ -41,9 +41,7 @@ class TestModelSyncWorker:
         mock_dispatcher.update_worker_state.assert_called()
 
     def test_process_error_handling(self, mock_db: MagicMock, tmp_path: Path) -> None:
-        with (
-            patch("src.worker.workers.model_sync_worker.get_config") as mock_cfg,
-        ):
+        with patch("src.worker.workers.model_sync_worker.get_config") as mock_cfg:
             mock_cfg.return_value.paths_model_registry = str(tmp_path / "registry.json")
             mock_cfg.return_value.llm_dir = "/nonexistent/llm"
             mock_cfg.return_value.embeddings_dir = "/nonexistent/embeddings"

@@ -134,9 +134,7 @@ class TestFindMatchingAsset:
         vm = VersionManager()
         release = MagicMock()
         release.assets = []
-        with (
-            patch.object(vm, "_detect_platform", return_value=("windows", "x64", "cpu")),
-        ):
+        with patch.object(vm, "_detect_platform", return_value=("windows", "x64", "cpu")):
             asset = vm.find_matching_asset(release, "llama.cpp")
             assert asset is None
 

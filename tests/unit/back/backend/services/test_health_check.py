@@ -109,9 +109,7 @@ async def test_check_all_qdrant_failure(health_service):
 @pytest.mark.asyncio
 async def test_check_all_qdrant_healthz_failure(health_service):
     """Test qdrant healthz endpoint failure -> status: error."""
-    with (
-        patch("src.shared.health.httpx") as mock_httpx,
-    ):
+    with patch("src.shared.health.httpx") as mock_httpx:
         # Mock httpx health check response - failure for the /healthz endpoint
         mock_response = MagicMock()
         mock_response.status_code = 503
@@ -147,9 +145,7 @@ async def test_check_llama_public_alias(health_service):
 @pytest.mark.asyncio
 async def test_check_qdrant_public_alias(health_service):
     """Test check_qdrant() delegates to _check_qdrant()."""
-    with (
-        patch("src.shared.health.httpx") as mock_httpx,
-    ):
+    with patch("src.shared.health.httpx") as mock_httpx:
         mock_response = MagicMock()
         mock_response.status_code = 200
 

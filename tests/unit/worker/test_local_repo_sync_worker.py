@@ -66,8 +66,6 @@ class TestLocalRepoSyncWorker:
         mock_dispatcher = MagicMock()
         worker = LocalRepoSyncWorker(mock_db, mock_dispatcher)
 
-        with (
-            patch("src.worker.workers.local_repo_sync_worker.list_repos", return_value=[]),
-        ):
+        with patch("src.worker.workers.local_repo_sync_worker.list_repos", return_value=[]):
             worker.process({"task_id": "lrs-4"})
             assert mock_dispatcher.update_worker_state.call_count >= 2

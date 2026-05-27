@@ -28,9 +28,7 @@ class TestShutdownAllServices:
     async def test_shuts_down(self) -> None:
         mock_mgr = AsyncMock()
         mock_mgr.stop_all = AsyncMock(return_value={})
-        with (
-            patch("src.back.service_manager.get_subprocess_manager", return_value=mock_mgr),
-        ):
+        with patch("src.back.service_manager.get_subprocess_manager", return_value=mock_mgr):
             await shutdown_all_services()
             mock_mgr.stop_all.assert_awaited_once()
 
@@ -38,8 +36,6 @@ class TestShutdownAllServices:
     async def test_handles_exception_gracefully(self) -> None:
         mock_mgr = AsyncMock()
         mock_mgr.stop_all = AsyncMock(side_effect=RuntimeError("fail"))
-        with (
-            patch("src.back.service_manager.get_subprocess_manager", return_value=mock_mgr),
-        ):
+        with patch("src.back.service_manager.get_subprocess_manager", return_value=mock_mgr):
             await shutdown_all_services()
             mock_mgr.stop_all.assert_awaited_once()
