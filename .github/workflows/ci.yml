@@ -21,10 +21,10 @@ jobs:
         run: uv python install 3.12
 
       - name: Install dependencies
-        run: uv sync --all-extras --dev
+        run: uv sync --dev
 
       - name: Ruff check
         run: uv run ruff check main.py src/ tests/
 
-      - name: Black check
-        run: uv run black --check main.py src/ tests/
+      - name: Ruff format check
+        run: uv run ruff format --check main.py src/ tests/
