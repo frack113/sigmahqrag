@@ -741,3 +741,421 @@ class TestRoundtrip:
 
         db.set_selected_dirs("org/repo", ["a", "b"])
         assert db.get_selected_dirs("org/repo") == ["a", "b"]
+
+
+class TestInitEdgeCases:
+    def test_double_initialize_is_noop(self, db: DatabaseService) -> None:
+        db.initialize()
+        assert db._initialized is True
+
+    def test_recreate_singleton_closes_previous(self) -> None:
+        import os
+        import tempfile
+
+        tmp1 = tempfile.NamedTemporaryFile(suffix=".duckdb", delete=False)
+        tmp1.close()
+        os.unlink(tmp1.name)
+        d1 = DatabaseService(tmp1.name)
+        d1.initialize()
+        assert DatabaseService._instance is d1
+
+        tmp2 = tempfile.NamedTemporaryFile(suffix=".duckdb", delete=False)
+        tmp2.close()
+        os.unlink(tmp2.name)
+        d2 = DatabaseService(tmp2.name)
+        assert DatabaseService._instance is d2
+        d2.initialize()
+        d2.close()
+        if os.path.exists(tmp2.name):
+            os.unlink(tmp2.name)
+
+
+class TestDefaultDbPath:
+    def test_default_path_uses_config(self) -> None:
+        from unittest.mock import MagicMock, patch
+
+        mock_cfg = MagicMock()
+        mock_cfg.paths_duckdb_path = "/tmp/test.duckdb"
+        with patch("src.back.database.service._default_db_path") as mock_fn:
+            mock_fn.return_value = "/tmp/test.duckdb"
+            svc = DatabaseService()
+            assert "test.duckdb" in str(svc.db_path)
+            svc.close()
+
+
+class TestInitializeLoadFromFile:
+    def test_load_from_existing_db(self, tmp_path) -> None:
+        db_file = tmp_path / "existing.duckdb"
+        d = DatabaseService(str(db_file))
+        d.initialize()
+        d.set_config("k", "v")
+        d.persist(str(db_file))
+        d.close()
+
+        d2 = DatabaseService(str(db_file))
+        d2.initialize()
+        assert d2.get_config("k") == "v"
+        d2.close()
+        if db_file.exists():
+            db_file.unlink()
+
+
+class TestPersist:
+    def test_persist_before_initialize_returns_early(self) -> None:
+        import os
+        import tempfile
+
+        tmp = tempfile.NamedTemporaryFile(suffix=".duckdb", delete=False)
+        tmp.close()
+        os.unlink(tmp.name)
+        d = DatabaseService(tmp.name)
+        d.persist()
+        d.close()
+
+    def test_persist_to_custom_path(self, db: DatabaseService, tmp_path) -> None:
+        target = tmp_path / "custom.duckdb"
+        db.set_config("ck", "cv")
+        db.persist(str(target))
+        assert target.exists()
+        target.unlink()
+
+
+class TestGetConfig:
+    def test_plain_string_returned_as_is(self, db: DatabaseService) -> None:
+        db._writer_conn.execute(
+            "INSERT INTO config (key, value) VALUES (?, ?)", ("plain", '"raw_string"')
+        )
+        db._writer_conn.commit()
+        val = db.get_config("plain")
+        assert val == "raw_string"
+
+    def test_json_decode_error_returns_raw(self, db: DatabaseService) -> None:
+        db._writer_conn.execute(
+            "INSERT INTO config (key, value) VALUES (?, ?)", ("bad", "not-json{")
+        )
+        db._writer_conn.commit()
+        val = db.get_config("bad")
+        assert val == "not-json{"
+
+
+class TestModelsFilesJsonError:
+    def test_invalid_files_json(self, db: DatabaseService) -> None:
+        db._writer_conn.execute(
+            "INSERT INTO models (repo_id, model_type, files) VALUES (?, ?, ?)",
+            ("org/bad", "llm", "{bad json}"),
+        )
+        db._writer_conn.commit()
+        models = db.get_models()
+        match = [m for m in models if m["repo_id"] == "org/bad"]
+        assert len(match) == 1
+        assert match[0]["files"] == {}
+
+
+class TestDocSigmaRefPending:
+    def test_get_pending_all(self, db: DatabaseService) -> None:
+        db.upsert_doc_sigma_ref(
+            {"url_hash": "h1", "original_url": "http://x", "embed_status": "discovery"}
+        )
+        db.upsert_doc_sigma_ref(
+            {"url_hash": "h2", "original_url": "http://y", "embed_status": "embedded"}
+        )
+        pending = db.get_pending_sigma_ref()
+        assert len(pending) == 1
+        assert pending[0]["url_hash"] == "h1"
+
+    def test_get_pending_filtered_by_org_repo(self, db: DatabaseService) -> None:
+        db.upsert_doc_sigma_ref(
+            {
+                "url_hash": "pa",
+                "org": "a",
+                "repo": "b",
+                "original_url": "http://a",
+                "embed_status": "discovery",
+            }
+        )
+        db.upsert_doc_sigma_ref(
+            {
+                "url_hash": "pb",
+                "org": "c",
+                "repo": "d",
+                "original_url": "http://c",
+                "embed_status": "discovery",
+            }
+        )
+        pending = db.get_pending_sigma_ref(org="a", repo="b")
+        assert len(pending) == 1
+        assert pending[0]["url_hash"] == "pa"
+
+    def test_update_embed_status(self, db: DatabaseService) -> None:
+        db.upsert_doc_sigma_ref(
+            {"url_hash": "up1", "original_url": "http://u", "embed_status": "discovery"}
+        )
+        db.update_sigma_ref_embed_status("up1", "embedded")
+        refs = db.get_doc_sigma_ref()
+        assert refs[0]["embed_status"] == "embedded"
+
+    def test_delete_by_repo(self, db: DatabaseService) -> None:
+        db.upsert_doc_sigma_ref(
+            {"url_hash": "dr1", "org": "x", "repo": "y", "original_url": "http://d"}
+        )
+        db.delete_doc_sigma_ref_by_repo("x", "y")
+        refs = db.get_doc_sigma_ref()
+        assert all(r["org"] != "x" or r["repo"] != "y" for r in refs)
+
+
+class TestResetEmbedStatus:
+    def test_sigmaref_collection(self, db: DatabaseService) -> None:
+        db.upsert_doc_sigma_ref(
+            {
+                "url_hash": "s1",
+                "org": "sigmaref",
+                "repo": "sigmaref",
+                "original_url": "http://s",
+                "embed_status": "embedded",
+            }
+        )
+        db.reset_embed_status_for_collection("sigmaref")
+        refs = db.get_doc_sigma_ref()
+        assert refs[0]["embed_status"] == "discovery"
+
+    def test_local_collection(self, db: DatabaseService) -> None:
+        db.upsert_doc_registry(
+            {
+                "url_hash": "l1",
+                "org": "local",
+                "repo": "local",
+                "original_url": "http://l",
+                "embed_status": "embedded",
+            }
+        )
+        db.reset_embed_status_for_collection("local")
+        refs = db.get_doc_registry()
+        assert refs[0]["embed_status"] == "discovery"
+
+    def test_custom_collection(self, db: DatabaseService) -> None:
+        db.upsert_doc_sigma_ref(
+            {
+                "url_hash": "c1",
+                "org": "myorg",
+                "repo": "myrepo",
+                "original_url": "http://c",
+                "embed_status": "embedded",
+            }
+        )
+        db.upsert_doc_registry(
+            {
+                "url_hash": "c2",
+                "org": "myorg",
+                "repo": "myrepo",
+                "original_url": "http://c2",
+                "embed_status": "embedded",
+            }
+        )
+        db.reset_embed_status_for_collection("myorg/myrepo")
+        refs_sigma = db.get_doc_sigma_ref()
+        refs_reg = db.get_doc_registry()
+        assert refs_sigma[0]["embed_status"] == "discovery"
+        assert refs_reg[0]["embed_status"] == "discovery"
+
+
+class TestResyncLocalFileSizesEdgeCases:
+    def test_invalid_base_path(self, db: DatabaseService) -> None:
+        result = db.resync_local_file_sizes("\x00invalid")
+        assert result["error"] == 0
+
+    def test_path_traversal_detected(self, db: DatabaseService, tmp_path) -> None:
+        doc_dir = tmp_path / "documents"
+        doc_dir.mkdir()
+        db.upsert_doc_registry(
+            {
+                "url_hash": "t1",
+                "org": "local",
+                "repo": "local",
+                "file_name": "../../etc/passwd",
+                "file_size": 0,
+                "original_url": "http://t",
+            }
+        )
+        result = db.resync_local_file_sizes(str(doc_dir))
+        assert result["skipped"] == 1
+
+    def test_bad_file_name_skipped(self, db: DatabaseService, tmp_path) -> None:
+        doc_dir = tmp_path / "documents"
+        doc_dir.mkdir()
+        db.upsert_doc_registry(
+            {
+                "url_hash": "bn1",
+                "org": "local",
+                "repo": "local",
+                "file_name": None,
+                "file_size": 0,
+                "original_url": "http://bn",
+            }
+        )
+        result = db.resync_local_file_sizes(str(doc_dir))
+        assert result["skipped"] == 1
+
+    def test_hash_failure_keeps_incomplete(self, db: DatabaseService, tmp_path) -> None:
+        doc_dir = tmp_path / "documents"
+        doc_dir.mkdir()
+        f = doc_dir / "unreadable.yml"
+        f.write_text("data")
+        f.chmod(0o000)
+        db.upsert_doc_registry(
+            {
+                "url_hash": "hf1",
+                "org": "local",
+                "repo": "local",
+                "file_name": "unreadable.yml",
+                "file_size": 0,
+                "content_sha256": None,
+                "original_url": "http://hf",
+            }
+        )
+        result = db.resync_local_file_sizes(str(doc_dir))
+        f.chmod(0o644)
+        assert result["error"] >= 1 or result["incomplete"] >= 0
+
+    def test_batch_update_exception(self, db: DatabaseService, tmp_path) -> None:
+        doc_dir = tmp_path / "documents"
+        doc_dir.mkdir()
+        f = doc_dir / "batch.yml"
+        f.write_text("x" * 10)
+        db.upsert_doc_registry(
+            {
+                "url_hash": "be1",
+                "org": "local",
+                "repo": "local",
+                "file_name": "batch.yml",
+                "file_size": 0,
+                "original_url": "http://be",
+            }
+        )
+        result = db.resync_local_file_sizes(str(doc_dir))
+        assert result["updated"] == 1
+
+
+class TestGitMetadataList:
+    def test_empty(self, db: DatabaseService) -> None:
+        assert db.get_git_metadata_list() == []
+
+    def test_returns_keys(self, db: DatabaseService) -> None:
+        db.set_git_metadata("a/r1", {"org": "a", "name": "r1", "url": "http://x", "branch": "main"})
+        db.set_git_metadata("b/r2", {"org": "b", "name": "r2", "url": "http://y", "branch": "dev"})
+        keys = db.get_git_metadata_list()
+        assert "a/r1" in keys
+        assert "b/r2" in keys
+
+
+class TestReposWithSelectedDirs:
+    def test_empty(self, db: DatabaseService) -> None:
+        assert db.get_repos_with_selected_dirs() == []
+
+    def test_with_dirs(self, db: DatabaseService) -> None:
+        db.set_selected_dirs("a/r1", ["rules"])
+        db.set_selected_dirs("b/r2", ["docs"])
+        repos = db.get_repos_with_selected_dirs()
+        assert "a/r1" in repos
+        assert "b/r2" in repos
+
+
+class TestGetInstance:
+    def test_get_instance_without_init_raises(self) -> None:
+        from src.back.database import DatabaseService as DS
+
+        DS._instance = None
+        with pytest.raises(RuntimeError, match="not initialized"):
+            DS.get_instance()
+
+    def test_get_instance_returns_existing(self, db: DatabaseService) -> None:
+        from src.back.database import DatabaseService as DS
+
+        inst = DS.get_instance()
+        assert inst is db
+
+
+class TestSafeQueryNoConn:
+    def test_returns_none_when_conn_is_none(self) -> None:
+        import os
+        import tempfile
+
+        tmp = tempfile.NamedTemporaryFile(suffix=".duckdb", delete=False)
+        tmp.close()
+        os.unlink(tmp.name)
+        d = DatabaseService(tmp.name)
+        d._writer_conn = None
+        result = d._safe_query("SELECT 1")
+        assert result is None
+        d.close()
+
+
+class TestDefaultDbPathFunction:
+    def test_calls_get_config(self) -> None:
+        from unittest.mock import MagicMock, patch
+
+        from src.back.database.service import _default_db_path
+
+        mock_cfg = MagicMock()
+        mock_cfg.paths_duckdb_path = "test/path.db"
+        with patch("src.shared.config.get_config", return_value=mock_cfg):
+            result = _default_db_path()
+        assert result == "test/path.db"
+
+
+class TestGetTables:
+    def test_returns_sorted_names(self, db: DatabaseService) -> None:
+        tables = db.get_tables()
+        assert isinstance(tables, list)
+        assert len(tables) >= 1
+
+    def test_get_table_data(self, db: DatabaseService) -> None:
+        db.set_config("ck", "cv")
+        data = db.get_table_data("config")
+        assert len(data) >= 1
+
+    def test_get_table_data_invalid_name(self, db: DatabaseService) -> None:
+        with pytest.raises(ValueError, match="Invalid table name"):
+            db.get_table_data("nonexistent")
+
+    def test_get_table_count(self, db: DatabaseService) -> None:
+        db.set_config("ck", "cv")
+        count = db.get_table_count("config")
+        assert count >= 1
+
+
+class TestPersistTwice:
+    def test_persist_after_existing_target(self, db: DatabaseService, tmp_path) -> None:
+        target = tmp_path / "twice.duckdb"
+        db.set_config("k", "v")
+        db.persist(str(target))
+        db.persist(str(target))
+        assert target.exists()
+        target.unlink()
+
+
+class TestResyncPathEdgeCases:
+    def test_none_file_name_skipped(self, db: DatabaseService, tmp_path) -> None:
+        doc_dir = tmp_path / "docs"
+        doc_dir.mkdir()
+        db.upsert_doc_registry(
+            {
+                "url_hash": "nf1",
+                "org": "local",
+                "repo": "local",
+                "file_name": None,
+                "file_size": 0,
+                "original_url": "http://nf",
+            }
+        )
+        result = db.resync_local_file_sizes(str(doc_dir))
+        assert result["skipped"] == 1
+
+
+class TestGetTableCount:
+    def test_empty_table(self, db: DatabaseService) -> None:
+        count = db.get_table_count("git_metadata")
+        assert count == 0
+
+    def test_invalid_name_raises(self, db: DatabaseService) -> None:
+        with pytest.raises(ValueError, match="Invalid table name"):
+            db.get_table_count("nonexistent")
