@@ -1,8 +1,16 @@
 """Tests for RAG search functionality."""
 
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
 
-from src.back.rag.search import SearchEngine, format_search_result, get_citation
+from src.back.rag.search import (
+    SearchEngine,
+    _get_search_embed_model,
+    format_search_result,
+    get_citation,
+    search,
+)
 
 
 class TestSearchEngine:
@@ -30,13 +38,173 @@ class TestSearchEngine:
         assert result == "f.yaml:5"
 
 
+class TestGetSearchEmbedModel:
+    def test_first_call_creates_model(self) -> None:
+        with (
+            patch("src.back.rag.search._async_embed_model", None),
+            patch("src.back.rag.search.HuggingFaceEmbedding") as mock_cls,
+        ):
+            _get_search_embed_model()
+        mock_cls.assert_called_once_with(model_name="intfloat/multilingual-e5-small")
+
+    def test_subsequent_call_returns_cached(self) -> None:
+        with patch("src.back.rag.search.HuggingFaceEmbedding"):
+            first = _get_search_embed_model()
+            second = _get_search_embed_model()
+        assert first is second
+
+
 class TestSearch:
     @pytest.mark.asyncio
     async def test_empty_query(self) -> None:
-        from src.back.rag.search import search
-
         result = await search("")
         assert result == []
+
+    @pytest.mark.asyncio
+    async def test_no_scored_points(self) -> None:
+        mock_client = MagicMock()
+        mock_client.query_points.return_value = MagicMock(points=[])
+        mock_embed = AsyncMock()
+        mock_embed.aget_query_embedding = AsyncMock(return_value=[0.1])
+        with (
+            patch("src.back.rag.search.get_qdrant_client", return_value=mock_client),
+            patch("src.back.rag.search._get_search_embed_model", return_value=mock_embed),
+        ):
+            results = await search("query")
+        assert results == []
+
+    @pytest.mark.asyncio
+    async def test_flat_payload(self) -> None:
+        point = MagicMock()
+        point.score = 0.9
+        point.payload = {"text": "hello", "source": "x.yaml"}
+        mock_client = MagicMock()
+        mock_client.query_points.return_value = MagicMock(points=[point])
+        mock_embed = AsyncMock()
+        mock_embed.aget_query_embedding = AsyncMock(return_value=[0.1])
+        with (
+            patch("src.back.rag.search.get_qdrant_client", return_value=mock_client),
+            patch("src.back.rag.search._get_search_embed_model", return_value=mock_embed),
+        ):
+            results = await search("query")
+        assert len(results) == 1
+        assert results[0]["text"] == "hello"
+        assert results[0]["score"] == 0.9
+
+    @pytest.mark.asyncio
+    async def test_node_content_json_string(self) -> None:
+        point = MagicMock()
+        point.score = 0.8
+        point.payload = {"_node_content": '{"text": "nested", "metadata": {"src": "a.yaml"}}'}
+        mock_client = MagicMock()
+        mock_client.query_points.return_value = MagicMock(points=[point])
+        mock_embed = AsyncMock()
+        mock_embed.aget_query_embedding = AsyncMock(return_value=[0.1])
+        with (
+            patch("src.back.rag.search.get_qdrant_client", return_value=mock_client),
+            patch("src.back.rag.search._get_search_embed_model", return_value=mock_embed),
+        ):
+            results = await search("query")
+        assert len(results) == 1
+        assert results[0]["text"] == "nested"
+        assert results[0]["metadata"] == {"src": "a.yaml"}
+
+    @pytest.mark.asyncio
+    async def test_node_content_dict(self) -> None:
+        point = MagicMock()
+        point.score = 0.7
+        point.payload = {"_node_content": {"text": "dict text", "metadata": {"k": "v"}}}
+        mock_client = MagicMock()
+        mock_client.query_points.return_value = MagicMock(points=[point])
+        mock_embed = AsyncMock()
+        mock_embed.aget_query_embedding = AsyncMock(return_value=[0.1])
+        with (
+            patch("src.back.rag.search.get_qdrant_client", return_value=mock_client),
+            patch("src.back.rag.search._get_search_embed_model", return_value=mock_embed),
+        ):
+            results = await search("query")
+        assert len(results) == 1
+        assert results[0]["text"] == "dict text"
+        assert results[0]["metadata"] == {"k": "v"}
+
+    @pytest.mark.asyncio
+    async def test_node_content_json_decode_error_falls_back(self) -> None:
+        point = MagicMock()
+        point.score = 0.6
+        point.payload = {"_node_content": "invalid json!!", "extra": "meta"}
+        mock_client = MagicMock()
+        mock_client.query_points.return_value = MagicMock(points=[point])
+        mock_embed = AsyncMock()
+        mock_embed.aget_query_embedding = AsyncMock(return_value=[0.1])
+        with (
+            patch("src.back.rag.search.get_qdrant_client", return_value=mock_client),
+            patch("src.back.rag.search._get_search_embed_model", return_value=mock_embed),
+        ):
+            results = await search("query")
+        assert len(results) == 1
+        assert results[0]["text"] == ""
+        assert results[0]["metadata"] == {"_node_content": "invalid json!!", "extra": "meta"}
+
+    @pytest.mark.asyncio
+    async def test_score_none_becomes_zero(self) -> None:
+        point = MagicMock()
+        point.score = None
+        point.payload = {"text": "no score"}
+        mock_client = MagicMock()
+        mock_client.query_points.return_value = MagicMock(points=[point])
+        mock_embed = AsyncMock()
+        mock_embed.aget_query_embedding = AsyncMock(return_value=[0.1])
+        with (
+            patch("src.back.rag.search.get_qdrant_client", return_value=mock_client),
+            patch("src.back.rag.search._get_search_embed_model", return_value=mock_embed),
+        ):
+            results = await search("query")
+        assert len(results) == 1
+        assert results[0]["score"] == 0.0
+        assert results[0]["text"] == "no score"
+
+    @pytest.mark.asyncio
+    async def test_below_threshold_excluded(self) -> None:
+        point = MagicMock()
+        point.score = 0.3
+        point.payload = {"text": "low"}
+        mock_client = MagicMock()
+        mock_client.query_points.return_value = MagicMock(points=[point])
+        mock_embed = AsyncMock()
+        mock_embed.aget_query_embedding = AsyncMock(return_value=[0.1])
+        with (
+            patch("src.back.rag.search.get_qdrant_client", return_value=mock_client),
+            patch("src.back.rag.search._get_search_embed_model", return_value=mock_embed),
+        ):
+            results = await search("query", similarity_threshold=0.5)
+        assert results == []
+
+    @pytest.mark.asyncio
+    async def test_exception_returns_empty(self) -> None:
+        with patch("src.back.rag.search.get_qdrant_client", side_effect=ValueError("fail")):
+            results = await search("query")
+        assert results == []
+
+
+class TestSearchEngineSearch:
+    @pytest.mark.asyncio
+    async def test_default_top_k(self) -> None:
+        engine = SearchEngine()
+        with patch("src.back.rag.search.search", AsyncMock(return_value=[{"text": "a"}])):
+            results = await engine.search("q")
+        assert results == [{"text": "a"}]
+
+    @pytest.mark.asyncio
+    async def test_custom_top_k(self) -> None:
+        engine = SearchEngine()
+        with patch("src.back.rag.search.search", AsyncMock()) as mock_search:
+            await engine.search("q", top_k=3)
+        mock_search.assert_called_once_with(
+            query="q",
+            collection_name="sigmaref",
+            top_k=3,
+            similarity_threshold=0.0,
+        )
 
 
 class TestFormatSearchResult:
