@@ -20,7 +20,6 @@ LLM_DIR = MODELS_DIR / "llm"
 EMBEDDINGS_DIR = MODELS_DIR / "embeddings"
 LOGS_DIR = BASE_DIR / "logs"
 PID_DIR = BASE_DIR / "pids"
-QDRANT_STORAGE_DIR = BASE_DIR / "qdrant_storage"
 TEMP_DIR = BASE_DIR / "temp"
 
 

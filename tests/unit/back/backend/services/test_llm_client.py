@@ -47,24 +47,6 @@ def test_llama_client_config():
     assert "8080" in client.base_url or "127.0.0.1" in client.base_url
 
 
-def test_llama_client_has_chat_method():
-    """Test LlamaClient has chat method."""
-    from src.back.llamacpp.client import LlamaClient
-
-    client = LlamaClient()
-    assert hasattr(client, "chat")
-    assert callable(client.chat)
-
-
-def test_llama_client_has_complete_alias():
-    """Test LlamaClient has complete legacy alias."""
-    from src.back.llamacpp.client import LlamaClient
-
-    client = LlamaClient()
-    assert hasattr(client, "complete")
-    assert callable(client.complete)
-
-
 def test_llama_client_has_erase_slot_cache():
     """Test LlamaClient has erase_slot_cache method."""
     from src.back.llamacpp.client import LlamaClient

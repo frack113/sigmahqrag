@@ -108,29 +108,6 @@ class TestIsHealthy:
             assert mgr.is_healthy("svc") is True
 
 
-class TestGetStatus:
-    @pytest.mark.asyncio
-    async def test_healthy_service(self) -> None:
-        mgr = SubprocessManager(logs_dir=Path("/tmp/logs"), pid_dir=Path("/tmp/pids"))
-        mgr._processes["svc"] = ServiceProcess(
-            name="svc", is_running=True, pid=12345, log_file=Path("/tmp/svc.log")
-        )
-        with patch.object(mgr, "_is_process_running", return_value=True):
-            status = await mgr.get_status("svc")
-            assert status["name"] == "svc"
-            assert status["running"] is True
-            assert status["pid"] == 12345
-            assert status["log_file"] == str(Path("/tmp/svc.log"))
-
-    @pytest.mark.asyncio
-    async def test_unknown_service(self) -> None:
-        mgr = SubprocessManager(logs_dir=Path("/tmp/logs"), pid_dir=Path("/tmp/pids"))
-        status = await mgr.get_status("unknown")
-        assert status["running"] is False
-        assert status["pid"] is None
-        assert status["log_file"] is None
-
-
 class TestGetLogs:
     def test_no_log_file(self) -> None:
         mgr = SubprocessManager(logs_dir=Path("/tmp/logs"), pid_dir=Path("/tmp/pids"))

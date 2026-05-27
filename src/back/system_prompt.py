@@ -118,20 +118,6 @@ def list_prompts() -> list[dict]:
     ]
 
 
-def get_prompt_content(prompt_id: str) -> str | None:
-    """Get prompt content by ID."""
-    _ensure_loaded()
-    prompt = _prompts.get(prompt_id)
-    return prompt.content if prompt else None
-
-
-def get_prompt_description(prompt_id: str) -> str | None:
-    """Get prompt description by ID."""
-    _ensure_loaded()
-    prompt = _prompts.get(prompt_id)
-    return prompt.description if prompt else None
-
-
 def get_prompt_by_id(prompt_id: str) -> Prompt | None:
     """Get a prompt by ID."""
     _ensure_loaded()

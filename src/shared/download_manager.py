@@ -471,17 +471,6 @@ class DownloadManager:
             "message": "Download cancelled and partial file cleaned up",
         }
 
-    def get_progress(self, download_id: str) -> DownloadTask | None:
-        """Get download task for progress tracking.
-
-        Args:
-            download_id: Download ID
-
-        Returns:
-            DownloadTask or None
-        """
-        return self.active_downloads.get(download_id)
-
     def get_progress_stream(self, download_id: str) -> asyncio.Queue | None:
         """Get progress queue for SSE streaming.
 

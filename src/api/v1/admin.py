@@ -227,13 +227,6 @@ class CancelRequest(BaseModel):
     job_id: str
 
 
-class JobResponse(BaseModel):
-    """Response model for job actions (Patch 13: Pydantic model)."""
-
-    job_id: str
-    status: str
-
-
 async def start_download(service: str | None = None, target: str | None = None) -> dict[str, Any]:
     """Start download action and return job info."""
     import uuid

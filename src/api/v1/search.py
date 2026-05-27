@@ -12,8 +12,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/search", tags=["v1-search"])
 
 
-async def search_rules(query: str, limit: int = 10, suggestions: bool = False) -> list[str]:
-    """Search rules (stub - not implemented)."""
+async def search_rules(query: str, limit: int = 10) -> list[str]:
     return []
 
 

@@ -115,17 +115,6 @@ class TestTOMLService:
         assert "a" in loaded
         assert "b" not in loaded
 
-    def test_clear_cache(self, tmp_path: Path) -> None:
-        toml_file = tmp_path / "config.toml"
-        toml_file.write_text('key = "initial"\n', encoding="utf-8")
-        svc = TOMLService(toml_file)
-        svc.load()
-
-        toml_file.write_text('key = "updated"\n', encoding="utf-8")
-        svc.clear_cache()
-        result = svc.load()
-        assert result["key"] == "updated"
-
     def test_save_invalidates_cache(self, tmp_path: Path) -> None:
         toml_file = tmp_path / "config.toml"
         toml_file.write_text('key = "old"\n', encoding="utf-8")

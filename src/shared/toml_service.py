@@ -74,10 +74,6 @@ class TOMLService:
             logger.error(f"Failed to save TOML to {self.file_path}: {e}")
             return False
 
-    def clear_cache(self) -> None:
-        """Clear the in-memory cache."""
-        self._cache = None
-
 
 def _remove_none_values(obj: Any) -> Any:
     """Remove None values recursively (TOML cannot serialize None)."""
