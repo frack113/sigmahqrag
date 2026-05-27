@@ -1,4 +1,5 @@
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -210,6 +211,53 @@ class TestEdgeCases:
         f = tmp_path / "doc.md"
         f.write_text("hello", encoding="utf-8")
         assert identify(f) == FileType.MARKDOWN
+
+    def test_puremagic_exception(self, tmp_path: Path) -> None:
+        f = tmp_path / "doc.md"
+        f.write_text("hello", encoding="utf-8")
+        with patch(
+            "src.back.utils.identify_file_type.puremagic.magic_string",
+            side_effect=Exception("boom"),
+        ):
+            assert identify(str(f)) == FileType.MARKDOWN
+
+    def test_yaml_list_not_dict(self, tmp_path: Path) -> None:
+        f = tmp_path / "rule.yml"
+        f.write_text("- item1\n- item2\n", encoding="utf-8")
+        assert identify(str(f)) == FileType.PLAIN_TEXT
+
+    def test_yaml_parse_error(self, tmp_path: Path) -> None:
+        f = tmp_path / "rule.yml"
+        f.write_text("invalid: [yaml", encoding="utf-8")
+        assert identify(str(f)) == FileType.PLAIN_TEXT
+
+    def test_json_parse_error(self, tmp_path: Path) -> None:
+        f = tmp_path / "data.json"
+        f.write_text("not json", encoding="utf-8")
+        assert identify(str(f)) == FileType.PLAIN_TEXT
+
+    def test_oserror_reading_header(self, tmp_path: Path) -> None:
+        with pytest.raises(OSError):
+            identify(str(tmp_path / "somedir"))
+
+    def test_unicode_decode_error(self, tmp_path: Path) -> None:
+        f = tmp_path / "doc.txt"
+        f.write_bytes(b"\xff\xfe\x00\xff")
+        assert identify(str(f)) == FileType.UNKNOWN
+
+    def test_detector_exception_continues(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        f = tmp_path / "doc.csv"
+        f.write_text("a,b\n1,2\n", encoding="utf-8")
+
+        def broken_has_header(*args: object) -> bool:
+            raise RuntimeError("boom")
+
+        monkeypatch.setattr(
+            "src.back.utils.identify_file_type.csv.Sniffer.has_header", broken_has_header
+        )
+        assert identify(str(f)) == FileType.PLAIN_TEXT
 
 
 class TestSupportedDocExtensionMap:

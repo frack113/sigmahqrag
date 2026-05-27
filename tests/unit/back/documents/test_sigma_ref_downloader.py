@@ -11,6 +11,8 @@ from src.back.documents.sigma_ref_downloader import (
     _backoff_delay,
     _detect_url_type,
     _download_file,
+    _get_retry_after,
+    _is_private_url,
     _iso_now,
     _load_registry,
     _registry_lock,
@@ -54,6 +56,20 @@ def _make_db(entries: list[dict] | None = None) -> MagicMock:
     return db
 
 
+class TestIsPrivateUrl:
+    def test_localhost(self) -> None:
+        assert _is_private_url("http://localhost/doc.md") is True
+
+    def test_private_ip(self) -> None:
+        assert _is_private_url("http://10.0.0.1/doc.md") is True
+
+    def test_public_ip(self) -> None:
+        assert _is_private_url("http://8.8.8.8/doc.md") is False
+
+    def test_invalid_host(self) -> None:
+        assert _is_private_url("http://not-an-ip/doc.md") is False
+
+
 class TestNormalizeUrl:
     def test_github_blob_main(self) -> None:
         url = "https://github.com/user/repo/blob/main/doc.md"
@@ -85,6 +101,10 @@ class TestNormalizeUrl:
         url = "https://example.com/page.html#section"
         assert normalize_url(url) == "https://example.com/page.html"
 
+    def test_github_blob_with_fragment(self) -> None:
+        url = "https://github.com/user/repo/blob/main/doc.md#section"
+        assert normalize_url(url) == "https://raw.githubusercontent.com/user/repo/main/doc.md"
+
 
 class TestDetectUrlType:
     def test_markdown_extension(self) -> None:
@@ -106,6 +126,11 @@ class TestDetectUrlType:
 
     def test_empty_path(self) -> None:
         assert _detect_url_type("https://example.com") is None
+
+    def test_text_plain_with_md_extension(self) -> None:
+        assert (
+            _detect_url_type("https://example.com/doc.md", content_type="text/plain") == "markdown"
+        )
 
 
 class TestDownloadFile:
@@ -732,6 +757,23 @@ class TestBackoffDelay:
     def test_beyond_list_length(self) -> None:
         assert _backoff_delay(4) == 9
         assert _backoff_delay(10) == 9
+
+
+class TestGetRetryAfter:
+    def test_no_header(self) -> None:
+        response = MagicMock()
+        response.headers = {}
+        assert _get_retry_after(response) is None
+
+    def test_valid_int(self) -> None:
+        response = MagicMock()
+        response.headers = {"Retry-After": "30"}
+        assert _get_retry_after(response) == 30
+
+    def test_invalid_value(self) -> None:
+        response = MagicMock()
+        response.headers = {"Retry-After": "not-a-number"}
+        assert _get_retry_after(response) is None
 
 
 class TestSha256File:
