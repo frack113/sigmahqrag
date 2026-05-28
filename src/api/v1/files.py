@@ -23,165 +23,103 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/files", tags=["v1-files"])
 
 
-class FileOperationResponse(BaseModel):
-    """Response for file operations."""
+class FileResponse(BaseModel):
+    """Unified response for file operations."""
 
     success: bool
     message: str | None = None
-    data: dict[str, Any] | None = None
-    error: str | None = None
-
-
-class LocalFileAddResponse(BaseModel):
-    success: bool
-    message: str | None = None
-    data: dict[str, Any] | None = None
-    error: str | None = None
-
-
-class LocalFileDeleteResponse(BaseModel):
-    success: bool
-    message: str | None = None
-    error: str | None = None
-
-
-class LocalFileListResponse(BaseModel):
-    success: bool
-    data: list[dict[str, Any]] | None = None
+    data: Any = None
     total: int = 0
-    message: str | None = None
     error: str | None = None
 
 
-class LocalFileResyncResponse(BaseModel):
-    success: bool
-    message: str | None = None
-    data: dict[str, Any] | None = None
-    error: str | None = None
+def _dispatch_workers(
+    dispatcher,
+    workers: list[tuple[WorkerName, str]],
+) -> tuple[list[str], list[str]]:
+    """Dispatch multiple workers and return (triggered_names, busy_names)."""
+    triggered: list[str] = []
+    busy: list[str] = []
+    for worker, collection in workers:
+        if dispatcher.ask_for_worker(worker, task_type=worker.value, collection_name=collection):
+            triggered.append(worker.value)
+        else:
+            busy.append(worker.value)
+    return triggered, busy
 
 
-@router.post("/list", response_model=FileOperationResponse)
+@router.post("/list", response_model=FileResponse)
 async def file_list(
     dispatcher=Depends(get_dispatcher),
-) -> FileOperationResponse:
+) -> FileResponse:
     """Trigger file discovery across all sources (GitHub, Local, SigmaRef)."""
-    triggered = []
-    busy = []
-
-    if dispatcher.ask_for_worker(
-        WorkerName.GITHUB_DISCOVERY,
-        task_type=WorkerName.GITHUB_DISCOVERY.value,
-        collection_name="all",
-    ):
-        triggered.append(WorkerName.GITHUB_DISCOVERY.value)
-    else:
-        busy.append(WorkerName.GITHUB_DISCOVERY.value)
-
-    if dispatcher.ask_for_worker(
-        WorkerName.LOCAL_DISCOVERY,
-        task_type=WorkerName.LOCAL_DISCOVERY.value,
-        collection_name="local",
-    ):
-        triggered.append(WorkerName.LOCAL_DISCOVERY.value)
-    else:
-        busy.append(WorkerName.LOCAL_DISCOVERY.value)
-
-    if dispatcher.ask_for_worker(
-        WorkerName.SIGMAREF_DISCOVERY,
-        task_type=WorkerName.SIGMAREF_DISCOVERY.value,
-        collection_name="sigmaref",
-    ):
-        triggered.append(WorkerName.SIGMAREF_DISCOVERY.value)
-    else:
-        busy.append(WorkerName.SIGMAREF_DISCOVERY.value)
+    triggered, busy = _dispatch_workers(
+        dispatcher,
+        [
+            (WorkerName.GITHUB_DISCOVERY, "all"),
+            (WorkerName.LOCAL_DISCOVERY, "local"),
+            (WorkerName.SIGMAREF_DISCOVERY, "sigmaref"),
+        ],
+    )
 
     if busy:
-        return FileOperationResponse(
+        return FileResponse(
             success=False,
             error=f"Workers already busy: {', '.join(busy)}",
             data={"triggered": triggered} if triggered else None,
         )
 
-    return FileOperationResponse(
+    return FileResponse(
         success=True,
         message=f"Discovery queued for: {', '.join(triggered)}",
         data={"tasks": triggered},
     )
 
 
-@router.post("/embed", response_model=FileOperationResponse)
+@router.post("/embed", response_model=FileResponse)
 async def file_embed(
     dispatcher=Depends(get_dispatcher),
-) -> FileOperationResponse:
+) -> FileResponse:
     """Trigger file embedding across all sources (GitHub, Local, SigmaRef)."""
-    triggered = []
-    busy = []
-
-    if dispatcher.ask_for_worker(
-        WorkerName.GITHUB_EMBEDDINGS,
-        task_type=WorkerName.GITHUB_EMBEDDINGS.value,
-        collection_name="all",
-    ):
-        triggered.append(WorkerName.GITHUB_EMBEDDINGS.value)
-    else:
-        busy.append(WorkerName.GITHUB_EMBEDDINGS.value)
-
-    if dispatcher.ask_for_worker(
-        WorkerName.LOCAL_EMBEDDINGS,
-        task_type=WorkerName.LOCAL_EMBEDDINGS.value,
-        collection_name="local",
-    ):
-        triggered.append(WorkerName.LOCAL_EMBEDDINGS.value)
-    else:
-        busy.append(WorkerName.LOCAL_EMBEDDINGS.value)
-
-    if dispatcher.ask_for_worker(
-        WorkerName.SIGMAREF_EMBEDDINGS,
-        task_type=WorkerName.SIGMAREF_EMBEDDINGS.value,
-        collection_name="sigmaref",
-    ):
-        triggered.append(WorkerName.SIGMAREF_EMBEDDINGS.value)
-    else:
-        busy.append(WorkerName.SIGMAREF_EMBEDDINGS.value)
+    triggered, busy = _dispatch_workers(
+        dispatcher,
+        [
+            (WorkerName.GITHUB_EMBEDDINGS, "all"),
+            (WorkerName.LOCAL_EMBEDDINGS, "local"),
+            (WorkerName.SIGMAREF_EMBEDDINGS, "sigmaref"),
+        ],
+    )
 
     if busy:
-        return FileOperationResponse(
+        return FileResponse(
             success=False,
             error=f"Workers already busy: {', '.join(busy)}",
             data={"triggered": triggered} if triggered else None,
         )
 
-    return FileOperationResponse(
+    return FileResponse(
         success=True,
         message=f"Embedding queued for: {', '.join(triggered)}",
         data={"tasks": triggered},
     )
 
 
-@router.post("/local/add", response_model=LocalFileAddResponse)
+@router.post("/local/add", response_model=FileResponse)
 async def add_local_file(
     file: UploadFile = FastAPIFile(...),
     collection_name: str = "local",
-) -> LocalFileAddResponse:
-    """Upload a local file to configured documents path.
-
-    Args:
-        file: The file to upload (supported types only).
-        collection_name: The local collection name (default 'local').
-
-    Returns:
-        LocalFileAddResponse with success status and metadata.
-    """
+) -> FileResponse:
+    """Upload a local file to configured documents path."""
     cfg = get_config()
     base_path = Path(cfg.local_documents_path)
     base_path.mkdir(parents=True, exist_ok=True)
 
     if not file.filename:
-        return LocalFileAddResponse(success=False, error="No filename provided.")
+        return FileResponse(success=False, error="No filename provided.")
 
     ext = "." + file.filename.rsplit(".", 1)[-1].lower()
     if ext not in SUPPORTED_DOC_EXTENSION_MAP:
-        return LocalFileAddResponse(
+        return FileResponse(
             success=False,
             error=f"Unsupported file type: {ext}",
             data={"supported_extensions": list(SUPPORTED_DOC_EXTENSION_MAP.keys())},
@@ -192,12 +130,12 @@ async def add_local_file(
     try:
         rel = dest_path.relative_to(base_path.resolve())
         if ".." in rel.parts or str(dest_path) != str(resolved_filename):
-            return LocalFileAddResponse(success=False, error="Path traversal detected")
+            return FileResponse(success=False, error="Path traversal detected")
     except ValueError:
-        return LocalFileAddResponse(success=False, error="Path traversal detected")
+        return FileResponse(success=False, error="Path traversal detected")
 
     if dest_path.exists():
-        return LocalFileAddResponse(
+        return FileResponse(
             success=False,
             error=f"File already exists: {file.filename}",
         )
@@ -240,7 +178,7 @@ async def add_local_file(
         }
     )
 
-    return LocalFileAddResponse(
+    return FileResponse(
         success=True,
         message=f"File '{file.filename}' added successfully.",
         data={
@@ -253,72 +191,57 @@ async def add_local_file(
     )
 
 
-@router.delete("/local/delete", response_model=LocalFileDeleteResponse)
+@router.delete("/local/delete", response_model=FileResponse)
 async def delete_local_file(
     file_path: str,
-) -> LocalFileDeleteResponse:
-    """Delete a local file from configured documents path and doc_registry.
-
-    Args:
-        file_path: Absolute path to the file to delete.
-
-    Returns:
-        LocalFileDeleteResponse with success status.
-    """
+) -> FileResponse:
+    """Delete a local file from configured documents path and doc_registry."""
     fs_path = Path(file_path)
 
     if not fs_path.exists():
-        return LocalFileDeleteResponse(success=False, error=f"File does not exist: {file_path}")
+        return FileResponse(success=False, error=f"File does not exist: {file_path}")
 
     try:
         fs_path.unlink()
     except OSError as e:
         logging.getLogger(__name__).error(f"Error deleting file from filesystem: {e}")
-        return LocalFileDeleteResponse(success=False, error=f"Failed to delete file: {str(e)}")
+        return FileResponse(success=False, error=f"Failed to delete file: {str(e)}")
 
     db = DatabaseService.get_instance()
     url_match = f"file://{fs_path.as_posix()}"
     db.delete_doc_registry_by_url(url_match)
 
-    return LocalFileDeleteResponse(
+    return FileResponse(
         success=True,
         message="File deleted successfully.",
     )
 
 
-@router.get("/local/list", response_model=LocalFileListResponse)
+@router.get("/local/list", response_model=FileResponse)
 async def list_local_files(
     limit: int = 1000,
     offset: int = 0,
-) -> LocalFileListResponse:
-    """List all local files from doc_registry.
-
-    Args:
-        limit: Maximum number of records to return (default 1000).
-        offset: Number of records to skip for pagination (default 0).
-
-    Returns:
-        List of local file records with metadata and counts.
-    """
+) -> FileResponse:
+    """List all local files from doc_registry."""
     db = DatabaseService.get_instance()
     files = db.get_local_files(limit=limit, offset=offset)
     total = db.get_local_file_count()
 
-    return LocalFileListResponse(
+    return FileResponse(
         success=True,
         data=files,
         total=total,
     )
 
 
-@router.post("/local/resync", response_model=LocalFileResyncResponse)
-def resync_local_file_sizes() -> LocalFileResyncResponse:
+@router.post("/local/resync", response_model=FileResponse)
+def resync_local_file_sizes() -> FileResponse:
     """Synchronous endpoint for resync — runs in FastAPI thread pool to avoid blocking event loop."""
     cfg = get_config()
     base_path = cfg.local_documents_path
 
     if not base_path or not isinstance(base_path, str):
-        return LocalFileResyncResponse(
+        return FileResponse(
             success=False,
             error="local_documents_path is not configured",
         )
@@ -330,23 +253,16 @@ def resync_local_file_sizes() -> LocalFileResyncResponse:
     has_incomplete = result.get("incomplete", 0) > 0
     all_skipped = result["updated"] == 0 and result["skipped"] > 0
 
-    if has_errors or all_skipped:
-        return LocalFileResyncResponse(
-            success=False,
-            message=(
-                f"Resync complete: {result['updated']} updated, "
-                f"{result['skipped']} skipped, {result['error']} errors"
-                + (f", {result['incomplete']} incomplete hashes" if has_incomplete else "")
-            ),
-            data=result,
-        )
+    message = (
+        f"Resync complete: {result['updated']} updated, "
+        f"{result['skipped']} skipped, {result['error']} errors"
+        + (f", {result['incomplete']} incomplete hashes" if has_incomplete else "")
+    )
 
-    return LocalFileResyncResponse(
-        success=not has_incomplete or result["updated"] > 0,
-        message=(
-            f"Resync complete: {result['updated']} updated, "
-            f"{result['skipped']} skipped, {result['error']} errors"
-            + (f", {result['incomplete']} files with incomplete hashes" if has_incomplete else "")
-        ),
+    success = not (has_errors or all_skipped) and not (has_incomplete and result["updated"] == 0)
+
+    return FileResponse(
+        success=success,
+        message=message,
         data=result,
     )

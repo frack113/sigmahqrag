@@ -12,7 +12,11 @@ from fastapi.responses import JSONResponse
 from src.api.dependencies import get_database_service, get_embedding_manager, get_unified_registry
 from src.back.database import DatabaseService
 from src.back.models import EmbeddingManager
-from src.api.v1._models_shared import _delete_all_models_of_type, _download_progress
+from src.api.v1._models_shared import (
+    _delete_all_models_of_type,
+    _delete_embedding_model as _shared_delete_embedding,
+    _download_progress,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -82,37 +86,12 @@ async def download_embedding_model(
 @router.delete("/embedding/{repo_id}")
 async def delete_embedding_model(repo_id: str) -> JSONResponse:
     """Delete an embedding model."""
-    import shutil
-    from pathlib import Path
-
-    from src.shared import EMBEDDINGS_DIR
-
-    if not repo_id or ".." in repo_id or "/" in repo_id:
-        return JSONResponse(status_code=400, content={"error": "Invalid repo_id"})
-
-    try:
-        db = get_database_service()
-        reg = get_unified_registry()
-        record = reg.get_embedding(repo_id, db)
-        if not record:
-            return JSONResponse(status_code=404, content={"error": f"Model {repo_id} not found"})
-        path = Path(record.get("local_path", "")).resolve()
-        try:
-            path.relative_to(Path(EMBEDDINGS_DIR).resolve())
-        except ValueError:
-            return JSONResponse(
-                status_code=400, content={"error": f"Invalid path for model {repo_id}"}
-            )
-        if path.exists():
-            if path.is_dir():
-                shutil.rmtree(path)
-            else:
-                path.unlink()
-        reg.remove_embedding(repo_id, db)
+    result = _shared_delete_embedding(repo_id)
+    if result.get("success"):
         return JSONResponse(content={"success": True, "repo_id": repo_id})
-    except Exception as e:
-        logger.error(f"Delete failed: {e}")
-        return JSONResponse(status_code=500, content={"error": "An internal error occurred"})
+
+    status_code = result.get("status_code", 500)
+    return JSONResponse(status_code=status_code, content={"error": result["error"]})
 
 
 @router.get("/embeddings/search")

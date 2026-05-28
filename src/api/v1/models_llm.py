@@ -9,7 +9,11 @@ from fastapi.responses import JSONResponse
 
 from src.api.dependencies import get_database_service, get_embedding_manager, get_unified_registry
 from src.back.models import HFRepo
-from src.api.v1._models_shared import _delete_all_models_of_type, _download_progress
+from src.api.v1._models_shared import (
+    _delete_all_models_of_type,
+    _delete_llm_model_file,
+    _download_progress,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -205,49 +209,9 @@ async def delete_llm_model(repo_id: str) -> JSONResponse:
 @router.delete("/llm/{repo_id}/file/{filename}")
 async def delete_llm_model_file(repo_id: str, filename: str) -> JSONResponse:
     """Delete a LLM model file."""
-    from pathlib import Path
-
-    from src.back.models.exceptions import ModelNotFoundError
-    from src.shared import LLM_DIR
-
-    if (
-        not repo_id
-        or ".." in repo_id
-        or repo_id.count("/") != 1
-        or repo_id.startswith("/")
-        or repo_id.endswith("/")
-    ):
-        return JSONResponse(status_code=400, content={"error": "Invalid repo_id"})
-
-    try:
-        db = get_database_service()
-        reg = get_unified_registry()
-        record = reg.get_llm(repo_id, db)
-        if not record:
-            raise ModelNotFoundError(f"Model {repo_id} not found")
-        if filename not in record.get("files", {}):
-            raise ModelNotFoundError(f"File {filename} not found in {repo_id}")
-        path = Path(record["files"][filename]["local_path"]).resolve()
-        try:
-            path.relative_to(Path(LLM_DIR).resolve())
-        except ValueError:
-            raise ModelNotFoundError(f"Invalid file path for {filename}")
-        if path.exists():
-            path.unlink()
-            parent = path.parent
-            while (
-                parent != Path(LLM_DIR).resolve() and parent.exists() and not any(parent.iterdir())
-            ):
-                parent.rmdir()
-                parent = parent.parent
-        del record["files"][filename]
-        if record["files"]:
-            reg._save(db)
-        else:
-            reg.remove_llm(repo_id, db)
+    result = _delete_llm_model_file(repo_id, filename)
+    if result.get("success"):
         return JSONResponse(content={"success": True, "repo_id": repo_id, "filename": filename})
-    except ModelNotFoundError as e:
-        return JSONResponse(status_code=404, content={"error": str(e)})
-    except Exception as e:
-        logger.error(f"Delete failed: {e}")
-        return JSONResponse(status_code=500, content={"error": "An internal error occurred"})
+
+    status_code = result.get("status_code", 500)
+    return JSONResponse(status_code=status_code, content={"error": result["error"]})

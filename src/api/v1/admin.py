@@ -145,62 +145,51 @@ async def post_backend(request: dict) -> JSONResponse:
         action = request.get("action")
         service = request.get("service")
 
-        if action == "start":
-            if service == "llama":
-                from pathlib import Path
+        result: dict[str, Any]
 
-                from src.shared import LLM_DIR
+        if action == "start" and service == "llama":
+            from pathlib import Path
 
-                # Find any available model
-                models = list(Path(LLM_DIR).rglob("*.gguf"))
-                model_path = str(models[0]) if models else None
+            from src.back.llamacpp.service import create_llama_service
+            from src.shared import LLM_DIR
 
-                if not model_path:
-                    return JSONResponse(
-                        content={
-                            "data": {
-                                "success": False,
-                                "error": "No model found in models/llm",
-                            },
-                            "status": "error",
-                        }
-                    )
+            models = list(Path(LLM_DIR).rglob("*.gguf"))
+            model_path = str(models[0]) if models else None
 
-                from src.back.llamacpp.service import create_llama_service
-
-                service_manager = create_llama_service()
-                base_url = get_config().llama_base_url or "http://127.0.0.1:8080"
-                _, llama_port = _parse_llama_url(base_url)
-                result = await service_manager.start(
-                    model_path=model_path,
-                    port=llama_port,
-                    context_size=4096,
+            if not model_path:
+                return JSONResponse(
+                    content={
+                        "data": {"success": False, "error": "No model found in models/llm"},
+                        "status": "error",
+                    }
                 )
 
-            elif service == "qdrant":
-                from src.back.qdrant.service import create_qdrant_service
+            base_url = get_config().llama_base_url or "http://127.0.0.1:8080"
+            _, llama_port = _parse_llama_url(base_url)
+            result = await create_llama_service().start(
+                model_path=model_path, port=llama_port, context_size=4096
+            )
 
-                qdrant_svc = create_qdrant_service()
-                result = await qdrant_svc.start()
-            else:
-                result = {"success": False, "error": f"Unknown service: {service}"}
+        elif action == "stop" and service == "llama":
+            from src.back.llamacpp.service import create_llama_service
 
-        elif action == "stop":
-            if service == "llama":
-                from src.back.llamacpp.service import create_llama_service
+            result = await create_llama_service().stop()
 
-                llm_svc = create_llama_service()
-                result = await llm_svc.stop()
-            elif service == "qdrant":
-                from src.back.qdrant.service import create_qdrant_service
+        elif action == "start" and service == "qdrant":
+            from src.back.qdrant.service import create_qdrant_service
 
-                qdrant_svc = create_qdrant_service()
-                result = await qdrant_svc.stop()
-            else:
-                result = {"success": False, "error": f"Unknown service: {service}"}
+            result = await create_qdrant_service().start()
+
+        elif action == "stop" and service == "qdrant":
+            from src.back.qdrant.service import create_qdrant_service
+
+            result = await create_qdrant_service().stop()
 
         else:
-            result = {"success": False, "error": f"Unknown action: {action}"}
+            result = {
+                "success": False,
+                "error": f"Unknown action/service: {action}/{service}",
+            }
 
         return JSONResponse(
             content={
