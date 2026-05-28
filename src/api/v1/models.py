@@ -26,6 +26,50 @@ def set_progress(repo_id: str, progress: int, status: str = "downloading"):
     _download_progress[repo_id] = {"progress": progress, "status": status}
 
 
+def _delete_all_models_of_type(model_type: str) -> None:
+    """Delete all models of a given type (llm or embeddings) from disk and registry."""
+    import shutil
+    from pathlib import Path
+
+    from src.api.dependencies import get_database_service, get_unified_registry
+    from src.shared import LLM_DIR as llm_dir, EMBEDDINGS_DIR as emb_dir
+
+    db = get_database_service()
+    reg = get_unified_registry()
+    models_dir = llm_dir if model_type == "llm" else emb_dir
+
+    if model_type == "llm":
+        reg.sync_llm_folder(models_dir, db)
+        items = reg.list_llms(db)
+    else:
+        reg.sync_embeddings_folder(models_dir, db)
+        items = reg.list_embeddings(db)
+
+    for repo_id, data in items.items():
+        if model_type == "llm":
+            for filename, info in data.get("files", {}).items():
+                path = Path(info["local_path"]).resolve()
+                if path.exists():
+                    path.unlink()
+                parent = path.parent
+                while (
+                    parent != Path(models_dir).resolve()
+                    and parent.exists()
+                    and not any(parent.iterdir())
+                ):
+                    parent.rmdir()
+                    parent = parent.parent
+            reg.remove_llm(repo_id, db)
+        else:
+            path = Path(data["local_path"]).resolve()
+            if path.exists():
+                if path.is_dir():
+                    shutil.rmtree(path)
+                else:
+                    path.unlink()
+            reg.remove_embedding(repo_id, db)
+
+
 @router.get("/llm/progress")
 async def get_download_progress(repo_id: str) -> JSONResponse:
     """Get download progress for a model."""
@@ -140,23 +184,30 @@ async def get_llm_model_info(repo_id: str) -> JSONResponse:
 async def download_llm_model(
     repo_id: str,
     filename: str | None = None,
-    expected_hash: str | None = None,
 ) -> JSONResponse:
-    """Download a LLM model from HuggingFace. Returns immediately - download runs in background."""
+    """Download a LLM model. Auto-deletes existing LLM model first.
+    If filename is not provided, tries to auto-discover GGUF files."""
     import asyncio
 
     from src.api.dependencies import get_embedding_manager
+
+    # Delete existing LLM model(s) first
+    _delete_all_models_of_type("llm")
 
     set_progress(repo_id, 0, "starting")
 
     async def download_in_background():
         try:
             mm = get_embedding_manager()
+            resolved_filename = filename
+            if not resolved_filename:
+                files = mm.download_service.list_gguf_files(HFRepo.from_string(repo_id))
+                if files:
+                    resolved_filename = files[0]["filename"]
             set_progress(repo_id, 5, "downloading")
             await mm.download_model(
                 repo_id=repo_id,
-                filename=filename,
-                expected_hash=expected_hash,
+                filename=resolved_filename,
             )
             set_progress(repo_id, 100, "completed")
             logger.info(f"Download completed: {repo_id}")
@@ -164,7 +215,6 @@ async def download_llm_model(
             set_progress(repo_id, 0, f"error: {str(e)}")
             logger.error(f"Download failed: {e}")
 
-    # Start download in background and return immediately
     asyncio.create_task(download_in_background())
 
     return JSONResponse(
@@ -276,8 +326,13 @@ async def download_embedding_model(
     repo_id: str,
     filename: str | None = None,
 ) -> JSONResponse:
-    """Download an embedding model from HuggingFace."""
+    """Download an embedding model. Auto-deletes existing embedding model first."""
     import asyncio
+
+    from src.api.dependencies import get_embedding_manager
+
+    # Delete existing embedding model first
+    _delete_all_models_of_type("embeddings")
 
     def set_emb_progress(r: str, p: int, s: str = "downloading"):
         _download_progress[f"emb_{r}"] = {"progress": p, "status": s}
