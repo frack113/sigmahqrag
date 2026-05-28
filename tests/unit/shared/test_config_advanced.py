@@ -20,7 +20,7 @@ class TestConfigSave:
     def test_saves_via_db(self) -> None:
         mock_db = MagicMock()
         cfg = Config()
-        with patch("src.shared.config.DatabaseService.get_instance", return_value=mock_db):
+        with patch("src.back.database.DatabaseService.get_instance", return_value=mock_db):
             result = cfg.save()
             assert result is True
             mock_db.set_config.assert_called()
@@ -30,7 +30,7 @@ class TestConfigSave:
         mock_db = MagicMock()
         mock_db.set_config.side_effect = RuntimeError("db error")
         cfg = Config()
-        with patch("src.shared.config.DatabaseService.get_instance", return_value=mock_db):
+        with patch("src.back.database.DatabaseService.get_instance", return_value=mock_db):
             result = cfg.save()
             assert result is False
 
@@ -43,7 +43,7 @@ class TestConfigApplyDbOverrides:
             "backend.gpu_type": "cuda",
         }.get(k)
         cfg = Config()
-        with patch("src.shared.config.DatabaseService.get_instance", return_value=mock_db):
+        with patch("src.back.database.DatabaseService.get_instance", return_value=mock_db):
             cfg.apply_db_overrides()
             assert cfg.os == "linux"
             assert cfg.gpu_type == "cuda"
@@ -52,7 +52,7 @@ class TestConfigApplyDbOverrides:
         mock_db = MagicMock()
         mock_db.get_config.return_value = {"value": "nvidia"}
         cfg = Config()
-        with patch("src.shared.config.DatabaseService.get_instance", return_value=mock_db):
+        with patch("src.back.database.DatabaseService.get_instance", return_value=mock_db):
             cfg.apply_db_overrides()
             assert cfg.gpu_type == "nvidia"
 
@@ -60,7 +60,7 @@ class TestConfigApplyDbOverrides:
         mock_db = MagicMock()
         mock_db.get_config.return_value = None
         cfg = Config()
-        with patch("src.shared.config.DatabaseService.get_instance", return_value=mock_db):
+        with patch("src.back.database.DatabaseService.get_instance", return_value=mock_db):
             cfg.apply_db_overrides()
             assert cfg.os == "windows"
 

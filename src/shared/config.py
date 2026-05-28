@@ -7,8 +7,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from src.back.database import DatabaseService
-
 logger = logging.getLogger(__name__)
 
 
@@ -149,6 +147,8 @@ class Config:
     def save(self) -> bool:
         global _config
         try:
+            from src.back.database import DatabaseService
+
             db = DatabaseService.get_instance()
             db.set_config("backend.os", self.os)
             db.set_config("backend.gpu_type", self.gpu_type)
@@ -163,6 +163,8 @@ class Config:
             return False
 
     def apply_db_overrides(self) -> None:
+        from src.back.database import DatabaseService
+
         db = DatabaseService.get_instance()
         overrides = {
             "backend.os": "os",

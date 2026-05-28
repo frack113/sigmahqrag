@@ -7,13 +7,14 @@ from unittest.mock import ANY, MagicMock, patch
 
 import httpx
 
+from src.shared.utils import iso_now
+
 from src.back.documents.sigma_ref_downloader import (
     _backoff_delay,
     _detect_url_type,
     _download_file,
     _get_retry_after,
     _is_private_url,
-    _iso_now,
     _load_registry,
     _registry_lock,
     _save_registry,
@@ -264,7 +265,7 @@ class TestRegistry:
         data = {
             "abc": {
                 "original_url": "https://example.com/doc.md",
-                "timestamp": _iso_now(),
+                "timestamp": iso_now(),
             }
         }
         _save_registry(data, tmp_path, db)
@@ -562,7 +563,7 @@ references:
                     "content_type": "markdown",
                     "rule_id": "rule-009",
                     "title": "Test Rule",
-                    "timestamp": _iso_now(),
+                    "timestamp": iso_now(),
                     "content_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
                 }
             ]
@@ -618,7 +619,7 @@ references:
                     "content_type": "markdown",
                     "rule_id": "rule-010",
                     "title": "Test Rule",
-                    "timestamp": _iso_now(),
+                    "timestamp": iso_now(),
                     "content_sha256": same_sha,
                 }
             ]
@@ -670,7 +671,7 @@ references:
                     "content_type": "markdown",
                     "rule_id": "rule-011",
                     "title": "Test Rule",
-                    "timestamp": _iso_now(),
+                    "timestamp": iso_now(),
                 }
             ]
         )

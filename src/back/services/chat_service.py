@@ -8,8 +8,8 @@ from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
 from typing import Any
 
-from src.back.backend.services.rag_pipeline import RAGPipeline
-from src.back.backend.services.sigma_validator import SigmaValidator
+from src.back.services.rag_pipeline import RAGPipeline
+from src.back.services.sigma_validator import SigmaValidator
 from src.back.rag.search import SearchEngine
 from src.shared.schemas.chat_mode import ChatMode
 

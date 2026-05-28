@@ -3,7 +3,7 @@ import logging
 from pathlib import Path
 
 from src.worker.base import BaseWorker
-from src.worker.utils import iso_now
+from src.shared.utils import iso_now
 from src.back.utils.identify_file_type import SUPPORTED_DOC_EXTENSION_MAP, identify
 
 logger = logging.getLogger(__name__)

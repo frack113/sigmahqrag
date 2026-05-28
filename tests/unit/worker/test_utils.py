@@ -1,6 +1,6 @@
 """Tests for worker utility functions."""
 
-from src.worker.utils import iso_now
+from src.shared.utils import iso_now
 
 
 class TestWorkerIsoNow:

@@ -16,6 +16,7 @@ import yaml
 
 from src.back.database import DatabaseService
 from src.back.utils.identify_file_type import SUPPORTED_DOC_EXTENSION_MAP
+from src.shared.utils import iso_now
 
 logger = logging.getLogger(__name__)
 
@@ -364,7 +365,7 @@ def download_references(
                                 content_type=existing.get("content_type", "markdown"),
                                 rule_id=rule_id,
                                 title=rule_title,
-                                timestamp=_iso_now(),
+                                timestamp=iso_now(),
                                 content_sha256=_sha256_file(output_file),
                                 file_name=output_file.name,
                                 file_size=output_file.stat().st_size,
@@ -389,7 +390,7 @@ def download_references(
                     content_type=_detect_url_type(normalized) or "markdown",
                     rule_id=rule_id,
                     title=rule_title,
-                    timestamp=_iso_now(),
+                    timestamp=iso_now(),
                     content_sha256=content_hash,
                     file_name=output_file.name,
                     file_size=output_file.stat().st_size,
@@ -413,7 +414,7 @@ def download_references(
                     content_type=ftype,
                     rule_id=rule_id,
                     title=rule_title,
-                    timestamp=_iso_now(),
+                    timestamp=iso_now(),
                     content_sha256=content_hash,
                     file_name=output_file.name,
                     file_size=output_file.stat().st_size if output_file.exists() else None,
@@ -474,10 +475,3 @@ def _empty_summary() -> dict[str, Any]:
         "skipped": 0,
         "failed": 0,
     }
-
-
-def _iso_now() -> str:
-    """Return current UTC timestamp in ISO 8601 format."""
-    from datetime import datetime, timezone
-
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")

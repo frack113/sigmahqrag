@@ -7,11 +7,12 @@ import json
 import logging
 import os
 import threading
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 import duckdb
+
+from src.shared.utils import iso_now
 
 logger = logging.getLogger(__name__)
 
@@ -35,10 +36,6 @@ _VALID_TABLES = frozenset(
         "worker_state",
     }
 )
-
-
-def _iso_now() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 class DatabaseService:
@@ -779,7 +776,6 @@ class DatabaseService:
 
     def set_selected_dirs(self, repo_key: str, dirs: list[str]) -> None:
         """Set selected directories for a repository."""
-        now = _iso_now()
         with self._lock:
             self._writer_conn.execute(
                 "DELETE FROM git_selected_dirs WHERE repo_key = ?", (repo_key,)
@@ -787,7 +783,7 @@ class DatabaseService:
             for d in dirs:
                 self._writer_conn.execute(
                     "INSERT INTO git_selected_dirs (repo_key, dir_path, updated) VALUES (?, ?, ?)",
-                    (repo_key, d, now),
+                    (repo_key, d, iso_now()),
                 )
             self._writer_conn.commit()
 
@@ -812,7 +808,6 @@ class DatabaseService:
         current_file: str | None = None,
     ) -> None:
         """Upsert worker state."""
-        now = _iso_now()
         with self._lock:
             self._writer_conn.execute(
                 """INSERT INTO worker_state (worker_type, status, current_task_id, progress_percent, current_file, last_heartbeat)
@@ -823,7 +818,7 @@ class DatabaseService:
                      progress_percent = EXCLUDED.progress_percent,
                      current_file = EXCLUDED.current_file,
                      last_heartbeat = EXCLUDED.last_heartbeat""",
-                (worker_type, status, current_task_id, progress_percent, current_file, now),
+                (worker_type, status, current_task_id, progress_percent, current_file, iso_now()),
             )
             self._writer_conn.commit()
 
@@ -848,11 +843,10 @@ class DatabaseService:
         self, worker_type: str, progress_percent: float, current_file: str | None = None
     ) -> None:
         """Update progress for a worker type."""
-        now = _iso_now()
         with self._lock:
             self._writer_conn.execute(
                 "UPDATE worker_state SET progress_percent = ?, current_file = ?, last_heartbeat = ? WHERE worker_type = ?",
-                (progress_percent, current_file, now, worker_type),
+                (progress_percent, current_file, iso_now(), worker_type),
             )
             self._writer_conn.commit()
 

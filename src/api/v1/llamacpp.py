@@ -6,7 +6,7 @@ from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from src.api.sse import download_progress_generator
-from src.back.backend.services.health_check import HealthCheckService
+from src.back.services.health_check import HealthCheckService
 from src.back.llamacpp.service import create_llama_service
 from src.shared import get_config
 from src.shared.download_manager import create_download_manager

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import time
 
-from src.back.backend.services.cache import ResponseCache
+from src.back.services.cache import ResponseCache
 
 
 def test_cache_set_and_get() -> None:
