@@ -40,10 +40,10 @@ def _delete_all_models_of_type(model_type: str) -> None:
 
     if model_type == "llm":
         reg.sync_llm_folder(models_dir, db)
-        items = reg.list_llms(db)
+        items = dict(reg.list_llms(db))
     else:
         reg.sync_embeddings_folder(models_dir, db)
-        items = reg.list_embeddings(db)
+        items = dict(reg.list_embeddings(db))
 
     for repo_id, data in items.items():
         if model_type == "llm":
@@ -198,17 +198,37 @@ async def download_llm_model(
 
     async def download_in_background():
         try:
-            mm = get_embedding_manager()
+            from huggingface_hub import hf_hub_download
+
+            from src.api.dependencies import get_database_service, get_unified_registry
+            from src.shared import LLM_DIR
+
             resolved_filename = filename
             if not resolved_filename:
+                mm = get_embedding_manager()
                 files = mm.download_service.list_gguf_files(HFRepo.from_string(repo_id))
                 if files:
                     resolved_filename = files[0]["filename"]
+            if not resolved_filename:
+                raise ValueError("No GGUF file specified or discovered")
+
             set_progress(repo_id, 5, "downloading")
-            await mm.download_model(
+
+            repo = HFRepo.from_string(repo_id)
+            dest_dir = LLM_DIR / repo.owner / repo.name
+            dest_dir.mkdir(parents=True, exist_ok=True)
+
+            hf_hub_download(
                 repo_id=repo_id,
                 filename=resolved_filename,
+                local_dir=dest_dir,
+                local_dir_use_symlinks=False,
             )
+
+            db = get_database_service()
+            reg = get_unified_registry()
+            reg.sync_llm_folder(LLM_DIR, db)
+
             set_progress(repo_id, 100, "completed")
             logger.info(f"Download completed: {repo_id}")
         except Exception as e:

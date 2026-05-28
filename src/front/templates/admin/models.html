@@ -7,28 +7,53 @@
 {% block content %}
 
 <div class="card">
-  <h3>LLM Model</h3>
-  <div id="llm-model">
-    <p>Loading...</p>
+  <h3>LLM Model <span class="text-muted" style="font-weight:normal;font-size:0.9rem">— Download New Model from HuggingFace</span></h3>
+  <div id="llm-model"><p>Loading...</p></div>
+  <hr>
+  <div class="form-group">
+    <label>Download New Model:</label>
+    <input type="text" id="llm-dl-repo" placeholder="org/model" style="width:350px">
+    <button class="btn btn-secondary btn-sm" onclick="listLLMFiles()">List Files</button>
   </div>
+  <div id="llm-dl-files" style="display:none">
+    <div class="form-group">
+      <label>GGUF Version:</label>
+      <select id="llm-dl-select" style="width:350px"></select>
+    </div>
+    <button class="btn btn-primary" onclick="startLLMDownload()">Download</button>
+  </div>
+  <div id="llm-dl-progress" style="display:none">
+    <progress id="llm-dl-bar" value="0" max="100" style="width:100%"></progress>
+    <p id="llm-dl-text">Starting...</p>
+  </div>
+  <p id="llm-dl-error" class="error" style="display:none"></p>
 </div>
 
 <div class="card">
-  <h3>Embedding Model</h3>
-  <div id="embedding-model">
-    <p>Loading...</p>
+  <h3>Embedding Model <span class="text-muted" style="font-weight:normal;font-size:0.9rem">— Download New Model from HuggingFace</span></h3>
+  <div id="embedding-model"><p>Loading...</p></div>
+  <hr>
+  <div class="form-group">
+    <label>Download New Model:</label>
+    <input type="text" id="emb-dl-repo" placeholder="org/model" style="width:350px">
+    <button class="btn btn-primary" onclick="startEmbDownload()">Download</button>
   </div>
+  <div id="emb-dl-progress" style="display:none">
+    <progress id="emb-dl-bar" value="0" max="100" style="width:100%"></progress>
+    <p id="emb-dl-text">Starting...</p>
+  </div>
+  <p id="emb-dl-error" class="error" style="display:none"></p>
 </div>
 
 <script>
 function loadModels() {
   fetch('/api/v1/models/llm/installed')
-    .then(r => r.json())
+    .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
     .then(data => {
       const models = data.models || [];
       const el = document.getElementById('llm-model');
       if (models.length === 0) {
-        el.innerHTML = '<p>No LLM model installed.</p>' + downloadForm('llm');
+        el.innerHTML = '<p>No LLM model installed.</p>';
         return;
       }
       const m = models[0];
@@ -36,90 +61,123 @@ function loadModels() {
       const size = Math.round((f.size || 0) / 1024 / 1024) || '?';
       const name = f.filename || m.repo_id;
       el.innerHTML = `
-        <p><strong>${escHtml(name)}</strong> (${size} MB)</p>
-        <p>
-          <button class="btn btn-danger btn-sm" onclick="deleteLLM('${escAttr(m.repo_id)}', '${escAttr(f.filename || '')}')">Delete</button>
-          <button class="btn btn-primary btn-sm" onclick="showDownload('llm')">Replace</button>
-        </p>
-        <div id="llm-download" style="display:none">${downloadForm('llm')}</div>`;
+        <p><strong>${escHtml(name)}</strong> (${size} MB) &mdash; ${escHtml(m.repo_id)}
+        <button class="btn btn-danger btn-sm" style="margin-left:1em" onclick="deleteLLM('${escAttr(m.repo_id)}', '${escAttr(f.filename || '')}')">Delete</button>
+        </p>`;
     })
     .catch(() => {
       document.getElementById('llm-model').innerHTML = '<p class="error">Failed to load</p>';
     });
 
   fetch('/api/v1/models/embedding/installed')
-    .then(r => r.json())
+    .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
     .then(data => {
       const modelsObj = data.models || {};
       const models = Array.isArray(modelsObj) ? modelsObj : Object.entries(modelsObj).map(([repo_id, info]) => ({ repo_id, ...info }));
       const el = document.getElementById('embedding-model');
       if (models.length === 0) {
-        el.innerHTML = '<p>No embedding model installed.</p>' + downloadForm('embedding');
+        el.innerHTML = '<p>No embedding model installed.</p>';
         return;
       }
       const m = models[0];
       el.innerHTML = `
-        <p><strong>${escHtml(m.repo_id)}</strong></p>
-        <p>
-          <button class="btn btn-danger btn-sm" onclick="deleteEmbedding('${escAttr(m.repo_id)}')">Delete</button>
-          <button class="btn btn-primary btn-sm" onclick="showDownload('embedding')">Replace</button>
-        </p>
-        <div id="embedding-download" style="display:none">${downloadForm('embedding')}</div>`;
+        <p><strong>${escHtml(m.repo_id)}</strong>
+        <button class="btn btn-danger btn-sm" style="margin-left:1em" onclick="deleteEmbedding('${escAttr(m.repo_id)}')">Delete</button>
+        </p>`;
     })
     .catch(() => {
       document.getElementById('embedding-model').innerHTML = '<p class="error">Failed to load</p>';
     });
 }
 
-function downloadForm(type) {
-  const label = type === 'llm' ? 'LLM Model' : 'Embedding Model';
-  return `
-    <div class="form-group">
-      <label>HuggingFace ID:</label>
-      <input type="text" id="${type}-repo-id" placeholder="org/model" style="width:350px">
-      <button class="btn btn-secondary btn-sm" onclick="startDownload('${type}')">Download</button>
-    </div>
-    <div id="${type}-progress" style="display:none">
-      <progress id="${type}-progress-bar" value="0" max="100" style="width:100%"></progress>
-      <p id="${type}-progress-text">Starting...</p>
-    </div>`;
-}
-
-function showDownload(type) {
-  const el = document.getElementById(type + '-download');
-  if (el) el.style.display = 'block';
-}
-
-function startDownload(type) {
-  const repoId = document.getElementById(type + '-repo-id').value.trim();
+function listLLMFiles() {
+  const repoId = document.getElementById('llm-dl-repo').value.trim();
   if (!repoId) { alert('Enter a HuggingFace model ID'); return; }
+  const errEl = document.getElementById('llm-dl-error');
+  errEl.style.display = 'none';
+  document.getElementById('llm-dl-files').style.display = 'none';
+  fetch('/api/v1/models/llm/files?repo_id=' + encodeURIComponent(repoId))
+    .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
+    .then(data => {
+      const files = data.files || [];
+      if (files.length === 0) {
+        errEl.textContent = 'No GGUF files found.';
+        errEl.style.display = 'block';
+        return;
+      }
+      const select = document.getElementById('llm-dl-select');
+      select.innerHTML = files.map(f =>
+        `<option value="${escAttr(f.filename)}">${escHtml(f.filename)} (${Math.round((f.size || 0) / 1024 / 1024) || '?'} MB)</option>`
+      ).join('');
+      document.getElementById('llm-dl-files').style.display = 'block';
+    })
+    .catch(e => {
+      errEl.textContent = 'Error: ' + e.message;
+      errEl.style.display = 'block';
+    });
+}
 
-  const basePath = type === 'embedding' ? '/api/v1/models/embedding' : '/api/v1/models/llm';
-  const url = basePath + '/download?repo_id=' + encodeURIComponent(repoId);
-
-  document.getElementById(type + '-progress').style.display = 'block';
-  document.getElementById(type + '-progress-bar').value = 0;
-  document.getElementById(type + '-progress-text').textContent = 'Deleting old model and downloading...';
-
+function startLLMDownload() {
+  const repoId = document.getElementById('llm-dl-repo').value.trim();
+  const filename = document.getElementById('llm-dl-select').value;
+  if (!repoId || !filename) return;
+  const url = '/api/v1/models/llm/download?repo_id=' + encodeURIComponent(repoId) + '&filename=' + encodeURIComponent(filename);
+  document.getElementById('llm-dl-progress').style.display = 'block';
+  document.getElementById('llm-dl-bar').value = 0;
+  document.getElementById('llm-dl-text').textContent = 'Deleting old model and downloading...';
+  document.getElementById('llm-dl-error').style.display = 'none';
   const poll = setInterval(() => {
-    fetch(basePath + '/progress?repo_id=' + encodeURIComponent(repoId))
-      .then(r => r.json())
+    fetch('/api/v1/models/llm/progress?repo_id=' + encodeURIComponent(repoId))
+      .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
       .then(d => {
         const p = d.progress || 0;
-        document.getElementById(type + '-progress-bar').value = p;
-        document.getElementById(type + '-progress-text').textContent = 'Downloading... ' + p + '%';
+        document.getElementById('llm-dl-bar').value = p;
+        document.getElementById('llm-dl-text').textContent = 'Downloading... ' + p + '%';
         if (p >= 100 || d.status === 'completed') {
           clearInterval(poll);
-          document.getElementById(type + '-progress-text').textContent = 'Complete!';
+          document.getElementById('llm-dl-text').textContent = 'Complete!';
           setTimeout(loadModels, 2000);
         }
-      });
+      })
+      .catch(() => { clearInterval(poll); document.getElementById('llm-dl-text').textContent = 'Poll error'; });
   }, 2000);
-
   fetch(url, { method: 'POST' })
-    .then(r => r.json())
-    .then(d => { if (!d.success) { clearInterval(poll); document.getElementById(type + '-progress-text').textContent = 'Failed: ' + d.error; } })
-    .catch(e => { clearInterval(poll); document.getElementById(type + '-progress-text').textContent = 'Error: ' + e.message; });
+    .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
+    .then(d => {
+      if (!d.success) { clearInterval(poll); document.getElementById('llm-dl-text').textContent = 'Failed: ' + (d.error || d.message); }
+    })
+    .catch(e => { clearInterval(poll); document.getElementById('llm-dl-text').textContent = 'Error: ' + e.message; });
+}
+
+function startEmbDownload() {
+  const repoId = document.getElementById('emb-dl-repo').value.trim();
+  if (!repoId) { alert('Enter a HuggingFace model ID'); return; }
+  const url = '/api/v1/models/embedding/download?repo_id=' + encodeURIComponent(repoId);
+  document.getElementById('emb-dl-progress').style.display = 'block';
+  document.getElementById('emb-dl-bar').value = 0;
+  document.getElementById('emb-dl-text').textContent = 'Deleting old model and downloading...';
+  document.getElementById('emb-dl-error').style.display = 'none';
+  const poll = setInterval(() => {
+    fetch('/api/v1/models/embedding/progress?repo_id=' + encodeURIComponent(repoId))
+      .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
+      .then(d => {
+        const p = d.progress || 0;
+        document.getElementById('emb-dl-bar').value = p;
+        document.getElementById('emb-dl-text').textContent = 'Downloading... ' + p + '%';
+        if (p >= 100 || d.status === 'completed') {
+          clearInterval(poll);
+          document.getElementById('emb-dl-text').textContent = 'Complete!';
+          setTimeout(loadModels, 2000);
+        }
+      })
+      .catch(() => { clearInterval(poll); document.getElementById('emb-dl-text').textContent = 'Poll error'; });
+  }, 2000);
+  fetch(url, { method: 'POST' })
+    .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
+    .then(d => {
+      if (!d.success) { clearInterval(poll); document.getElementById('emb-dl-text').textContent = 'Failed: ' + (d.error || d.message); }
+    })
+    .catch(e => { clearInterval(poll); document.getElementById('emb-dl-text').textContent = 'Error: ' + e.message; });
 }
 
 function deleteLLM(repoId, filename) {
@@ -129,7 +187,7 @@ function deleteLLM(repoId, filename) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ repo_id: repoId, filename: filename }),
   })
-  .then(r => r.json())
+  .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
   .then(d => { alert(d.status === 'success' ? 'Deleted' : (d.error || 'Error')); loadModels(); })
   .catch(e => { alert('Error: ' + e.message); });
 }
@@ -141,7 +199,7 @@ function deleteEmbedding(repoId) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ repo_id: repoId }),
   })
-  .then(r => r.json())
+  .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
   .then(d => { alert(d.status === 'success' ? 'Deleted' : (d.error || 'Error')); loadModels(); })
   .catch(e => { alert('Error: ' + e.message); });
 }
