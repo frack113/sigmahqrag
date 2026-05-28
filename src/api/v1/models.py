@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 
 from src.api.dependencies import get_database_service, get_embedding_manager, get_unified_registry
-from src.back.embedding_config import EmbeddingTypeConfig
+from src.back.database import DatabaseService
 from src.back.models import EmbeddingManager, HFRepo
 
 logger = logging.getLogger(__name__)
@@ -225,6 +225,13 @@ async def delete_llm_model_file(repo_id: str, filename: str) -> JSONResponse:
             raise ModelNotFoundError(f"Invalid file path for {filename}")
         if path.exists():
             path.unlink()
+            # Clean up empty parent directories
+            parent = path.parent
+            while (
+                parent != Path(LLM_DIR).resolve() and parent.exists() and not any(parent.iterdir())
+            ):
+                parent.rmdir()
+                parent = parent.parent
         del record["files"][filename]
         if record["files"]:
             reg._save(db)
@@ -350,14 +357,13 @@ async def search_embedding_models(
 
 
 # ============= Embedding Config (single global model) =============
-_config_manager = EmbeddingTypeConfig()
 MODEL_ID_RE = re.compile(r"^[\w.-]+/[\w.-]+$")
 
 
 @router.get("/embeddings/config")
 async def get_embedding_config() -> JSONResponse:
     """Get the global embedding model configuration."""
-    config = _config_manager.load()
+    config = DatabaseService.get_instance().get_embedding_config()
     return JSONResponse(content=json.loads(json.dumps(config, default=str)))
 
 
@@ -366,7 +372,6 @@ async def update_embedding_config(body: dict) -> JSONResponse:
     """Update the global embedding model.
 
     Sending model="" resets to default.
-    This replaces the old per-type config with a single shared model.
     """
     if "model" not in body:
         return JSONResponse(status_code=400, content={"error": "model is required"})
@@ -378,9 +383,12 @@ async def update_embedding_config(body: dict) -> JSONResponse:
             content={"error": "Invalid model ID format (expected: org/model)"},
         )
 
-    config = _config_manager.update_type("global", body)
-    if config is None:
-        return JSONResponse(status_code=500, content={"error": "Failed to save config"})
+    db = DatabaseService.get_instance()
+    if model:
+        db.set_embedding_config(model)
+    else:
+        db.delete_embedding_config()
+    config = db.get_embedding_config()
     return JSONResponse(content=json.loads(json.dumps(config, default=str)))
 
 

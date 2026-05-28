@@ -6,22 +6,10 @@ import pytest
 
 from src.back.rag.embeddings import (
     EmbeddingGenerator,
-    _check_hf_available,
     embed_documents,
     get_embedding_model,
     store_embeddings,
 )
-
-
-class TestCheckHfAvailable:
-    def test_returns_true_when_reachable(self) -> None:
-        mock_response = MagicMock(status_code=200)
-        with patch("httpx.get", return_value=mock_response):
-            assert _check_hf_available() is True
-
-    def test_returns_false_on_exception(self) -> None:
-        with patch("httpx.get", side_effect=ValueError("fail")):
-            assert _check_hf_available() is False
 
 
 class TestGetEmbeddingModel:
@@ -31,108 +19,33 @@ class TestGetEmbeddingModel:
             result = get_embedding_model()
         assert result is fake
 
-    def test_huggingface_env(self) -> None:
+    def test_uses_config_from_db(self) -> None:
+        mock_db = MagicMock()
+        mock_db.get_embedding_config.return_value = {"model": "custom/model"}
         with (
             patch("src.back.rag.embeddings._embed_model", None),
-            patch("llama_index.embeddings.huggingface.HuggingFaceEmbedding") as mock_cls,
-            patch.dict("os.environ", {"SIGMA_RAG_EMBED_MODEL": "huggingface"}),
+            patch("src.back.rag.embeddings.DatabaseService.get_instance", return_value=mock_db),
+            patch("src.back.rag.ingestion.build_embed_model") as mock_build,
         ):
+            mock_build.return_value = "fake_model"
             result = get_embedding_model()
-        mock_cls.assert_called_once_with(
-            model_name="intfloat/multilingual-e5-small",
-            embed_batch_size=32,
-        )
-        assert result is not None
+        mock_build.assert_called_once_with("custom/model")
+        assert result == "fake_model"
 
-    def test_local_gguf(self) -> None:
-        mock_dir = MagicMock()
-        mock_dir.exists.return_value = True
-        mock_dir.glob.return_value = [MagicMock(__str__=MagicMock(return_value="/fake/model.gguf"))]
+    def test_falls_back_to_default(self) -> None:
+        mock_db = MagicMock()
+        mock_db.get_embedding_config.return_value = {}
         with (
             patch("src.back.rag.embeddings._embed_model", None),
-            patch("llama_index.embeddings.huggingface.HuggingFaceEmbedding") as mock_cls,
-            patch("src.back.rag.embeddings.EMBEDDINGS_DIR", mock_dir),
+            patch("src.back.rag.embeddings.DatabaseService.get_instance", return_value=mock_db),
+            patch("src.back.rag.ingestion.build_embed_model") as mock_build,
         ):
+            mock_build.return_value = "default_model"
             result = get_embedding_model()
-        mock_cls.assert_called_once_with(
-            model_name="/fake/model.gguf",
-            embed_batch_size=32,
-        )
-        assert result is not None
+        from src.back.rag.ingestion import DEFAULT_MODEL
 
-    def test_local_env_no_gguf_raises(self) -> None:
-        mock_dir = MagicMock()
-        mock_dir.exists.return_value = True
-        mock_dir.glob.return_value = []
-        with (
-            patch("src.back.rag.embeddings._embed_model", None),
-            patch("llama_index.embeddings.huggingface.HuggingFaceEmbedding"),
-            patch("src.back.rag.embeddings.EMBEDDINGS_DIR", mock_dir),
-            patch.dict("os.environ", {"SIGMA_RAG_EMBED_MODEL": "local"}),
-            pytest.raises(OSError, match="no GGUF model found"),
-        ):
-            get_embedding_model()
-
-    def test_hf_fallback(self) -> None:
-        mock_dir = MagicMock()
-        mock_dir.exists.return_value = True
-        mock_dir.glob.return_value = []
-        with (
-            patch("src.back.rag.embeddings._embed_model", None),
-            patch("llama_index.embeddings.huggingface.HuggingFaceEmbedding") as mock_cls,
-            patch("src.back.rag.embeddings.EMBEDDINGS_DIR", mock_dir),
-            patch("src.back.rag.embeddings._check_hf_available", return_value=True),
-        ):
-            result = get_embedding_model()
-        mock_cls.assert_called_once_with(
-            model_name="intfloat/multilingual-e5-small",
-            embed_batch_size=32,
-        )
-        assert result is not None
-
-    def test_air_gapped_raises(self) -> None:
-        mock_dir = MagicMock()
-        mock_dir.exists.return_value = True
-        mock_dir.glob.return_value = []
-        with (
-            patch("src.back.rag.embeddings._embed_model", None),
-            patch("llama_index.embeddings.huggingface.HuggingFaceEmbedding"),
-            patch("src.back.rag.embeddings.EMBEDDINGS_DIR", mock_dir),
-            patch("src.back.rag.embeddings._check_hf_available", return_value=False),
-            pytest.raises(OSError, match="Air-gapped environment"),
-        ):
-            get_embedding_model()
-
-    def test_embeddings_dir_not_exists_hf_fallback(self) -> None:
-        mock_dir = MagicMock()
-        mock_dir.exists.return_value = False
-        with (
-            patch("src.back.rag.embeddings._embed_model", None),
-            patch("llama_index.embeddings.huggingface.HuggingFaceEmbedding") as mock_cls,
-            patch("src.back.rag.embeddings.EMBEDDINGS_DIR", mock_dir),
-            patch("src.back.rag.embeddings._check_hf_available", return_value=True),
-        ):
-            result = get_embedding_model()
-        mock_cls.assert_called_once()
-        assert result is not None
-
-    def test_gguf_str_method(self) -> None:
-        mock_dir = MagicMock()
-        mock_dir.exists.return_value = True
-        gguf_mock = MagicMock()
-        gguf_mock.__str__.return_value = "/fake/path/model.gguf"
-        mock_dir.glob.return_value = [gguf_mock]
-        with (
-            patch("src.back.rag.embeddings._embed_model", None),
-            patch("llama_index.embeddings.huggingface.HuggingFaceEmbedding") as mock_cls,
-            patch("src.back.rag.embeddings.EMBEDDINGS_DIR", mock_dir),
-            patch("src.back.rag.embeddings._check_hf_available"),
-        ):
-            get_embedding_model()
-        mock_cls.assert_called_once_with(
-            model_name="/fake/path/model.gguf",
-            embed_batch_size=32,
-        )
+        mock_build.assert_called_once_with(DEFAULT_MODEL)
+        assert result == "default_model"
 
 
 class TestEmbedDocuments:

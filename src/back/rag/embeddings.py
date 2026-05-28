@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import logging
-import os
 from typing import Any
 
 from llama_index.core.schema import Document
 
+from src.back.database import DatabaseService
 from src.back.qdrant.storage import store_embeddings as _store_embeddings
-from src.shared import EMBEDDINGS_DIR
+from src.back.rag.ingestion import DEFAULT_MODEL
 
 logger = logging.getLogger(__name__)
 
@@ -19,72 +19,19 @@ EMBEDDING_DIM = 384
 _embed_model: Any | None = None
 
 
-def _check_hf_available() -> bool:
-    """Check if HuggingFace Hub is accessible."""
-    try:
-        import httpx
-
-        response = httpx.get("https://huggingface.co", timeout=5)
-        return bool(response.status_code == 200)
-    except Exception:
-        return False
-
-
 def get_embedding_model() -> Any:
-    """Get the embedding model (singleton).
-
-    Uses local GGUF model from models/embeddings/ or
-    llama.cpp server embeddings endpoint.
-    For air-gapped environments, only local GGUF models are supported.
-    """
+    """Get the embedding model singleton, using the DuckDB config."""
     global _embed_model
 
     if _embed_model is not None:
         return _embed_model
 
-    from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+    from src.back.rag.ingestion import build_embed_model
 
-    embeddings_dir = EMBEDDINGS_DIR
-    model_path = None
-
-    if embeddings_dir.exists():
-        gguf_files = list(embeddings_dir.glob("*.gguf"))
-        if gguf_files:
-            model_path = str(gguf_files[0])
-
-    env_mode = os.environ.get("SIGMA_RAG_EMBED_MODEL", "").lower()
-
-    if env_mode == "huggingface":
-        logger.info("Using HuggingFace Hub for embeddings (SIGMA_RAG_EMBED_MODEL=huggingface)")
-        _embed_model = HuggingFaceEmbedding(
-            model_name="intfloat/multilingual-e5-small",
-            embed_batch_size=BATCH_SIZE,
-        )
-        return _embed_model
-
-    if model_path:
-        logger.info(f"Using local GGUF model: {model_path}")
-        _embed_model = HuggingFaceEmbedding(
-            model_name=model_path,
-            embed_batch_size=BATCH_SIZE,
-        )
-        return _embed_model
-
-    if env_mode == "local":
-        raise OSError("SIGMA_RAG_EMBED_MODEL=local but no GGUF model found in models/embeddings/")
-
-    if _check_hf_available():
-        logger.info("No local GGUF found, falling back to HuggingFace Hub")
-        _embed_model = HuggingFaceEmbedding(
-            model_name="intfloat/multilingual-e5-small",
-            embed_batch_size=BATCH_SIZE,
-        )
-        return _embed_model
-
-    raise OSError(
-        "Air-gapped environment: no GGUF model in models/embeddings/ and HF Hub unreachable. "
-        "Set SIGMA_RAG_EMBED_MODEL=local or provide a GGUF model."
-    )
+    config_data = DatabaseService.get_instance().get_embedding_config()
+    model_name = config_data.get("model") or DEFAULT_MODEL
+    _embed_model = build_embed_model(model_name)
+    return _embed_model
 
 
 async def embed_documents(documents: list[Document]) -> list[list[float]]:

@@ -527,6 +527,17 @@ async def delete_model(request: dict) -> JSONResponse:
             )
         if path.exists():
             path.unlink()
+            # Clean up empty parent directories
+            from src.shared import LLM_DIR as llm_dir_base
+
+            parent = path.parent
+            while (
+                parent != Path(llm_dir_base).resolve()
+                and parent.exists()
+                and not any(parent.iterdir())
+            ):
+                parent.rmdir()
+                parent = parent.parent
         del record["files"][filename]
         if record["files"]:
             reg._save(db)

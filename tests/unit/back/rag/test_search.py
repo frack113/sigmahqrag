@@ -40,18 +40,31 @@ class TestSearchEngine:
 
 class TestGetSearchEmbedModel:
     def test_first_call_creates_model(self) -> None:
+        mock_db = MagicMock()
+        mock_db.get_embedding_config.return_value = {}
         with (
             patch("src.back.rag.search._async_embed_model", None),
-            patch("src.back.rag.search.HuggingFaceEmbedding") as mock_cls,
+            patch("src.back.rag.search.DatabaseService.get_instance", return_value=mock_db),
+            patch("src.back.rag.search.build_embed_model") as mock_build,
         ):
+            from src.back.rag.ingestion import DEFAULT_MODEL
+
             _get_search_embed_model()
-        mock_cls.assert_called_once_with(model_name="intfloat/multilingual-e5-small")
+        mock_build.assert_called_once_with(DEFAULT_MODEL)
 
     def test_subsequent_call_returns_cached(self) -> None:
-        with patch("src.back.rag.search.HuggingFaceEmbedding"):
+        mock_db = MagicMock()
+        mock_db.get_embedding_config.return_value = {}
+        with (
+            patch("src.back.rag.search._async_embed_model", None),
+            patch("src.back.rag.search.DatabaseService.get_instance", return_value=mock_db),
+            patch("src.back.rag.search.build_embed_model") as mock_build,
+        ):
+            mock_build.return_value = "fake_model"
             first = _get_search_embed_model()
             second = _get_search_embed_model()
         assert first is second
+        mock_build.assert_called_once()
 
 
 class TestSearch:

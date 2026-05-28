@@ -147,26 +147,3 @@ async def llama_stop():
     except Exception as e:
         logger.error(f"Llama stop error: {e}")
         return JSONResponse(status_code=500, content={"error": "An internal error occurred"})
-
-
-@router.post("/restart")
-async def llama_restart(
-    model_path: str | None = Query(None, description="Path to model file (optional)"),
-    port: int = Query(8080, description="Port to listen on"),
-    context_size: int = Query(4096, description="Context size in tokens"),
-):
-    """Restart the llama.cpp server."""
-    try:
-        if not model_path:
-            return JSONResponse(
-                status_code=400,
-                content={"error": "model_path is required to restart the service"},
-            )
-
-        service = create_llama_service()
-        await service.stop()
-        result = await service.start(model_path, port, context_size)
-        return JSONResponse(content=result)
-    except Exception as e:
-        logger.error(f"Llama restart error: {e}")
-        return JSONResponse(status_code=500, content={"error": "An internal error occurred"})

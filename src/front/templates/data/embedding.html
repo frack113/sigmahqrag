@@ -4,27 +4,11 @@
 
 {% block page_content %}
 <h1>Embedding Model</h1>
-<p>Select the embedding model used for all document types. A single shared model ensures consistent vector representations across the entire knowledge base.</p>
+<p>The embedding model used for all document types is configured globally. To change it, download or delete models from the <a href="/admin/models">admin panel</a>.</p>
 
-<div class="embedding-config" id="embedding_config">
-    <div class="card config-card">
-        <div class="type-header">
-            <span class="type-name">Global Embedding Model</span>
-            <span class="status-badge configured" id="config-status">Saved</span>
-        </div>
-        <div class="type-body">
-            <label for="embed-model-select">Model</label>
-            <select id="embed-model-select" class="model-input">
-                {% for m in models %}
-                <option value="{{ m }}" {{ 'selected' if config.get('model', '') == m }}>{{ m }}</option>
-                {% endfor %}
-            </select>
-
-            <p class="model-hint">Default: intfloat/multilingual-e5-small</p>
-
-            <button class="btn btn-primary save-btn" onclick="saveGlobalConfig()">Save Model</button>
-        </div>
-    </div>
+<div class="card">
+    <h3>Current Embedding Model</h3>
+    <p><strong>{{ current_model or 'intfloat/multilingual-e5-small (default)' }}</strong></p>
 </div>
 {% endblock %}
 

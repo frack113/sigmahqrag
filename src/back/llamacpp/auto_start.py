@@ -66,7 +66,7 @@ async def start_llamacpp() -> None:
             logger.warning("llama.cpp download failed: %s", e)
             return
 
-    model_path = config.llama_model_name or _find_first_model()
+    model_path = _find_first_model()
     if not model_path:
         logger.warning("No LLM model configured or found -- cannot start llama.cpp")
         return

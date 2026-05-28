@@ -103,9 +103,9 @@ class IngestionPipelineBuilder:
         num_workers: int = DEFAULT_NUM_WORKERS,
     ) -> None:
         if model_name is None:
-            from src.back.embedding_config import EmbeddingTypeConfig
+            from src.back.database import DatabaseService
 
-            config_data = EmbeddingTypeConfig().load()
+            config_data = DatabaseService.get_instance().get_embedding_config()
             self._model_name = (config_data.get("model") or "") or DEFAULT_MODEL
         else:
             self._model_name = model_name
@@ -279,9 +279,9 @@ def get_pipeline(
 ) -> IngestionPipeline:
     """Get or create a cached IngestionPipeline keyed by (model, collection)."""
     if model_name is None:
-        from src.back.embedding_config import EmbeddingTypeConfig
+        from src.back.database import DatabaseService
 
-        config_data = EmbeddingTypeConfig().load()
+        config_data = DatabaseService.get_instance().get_embedding_config()
         model_name = config_data.get("model") or DEFAULT_MODEL
     model = model_name
     collection = collection_name or "sigmaref"
