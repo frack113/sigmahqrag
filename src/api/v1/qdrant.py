@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-import asyncio
-import json
 import logging
-from collections.abc import AsyncGenerator
 from pathlib import Path
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, StreamingResponse
+
+from src.api.sse import download_progress_generator
 from src.back.database.service import DatabaseService
 from src.back.qdrant.collections import (
     list_collections,
@@ -36,27 +35,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/qdrant", tags=["v1-qdrant"])
 
 SERVICE_NAME = "qdrant"
-
-
-async def _progress_generator(download_id: str) -> AsyncGenerator[str, None]:
-    """Generate SSE progress updates."""
-    manager = create_download_manager()
-    queue = manager.get_progress_stream(download_id)
-
-    if not queue:
-        yield f"data: {json.dumps({'status': 'not_found'})}\n\n"
-        return
-
-    while True:
-        try:
-            data = await asyncio.wait_for(queue.get(), timeout=30.0)
-            yield f"data: {json.dumps(data)}\n\n"
-
-            if data.get("status") in ("completed", "cancelled", "failed"):
-                break
-        except TimeoutError:
-            yield f"data: {json.dumps({'status': 'timeout'})}\n\n"
-            break
 
 
 @router.get("/status")
@@ -98,7 +76,7 @@ async def qdrant_progress(download_id: str):
     """Stream progress for a specific qdrant download."""
     try:
         return StreamingResponse(
-            _progress_generator(download_id),
+            download_progress_generator(download_id),
             media_type="text/event-stream",
         )
     except Exception as e:

@@ -1,17 +1,15 @@
 from __future__ import annotations
 
-import asyncio
-import json
 import logging
-from collections.abc import AsyncGenerator
 
 from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse, StreamingResponse
 
+from src.api.sse import download_progress_generator
 from src.back.backend.services.health_check import HealthCheckService
 from src.back.llamacpp.service import create_llama_service
-from src.shared.download_manager import create_download_manager
 from src.shared import get_config
+from src.shared.download_manager import create_download_manager
 
 logger = logging.getLogger(__name__)
 
@@ -20,25 +18,7 @@ router = APIRouter(prefix="/api/v1/llamacpp", tags=["v1-llamacpp"])
 SERVICE_NAME = "llama"
 
 
-async def _progress_generator(download_id: str) -> AsyncGenerator[str, None]:
-    """Generate SSE progress updates."""
-    manager = create_download_manager()
-    queue = manager.get_progress_stream(download_id)
-
-    if not queue:
-        yield f"data: {json.dumps({'status': 'not_found'})}\n\n"
-        return
-
-    while True:
-        try:
-            data = await asyncio.wait_for(queue.get(), timeout=30.0)
-            yield f"data: {json.dumps(data)}\n\n"
-
-            if data.get("status") in ("completed", "updated", "cancelled", "failed"):
-                break
-        except TimeoutError:
-            yield f"data: {json.dumps({'status': 'timeout'})}\n\n"
-            break
+_LLAMA_TERMINAL_STATUSES = frozenset({"completed", "updated", "cancelled", "failed"})
 
 
 @router.get("/status")
@@ -107,7 +87,7 @@ async def llama_progress(download_id: str):
     """Stream progress for a specific llama download."""
     try:
         return StreamingResponse(
-            _progress_generator(download_id),
+            download_progress_generator(download_id, terminal_statuses=_LLAMA_TERMINAL_STATUSES),
             media_type="text/event-stream",
         )
     except Exception as e:
