@@ -1,7 +1,7 @@
 """Advanced tests for config module."""
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from src.shared.config import Config, get_config
 
@@ -17,52 +17,15 @@ class TestConfigToDict:
 
 
 class TestConfigSave:
-    def test_saves_via_db(self) -> None:
-        mock_db = MagicMock()
+    def test_save_returns_true(self) -> None:
         cfg = Config()
-        with patch("src.back.database.DatabaseService.get_instance", return_value=mock_db):
-            result = cfg.save()
-            assert result is True
-            mock_db.set_config.assert_called()
-            mock_db.persist.assert_called_once()
-
-    def test_fails_on_db_error(self) -> None:
-        mock_db = MagicMock()
-        mock_db.set_config.side_effect = RuntimeError("db error")
-        cfg = Config()
-        with patch("src.back.database.DatabaseService.get_instance", return_value=mock_db):
-            result = cfg.save()
-            assert result is False
+        result = cfg.save()
+        assert result is True
 
 
 class TestConfigApplyDbOverrides:
-    def test_applies_overrides(self) -> None:
-        mock_db = MagicMock()
-        mock_db.get_config.side_effect = lambda k: {
-            "backend.os": "linux",
-            "backend.gpu_type": "cuda",
-        }.get(k)
-        cfg = Config()
-        with patch("src.back.database.DatabaseService.get_instance", return_value=mock_db):
-            cfg.apply_db_overrides()
-            assert cfg.os == "linux"
-            assert cfg.gpu_type == "cuda"
-
-    def test_handles_legacy_dict_value(self) -> None:
-        mock_db = MagicMock()
-        mock_db.get_config.return_value = {"value": "nvidia"}
-        cfg = Config()
-        with patch("src.back.database.DatabaseService.get_instance", return_value=mock_db):
-            cfg.apply_db_overrides()
-            assert cfg.gpu_type == "nvidia"
-
-    def test_skips_none_value(self) -> None:
-        mock_db = MagicMock()
-        mock_db.get_config.return_value = None
-        cfg = Config()
-        with patch("src.back.database.DatabaseService.get_instance", return_value=mock_db):
-            cfg.apply_db_overrides()
-            assert cfg.os == "windows"
+    def test_method_removed(self) -> None:
+        assert not hasattr(Config, "apply_db_overrides")
 
 
 class TestConfigInitApp:
@@ -70,19 +33,20 @@ class TestConfigInitApp:
         with (
             patch("src.shared.config.Config.ensure_config_file"),
             patch("src.shared.config.Config.ensure_qdrant_config"),
-            patch.object(Config, "apply_db_overrides"),
         ):
             cfg = Config.init_app()
             assert isinstance(cfg, Config)
 
-    def test_init_app_handles_db_error(self) -> None:
+    def test_init_app_creates_global_config(self) -> None:
         with (
+            patch("src.shared.config._config", None),
             patch("src.shared.config.Config.ensure_config_file"),
             patch("src.shared.config.Config.ensure_qdrant_config"),
-            patch.object(Config, "apply_db_overrides", side_effect=RuntimeError("fail")),
         ):
             cfg = Config.init_app()
-            assert isinstance(cfg, Config)
+            from src.shared.config import _config as global_cfg
+
+            assert global_cfg is cfg
 
 
 class TestConfigResolveLlamaCppBinPath:

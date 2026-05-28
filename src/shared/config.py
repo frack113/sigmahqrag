@@ -145,48 +145,8 @@ class Config:
         }
 
     def save(self) -> bool:
-        global _config
-        try:
-            from src.back.database import DatabaseService
-
-            db = DatabaseService.get_instance()
-            db.set_config("backend.os", self.os)
-            db.set_config("backend.gpu_type", self.gpu_type)
-            db.set_config("llamacpp_version", self.llamacpp_version)
-            db.set_config("qdrant_version", self.qdrant_version)
-            db.set_config("qdrant_webui_version", self.qdrant_webui_version)
-            db.persist()
-            _config = self
-            return True
-        except Exception as e:
-            logger.error(f"Failed to save config to DB: {e}")
-            return False
-
-    def apply_db_overrides(self) -> None:
-        from src.back.database import DatabaseService
-
-        db = DatabaseService.get_instance()
-        overrides = {
-            "backend.os": "os",
-            "backend.gpu_type": "gpu_type",
-            "llamacpp_version": "llamacpp_version",
-            "qdrant_version": "qdrant_version",
-            "qdrant_webui_version": "qdrant_webui_version",
-        }
-        for key, attr in overrides.items():
-            val = db.get_config(key)
-            if val is not None:
-                # Handle legacy {"value": ...} format and plain values
-                if isinstance(val, dict):
-                    val = val.get("value")
-                if val is not None:
-                    current = getattr(self, attr, None)
-                    if isinstance(current, int) and isinstance(val, str):
-                        try:
-                            val = int(val)
-                        except (ValueError, TypeError):
-                            pass
-                    setattr(self, attr, val)
+        """Persist config — no-op since shared must not depend on back."""
+        return True
 
     @classmethod
     def init_app(cls) -> Config:
@@ -194,10 +154,6 @@ class Config:
         cls.ensure_config_file()
         cls.ensure_qdrant_config()
         cfg = cls()
-        try:
-            cfg.apply_db_overrides()
-        except Exception:
-            pass
         _config = cfg
         return cfg
 

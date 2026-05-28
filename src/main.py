@@ -122,13 +122,30 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
         sync_prompts_from_files()
 
-        from src.shared import Config
+        from src.shared import Config, get_config
 
         Config.init_app()
-
-        from src.shared import get_config
-
         config = get_config()
+        # Apply DuckDB overrides (replaces removed Config.apply_db_overrides)
+        for key, attr in (
+            ("backend.os", "os"),
+            ("backend.gpu_type", "gpu_type"),
+            ("llamacpp_version", "llamacpp_version"),
+            ("qdrant_version", "qdrant_version"),
+            ("qdrant_webui_version", "qdrant_webui_version"),
+        ):
+            val = db.get_config(key)
+            if val is not None and isinstance(val, dict):
+                val = val.get("value")
+            if val is not None:
+                current = getattr(config, attr, None)
+                if isinstance(current, int) and isinstance(val, str):
+                    try:
+                        val = int(val)
+                    except (ValueError, TypeError):
+                        pass
+                setattr(config, attr, val)
+        logger.info("DuckDB config overrides applied.")
         _setup_logging(
             level=config.logging_level,
             max_size=config.logging_log_max_size,
