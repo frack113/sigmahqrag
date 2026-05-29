@@ -28,6 +28,7 @@ class FileType(Enum):
     JSON = "json"
     CSV = "csv"
     MARKDOWN = "markdown"
+    HTML = "html"
     PLAIN_TEXT = "plain_text"
     UNKNOWN = "unknown"
 
@@ -41,6 +42,8 @@ SUPPORTED_DOC_EXTENSION_MAP: dict[str, FileType] = {
     ".rst": FileType.PLAIN_TEXT,
     ".adoc": FileType.PLAIN_TEXT,
     ".asciidoc": FileType.PLAIN_TEXT,
+    ".html": FileType.HTML,
+    ".htm": FileType.HTML,
     ".docx": FileType.OFFICE_DOCUMENT,
     ".pptx": FileType.OFFICE_DOCUMENT,
     ".xlsx": FileType.OFFICE_DOCUMENT,
@@ -53,6 +56,7 @@ SUPPORTED_REFERENCE_DOC_TYPES: set[str] = {
     FileType.MARKDOWN.value,
     FileType.PDF.value,
     FileType.PLAIN_TEXT.value,
+    FileType.HTML.value,
     FileType.OFFICE_DOCUMENT.value,
 }
 
@@ -180,6 +184,10 @@ def _is_markdown(file_path: str, content: str) -> bool:
     return Path(file_path).suffix.lower() == ".md"
 
 
+def _is_html(file_path: str, content: str) -> bool:
+    return Path(file_path).suffix.lower() in (".html", ".htm")
+
+
 def _is_plain_text(file_path: str, content: str) -> bool:
     return True
 
@@ -190,6 +198,7 @@ DETECTION_REGISTRY: tuple[tuple[FileType, Callable[[str, str], bool]], ...] = (
     (FileType.JSON, _is_json),
     (FileType.CSV, _is_csv),
     (FileType.MARKDOWN, _is_markdown),
+    (FileType.HTML, _is_html),
     (FileType.PLAIN_TEXT, _is_plain_text),
 )
 

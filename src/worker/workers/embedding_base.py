@@ -1,5 +1,7 @@
 import logging
+import re
 from abc import abstractmethod
+from html.parser import HTMLParser
 from pathlib import Path
 
 from llama_index.core.node_parser import MarkdownNodeParser
@@ -14,6 +16,41 @@ logger = logging.getLogger(__name__)
 
 _OFFICE_TEXT_FORMATS = {".docx", ".doc", ".pptx", ".ppt", ".pptm"}
 _OFFICE_SKIP_FORMATS = {".xlsx", ".xls", ".ods", ".odp", ".xlsm", ".xlsb"}
+
+
+class _HTMLStripper(HTMLParser):
+    """HTMLParser subclass that strips tags and extracts text."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._text_parts: list[str] = []
+        self._skip = False
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag in ("script", "style"):
+            self._skip = True
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag in ("script", "style"):
+            self._skip = False
+        if tag in ("p", "br", "li", "h1", "h2", "h3", "h4", "h5", "h6", "tr", "div"):
+            self._text_parts.append("\n")
+
+    def handle_data(self, data: str) -> None:
+        if not self._skip:
+            self._text_parts.append(data)
+
+    def get_text(self) -> str:
+        text = "".join(self._text_parts)
+        text = re.sub(r"\n{3,}", "\n\n", text)
+        return text.strip()
+
+
+def _strip_html(html: str) -> str:
+    """Strip HTML tags and return plain text content."""
+    stripper = _HTMLStripper()
+    stripper.feed(html)
+    return stripper.get_text()
 
 
 class EmbeddingWorker(BaseWorker):
@@ -143,6 +180,9 @@ class EmbeddingWorker(BaseWorker):
                     current_file=current_file,
                 )
                 continue
+
+            if content_type == FileType.HTML.value:
+                doc_text = _strip_html(doc_text)
 
             if source in ("sigmaref", "github", "local") and content_type in ("markdown", ""):
                 md_parser = MarkdownNodeParser(include_metadata=True)

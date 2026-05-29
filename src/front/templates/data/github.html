@@ -326,24 +326,27 @@ function isWorkerActive(status) {
 async function pollWorkerStatus(workerType) {
     try {
         const resp = await fetch('/api/v1/dispatcher/status/' + workerType);
-        if (!resp.ok) return 'not_found';
-        const data = await resp.json();
-        return data.status || 'idle';
+        if (!resp.ok) return null;
+        return await resp.json();
     } catch {
-        return 'not_found';
+        return null;
     }
 }
 
 async function checkAnyWorkerActive() {
     const results = await Promise.all(DISCOVERY_WORKERS.map(pollWorkerStatus));
-    return results.some(isWorkerActive);
+    return results.some(s => s && isWorkerActive(s.status));
 }
 
-function setScanningButton(scanning) {
+function setScanningButton(scanning, pct) {
     const btn = document.getElementById('list-document-btn');
     if (!btn) return;
     btn.disabled = scanning;
-    btn.textContent = scanning ? 'Scanning...' : 'List document';
+    if (scanning && pct !== undefined) {
+        btn.textContent = 'Scanning ' + pct + '%..';
+    } else {
+        btn.textContent = scanning ? 'Scanning...' : 'List document';
+    }
 }
 
 function stopDiscoveryPolling() {
@@ -356,13 +359,21 @@ function stopDiscoveryPolling() {
 function startDiscoveryPolling(onIdle) {
     stopDiscoveryPolling();
     _discoveryPollInterval = setInterval(async () => {
-        const active = await checkAnyWorkerActive();
+        const results = await Promise.all(DISCOVERY_WORKERS.map(pollWorkerStatus));
+        const active = results.some(s => s && isWorkerActive(s.status));
         if (!active) {
             stopDiscoveryPolling();
             setScanningButton(false);
             if (onIdle) onIdle();
+            return;
         }
-    }, 1000);
+        const sigmaref = results[2];
+        if (sigmaref && isWorkerActive(sigmaref.status)) {
+            setScanningButton(true, Math.round(sigmaref.progress_percent));
+        } else {
+            setScanningButton(true);
+        }
+    }, 5000);
 }
 
 async function listDocuments() {

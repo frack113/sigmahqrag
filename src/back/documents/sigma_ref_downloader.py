@@ -8,6 +8,7 @@ import re
 import threading
 import time
 import urllib.parse
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -94,6 +95,8 @@ def _detect_url_type(url: str, content_type: str | None = None) -> str | None:
         ct = content_type.lower()
         if ct.startswith("text/markdown"):
             return "markdown"
+        if ct.startswith("text/html"):
+            return "html"
         if ct.startswith("text/plain"):
             if ext in {".md", ".markdown"}:
                 return "markdown"
@@ -110,6 +113,26 @@ def _detect_url_type(url: str, content_type: str | None = None) -> str | None:
             return "office_document"
 
     return None
+
+
+def _head_content_type(url: str, timeout: int = 10) -> str | None:
+    """Do a HEAD request to discover the Content-Type of a URL.
+
+    Args:
+        url: The URL to check.
+        timeout: HTTP request timeout in seconds.
+
+    Returns:
+        The Content-Type header value, or None if the request failed.
+    """
+    try:
+        with httpx.Client(timeout=httpx.Timeout(timeout), follow_redirects=True) as client:
+            response = client.head(url)
+            response.raise_for_status()
+            ct = response.headers.get("content-type")
+            return str(ct) if ct else None
+    except Exception:
+        return None
 
 
 def _download_file(
@@ -168,7 +191,12 @@ def _download_file(
             logger.warning("HTTP %d for %s — giving up", status, url)
             return False
 
-        except (httpx.TimeoutException, httpx.NetworkError, httpx.ConnectError) as exc:
+        except (
+            httpx.TimeoutException,
+            httpx.NetworkError,
+            httpx.ConnectError,
+            httpx.RemoteProtocolError,
+        ) as exc:
             if attempt < max_retries:
                 wait: float = _backoff_delay(attempt)  # type: ignore[no-redef]
                 logger.warning(
@@ -287,6 +315,7 @@ def download_references(
     db: DatabaseService,
     supported_types: set[str] | None = None,
     request_delay: float = DEFAULT_REQUEST_DELAY,
+    progress_callback: Callable[[int, int], None] | None = None,
 ) -> dict[str, Any]:
     """Download all Sigma rule references matching supported document types.
 
@@ -300,6 +329,7 @@ def download_references(
         supported_types: Set of FileType values to accept (e.g. {"markdown"}).
             Defaults to {"markdown"}.
         request_delay: Seconds to wait between download requests.
+        progress_callback: Optional callback(current, total) called after each file.
 
     Returns:
         Dict with summary stats: total_rules, total_refs, downloaded, skipped, failed.
@@ -329,7 +359,10 @@ def download_references(
     for pattern in yml_patterns:
         yml_files.extend(rules_path.rglob(pattern))
 
-    for yml_file in yml_files:
+    total_files = len(yml_files)
+    for file_idx, yml_file in enumerate(yml_files):
+        if progress_callback:
+            progress_callback(file_idx + 1, total_files)
         if not yml_file.is_file():
             continue
         try:
@@ -365,7 +398,26 @@ def download_references(
             normalized = normalize_url(ref)
 
             url_hash = _sha256(normalized)
-            ext = _url_ext(normalized) or ".md"
+            ext = _url_ext(normalized)
+
+            ftype = _detect_url_type(normalized)
+            if ftype is None:
+                head_ct = _head_content_type(normalized)
+                ftype = _detect_url_type(normalized, content_type=head_ct)
+
+            if not ext and ftype is not None:
+                _TYPE_TO_EXT: dict[str, str] = {
+                    "html": ".html",
+                    "markdown": ".md",
+                    "plain_text": ".txt",
+                    "pdf": ".pdf",
+                    "office_document": ".docx",
+                }
+                ext = _TYPE_TO_EXT.get(ftype, ".md")
+
+            if not ext:
+                ext = ".md"
+
             output_file = output_path / f"{url_hash}{ext}"
 
             if url_hash in registry:
@@ -404,7 +456,7 @@ def download_references(
                     url_hash=url_hash,
                     original_url=ref,
                     normalized_url=normalized,
-                    content_type=_detect_url_type(normalized) or "markdown",
+                    content_type=ftype or "markdown",
                     rule_id=rule_id,
                     title=rule_title,
                     timestamp=iso_now(),
@@ -417,7 +469,6 @@ def download_references(
                 skipped += 1
                 continue
 
-            ftype = _detect_url_type(normalized)
             if ftype is None or ftype not in supported_types:
                 skipped += 1
                 continue
