@@ -90,7 +90,7 @@ function saveConfig() {
     const os = document.getElementById('os-select').value;
     const gpu = document.getElementById('gpu-select').value;
 
-    fetch('/v1/config', {
+    fetch('/api/v1/config', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({backend: {os: os, gpu_type: gpu}})

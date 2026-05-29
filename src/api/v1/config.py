@@ -13,7 +13,7 @@ from src.shared import get_config
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/v1", tags=["config-v1"])
+router = APIRouter(prefix="/api/v1", tags=["config-v1"])
 
 
 class ConfigUpdateRequest(BaseModel):
@@ -24,7 +24,7 @@ class ConfigUpdateRequest(BaseModel):
 
 @router.get("/config")
 async def get_full_config() -> JSONResponse:
-    """GET /v1/config — Return full application configuration."""
+    """GET /api/v1/config — Return full application configuration."""
     try:
         config = get_config()
         return JSONResponse(content={"status": "success", "data": config.to_dict()})
@@ -37,7 +37,7 @@ async def get_full_config() -> JSONResponse:
 
 @router.post("/config")
 async def update_config(request: ConfigUpdateRequest) -> JSONResponse:
-    """POST /v1/config — Update backend config (os, gpu_type) persisted to DuckDB."""
+    """POST /api/v1/config — Update backend config (os, gpu_type) persisted to DuckDB."""
     try:
         config = get_config()
         if request.backend:

@@ -12,20 +12,16 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/search", tags=["v1-search"])
 
 
-async def search_rules(query: str, limit: int = 10, suggestions: bool = False) -> list[str]:
-    """Search rules (stub - not implemented)."""
-    return []
-
-
 @router.post("")
 async def search_rules_endpoint(
     query: str = Query(..., description="Search query"),
     limit: int = Query(default=10, ge=1, le=100),
 ) -> JSONResponse:
-    """Search Sigma rules by query."""
-    try:
-        results = await search_rules(query, limit=limit)
-        return JSONResponse(content={"rules": results})
-    except Exception as e:
-        logger.error(f"Search failed: {e}")
-        return JSONResponse(status_code=500, content={"error": "An internal error occurred"})
+    """Search Sigma rules by query.
+
+    TODO: Implement actual search via Qdrant vector or DuckDB full-text.
+    """
+    return JSONResponse(
+        status_code=501,
+        content={"error": "Not implemented", "message": "Search is not yet implemented"},
+    )

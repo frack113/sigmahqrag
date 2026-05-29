@@ -5,15 +5,14 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from llama_index.embeddings.huggingface import HuggingFaceEmbedding
-
+from src.back.database import DatabaseService
 from src.back.qdrant.client import get_qdrant_client
+from src.back.rag.ingestion import build_embed_model, DEFAULT_MODEL
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_TOP_K = 15
 SIMILARITY_THRESHOLD = 0.0
-DEFAULT_EMBED_MODEL = "intfloat/multilingual-e5-small"
 
 
 _async_embed_model: Any | None = None
@@ -22,7 +21,9 @@ _async_embed_model: Any | None = None
 def _get_search_embed_model() -> Any:
     global _async_embed_model
     if _async_embed_model is None:
-        _async_embed_model = HuggingFaceEmbedding(model_name=DEFAULT_EMBED_MODEL)
+        config_data = DatabaseService.get_instance().get_embedding_config()
+        model_name = config_data.get("model") or DEFAULT_MODEL
+        _async_embed_model = build_embed_model(model_name)
     return _async_embed_model
 
 

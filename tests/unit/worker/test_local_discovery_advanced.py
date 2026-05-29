@@ -1,0 +1,56 @@
+"""Advanced tests for LocalDiscoveryWorker — error path coverage."""
+
+from __future__ import annotations
+
+from pathlib import Path
+from unittest.mock import MagicMock, patch
+
+from src.worker.workers.local_discovery_worker import LocalDiscoveryWorker
+
+
+class TestLocalDiscoveryWorkerAdvanced:
+    def test_process_handles_read_error(self, mock_db: MagicMock, tmp_path: Path) -> None:
+        local_dir = tmp_path / "docs"
+        local_dir.mkdir()
+        test_file = local_dir / "doc.md"
+        test_file.write_text("# Doc")
+
+        task = {
+            "task_id": "local-adv-001",
+            "collection_name": "local",
+            "base_path": str(local_dir),
+        }
+
+        worker = LocalDiscoveryWorker(mock_db)
+        with patch.object(Path, "read_bytes", side_effect=PermissionError("denied")):
+            worker.process(task)
+        mock_db.upsert_doc_registry.assert_called_once()
+        call_args = mock_db.upsert_doc_registry.call_args[0][0]
+        assert call_args["content_sha256"] == ""
+        assert call_args["file_size"] == 0
+
+    def test_process_handles_identify_error(self, mock_db: MagicMock, tmp_path: Path) -> None:
+        local_dir = tmp_path / "docs"
+        local_dir.mkdir()
+        (local_dir / "doc.unknown").write_text("# Doc")
+
+        task = {
+            "task_id": "local-adv-002",
+            "collection_name": "local",
+            "base_path": str(local_dir),
+        }
+
+        worker = LocalDiscoveryWorker(mock_db)
+        with patch(
+            "src.worker.workers.local_discovery_worker.SUPPORTED_DOC_EXTENSION_MAP",
+            {".unknown": "unknown"},
+        ):
+            with patch(
+                "src.worker.workers.discovery_base.identify",
+                side_effect=ValueError("unknown"),
+            ):
+                worker.process(task)
+                # identify error handled gracefully by _identify_content_type
+                mock_db.upsert_doc_registry.assert_called_once()
+                call_args = mock_db.upsert_doc_registry.call_args[0][0]
+                assert call_args["content_type"] == "unknown"

@@ -95,52 +95,6 @@ class SubprocessManager:
 
         return self._is_process_running(proc_info.pid)
 
-    async def get_status(self, name: str) -> dict[str, Any]:
-        """Get detailed status of a service.
-
-        Args:
-            name: Service name
-
-        Returns:
-            Dict with service status
-        """
-        is_healthy = self.is_healthy(name)
-        proc_info = self._processes.get(name)
-
-        return {
-            "name": name,
-            "running": is_healthy,
-            "pid": proc_info.pid if proc_info else None,
-            "log_file": (str(proc_info.log_file) if proc_info and proc_info.log_file else None),
-        }
-
-    async def restart_service(
-        self,
-        name: str,
-        cmd: list[str],
-        log_file: Path,
-        pid_file: Path,
-        cwd: Path | None = None,
-    ) -> dict[str, Any]:
-        """Restart a crashed service.
-
-        Args:
-            name: Service name
-            cmd: Command to run
-            log_file: Path to log file
-            pid_file: Path to PID file
-            cwd: Working directory for subprocess
-
-        Returns:
-            Dict with restart status
-        """
-        if name in self._processes:
-            logger.warning(f"Service {name} is still tracked as running, stopping first.")
-            await self.stop_service(name)
-
-        pid_file.unlink(missing_ok=True)
-        return await self.start_service(name, cmd, log_file, pid_file, cwd)
-
     async def start_service(
         self,
         name: str,

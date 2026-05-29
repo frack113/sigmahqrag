@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import logging
-import re
-
 from src.back.documents.models import SigmaRule, ValidationError, ValidationResult
 
 logger = logging.getLogger(__name__)
@@ -78,76 +76,3 @@ def validate_sigma_rule(rule: SigmaRule) -> ValidationResult:
         rule=rule,
         errors=errors,
     )
-
-
-def validate_encoding(content: str) -> list[ValidationError]:
-    """Validate file encoding.
-
-    Args:
-        content: File content as string
-
-    Returns:
-        List of encoding errors
-    """
-    errors: list[ValidationError] = []
-
-    try:
-        content.encode("utf-8")
-    except UnicodeEncodeError:
-        errors.append(
-            ValidationError(
-                field="encoding",
-                message="File must be valid UTF-8",
-            )
-        )
-
-    return errors
-
-
-def validate_indentation(content: str) -> list[ValidationError]:
-    """Validate YAML indentation (4 spaces).
-
-    Args:
-        content: File content as string
-
-    Returns:
-        List of indentation errors
-    """
-    errors: list[ValidationError] = []
-
-    for line_no, line in enumerate(content.splitlines(), 1):
-        if line.startswith(" ") and not line.startswith("    "):
-            if not re.match(r"^(\t|    )+", line):
-                errors.append(
-                    ValidationError(
-                        field="indentation",
-                        message=f"Line {line_no}:Must use 4-space indentation",
-                    )
-                )
-
-    return errors
-
-
-def validate_keys_lowercase(content: str) -> list[ValidationError]:
-    """Validate YAML keys are lowercase.
-
-    Args:
-        content: File content as string
-
-    Returns:
-        List of key case errors
-    """
-    errors: list[ValidationError] = []
-
-    key_pattern = re.compile(r"^([a-zA-Z][a-zA-Z0-9_]*)\s*:", re.MULTILINE)
-    for match in key_pattern.finditer(content):
-        key = match.group(1)
-        if key.lower() != key:
-            errors.append(
-                ValidationError(
-                    field="keys",
-                    message=f"Key '{key}' must be lowercase",
-                )
-            )
-
-    return errors

@@ -9,7 +9,6 @@
         var welcome = document.getElementById("chat-welcome");
         var newChatBtn = document.getElementById("new-chat-btn");
         var typingEl = document.getElementById("typing-indicator");
-        var llmSelect = document.getElementById("llm-select");
         var promptSelect = document.getElementById("prompt-select");
 
         if (!messagesEl || !chatForm || !input || !sendBtn) return;
@@ -57,131 +56,6 @@
                 thinking: raw.substring(openIdx + 7),
                 answer: raw.substring(0, openIdx),
             };
-        }
-
-        var config = window.__CONFIG || {};
-        var manageInternally = config.llama_manage_internally !== false;
-        var currentModel = config.current_model || "";
-        var _modelsData = [];
-
-        function populateModelSelect(models) {
-            if (!llmSelect) return;
-            _modelsData = models;
-            llmSelect.innerHTML = "";
-
-            if (models.length === 0) {
-                var emptyOpt = document.createElement("option");
-                emptyOpt.value = "";
-                emptyOpt.textContent = "— No models —";
-                llmSelect.appendChild(emptyOpt);
-                llmSelect.disabled = true;
-                return;
-            }
-
-            if (!manageInternally) {
-                var disabledOpt = document.createElement("option");
-                disabledOpt.value = "";
-                disabledOpt.textContent = "— External service —";
-                llmSelect.appendChild(disabledOpt);
-                llmSelect.disabled = true;
-                return;
-            }
-
-            models.forEach(function (m) {
-                var opt = document.createElement("option");
-                opt.value = m.repo_id + "/" + m.filename;
-                opt.textContent = m.repo_id + " — " + m.filename + " (" + m.size_mb + " MB)";
-                if (opt.value === currentModel) {
-                    opt.selected = true;
-                }
-                llmSelect.appendChild(opt);
-            });
-
-            if (!currentModel && models.length > 0) {
-                llmSelect.selectedIndex = 0;
-                currentModel = llmSelect.value;
-            }
-
-            llmSelect.addEventListener("change", onModelChange);
-        }
-
-        function onModelChange() {
-            var newValue = llmSelect.value;
-            if (!newValue || newValue === currentModel) return;
-
-            var selected = _modelsData.find(function (m) {
-                return (m.repo_id + "/" + m.filename) === newValue;
-            });
-            if (!selected || !selected.local_path) {
-                showToast("Cannot switch model: path not found");
-                llmSelect.value = currentModel;
-                return;
-            }
-
-            var oldValue = currentModel;
-            showToast("Switching model…");
-            llmSelect.disabled = true;
-
-            var params = new URLSearchParams();
-            params.set("model_path", selected.local_path);
-            params.set("port", "8080");
-            params.set("context_size", "4096");
-
-            fetch("/api/v1/llamacpp/restart?" + params.toString(), { method: "POST" })
-                .then(function (r) { return r.json(); })
-                .then(function (data) {
-                    if (data.success || data.status === "success") {
-                        currentModel = newValue;
-                        showToast("Model switched to " + selected.filename);
-                    } else {
-                        currentModel = oldValue;
-                        llmSelect.value = oldValue;
-                        showToast("Failed to switch model: " + (data.error || "unknown"));
-                    }
-                })
-                .catch(function (err) {
-                    currentModel = oldValue;
-                    llmSelect.value = oldValue;
-                    showToast("Error switching model: " + err.message);
-                })
-                .finally(function () {
-                    llmSelect.disabled = false;
-                });
-        }
-
-        function loadModels() {
-            if (window.__INITIAL_MODELS && window.__INITIAL_MODELS.length > 0) {
-                populateModelSelect(window.__INITIAL_MODELS);
-                return;
-            }
-            fetch("/api/v1/models/llm/installed")
-                .then(function (r) { return r.json(); })
-                .then(function (data) {
-                    var models = data.models || [];
-                    var flat = [];
-                    models.forEach(function (entry) {
-                        (entry.files || []).forEach(function (f) {
-                            flat.push({
-                                repo_id: entry.repo_id,
-                                filename: f.filename,
-                                size_mb: f.size ? (f.size / (1024 * 1024)).toFixed(1) : "?",
-                                local_path: f.path || "",
-                            });
-                        });
-                    });
-                    populateModelSelect(flat);
-                })
-                .catch(function () {
-                    if (llmSelect) {
-                        llmSelect.innerHTML = "<option value=\"\">— No models found —</option>";
-                        llmSelect.disabled = true;
-                    }
-                });
-        }
-
-        function getSelectedModel() {
-            if (llmSelect) return llmSelect.value || "";
-            return "";
         }
 
         function populatePromptSelect(prompts) {
@@ -392,7 +266,6 @@
             newChatBtn.addEventListener("click", clearChat);
         }
 
-        loadModels();
         loadPrompts();
         loadHistory();
 
@@ -414,7 +287,6 @@
 
             if (welcome) { welcome.remove(); welcome = null; }
 
-            var model = getSelectedModel();
             var promptId = getSelectedPrompt();
 
             currentAbort = new AbortController();
@@ -423,7 +295,7 @@
                 resp = await fetch("/api/v1/chat/message/stream", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ message: text, mode: "search", model: model, prompt_id: promptId }),
+                    body: JSON.stringify({ message: text, mode: "search", model: "", prompt_id: promptId }),
                     signal: currentAbort.signal,
                 });
             } catch (err) {

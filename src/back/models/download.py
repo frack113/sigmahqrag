@@ -36,13 +36,6 @@ class HFDownloadService:
         except RuntimeError:
             pass
 
-    def _save_metadata(self) -> None:
-        """Save download metadata to DuckDB."""
-        try:
-            DatabaseService.get_instance().set_config("download_metadata", self._metadata)
-        except RuntimeError:
-            pass
-
     def list_gguf_files(
         self,
         repo: HFRepo,
@@ -75,33 +68,6 @@ class HFDownloadService:
         api = HfApi(token=self.token)
         return api.model_info(repo_id=repo.full_id)
 
-    def download_gguf(self, repo: HFRepo, target_dir: Path, filename: str | None = None) -> Path:
-        """Download a GGUF file."""
-        from huggingface_hub import hf_hub_download
-
-        if filename is None:
-            info = self.get_model_info(repo)
-            if info.siblings:
-                for f in info.siblings:
-                    if f.rfilename.endswith(".gguf"):
-                        filename = f.rfilename
-                        break
-
-        if filename is None:
-            raise DownloadError(f"No GGUF file found for {repo.full_id}")
-
-        model_dir = target_dir / repo.owner / repo.name
-        model_dir.mkdir(parents=True, exist_ok=True)
-
-        path = hf_hub_download(
-            repo_id=repo.full_id,
-            filename=filename,
-            local_dir=model_dir,
-            local_dir_use_symlinks=False,
-            token=self.token,
-        )
-        return Path(path)
-
     def download_repo(self, repo: HFRepo, target_dir: Path) -> Path:
         """Download an entire repository."""
         from huggingface_hub import snapshot_download
@@ -129,10 +95,6 @@ class HFDownloadService:
             for chunk in iter(lambda: f.read(8192), b""):
                 sha256_hash.update(chunk)
         return sha256_hash.hexdigest()
-
-    def get_pending_downloads(self) -> dict:
-        """Get pending downloads."""
-        return self._metadata
 
     async def list_models(self, query: str) -> list[HFRepo]:
         """Search for models on HuggingFace."""

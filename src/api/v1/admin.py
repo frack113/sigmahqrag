@@ -145,62 +145,51 @@ async def post_backend(request: dict) -> JSONResponse:
         action = request.get("action")
         service = request.get("service")
 
-        if action == "start":
-            if service == "llama":
-                from pathlib import Path
+        result: dict[str, Any]
 
-                from src.shared import LLM_DIR
+        if action == "start" and service == "llama":
+            from pathlib import Path
 
-                # Find any available model
-                models = list(Path(LLM_DIR).rglob("*.gguf"))
-                model_path = str(models[0]) if models else None
+            from src.back.llamacpp.service import get_llama_service
+            from src.shared import LLM_DIR
 
-                if not model_path:
-                    return JSONResponse(
-                        content={
-                            "data": {
-                                "success": False,
-                                "error": "No model found in models/llm",
-                            },
-                            "status": "error",
-                        }
-                    )
+            models = list(Path(LLM_DIR).rglob("*.gguf"))
+            model_path = str(models[0]) if models else None
 
-                from src.back.llamacpp.service import create_llama_service
-
-                service_manager = create_llama_service()
-                base_url = get_config().llama_base_url or "http://127.0.0.1:8080"
-                _, llama_port = _parse_llama_url(base_url)
-                result = await service_manager.start(
-                    model_path=model_path,
-                    port=llama_port,
-                    context_size=4096,
+            if not model_path:
+                return JSONResponse(
+                    content={
+                        "data": {"success": False, "error": "No model found in models/llm"},
+                        "status": "error",
+                    }
                 )
 
-            elif service == "qdrant":
-                from src.back.qdrant.service import create_qdrant_service
+            base_url = get_config().llama_base_url or "http://127.0.0.1:8080"
+            _, llama_port = _parse_llama_url(base_url)
+            result = await get_llama_service().start(
+                model_path=model_path, port=llama_port, context_size=4096
+            )
 
-                qdrant_svc = create_qdrant_service()
-                result = await qdrant_svc.start()
-            else:
-                result = {"success": False, "error": f"Unknown service: {service}"}
+        elif action == "stop" and service == "llama":
+            from src.back.llamacpp.service import get_llama_service
 
-        elif action == "stop":
-            if service == "llama":
-                from src.back.llamacpp.service import create_llama_service
+            result = await get_llama_service().stop()
 
-                llm_svc = create_llama_service()
-                result = await llm_svc.stop()
-            elif service == "qdrant":
-                from src.back.qdrant.service import create_qdrant_service
+        elif action == "start" and service == "qdrant":
+            from src.back.qdrant.service import get_qdrant_service
 
-                qdrant_svc = create_qdrant_service()
-                result = await qdrant_svc.stop()
-            else:
-                result = {"success": False, "error": f"Unknown service: {service}"}
+            result = await get_qdrant_service().start()
+
+        elif action == "stop" and service == "qdrant":
+            from src.back.qdrant.service import get_qdrant_service
+
+            result = await get_qdrant_service().stop()
 
         else:
-            result = {"success": False, "error": f"Unknown action: {action}"}
+            result = {
+                "success": False,
+                "error": f"Unknown action/service: {action}/{service}",
+            }
 
         return JSONResponse(
             content={
@@ -225,13 +214,6 @@ class CancelRequest(BaseModel):
     """Request model for cancel action (Patch 13: Pydantic model)."""
 
     job_id: str
-
-
-class JobResponse(BaseModel):
-    """Response model for job actions (Patch 13: Pydantic model)."""
-
-    job_id: str
-    status: str
 
 
 async def start_download(service: str | None = None, target: str | None = None) -> dict[str, Any]:
@@ -448,172 +430,6 @@ async def cancel_action(
         )
 
     return JSONResponse(content=response_content)
-
-
-@router.get("/models")
-async def get_models() -> JSONResponse:
-    """GET /api/v1/admin/models - Return installed models list."""
-    from src.api.dependencies import get_unified_registry
-    from src.shared import LLM_DIR
-
-    try:
-        from src.api.dependencies import get_database_service
-
-        db = get_database_service()
-        reg = get_unified_registry()
-        reg.sync_llm_folder(LLM_DIR, db)
-        llms = reg.list_llms(db)
-
-        model_list = []
-        for repo_id, data in llms.items():
-            for filename, info in data.get("files", {}).items():
-                model_list.append(
-                    {
-                        "repo_id": repo_id,
-                        "filename": info.get("filename", filename),
-                        "size_mb": (info.get("file_size", 0) or 0) / (1024 * 1024),
-                    }
-                )
-
-        return JSONResponse(content={"status": "success", "data": {"models": model_list}})
-    except Exception as e:
-        logger.error(f"Failed to list models: {e}")
-        return JSONResponse(
-            status_code=500,
-            content={"status": "error", "error": "An internal error occurred"},
-        )
-
-
-@router.post("/models/delete")
-async def delete_model(request: dict) -> JSONResponse:
-    """POST /api/v1/admin/models/delete - Delete a model."""
-    from pathlib import Path
-
-    from src.api.dependencies import get_unified_registry
-    from src.back.models import ModelNotFoundError
-    from src.shared import LLM_DIR
-
-    try:
-        reg = get_unified_registry()
-        repo_id = request.get("repo_id")
-        filename = request.get("filename")
-
-        if not repo_id or not filename:
-            return JSONResponse(
-                status_code=400,
-                content={"status": "error", "error": "repo_id and filename required"},
-            )
-
-        # Validate repo_id to prevent path traversal (format: org/name)
-        if (
-            ".." in repo_id
-            or repo_id.count("/") != 1
-            or repo_id.startswith("/")
-            or repo_id.endswith("/")
-        ):
-            return JSONResponse(
-                status_code=400,
-                content={"status": "error", "error": "Invalid repo_id"},
-            )
-
-        from src.api.dependencies import get_database_service
-
-        db = get_database_service()
-        record = reg.get_llm(repo_id, db)
-        if not record:
-            raise ModelNotFoundError(f"Model {repo_id} not found")
-        if filename not in record.get("files", {}):
-            raise ModelNotFoundError(f"File {filename} not found in {repo_id}")
-        path = Path(record["files"][filename]["local_path"]).resolve()
-        try:
-            path.relative_to(Path(LLM_DIR).resolve())
-        except ValueError:
-            return JSONResponse(
-                status_code=400,
-                content={"status": "error", "error": "Invalid file path"},
-            )
-        if path.exists():
-            path.unlink()
-        del record["files"][filename]
-        if record["files"]:
-            reg._save(db)
-        else:
-            reg.remove_llm(repo_id, db)
-
-        return JSONResponse(
-            content={"status": "success", "message": f"Deleted {repo_id}/{filename}"}
-        )
-    except ModelNotFoundError as e:
-        return JSONResponse(status_code=404, content={"status": "error", "error": str(e)})
-    except Exception as e:
-        logger.error(f"Failed to delete model: {e}")
-        return JSONResponse(
-            status_code=500,
-            content={"status": "error", "error": "An internal error occurred"},
-        )
-
-
-@router.post("/models/delete-embedding")
-async def delete_embedding_model(request: dict) -> JSONResponse:
-    """POST /api/v1/admin/models/delete-embedding - Delete an embedding model."""
-    import shutil
-    from pathlib import Path
-
-    from src.api.dependencies import get_unified_registry
-    from src.shared import EMBEDDINGS_DIR
-
-    try:
-        reg = get_unified_registry()
-        repo_id = request.get("repo_id")
-
-        if not repo_id:
-            return JSONResponse(
-                status_code=400,
-                content={"status": "error", "error": "repo_id required"},
-            )
-
-        if ".." in repo_id:
-            return JSONResponse(
-                status_code=400,
-                content={"status": "error", "error": "Invalid repo_id"},
-            )
-
-        from src.api.dependencies import get_database_service
-
-        db = get_database_service()
-        record = reg.get_embedding(repo_id, db)
-        if not record:
-            return JSONResponse(
-                status_code=404,
-                content={"status": "error", "error": f"Model {repo_id} not found"},
-            )
-
-        local_path = record.get("local_path", "")
-        if local_path:
-            path = Path(local_path).resolve()
-            try:
-                path.relative_to(Path(EMBEDDINGS_DIR).resolve())
-            except ValueError:
-                return JSONResponse(
-                    status_code=400,
-                    content={"status": "error", "error": "Invalid file path"},
-                )
-            if path.exists():
-                if path.is_dir():
-                    shutil.rmtree(path)
-                else:
-                    path.unlink()
-
-        reg.remove_embedding(repo_id, db)
-        return JSONResponse(
-            content={"status": "success", "message": f"Deleted embedding {repo_id}"}
-        )
-    except Exception as e:
-        logger.error(f"Failed to delete embedding model: {e}")
-        return JSONResponse(
-            status_code=500,
-            content={"status": "error", "error": "An internal error occurred"},
-        )
 
 
 @router.get("/config")

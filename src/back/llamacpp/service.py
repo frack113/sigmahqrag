@@ -119,8 +119,8 @@ class LlamaBinaryService:
         return self._subprocess_manager.get_logs("llama.cpp", lines)  # type: ignore[no-any-return]
 
 
-def create_llama_service() -> LlamaBinaryService:
-    """Create or return cached llama service instance."""
+def get_llama_service() -> LlamaBinaryService:
+    """Get or create the cached llama service singleton."""
     global _llama_service
     if _llama_service is None:
         _llama_service = LlamaBinaryService()

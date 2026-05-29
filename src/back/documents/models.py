@@ -50,15 +50,6 @@ class IngestRequest(BaseModel):
     recursive: bool = True
 
 
-class IngestResponse(BaseModel):
-    """Response from ingesting Sigma rules."""
-
-    total_files: int
-    successful: int
-    failed: int
-    results: list[IngestResult]
-
-
 class IngestResult(BaseModel):
     """Result for a single file."""
 

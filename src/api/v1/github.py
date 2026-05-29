@@ -78,6 +78,26 @@ class RepositoryStatus(BaseModel):
     )
 
 
+def _sync_single_repo(org: str, name: str, branch: str | None = None) -> dict[str, Any]:
+    """Sync a single repository and save metadata. Runs under _sync_lock."""
+    with _sync_lock:
+        meta = get_metadata(org, name) or {}
+        resolved_branch = branch or meta.get("branch", "main")
+        result = update_repo(org=org, name=name, branch=resolved_branch)
+        if result.get("success"):
+            merged = {
+                **meta,
+                "org": org,
+                "name": name,
+                "branch": resolved_branch,
+                "status": "synced",
+                "last_synced": datetime.now().isoformat(),
+                "remote_head": result.get("remote_head"),
+            }
+            save_metadata(org, name, merged)
+    return result
+
+
 def _extract_org_name(url: str) -> tuple[str, str]:
     """Extract org and name from URL."""
     url = url.rstrip("/")
@@ -223,25 +243,8 @@ async def sync_repo(
     if not any(r["org"] == org and r["name"] == name for r in repos):
         return RepositoryResponse(success=False, error=f"Repository '{org}/{name}' not found")
 
-    def sync_with_status() -> dict[str, Any]:
-        with _sync_lock:
-            result = update_repo(org=org, name=name, branch=branch)
-            existing_meta = get_metadata(org, name) or {}
-            if result.get("success"):
-                merged = {
-                    **existing_meta,
-                    "org": org,
-                    "name": name,
-                    "branch": branch,
-                    "status": "synced",
-                    "last_synced": datetime.now().isoformat(),
-                    "remote_head": result.get("remote_head"),
-                }
-                save_metadata(org, name, merged)
-        return result
-
     if background_tasks is not None:
-        background_tasks.add_task(sync_with_status)
+        background_tasks.add_task(_sync_single_repo, org, name, branch)
 
     return RepositoryResponse(success=True, message="Sync started in background")
 
@@ -256,26 +259,9 @@ async def sync_all_repos(
         return RepositoryResponse(success=True, message="No repositories to sync")
 
     def sync_all_task() -> None:
-        for repo in list(repos):
-            repo_data = {k: repo[k] for k in ("org", "name")}
+        for repo_data in list(repos):
             try:
-                with _sync_lock:
-                    meta = get_metadata(repo_data["org"], repo_data["name"]) or {}
-                    branch = meta.get("branch", "main")
-                    result = update_repo(
-                        org=repo_data["org"], name=repo_data["name"], branch=branch
-                    )
-                    existing_meta = get_metadata(repo_data["org"], repo_data["name"]) or {}
-                    merged = {
-                        **existing_meta,
-                        "org": repo_data["org"],
-                        "name": repo_data["name"],
-                        "branch": branch,
-                        "status": "synced",
-                        "last_synced": datetime.now().isoformat(),
-                        "remote_head": result.get("remote_head"),
-                    }
-                    save_metadata(repo_data["org"], repo_data["name"], merged)
+                _sync_single_repo(repo_data["org"], repo_data["name"])
             except Exception as e:
                 logger.error(f"Failed to sync {repo_data['org']}/{repo_data['name']}: {e}")
 

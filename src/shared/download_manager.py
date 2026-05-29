@@ -16,7 +16,7 @@ import httpx
 
 from src.shared import BIN_DIR
 from src.shared.exceptions import DownloadError
-from src.shared.temp_manager import create_temp_manager
+from src.shared.temp_manager import get_temp_manager
 from src.shared.version_manager import (
     ReleaseAsset,
     VersionManager,
@@ -61,7 +61,7 @@ class DownloadManager:
             temp_manager: Temp file manager
         """
         self.version_manager = version_manager or create_version_manager()
-        self.temp_manager = temp_manager_manager or create_temp_manager()
+        self.temp_manager = temp_manager_manager or get_temp_manager()
         self.active_downloads: dict[str, DownloadTask] = {}
         self._cleanup_task: asyncio.Task | None = None
 
@@ -470,17 +470,6 @@ class DownloadManager:
             "status": "cancelled",
             "message": "Download cancelled and partial file cleaned up",
         }
-
-    def get_progress(self, download_id: str) -> DownloadTask | None:
-        """Get download task for progress tracking.
-
-        Args:
-            download_id: Download ID
-
-        Returns:
-            DownloadTask or None
-        """
-        return self.active_downloads.get(download_id)
 
     def get_progress_stream(self, download_id: str) -> asyncio.Queue | None:
         """Get progress queue for SSE streaming.

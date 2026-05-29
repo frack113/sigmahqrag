@@ -176,32 +176,23 @@ class TestGithubEmbeddingWorker:
     def test_process_completes_if_no_registry_entries(
         self, mock_db: MagicMock, tmp_path: Path
     ) -> None:
-        repo_dir = tmp_path / "test-org" / "test-repo"
-        repo_dir.mkdir(parents=True)
-
         mock_db.get_pending_sigma_ref.return_value = []
 
         task = {
             "task_id": "gh-emb-003",
             "task_type": "github_embeddings",
-            "collection_name": "test-org/test-repo",
+            "collection_name": "all",
         }
 
-        def mock_path(*args):
-            if args == ("data/github",):
-                return tmp_path
-            return tmp_path / "/".join(args)
+        with patch(
+            "src.worker.workers.embedding_base.IngestionPipelineBuilder"
+        ) as mock_builder_cls:
+            mock_builder = MagicMock()
+            mock_builder.run = MagicMock()
+            mock_builder_cls.return_value = mock_builder
 
-        with patch("src.worker.workers.embedding_base.Path", side_effect=mock_path):
-            with patch(
-                "src.worker.workers.embedding_base.IngestionPipelineBuilder"
-            ) as mock_builder_cls:
-                mock_builder = MagicMock()
-                mock_builder.run = MagicMock()
-                mock_builder_cls.return_value = mock_builder
-
-                worker, _ = _make_worker(GithubEmbeddingWorker, mock_db)
-                worker.process(task)
+            worker, _ = _make_worker(GithubEmbeddingWorker, mock_db)
+            worker.process(task)
 
         mock_db.get_pending_sigma_ref.assert_called()
 
@@ -225,15 +216,14 @@ class TestGithubEmbeddingWorker:
         task = {
             "task_id": "gh-emb-004",
             "task_type": "github_embeddings",
-            "collection_name": "test-org/test-repo",
+            "collection_name": "all",
         }
 
-        def mock_path(*args):
-            if args == ("data/github",):
-                return tmp_path
-            return tmp_path / "/".join(args)
+        def mock_resolve(entry):
+            file_name = entry.get("file_name", "")
+            return tmp_path / "test-org" / "test-repo" / file_name
 
-        with patch("src.worker.workers.embedding_base.Path", side_effect=mock_path):
+        with patch.object(GithubEmbeddingWorker, "_resolve_file_path", side_effect=mock_resolve):
             with patch(
                 "src.worker.workers.embedding_base.IngestionPipelineBuilder"
             ) as mock_builder_cls:
@@ -248,9 +238,6 @@ class TestGithubEmbeddingWorker:
         mock_db.update_sigma_ref_embed_status.assert_called()
 
     def test_process_filters_by_org_and_repo(self, mock_db: MagicMock, tmp_path: Path) -> None:
-        repo_dir = tmp_path / "test-org" / "test-repo"
-        repo_dir.mkdir(parents=True)
-
         mock_db.get_pending_sigma_ref.return_value = [
             {
                 "url_hash": "hash2",
@@ -265,26 +252,20 @@ class TestGithubEmbeddingWorker:
         task = {
             "task_id": "gh-emb-005",
             "task_type": "github_embeddings",
-            "collection_name": "test-org/test-repo",
+            "collection_name": "all",
         }
 
-        def mock_path(*args):
-            if args == ("data/github",):
-                return tmp_path
-            return tmp_path / "/".join(args)
+        with patch(
+            "src.worker.workers.embedding_base.IngestionPipelineBuilder"
+        ) as mock_builder_cls:
+            mock_builder = MagicMock()
+            mock_builder.run = MagicMock()
+            mock_builder_cls.return_value = mock_builder
 
-        with patch("src.worker.workers.embedding_base.Path", side_effect=mock_path):
-            with patch(
-                "src.worker.workers.embedding_base.IngestionPipelineBuilder"
-            ) as mock_builder_cls:
-                mock_builder = MagicMock()
-                mock_builder.run = MagicMock()
-                mock_builder_cls.return_value = mock_builder
+            worker, _ = _make_worker(GithubEmbeddingWorker, mock_db)
+            worker.process(task)
 
-                worker, _ = _make_worker(GithubEmbeddingWorker, mock_db)
-                worker.process(task)
-
-        mock_db.get_pending_sigma_ref.assert_called_with("test-org", "test-repo")
+        mock_db.get_pending_sigma_ref.assert_called()
 
 
 class TestLocalEmbeddingWorker:

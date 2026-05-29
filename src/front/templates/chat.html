@@ -15,12 +15,6 @@
         <div class="chat-sidebar-actions">
             <button class="chat-sidebar-btn" id="new-chat-btn" title="Nouvelle discussion">+ New Chat</button>
             <div class="chat-sidebar-group">
-                <label class="chat-sidebar-label" for="llm-select">Select LLM</label>
-                <select id="llm-select" class="chat-sidebar-select">
-                    <option value="">— Loading models —</option>
-                </select>
-            </div>
-            <div class="chat-sidebar-group">
                 <label class="chat-sidebar-label" for="prompt-select">System Prompt</label>
                 <select id="prompt-select" class="chat-sidebar-select">
                     <option value="">— Default (none) —</option>
@@ -58,12 +52,7 @@
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
 <script>
-    window.__INITIAL_MODELS = {{ models | tojson | safe }};
     window.__INITIAL_PROMPTS = {{ prompts | tojson | safe }};
-    window.__CONFIG = {
-        llama_manage_internally: {{ llama_manage_internally | tojson }},
-        current_model: {{ current_model | tojson | safe }},
-    };
 </script>
 <script src="{{ url_for('static', path='/js/chat.js') }}"></script>
 {% endblock %}

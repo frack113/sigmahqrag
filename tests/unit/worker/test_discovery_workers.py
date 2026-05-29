@@ -87,10 +87,10 @@ class TestGithubDiscoveryWorker:
             "task_id": "gh-disc-003",
             "task_type": "github_discovery",
             "collection_name": "all",
+            "github_base_dir": str(tmp_path),
         }
 
         worker = GithubDiscoveryWorker(mock_db)
-        worker.github_base_dir = str(tmp_path)
         worker.process(task)
 
         assert mock_db.upsert_doc_registry.call_count == 3
@@ -111,10 +111,10 @@ class TestGithubDiscoveryWorker:
             "task_id": "gh-disc-004",
             "task_type": "github_discovery",
             "collection_name": "all",
+            "github_base_dir": str(tmp_path),
         }
 
         worker = GithubDiscoveryWorker(mock_db)
-        worker.github_base_dir = str(tmp_path)
         worker.process(task)
 
         assert mock_db.upsert_doc_registry.call_count == 1
@@ -134,10 +134,10 @@ class TestGithubDiscoveryWorker:
             "task_id": "gh-disc-005",
             "task_type": "github_discovery",
             "collection_name": "all",
+            "github_base_dir": str(tmp_path),
         }
 
         worker = GithubDiscoveryWorker(mock_db)
-        worker.github_base_dir = str(tmp_path)
         worker.process(task)
 
         assert mock_db.upsert_doc_registry.call_count == 1
@@ -154,10 +154,10 @@ class TestGithubDiscoveryWorker:
             "task_id": "gh-disc-006",
             "task_type": "github_discovery",
             "collection_name": "all",
+            "github_base_dir": str(tmp_path),
         }
 
         worker = GithubDiscoveryWorker(mock_db)
-        worker.github_base_dir = str(tmp_path)
         worker.process(task)
 
         assert mock_db.upsert_doc_registry.call_count >= 1

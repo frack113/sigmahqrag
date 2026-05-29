@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from src.back.backend.services.health_check import HealthCheckService
+from src.back.services.health_check import HealthCheckService
 
 logger = logging.getLogger(__name__)
 

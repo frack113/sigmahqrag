@@ -4,83 +4,10 @@
 
 {% block page_content %}
 <h1>Embedding Model</h1>
-<p>Select the embedding model used for all document types. A single shared model ensures consistent vector representations across the entire knowledge base.</p>
+<p>The embedding model used for all document types is configured globally. To change it, download or delete models from the <a href="/admin/models">admin panel</a>.</p>
 
-<div class="embedding-config" id="embedding_config">
-    <div class="card config-card">
-        <div class="type-header">
-            <span class="type-name">Global Embedding Model</span>
-            <span class="status-badge configured" id="config-status">Saved</span>
-        </div>
-        <div class="type-body">
-            <label for="embed-model-select">Model</label>
-            <select id="embed-model-select" class="model-input">
-                {% for m in models %}
-                <option value="{{ m }}" {{ 'selected' if config.get('model', '') == m }}>{{ m }}</option>
-                {% endfor %}
-            </select>
-
-            <p class="model-hint">Default: intfloat/multilingual-e5-small</p>
-
-            <button class="btn btn-primary save-btn" onclick="saveGlobalConfig()">Save Model</button>
-        </div>
-    </div>
+<div class="card">
+    <h3>Current Embedding Model</h3>
+    <p><strong>{{ current_model or 'intfloat/multilingual-e5-small (default)' }}</strong></p>
 </div>
-{% endblock %}
-
-{% block scripts %}
-{{ super() }}
-<script>
-async function saveGlobalConfig() {
-    const select = document.getElementById('embed-model-select');
-    const btn = document.querySelector('.save-btn');
-    const badge = document.getElementById('config-status');
-    const model = select.value.trim();
-
-    if (!model) {
-        showToast('Please select a model', 'error');
-        return;
-    }
-
-    btn.disabled = true;
-    btn.textContent = 'Saving...';
-
-    try {
-        const response = await fetch('/api/v1/models/embeddings/config', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ model })
-        });
-        const text = await response.text();
-        if (!response.ok) {
-            let msg = 'Save failed';
-            try { const err = JSON.parse(text); msg = err.error || msg; } catch (_) {}
-            throw new Error(msg);
-        }
-        badge.textContent = 'Configured ✓';
-        badge.className = 'status-badge configured';
-        showToast('Model saved successfully', 'success');
-    } catch (error) {
-        showToast(error.message || 'Failed to save configuration', 'error');
-        badge.textContent = 'Unsaved';
-        badge.className = 'status-badge';
-    } finally {
-        btn.disabled = false;
-        btn.textContent = 'Save Model';
-    }
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-    const badge = document.getElementById('config-status');
-    if (badge) {
-        const currentModel = document.getElementById('embed-model-select').value.trim();
-        if (currentModel) {
-            badge.textContent = 'Configured ✓';
-        } else {
-            badge.textContent = 'Unsaved';
-            badge.className = 'status-badge';
-        }
-    }
-});
-</script>
 {% endblock %}

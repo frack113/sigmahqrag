@@ -13,7 +13,6 @@ from src.shared import get_config
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_COLLECTION = "sigma_rules"
 EMBEDDING_DIM = 384
 
 
@@ -150,41 +149,3 @@ async def _generate_embeddings(nodes: list[TextNode]) -> list[list[float]]:
         embeddings.append(embedding)
 
     return embeddings
-
-
-async def check_duplicate(rule_id: str, collection: str) -> bool:
-    """Check if rule already exists in collection.
-
-    Args:
-        rule_id: Rule ID to check
-        collection: Collection name
-
-    Returns:
-        True if duplicate exists
-    """
-    config = get_config()
-
-    service = QdrantService(
-        collection_name=collection,
-        vector_size=EMBEDDING_DIM,
-        host=config.qdrant_host,
-        port=config.qdrant_port,
-    )
-
-    try:
-        await service.initialize()
-    except Exception:
-        return False
-
-    try:
-        results = await service.search(
-            query_embedding=[0.0] * EMBEDDING_DIM,
-            top_k=100,
-        )
-        for r in results:
-            if r.get("metadata", {}).get("rule_id") == rule_id:
-                return True
-    except Exception:
-        pass
-
-    return False

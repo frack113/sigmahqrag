@@ -6,22 +6,18 @@ import logging
 import os
 from pathlib import Path
 
-from src.shared.config import get_config
-
 logger = logging.getLogger(__name__)
 
 
 class TempManager:
     """Manager for temporary download files."""
 
-    def __init__(self, temp_dir: Path | None = None) -> None:
+    def __init__(self, temp_dir: Path) -> None:
         """Initialize temp manager.
 
         Args:
             temp_dir: Directory for temporary files
         """
-        if temp_dir is None:
-            temp_dir = Path(get_config().paths_temp_dir).resolve()
         self.temp_dir = temp_dir
 
     def create_temp_file(self, download_id: str, extension: str = ".tmp") -> Path:
@@ -80,8 +76,8 @@ class TempManager:
 _temp_manager: TempManager | None = None
 
 
-def create_temp_manager() -> TempManager:
-    """Create a singleton temp manager instance."""
+def get_temp_manager() -> TempManager:
+    """Get or create the cached temp manager singleton."""
     global _temp_manager
     if _temp_manager is None:
         from src.shared.config import TEMP_DIR
