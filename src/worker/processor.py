@@ -1,6 +1,5 @@
 import logging
 import threading
-import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor, Future
 from typing import Dict, Type
@@ -43,6 +42,7 @@ class TaskDispatcher:
         self.poll_interval = poll_interval
         self.max_workers = max_workers
         self._running = False
+        self._stop_event = threading.Event()
         self._lock = threading.Lock()
         self._pending_tasks: Dict[WorkerName, dict] = {}
         self._executor: ThreadPoolExecutor | None = None
@@ -165,6 +165,7 @@ class TaskDispatcher:
     def stop(self, timeout: int = 30):
         """Signal the dispatcher to stop and shut down the executor."""
         self._running = False
+        self._stop_event.set()
         if self._executor:
             self._executor.shutdown(wait=True, cancel_futures=True)
         if self._thread and self._thread.is_alive():
@@ -226,8 +227,8 @@ class TaskDispatcher:
                     future.add_done_callback(self._on_task_done)
                     launched = True
 
-            if not launched:
-                time.sleep(self.poll_interval)
+            if not launched and self._stop_event.wait(timeout=self.poll_interval):
+                break
 
     def _run_worker(self, worker_type: WorkerName, worker: BaseWorker, task: dict) -> None:
         """Execute a worker's process method and manage state transitions."""

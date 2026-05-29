@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import contextlib
 from concurrent.futures import Future
 from unittest.mock import MagicMock, patch
 
@@ -167,9 +166,8 @@ class TestRunLoop:
                 "progress_percent": 0,
                 "current_file": "",
             }
-            with patch("src.worker.processor.time.sleep", side_effect=StopIteration):
-                with contextlib.suppress(StopIteration):
-                    d._run_loop()
+            d._stop_event.set()
+            d._run_loop()
             state = d._worker_states[WorkerName.SIGMAREF_DISCOVERY]
             assert state["status"] == WorkerStatus.IDLE
 
@@ -188,9 +186,8 @@ class TestRunLoop:
                 "progress_percent": 0,
                 "current_file": "",
             }
-            with patch("src.worker.processor.time.sleep", side_effect=StopIteration):
-                with contextlib.suppress(StopIteration):
-                    d._run_loop()
+            d._stop_event.set()
+            d._run_loop()
             d._executor.submit.assert_called_once()
 
     def test_handles_submit_failure(self, mock_db: MagicMock) -> None:
@@ -210,9 +207,8 @@ class TestRunLoop:
                 "progress_percent": 0,
                 "current_file": "",
             }
-            with patch("src.worker.processor.time.sleep", side_effect=StopIteration):
-                with contextlib.suppress(StopIteration):
-                    d._run_loop()
+            d._stop_event.set()
+            d._run_loop()
             state = d._worker_states[WorkerName.SIGMAREF_DISCOVERY]
             assert state["status"] == WorkerStatus.IDLE
             assert "submit failed" in state["error"]
@@ -231,9 +227,8 @@ class TestRunLoop:
                 "progress_percent": 0,
                 "current_file": "",
             }
-            with patch("src.worker.processor.time.sleep", side_effect=StopIteration):
-                with contextlib.suppress(StopIteration):
-                    d._run_loop()
+            d._stop_event.set()
+            d._run_loop()
             state = d._worker_states[WorkerName.SIGMAREF_DISCOVERY]
             assert state["status"] == WorkerStatus.IDLE
             assert "No worker registered" in state["error"]
