@@ -56,7 +56,7 @@ class TestGithubDiscoveryWorkerAdvanced:
 
         worker = GithubDiscoveryWorker(mock_db)
         with patch(
-            "src.worker.workers.github_discovery_worker.identify",
+            "src.worker.workers.discovery_base.identify",
             side_effect=ValueError("unknown type"),
         ):
             result = worker._process_file(file_path, repo_dir, "org", "repo")

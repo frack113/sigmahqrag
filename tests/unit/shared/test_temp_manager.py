@@ -1,9 +1,10 @@
 """Tests for temporary file manager."""
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 
+from src.shared.config import TEMP_DIR
 from src.shared.temp_manager import TempManager, get_temp_manager
 
 
@@ -65,12 +66,9 @@ class TestTempManager:
         count = mgr.cleanup_all()
         assert count == 0
 
-    def test_init_with_none_uses_config(self) -> None:
-        mock_cfg = MagicMock()
-        mock_cfg.paths_temp_dir = "/tmp/sigma_temp"
-        with patch("src.shared.temp_manager.get_config", return_value=mock_cfg):
-            mgr = TempManager()
-            assert mgr.temp_dir == Path("/tmp/sigma_temp").resolve()
+    def test_get_temp_manager_uses_config_temp_dir(self) -> None:
+        mgr = get_temp_manager()
+        assert mgr.temp_dir == TEMP_DIR
 
     def test_create_temp_file_creates_dir(self, tmp_path: Path) -> None:
         nested = tmp_path / "sub" / "nested"

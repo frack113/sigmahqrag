@@ -46,9 +46,11 @@ class TestLocalDiscoveryWorkerAdvanced:
             {".unknown": "unknown"},
         ):
             with patch(
-                "src.worker.workers.local_discovery_worker.identify",
+                "src.worker.workers.discovery_base.identify",
                 side_effect=ValueError("unknown"),
             ):
                 worker.process(task)
-                # identify error caught by outer try/except, upsert not called
-                mock_db.upsert_doc_registry.assert_not_called()
+                # identify error handled gracefully by _identify_content_type
+                mock_db.upsert_doc_registry.assert_called_once()
+                call_args = mock_db.upsert_doc_registry.call_args[0][0]
+                assert call_args["content_type"] == "unknown"

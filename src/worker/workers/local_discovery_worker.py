@@ -1,16 +1,14 @@
-import hashlib
 import logging
 from pathlib import Path
 
 from src.shared.config import get_config
-from src.worker.base import BaseWorker
-from src.shared.utils import iso_now
-from src.back.utils.identify_file_type import SUPPORTED_DOC_EXTENSION_MAP, identify
+from src.worker.workers.discovery_base import DiscoveryWorker
+from src.back.utils.identify_file_type import SUPPORTED_DOC_EXTENSION_MAP
 
 logger = logging.getLogger(__name__)
 
 
-class LocalDiscoveryWorker(BaseWorker):
+class LocalDiscoveryWorker(DiscoveryWorker):
     """Scans a local directory for supported documents."""
 
     def process(self, task: dict) -> None:
@@ -39,37 +37,21 @@ class LocalDiscoveryWorker(BaseWorker):
                 file_rel_path = file_path.relative_to(base_path).as_posix()
                 processed_count += 1
 
-                try:
-                    file_bytes = file_path.read_bytes()
-                    content_hash = hashlib.sha256(file_bytes).hexdigest()
-                    file_size = file_path.stat().st_size
-                except Exception:
-                    content_hash = ""
-                    file_size = 0
-
-                content_type = identify(file_path).value
-                url_hash = hashlib.sha256(
-                    f"local/{collection_name}/{file_rel_path}".encode()
-                ).hexdigest()
-                title = file_path.stem
+                content_hash, file_size = self._compute_sha256(file_path)
+                content_type = self._identify_content_type(file_path)
 
                 self.db.upsert_doc_registry(
-                    {
-                        "url_hash": url_hash,
-                        "org": "local",
-                        "repo": collection_name,
-                        "content_type": content_type,
-                        "file_name": file_rel_path,
-                        "content_sha256": content_hash,
-                        "file_size": file_size,
-                        "original_url": f"file://{base_path}/{file_rel_path}",
-                        "normalized_url": f"file://{base_path}/{file_rel_path}",
-                        "rule_id": "00000000-0000-0000-0000-000000000000",
-                        "title": title,
-                        "timestamp": iso_now(),
-                        "last_seen": iso_now(),
-                        "embed_status": "discovered",
-                    }
+                    self._make_doc_registry_entry(
+                        org="local",
+                        repo=collection_name,
+                        file_rel_path=file_rel_path,
+                        content_type=content_type,
+                        content_hash=content_hash,
+                        file_size=file_size,
+                        original_url=f"file://{base_path}/{file_rel_path}",
+                        normalized_url=f"file://{base_path}/{file_rel_path}",
+                        title=file_path.stem,
+                    )
                 )
             except Exception as e:
                 logger.error(f"[LocalDiscoveryWorker] Error processing {file_path}: {e}")
