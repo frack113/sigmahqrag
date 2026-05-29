@@ -15,7 +15,10 @@ import httpx
 import yaml
 
 from src.back.database import DatabaseService
-from src.back.utils.identify_file_type import SUPPORTED_DOC_EXTENSION_MAP
+from src.back.utils.identify_file_type import (
+    SUPPORTED_DOC_EXTENSION_MAP,
+    SUPPORTED_REFERENCE_DOC_TYPES,
+)
 from src.shared.utils import iso_now
 
 logger = logging.getLogger(__name__)
@@ -91,8 +94,20 @@ def _detect_url_type(url: str, content_type: str | None = None) -> str | None:
         ct = content_type.lower()
         if ct.startswith("text/markdown"):
             return "markdown"
-        if ct.startswith("text/plain") and ext in {".md", ".markdown"}:
-            return "markdown"
+        if ct.startswith("text/plain"):
+            if ext in {".md", ".markdown"}:
+                return "markdown"
+            return "plain_text"
+        if ct.startswith("application/pdf"):
+            return "pdf"
+        if ct.startswith("application/vnd.openxmlformats-officedocument"):
+            return "office_document"
+        if ct.startswith("application/vnd.oasis.opendocument"):
+            return "office_document"
+        if ct.startswith("application/msword"):
+            return "office_document"
+        if ct.startswith("application/rtf"):
+            return "office_document"
 
     return None
 
@@ -288,7 +303,7 @@ def download_references(
         Dict with summary stats: total_rules, total_refs, downloaded, skipped, failed.
     """
     if supported_types is None:
-        supported_types = {"markdown"}
+        supported_types = SUPPORTED_REFERENCE_DOC_TYPES
 
     rules_path = Path(rules_dir)
     output_path = Path(output_dir)

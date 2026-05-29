@@ -6,6 +6,7 @@ from llama_index.core.node_parser import MarkdownNodeParser
 from llama_index.core.schema import Document
 
 from src.back.rag.ingestion import IngestionPipelineBuilder
+from src.back.utils.identify_file_type import FileType
 from src.worker.base import BaseWorker
 from src.worker.enums import WorkerName, WorkerStatus
 
@@ -58,6 +59,25 @@ class EmbeddingWorker(BaseWorker):
                 )
                 continue
 
+            metadata = self._build_metadata(entry, self._collection_name)
+            content_type = metadata.get("content_type", "")
+            source = metadata.get("source", "")
+
+            _binary_types = {FileType.PDF.value, FileType.OFFICE_DOCUMENT.value}
+            if content_type in _binary_types:
+                logger.warning(
+                    f"[{self.__class__.__name__}] Binary format '{content_type}' not yet supported "
+                    f"for embedding: {file_path}"
+                )
+                skipped.append(current_file)
+                self._update_status(entry, "skipped")
+                self.dispatcher.update_worker_state(
+                    worker_type=self.worker_type,
+                    progress_percent=round(((idx + 1) / total) * 10, 2),
+                    current_file=current_file,
+                )
+                continue
+
             try:
                 doc_text = file_path.read_text(encoding="utf-8")
             except Exception as e:
@@ -70,11 +90,6 @@ class EmbeddingWorker(BaseWorker):
                     current_file=current_file,
                 )
                 continue
-
-            metadata = self._build_metadata(entry, self._collection_name)
-
-            source = metadata.get("source", "")
-            content_type = metadata.get("content_type", "")
 
             if source in ("sigmaref", "github", "local") and content_type in ("markdown", ""):
                 md_parser = MarkdownNodeParser(include_metadata=True)

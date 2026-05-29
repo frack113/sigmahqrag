@@ -3,6 +3,7 @@ import logging
 from src.shared.config import get_config
 from src.worker.base import BaseWorker
 from src.back.documents.sigma_ref_downloader import download_references
+from src.back.utils.identify_file_type import SUPPORTED_REFERENCE_DOC_TYPES
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +25,7 @@ class SigmaRefDiscoveryWorker(BaseWorker):
                 rules_dir=rules_dir,
                 output_dir=output_dir,
                 db=self.db,
-                supported_types={"markdown"},
+                supported_types=SUPPORTED_REFERENCE_DOC_TYPES,
             )
             logger.info(f"[SigmaRefDiscoveryWorker] Complete: {summary}")
         except Exception as e:

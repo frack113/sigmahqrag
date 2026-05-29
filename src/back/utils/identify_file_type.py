@@ -35,6 +35,25 @@ class FileType(Enum):
 SUPPORTED_DOC_EXTENSION_MAP: dict[str, FileType] = {
     ".md": FileType.MARKDOWN,
     ".markdown": FileType.MARKDOWN,
+    ".pdf": FileType.PDF,
+    ".txt": FileType.PLAIN_TEXT,
+    ".text": FileType.PLAIN_TEXT,
+    ".rst": FileType.PLAIN_TEXT,
+    ".adoc": FileType.PLAIN_TEXT,
+    ".asciidoc": FileType.PLAIN_TEXT,
+    ".docx": FileType.OFFICE_DOCUMENT,
+    ".pptx": FileType.OFFICE_DOCUMENT,
+    ".xlsx": FileType.OFFICE_DOCUMENT,
+    ".odt": FileType.OFFICE_DOCUMENT,
+    ".ods": FileType.OFFICE_DOCUMENT,
+    ".odp": FileType.OFFICE_DOCUMENT,
+}
+
+SUPPORTED_REFERENCE_DOC_TYPES: set[str] = {
+    FileType.MARKDOWN.value,
+    FileType.PDF.value,
+    FileType.PLAIN_TEXT.value,
+    FileType.OFFICE_DOCUMENT.value,
 }
 
 PUREMAGIC_TYPE_MAP: dict[str, FileType] = {

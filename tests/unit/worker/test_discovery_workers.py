@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from src.back.utils.identify_file_type import SUPPORTED_REFERENCE_DOC_TYPES
 from src.worker.workers.github_discovery_worker import GithubDiscoveryWorker
 from src.worker.workers.local_discovery_worker import LocalDiscoveryWorker
 from src.worker.workers.sigmaref_discovery_worker import SigmaRefDiscoveryWorker
@@ -35,7 +36,7 @@ class TestSigmaRefDiscoveryWorker:
             rules_dir="data/github",
             output_dir="data/documents/sigmaref",
             db=mock_db,
-            supported_types={"markdown"},
+            supported_types=SUPPORTED_REFERENCE_DOC_TYPES,
         )
 
     def test_process_propagates_errors(self, mock_db: MagicMock) -> None:

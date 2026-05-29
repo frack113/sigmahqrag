@@ -16,6 +16,7 @@ from src.back.documents.models import (
     IngestResult,
 )
 from src.back.documents.sigma_ref_downloader import download_references
+from src.back.utils.identify_file_type import SUPPORTED_REFERENCE_DOC_TYPES
 from src.back.documents.parser import parse_sigma_rule, scan_directory
 from src.back.documents.validator import validate_sigma_rule
 
@@ -157,7 +158,10 @@ async def index_sigma_ref(
     try:
         db = DatabaseService.get_instance()
         summary = download_references(
-            rules_dir=rules_dir, output_dir=output_dir, db=db, supported_types={"markdown"}
+            rules_dir=rules_dir,
+            output_dir=output_dir,
+            db=db,
+            supported_types=SUPPORTED_REFERENCE_DOC_TYPES,
         )
         return JSONResponse(content=summary)
     except Exception as e:

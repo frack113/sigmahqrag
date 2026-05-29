@@ -6,6 +6,7 @@ import pytest
 from src.back.utils.identify_file_type import (
     DETECTION_REGISTRY,
     SUPPORTED_DOC_EXTENSION_MAP,
+    SUPPORTED_REFERENCE_DOC_TYPES,
     FileType,
     identify,
 )
@@ -267,12 +268,41 @@ class TestSupportedDocExtensionMap:
     def test_contains_markdown_alt(self) -> None:
         assert SUPPORTED_DOC_EXTENSION_MAP[".markdown"] == FileType.MARKDOWN
 
-    def test_only_markdown_types(self) -> None:
-        assert set(SUPPORTED_DOC_EXTENSION_MAP.values()) == {FileType.MARKDOWN}
+    def test_contains_pdf(self) -> None:
+        assert SUPPORTED_DOC_EXTENSION_MAP[".pdf"] == FileType.PDF
+
+    def test_contains_plain_text(self) -> None:
+        assert SUPPORTED_DOC_EXTENSION_MAP[".txt"] == FileType.PLAIN_TEXT
+        assert SUPPORTED_DOC_EXTENSION_MAP[".rst"] == FileType.PLAIN_TEXT
+        assert SUPPORTED_DOC_EXTENSION_MAP[".adoc"] == FileType.PLAIN_TEXT
+
+    def test_contains_office_documents(self) -> None:
+        assert SUPPORTED_DOC_EXTENSION_MAP[".docx"] == FileType.OFFICE_DOCUMENT
+        assert SUPPORTED_DOC_EXTENSION_MAP[".pptx"] == FileType.OFFICE_DOCUMENT
+        assert SUPPORTED_DOC_EXTENSION_MAP[".xlsx"] == FileType.OFFICE_DOCUMENT
+        assert SUPPORTED_DOC_EXTENSION_MAP[".odt"] == FileType.OFFICE_DOCUMENT
+
+    def test_excludes_binary_and_media(self) -> None:
+        skipped = {".png", ".jpg", ".mp3", ".mp4", ".zip", ".exe"}
+        for ext in skipped:
+            assert ext not in SUPPORTED_DOC_EXTENSION_MAP
 
     def test_values_are_filetype(self) -> None:
         for ft in SUPPORTED_DOC_EXTENSION_MAP.values():
             assert isinstance(ft, FileType)
+
+
+class TestSupportedReferenceDocTypes:
+    def test_contains_relevant_types(self) -> None:
+        assert "markdown" in SUPPORTED_REFERENCE_DOC_TYPES
+        assert "pdf" in SUPPORTED_REFERENCE_DOC_TYPES
+        assert "plain_text" in SUPPORTED_REFERENCE_DOC_TYPES
+        assert "office_document" in SUPPORTED_REFERENCE_DOC_TYPES
+
+    def test_excludes_media_types(self) -> None:
+        excluded = {"image", "audio", "video", "archive", "executable"}
+        for ft in excluded:
+            assert ft not in SUPPORTED_REFERENCE_DOC_TYPES
 
 
 class TestRegistry:
