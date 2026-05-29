@@ -12,12 +12,36 @@ from src.worker.enums import WorkerName, WorkerStatus
 
 logger = logging.getLogger(__name__)
 
+_OFFICE_TEXT_FORMATS = {".docx", ".doc", ".pptx", ".ppt", ".pptm"}
+_OFFICE_SKIP_FORMATS = {".xlsx", ".xls", ".ods", ".odp", ".xlsm", ".xlsb"}
+
 
 class EmbeddingWorker(BaseWorker):
     """Base class for embedding workers with shared progress tracking and error handling."""
 
     worker_type: WorkerName
     collection_name: str = ""
+
+    def _parse_binary_document(self, file_path: Path, content_type: str) -> list[Document]:
+        if content_type == FileType.PDF.value:
+            from llama_index.readers.file import PyMuPDFReader
+
+            return PyMuPDFReader().load_data(file_path)
+
+        if content_type == FileType.OFFICE_DOCUMENT.value:
+            ext = file_path.suffix.lower()
+            if ext in _OFFICE_TEXT_FORMATS:
+                if ext in (".docx", ".doc"):
+                    from llama_index.readers.file import DocxReader
+
+                    return DocxReader().load_data(file_path)
+                if ext in (".pptx", ".ppt", ".pptm"):
+                    from llama_index.readers.file import PptxReader
+
+                    return PptxReader().load_data(file_path)
+            raise ValueError(f"Unsupported office format: {ext}")
+
+        raise ValueError(f"Unsupported binary format: {content_type}")
 
     def process(self, task: dict) -> None:
         assert self.dispatcher is not None
@@ -65,12 +89,41 @@ class EmbeddingWorker(BaseWorker):
 
             _binary_types = {FileType.PDF.value, FileType.OFFICE_DOCUMENT.value}
             if content_type in _binary_types:
-                logger.warning(
-                    f"[{self.__class__.__name__}] Binary format '{content_type}' not yet supported "
-                    f"for embedding: {file_path}"
-                )
-                skipped.append(current_file)
-                self._update_status(entry, "skipped")
+                ext = file_path.suffix.lower()
+                if content_type == FileType.OFFICE_DOCUMENT.value and ext in _OFFICE_SKIP_FORMATS:
+                    logger.warning(
+                        f"[{self.__class__.__name__}] Skipping unsupported office format {ext}: "
+                        f"{file_path}"
+                    )
+                    skipped.append(current_file)
+                    self._update_status(entry, "skipped")
+                    self.dispatcher.update_worker_state(
+                        worker_type=self.worker_type,
+                        progress_percent=round(((idx + 1) / total) * 10, 2),
+                        current_file=current_file,
+                    )
+                    continue
+
+                try:
+                    reader_docs = self._parse_binary_document(file_path, content_type)
+                except Exception as e:
+                    logger.warning(
+                        f"[{self.__class__.__name__}] Error parsing {content_type} {file_path}: {e}"
+                    )
+                    errors.append({"file": current_file, "error": str(e)})
+                    self._update_status(entry, "error")
+                    self.dispatcher.update_worker_state(
+                        worker_type=self.worker_type,
+                        progress_percent=round(((idx + 1) / total) * 10, 2),
+                        current_file=current_file,
+                    )
+                    continue
+
+                for doc in reader_docs:
+                    merged_metadata = {**metadata, **doc.metadata}
+                    doc.metadata = merged_metadata
+                    valid_docs.append((doc, entry))
+
                 self.dispatcher.update_worker_state(
                     worker_type=self.worker_type,
                     progress_percent=round(((idx + 1) / total) * 10, 2),
