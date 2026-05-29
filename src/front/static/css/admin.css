@@ -31,13 +31,6 @@
     margin-bottom: 0;
 }
 
-.status-item {
-    margin-bottom: 15px;
-    padding: 10px;
-    background: #f8f9fa;
-    border-radius: 4px;
-}
-
 /* Admin forms: inline labels with fixed width */
 .form-group label {
     display: inline-block;

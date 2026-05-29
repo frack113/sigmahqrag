@@ -31,13 +31,6 @@ function toggleAutoRefresh() {
     }
 }
 
-function stopAutoRefresh() {
-    if (autoRefreshInterval) {
-        clearInterval(autoRefreshInterval);
-        autoRefreshInterval = null;
-    }
-}
-
 async function loadTableList() {
     const container = document.getElementById('table-list');
     if (!container) return;

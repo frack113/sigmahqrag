@@ -73,14 +73,3 @@ async function createCollection(name, vectorSize = 384) {
     });
 }
 
-// Export functions for use in other scripts if needed (for ESM environments)
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = {
-        qdrantAction,
-        getQdrantStatus,
-        listCollections,
-        getCollectionDetails,
-        deleteCollection,
-        createCollection
-    };
-}
