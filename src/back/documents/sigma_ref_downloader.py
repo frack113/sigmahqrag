@@ -226,6 +226,7 @@ def _load_registry(path: Path, db: DatabaseService) -> dict[str, Any]:
             "title": entry.get("title"),
             "timestamp": entry.get("timestamp"),
             "content_sha256": entry.get("content_sha256"),
+            "embed_status": entry.get("embed_status"),
         }
     return registry
 
@@ -247,6 +248,7 @@ def _save_registry(registry: dict[str, Any], path: Path, db: DatabaseService) ->
                 "repo": entry.get("repo", "references"),
                 "file_name": entry.get("file_name", ""),
                 "file_size": entry.get("file_size"),
+                "embed_status": entry.get("embed_status", "discovery"),
             }
             db.upsert_doc_sigma_ref(row)
 

@@ -44,6 +44,7 @@ def _make_db(entries: list[dict] | None = None) -> MagicMock:
                 "title": v.get("title"),
                 "timestamp": v.get("timestamp"),
                 "content_sha256": v.get("content_sha256"),
+                "embed_status": v.get("embed_status"),
             }
             for k, v in data.items()
         ]
@@ -115,7 +116,7 @@ class TestDetectUrlType:
         assert _detect_url_type("https://example.com/doc.markdown") == "markdown"
 
     def test_unsupported_extension(self) -> None:
-        assert _detect_url_type("https://example.com/doc.pdf") is None
+        assert _detect_url_type("https://example.com/doc.exe") is None
 
     def test_no_extension_with_markdown_content_type(self) -> None:
         assert (
@@ -257,6 +258,7 @@ class TestRegistry:
                 "title": None,
                 "timestamp": None,
                 "content_sha256": None,
+                "embed_status": None,
             }
         }
 
@@ -272,6 +274,31 @@ class TestRegistry:
         reg = _load_registry(tmp_path, db)
         assert "abc" in reg
         assert reg["abc"]["original_url"] == "https://example.com/doc.md"
+
+    def test_save_sets_embed_status_discovery(self, tmp_path: Path) -> None:
+        db = _make_db()
+        data = {
+            "abc": {
+                "original_url": "https://example.com/doc.md",
+                "timestamp": iso_now(),
+            }
+        }
+        _save_registry(data, tmp_path, db)
+        reg = _load_registry(tmp_path, db)
+        assert reg["abc"]["embed_status"] == "discovery"
+
+    def test_save_preserves_existing_embed_status(self, tmp_path: Path) -> None:
+        db = _make_db()
+        data = {
+            "abc": {
+                "original_url": "https://example.com/doc.md",
+                "timestamp": iso_now(),
+                "embed_status": "embedded",
+            }
+        }
+        _save_registry(data, tmp_path, db)
+        reg = _load_registry(tmp_path, db)
+        assert reg["abc"]["embed_status"] == "embedded"
 
 
 class TestSha256:
@@ -326,7 +353,7 @@ detection:
     EventID: 4688
   condition: selection
 references:
-  - https://example.com/doc.pdf
+  - https://example.com/doc.exe
 """)
 
         db = _make_db()
