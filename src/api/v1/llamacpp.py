@@ -7,7 +7,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 
 from src.api.sse import download_progress_generator
 from src.back.services.health_check import HealthCheckService
-from src.back.llamacpp.service import create_llama_service
+from src.back.llamacpp.service import get_llama_service
 from src.shared import get_config
 from src.shared.download_manager import create_download_manager
 
@@ -109,7 +109,7 @@ async def llama_start(
                 content={"error": "model_path is required to start the service"},
             )
 
-        service = create_llama_service()
+        service = get_llama_service()
         result = await service.start(model_path, port, context_size)
         return JSONResponse(content=result)
     except Exception as e:
@@ -121,7 +121,7 @@ async def llama_start(
 async def llama_stop():
     """Stop the llama.cpp server."""
     try:
-        service = create_llama_service()
+        service = get_llama_service()
         result = await service.stop()
         return JSONResponse(content=result)
     except Exception as e:

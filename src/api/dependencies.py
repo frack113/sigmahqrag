@@ -28,7 +28,6 @@ def safe_error_response(
 
 
 _embedding_manager_instance: EmbeddingManager | None = None
-_unified_registry_instance: UnifiedRegistry | None = None
 
 
 def get_database_service() -> DatabaseService:

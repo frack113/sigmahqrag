@@ -15,7 +15,7 @@ from src.back.qdrant.collections import (
     get_collection,
 )
 from src.back.qdrant.health import check_health
-from src.back.qdrant.service import create_qdrant_service
+from src.back.qdrant.service import get_qdrant_service
 from src.back.qdrant.storage import store_embeddings, delete_point, search as qdrant_search
 from src.shared.download_manager import create_download_manager
 from src.shared.schemas.qdrant import (
@@ -126,7 +126,7 @@ async def qdrant_action(
             )
 
         elif isinstance(payload, ServiceControlPayload):
-            service_manager = create_qdrant_service()
+            service_manager = get_qdrant_service()
             command = payload.command
             if command == "start":
                 result = await service_manager.start()

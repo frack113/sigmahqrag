@@ -4,7 +4,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 
-from src.shared.temp_manager import TempManager, create_temp_manager
+from src.shared.temp_manager import TempManager, get_temp_manager
 
 
 class TestTempManager:
@@ -94,12 +94,12 @@ class TestTempManager:
             assert count == 0
 
 
-class TestCreateTempManager:
+class TestGetTempManager:
     def test_returns_instance(self) -> None:
-        mgr = create_temp_manager()
+        mgr = get_temp_manager()
         assert isinstance(mgr, TempManager)
 
     def test_singleton_behavior(self) -> None:
-        mgr1 = create_temp_manager()
-        mgr2 = create_temp_manager()
+        mgr1 = get_temp_manager()
+        mgr2 = get_temp_manager()
         assert mgr1 is mgr2

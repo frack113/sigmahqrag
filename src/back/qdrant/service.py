@@ -82,8 +82,8 @@ class QdrantBinaryService:
         return self._subprocess_manager.get_logs("qdrant", lines)  # type: ignore[no-any-return]
 
 
-def create_qdrant_service() -> QdrantBinaryService:
-    """Create or return cached qdrant service instance."""
+def get_qdrant_service() -> QdrantBinaryService:
+    """Get or create the cached qdrant service singleton."""
     global _qdrant_service
     if _qdrant_service is None:
         _qdrant_service = QdrantBinaryService()

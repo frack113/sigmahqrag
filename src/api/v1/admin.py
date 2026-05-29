@@ -150,7 +150,7 @@ async def post_backend(request: dict) -> JSONResponse:
         if action == "start" and service == "llama":
             from pathlib import Path
 
-            from src.back.llamacpp.service import create_llama_service
+            from src.back.llamacpp.service import get_llama_service
             from src.shared import LLM_DIR
 
             models = list(Path(LLM_DIR).rglob("*.gguf"))
@@ -166,24 +166,24 @@ async def post_backend(request: dict) -> JSONResponse:
 
             base_url = get_config().llama_base_url or "http://127.0.0.1:8080"
             _, llama_port = _parse_llama_url(base_url)
-            result = await create_llama_service().start(
+            result = await get_llama_service().start(
                 model_path=model_path, port=llama_port, context_size=4096
             )
 
         elif action == "stop" and service == "llama":
-            from src.back.llamacpp.service import create_llama_service
+            from src.back.llamacpp.service import get_llama_service
 
-            result = await create_llama_service().stop()
+            result = await get_llama_service().stop()
 
         elif action == "start" and service == "qdrant":
-            from src.back.qdrant.service import create_qdrant_service
+            from src.back.qdrant.service import get_qdrant_service
 
-            result = await create_qdrant_service().start()
+            result = await get_qdrant_service().start()
 
         elif action == "stop" and service == "qdrant":
-            from src.back.qdrant.service import create_qdrant_service
+            from src.back.qdrant.service import get_qdrant_service
 
-            result = await create_qdrant_service().stop()
+            result = await get_qdrant_service().stop()
 
         else:
             result = {

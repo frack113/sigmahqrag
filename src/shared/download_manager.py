@@ -16,7 +16,7 @@ import httpx
 
 from src.shared import BIN_DIR
 from src.shared.exceptions import DownloadError
-from src.shared.temp_manager import create_temp_manager
+from src.shared.temp_manager import get_temp_manager
 from src.shared.version_manager import (
     ReleaseAsset,
     VersionManager,
@@ -61,7 +61,7 @@ class DownloadManager:
             temp_manager: Temp file manager
         """
         self.version_manager = version_manager or create_version_manager()
-        self.temp_manager = temp_manager_manager or create_temp_manager()
+        self.temp_manager = temp_manager_manager or get_temp_manager()
         self.active_downloads: dict[str, DownloadTask] = {}
         self._cleanup_task: asyncio.Task | None = None
 

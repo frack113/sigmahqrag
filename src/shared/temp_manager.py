@@ -80,8 +80,8 @@ class TempManager:
 _temp_manager: TempManager | None = None
 
 
-def create_temp_manager() -> TempManager:
-    """Create a singleton temp manager instance."""
+def get_temp_manager() -> TempManager:
+    """Get or create the cached temp manager singleton."""
     global _temp_manager
     if _temp_manager is None:
         from src.shared.config import TEMP_DIR

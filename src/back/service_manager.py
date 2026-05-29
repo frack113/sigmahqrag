@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
-_subprocess_manager = None
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from src.shared.subprocess_manager import SubprocessManager
+
+_subprocess_manager: SubprocessManager | None = None
 
 
-def get_subprocess_manager():
+def get_subprocess_manager() -> SubprocessManager:
     """Get or create the global subprocess manager."""
     global _subprocess_manager
     if _subprocess_manager is None:
