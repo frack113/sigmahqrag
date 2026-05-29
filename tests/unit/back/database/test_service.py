@@ -776,7 +776,7 @@ class TestDefaultDbPath:
 
         mock_cfg = MagicMock()
         mock_cfg.paths_duckdb_path = "/tmp/test.duckdb"
-        with patch("src.back.database.service._default_db_path") as mock_fn:
+        with patch("src.back.database.core._default_db_path") as mock_fn:
             mock_fn.return_value = "/tmp/test.duckdb"
             svc = DatabaseService()
             assert "test.duckdb" in str(svc.db_path)
