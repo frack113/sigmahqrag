@@ -140,7 +140,7 @@ def _download_file(
     output_path: Path,
     timeout: int = 30,
     max_retries: int = MAX_RETRIES,
-) -> bool:
+) -> tuple[bool, int | None]:
     """Download a single file with retry and exponential backoff.
 
     Args:
@@ -159,7 +159,7 @@ def _download_file(
                 response.raise_for_status()
             output_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.write_bytes(response.content)
-            return True
+            return True, None
 
         except OSError as exc:
             logger.warning("Filesystem error for %s: %s — skipping", url, exc)
@@ -168,7 +168,7 @@ def _download_file(
                     output_path.unlink()
                 except OSError:
                     pass
-            return False
+            return False, None
 
         except httpx.HTTPStatusError as exc:
             status = exc.response.status_code
@@ -189,7 +189,7 @@ def _download_file(
                 time.sleep(wait)
                 continue
             logger.warning("HTTP %d for %s — giving up", status, url)
-            return False
+            return False, status
 
         except (
             httpx.TimeoutException,
@@ -210,9 +210,9 @@ def _download_file(
                 time.sleep(wait)
                 continue
             logger.warning("Network error for %s after %d attempts: %s", url, max_retries, exc)
-            return False
+            return False, None
 
-    return False
+    return False, None
 
 
 def _backoff_delay(attempt: int) -> float:
@@ -281,6 +281,46 @@ def _save_registry(registry: dict[str, Any], path: Path, db: DatabaseService) ->
             db.upsert_doc_sigma_ref(row)
 
 
+def _load_error_registry(db: DatabaseService) -> set[str]:
+    """Load the set of url_hash values that have previously failed (30x/40x)."""
+    try:
+        entries = db.get_doc_sigma_ref_error()
+        return {e["url_hash"] for e in entries}
+    except Exception:
+        logger.warning("Failed to load error registry from DuckDB — proceeding without it")
+        return set()
+
+
+def _maybe_record_error(
+    db: DatabaseService,
+    url_hash: str,
+    original_url: str,
+    normalized_url: str,
+    status_code: int | None,
+    rule_id: str,
+    rule_title: str,
+) -> None:
+    """Record a 30x/40x download error in doc_sigma_ref_error so it is skipped on retry."""
+    if status_code is None:
+        return
+    if 300 <= status_code < 500 or (status_code >= 500 and status_code not in RETRY_STATUSES):
+        try:
+            db.upsert_doc_sigma_ref_error(
+                {
+                    "url_hash": url_hash,
+                    "original_url": original_url,
+                    "normalized_url": normalized_url,
+                    "error_code": status_code,
+                    "error_message": f"HTTP {status_code}",
+                    "org": "sigmaref",
+                    "repo": "references",
+                    "timestamp": iso_now(),
+                }
+            )
+        except Exception:
+            logger.warning("Failed to record error for %s", normalized_url)
+
+
 def _make_entry(
     url_hash: str,
     original_url: str,
@@ -347,6 +387,7 @@ def download_references(
 
     with _registry_lock:
         registry = _load_registry(output_path, db)
+        error_registry = _load_error_registry(db)
 
     total_rules = 0
     total_refs = 0
@@ -398,6 +439,12 @@ def download_references(
             normalized = normalize_url(ref)
 
             url_hash = _sha256(normalized)
+
+            if url_hash in error_registry:
+                logger.debug("Skipping previously failed URL: %s", normalized)
+                skipped += 1
+                continue
+
             ext = _url_ext(normalized)
 
             ftype = _detect_url_type(normalized)
@@ -426,7 +473,8 @@ def download_references(
                     existing_sha = existing.get("content_sha256")
                     if existing_sha is not None and _sha256_file(output_file) != existing_sha:
                         logger.info("Content changed for %s, re-downloading", normalized)
-                        if _download_file(normalized, output_file):
+                        success, status_code = _download_file(normalized, output_file)
+                        if success:
                             registry[url_hash] = _make_entry(
                                 url_hash=url_hash,
                                 original_url=ref,
@@ -443,6 +491,9 @@ def download_references(
                                 _save_registry(registry, output_path, db)
                             downloaded += 1
                         else:
+                            _maybe_record_error(
+                                db, url_hash, ref, normalized, status_code, rule_id, rule_title
+                            )
                             failed += 1
                         if request_delay > 0:
                             time.sleep(request_delay)
@@ -473,7 +524,8 @@ def download_references(
                 skipped += 1
                 continue
 
-            if _download_file(normalized, output_file):
+            success, status_code = _download_file(normalized, output_file, max_retries=MAX_RETRIES)
+            if success:
                 content_hash = _sha256_file(output_file) if output_file.exists() else ""
                 registry[url_hash] = _make_entry(
                     url_hash=url_hash,
@@ -491,6 +543,7 @@ def download_references(
                     _save_registry(registry, output_path, db)
                 downloaded += 1
             else:
+                _maybe_record_error(db, url_hash, ref, normalized, status_code, rule_id, rule_title)
                 failed += 1
 
             if request_delay > 0:

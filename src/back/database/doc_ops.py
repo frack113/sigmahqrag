@@ -99,6 +99,57 @@ class DatabaseServiceDocOps:
         result = self._safe_query("SELECT 1 FROM doc_sigma_ref WHERE url_hash = ?", (url_hash,))
         return result is not None
 
+    # ------------------------------------------------------------------
+    # DOC_SIGMA_REF_ERROR table (broken link tracking)
+    # ------------------------------------------------------------------
+
+    def upsert_doc_sigma_ref_error(self, data: dict) -> None:
+        with self._lock:
+            self._writer_conn.execute(
+                """INSERT INTO doc_sigma_ref_error (
+                    url_hash, original_url, normalized_url,
+                    error_code, error_message, org, repo, timestamp
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (url_hash) DO UPDATE SET
+                    error_code = EXCLUDED.error_code,
+                    error_message = EXCLUDED.error_message,
+                    timestamp = EXCLUDED.timestamp""",
+                (
+                    data.get("url_hash"),
+                    data.get("original_url"),
+                    data.get("normalized_url"),
+                    data.get("error_code"),
+                    data.get("error_message"),
+                    data.get("org"),
+                    data.get("repo"),
+                    data.get("timestamp"),
+                ),
+            )
+            self._writer_conn.commit()
+
+    def get_doc_sigma_ref_error(self, limit: int = 1000, offset: int = 0) -> list[dict]:
+        with self._lock:
+            results = self._writer_conn.execute(
+                "SELECT url_hash, original_url, normalized_url, error_code, error_message, org, repo, timestamp "
+                "FROM doc_sigma_ref_error ORDER BY url_hash LIMIT ? OFFSET ?",
+                [limit, offset],
+            ).fetchall()
+            col_names = [desc[0] for desc in self._writer_conn.description]
+        return [dict(zip(col_names, row)) for row in results]
+
+    def doc_sigma_ref_error_exists(self, url_hash: str) -> bool:
+        result = self._safe_query(
+            "SELECT 1 FROM doc_sigma_ref_error WHERE url_hash = ?", (url_hash,)
+        )
+        return result is not None
+
+    def delete_doc_sigma_ref_error(self, url_hash: str) -> None:
+        with self._lock:
+            self._writer_conn.execute(
+                "DELETE FROM doc_sigma_ref_error WHERE url_hash = ?", (url_hash,)
+            )
+            self._writer_conn.commit()
+
     def delete_doc_sigma_ref_by_repo(self, org: str, repo: str) -> None:
         with self._lock:
             self._writer_conn.execute(
