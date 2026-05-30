@@ -3,13 +3,16 @@ let eventSource = null;
 let isTailMode = true;
 let scrollLocked = true;
 let allLines = [];
+let allLinesLower = [];
+const MAX_LINES = 10000; // Hard cap on in-memory buffer
 
 document.addEventListener('DOMContentLoaded', () => {
     const output = document.getElementById('logs-output');
     const linesInput = document.getElementById('log-lines');
 
     linesInput.addEventListener('change', () => {
-        if (!isTailMode) loadLogs();
+        if (isTailMode) restartTail();
+        else loadLogs();
     });
 
     document.querySelectorAll('#log-sources a').forEach(a => {
@@ -33,6 +36,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     startTail();
 });
+
+function trimLines() {
+    if (allLines.length > MAX_LINES) {
+        const excess = allLines.length - MAX_LINES;
+        allLines = allLines.slice(excess);
+        allLinesLower = allLinesLower.slice(excess);
+    }
+}
 
 function selectSource(source) {
     currentSource = source;
@@ -81,23 +92,30 @@ function startTail() {
             const data = JSON.parse(event.data);
             if (data.type === 'init') {
                 allLines = data.lines || [];
+                allLinesLower = allLines.map(l => l.toLowerCase());
                 totalSeen = allLines.length;
                 scrollLocked = true;
+                trimLines();
             } else if (data.type === 'update') {
                 const newLines = data.lines || [];
                 const newTotal = data.line_count || 0;
                 // File was truncated/rotated — reset buffer
                 if (newTotal < totalSeen) {
                     allLines = newLines;
+                    allLinesLower = allLines.map(l => l.toLowerCase());
                     totalSeen = newTotal;
                 } else {
                     const countToAdd = newTotal - totalSeen;
-                    allLines.push(...newLines.slice(-countToAdd));
+                    const toAdd = newLines.slice(-countToAdd);
+                    allLines.push(...toAdd);
+                    allLinesLower.push(...toAdd.map(l => l.toLowerCase()));
                     totalSeen = newTotal;
                 }
                 scrollLocked = true;
+                trimLines();
             } else if (data.type === 'error') {
                 allLines = [`Error: ${data.message}`];
+                allLinesLower = [allLines[0].toLowerCase()];
                 totalSeen = 0;
             }
             renderFilteredLogs();
@@ -129,11 +147,14 @@ function renderFilteredLogs() {
     const count = getLines();
 
     // Get recent lines based on config
-    const displayedLines = allLines.length > count ? allLines.slice(-count) : allLines;
+    const startIdx = allLines.length > count ? allLines.length - count : 0;
+    const displayedLines = allLines.slice(startIdx);
+    const displayedLower = allLinesLower.slice(startIdx);
 
-    // Filter by search term
-    const filtered = searchTerm
-        ? displayedLines.filter(line => line.toLowerCase().includes(searchTerm))
+    // Filter by search term — use cached lowercase
+    const searchIdx = displayedLower.findIndex(l => l.includes(searchTerm));
+    const filtered = searchTerm && searchIdx >= 0
+        ? displayedLines.filter((_, i) => displayedLower[i].includes(searchTerm))
         : displayedLines;
 
     // Colorize log levels
@@ -163,16 +184,13 @@ function colorizeLine(line) {
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;');
 
-    // Color by log level — single regex pass
-    if (/^\d{4}-\d{2}-\d{2}/.test(escaped)) {
-        const match = escaped.match(/(?:ERROR|CRITICAL|WARNING|WARN|DEBUG|INFO)/);
-        if (match) {
-            const levelClass = match[0].toUpperCase();
-            const cls = levelClass === 'WARN' ? 'warning'
-                : levelClass === 'CRITICAL' ? 'error'
-                : levelClass.toLowerCase();
-            return `<span class="log-level-${cls}">${escaped}</span>`;
-        }
+    // Color by log level — single regex pass for both date and level
+    const m = escaped.match(/^\d{4}-\d{2}-\d{2}.*?(ERROR|CRITICAL|WARNING|WARN|DEBUG|INFO)/);
+    if (m) {
+        const cls = m[1] === 'WARN' ? 'warning'
+            : m[1] === 'CRITICAL' ? 'error'
+            : m[1].toLowerCase();
+        return `<span class="log-level-${cls}">${escaped}</span>`;
     }
     return `<span class="log-line">${escaped}</span>`;
 }
@@ -182,10 +200,11 @@ async function loadLogs() {
     const lines = getLines();
     const params = new URLSearchParams({ source: currentSource, lines: lines });
 
-    try {
+   try {
         const response = await fetch(`/api/v1/logs?${params}`);
         const data = await response.json();
         allLines = data.logs.map(l => l.text);
+        allLinesLower = allLines.map(l => l.toLowerCase());
         scrollLocked = true;
         renderFilteredLogs();
     } catch (error) {
@@ -200,6 +219,7 @@ async function clearLogs() {
         const data = await response.json();
         if (data.success) {
             allLines = [];
+            allLinesLower = [];
             document.getElementById('logs-output').innerHTML = '';
             const statsEl = document.getElementById('log-stats');
             if (statsEl) statsEl.textContent = 'Logs cleared';
