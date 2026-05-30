@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import asyncio
+import json
 import logging
 from pathlib import Path
 
 from fastapi import APIRouter, Query
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 
 from src.shared.config import get_config
 
@@ -37,6 +39,85 @@ def read_log_file(path: Path) -> list[str]:
             continue
     with open(path, encoding="utf-8", errors="replace") as f:
         return f.readlines()
+
+
+async def _tail_log_file(
+    log_path: Path,
+    lines: int = 50,
+) -> str:
+    """Read last N lines from log file."""
+    if not log_path.exists():
+        return _sse("error", "Log file not found")
+
+    all_lines = read_log_file(log_path)
+    if lines > 0:
+        recent = all_lines[-lines:]
+    entries = [line.strip() for line in recent]
+    return _sse("init", entries, line_count=len(entries))
+
+
+def _sse(event: str, data, **extra) -> str:
+    payload = {"type": event}
+    if isinstance(data, list):
+        payload["lines"] = data
+    else:
+        payload["message"] = data
+    payload.update(extra)
+    return "event: log\n" + "data: " + json.dumps(payload) + "\n\n"
+
+
+@router.get("/stream")
+async def stream_logs(
+    source: str = Query("system", description="Log source: system, llamacpp, qdrant"),
+    lines: int = Query(default=50, ge=1, le=500),
+):
+    """SSE endpoint for live log streaming (tail -f)."""
+
+    if source not in LOG_FILES:
+        return JSONResponse(status_code=400, content={"error": f"Invalid log source: {source}"})
+
+    # Resolve lines=0 as "all" for backwards compat
+    effective_lines = lines if lines > 0 else 0
+
+    logs_dir = get_logs_dir()
+    log_filename = LOG_FILES[source]
+    log_path = logs_dir / log_filename
+
+    async def event_generator():
+        # Track line counts to send only new lines
+        init_msg = await _tail_log_file(log_path, lines=effective_lines)
+        yield init_msg
+
+        while True:
+            try:
+                await asyncio.sleep(1)
+                if not log_path.exists():
+                    yield _sse("error", "Log file deleted")
+                    break
+
+                all_lines = read_log_file(log_path)
+
+                # Only yield lines beyond what was already sent
+                total = len(all_lines)
+                if effective_lines > 0:
+                    recent = all_lines[-effective_lines:]
+                else:
+                    recent = all_lines
+                new_entries = [line.strip() for line in recent]
+                if new_entries:
+                    yield _sse("update", new_entries, line_count=total)
+            except asyncio.CancelledError:
+                break
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @router.get("")

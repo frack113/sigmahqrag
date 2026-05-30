@@ -1,0 +1,52 @@
+{% extends "shared/layout.html" %}
+
+{% block title %}Logs - Sigmahqrag{% endblock %}
+
+{% block styles %}
+{{ super() }}
+<link rel="stylesheet" href="{{ url_for('static', path='/css/logs.css') }}">
+{% endblock %}
+
+{% block sidebar_title %}Logs{% endblock %}
+{% block sidebar_subtitle %}Viewer{% endblock %}
+
+{% block sidebar_nav %}
+<div class="sidebar-section">
+    <div class="sidebar-section-title">Config</div>
+    <div class="sidebar-config">
+        <label class="config-toggle">
+            <input type="checkbox" id="tail-mode" checked onchange="toggleTail()">
+            <span>Tail mode</span>
+        </label>
+        <label class="config-row">
+            <span>Lines</span>
+            <select id="log-lines" onchange="restartTail()">
+                <option value="25">25</option>
+                <option value="50" selected>50</option>
+            </select>
+        </label>
+        <label class="config-row">
+            <span>Application logs level</span>
+            <span id="app-log-level" class="level-value">{{ config.logging.level }}</span>
+        </label>
+        <label class="config-toggle">
+            <input type="checkbox" id="clear-startup" {% if config.logging.clean_at_startup %}checked{% endif %} disabled>
+            <span>Clear at startup</span>
+        </label>
+    </div>
+</div>
+<div class="sidebar-section">
+    <div class="sidebar-section-title">Sources</div>
+    <div id="log-sources">
+        <a href="#" data-source="system" class="active">System</a>
+        <a href="#" data-source="llamacpp">llama.cpp</a>
+        <a href="#" data-source="qdrant">Qdrant</a>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', path='/js/logs.js') }}"></script>
+{% endblock %}
+
+{% block content %}{% endblock %}
