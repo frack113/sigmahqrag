@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from src.back.services.health_check import HealthCheckService
@@ -55,9 +55,9 @@ async def admin_health(request: Request) -> HTMLResponse:
 
 
 @router.get("/admin/logs")
-async def admin_logs(request: Request) -> HTMLResponse:
-    """Serve logs page."""
-    return templates.TemplateResponse(request=request, name="admin/logs.html")
+async def admin_logs(request: Request) -> RedirectResponse:
+    """Redirect to new logs tab."""
+    return RedirectResponse(url="/logs")
 
 
 @router.get("/admin/llama")

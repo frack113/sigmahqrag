@@ -14,6 +14,7 @@ from src.api.routes.page_admin import router as admin_pages_router
 from src.api.routes.page_chat import router as chat_page_router
 from src.api.routes.page_data import router as data_page_router
 from src.api.routes.page_duckdb import router as duckdb_page_router
+from src.api.routes.page_logs import router as logs_page_router
 from src.api.v1.admin import router as admin_v1_router
 from src.api.v1.admin_models import router as admin_models_router
 from src.api.v1.chat import router as chat_v1_router
@@ -83,7 +84,8 @@ def _setup_logging(level: str = "INFO", max_size: str = "10M", max_files: int = 
 
 
 def _clean_at_startup() -> None:
-    """Clean temp, pid, and rotated log files at startup when clean_at_startup is enabled."""
+    """Clean temp, pid, and log files at startup when clean_at_startup is enabled."""
+    import shutil
     from src.shared import PID_DIR, LOGS_DIR
 
     for d in (TEMP_DIR, PID_DIR):
@@ -93,22 +95,19 @@ def _clean_at_startup() -> None:
                     if p.is_file():
                         p.unlink()
                     elif p.is_dir():
-                        import shutil
-
                         shutil.rmtree(p)
                 except Exception as e:
-                    logger.warning("Could not clean %s: %s", p, e)
+                    print(f"Could not clean {p}: {e}")
 
-    # Remove rotated log files (keep current sigmahqrag.log)
+    # Clear all log files (they will be recreated by the handler)
     if LOGS_DIR.exists():
         for p in LOGS_DIR.iterdir():
-            if p.is_file() and p.name != "sigmahqrag.log":
+            if p.is_file():
                 try:
-                    p.unlink()
+                    p.write_text("")
                 except Exception as e:
-                    logger.warning("Could not clean %s: %s", p, e)
-
-    logger.info("Cleanup at startup: temp, pid, and rotated logs cleared.")
+                    print(f"Could not clear {p}: {e}")
+        print("Cleanup at startup: all log files cleared.")
 
 
 @asynccontextmanager
@@ -149,6 +148,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                         pass
                 setattr(config, attr, val)
         logger.info("DuckDB config overrides applied.")
+
+        if config.logging_clean_at_startup:
+            _clean_at_startup()
+
         _setup_logging(
             level=config.logging_level,
             max_size=config.logging_log_max_size,
@@ -157,9 +160,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         logger.info("=== Lifespan starting ===")
         logger.info("Database initialized.")
         logger.info("Config initialized.")
-
-        if config.logging_clean_at_startup:
-            _clean_at_startup()
 
         # Start the background task dispatcher in its own thread
         dispatcher = TaskDispatcher(poll_interval=1, max_workers=4)
@@ -259,6 +259,7 @@ def create_app() -> FastAPI:
     app.include_router(admin_v1_router)
     app.include_router(admin_models_router)
     app.include_router(duckdb_page_router)
+    app.include_router(logs_page_router)
     app.include_router(duckdb_v1_router)
     app.include_router(config_v1_router)
     app.include_router(coverage_v1_router)

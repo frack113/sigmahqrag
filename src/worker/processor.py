@@ -235,12 +235,14 @@ class TaskDispatcher:
         task_id = task.get("task_id", "")
         error: str | None = None
 
+        logger.info(f"Worker {worker_type.value} started (task_id={task_id})")
         try:
             worker.process(task)
-            logger.debug(f"Task {task_id} completed successfully")
+            logger.info(f"Worker {worker_type.value} stopped (task_id={task_id}, status=ok)")
         except Exception as e:
             logger.error(f"Worker execution failed for task {task_id}: {e}", exc_info=True)
             error = str(e)
+            logger.info(f"Worker {worker_type.value} stopped (task_id={task_id}, status=error)")
             raise
         finally:
             with self._lock:
