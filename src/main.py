@@ -78,6 +78,9 @@ def _setup_logging(level: str = "INFO", max_size: str = "10M", max_files: int = 
     root_logger.addHandler(handler)
     root_logger.setLevel(log_level)
 
+    for noisy in ("httpx", "httpcore", "urllib3", "uvicorn.access"):
+        logging.getLogger(noisy).setLevel(logging.WARNING)
+
 
 def _clean_at_startup() -> None:
     """Clean temp, pid, and rotated log files at startup when clean_at_startup is enabled."""

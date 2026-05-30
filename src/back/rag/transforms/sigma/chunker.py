@@ -33,9 +33,9 @@ def chunk_sigma_rules_rich(rule: dict) -> list[dict]:
 
     chunks: list[dict] = []
 
-# ------------------------------------------------------------------
-# Chunk: Executive summary
-# ------------------------------------------------------------------
+    # ------------------------------------------------------------------
+    # Chunk: Executive summary
+    # ------------------------------------------------------------------
     chunks.append(
         make_chunk(
             rule,
@@ -56,10 +56,9 @@ Main detection logic: {condition}
         )
     )
 
-
-# ------------------------------------------------------------------
-# Chunk: Rule metadata and lifecycle
-# ------------------------------------------------------------------
+    # ------------------------------------------------------------------
+    # Chunk: Rule metadata and lifecycle
+    # ------------------------------------------------------------------
     chunks.append(
         make_chunk(
             rule,
@@ -83,9 +82,9 @@ References:
         )
     )
 
-# ------------------------------------------------------------------
-# Chunk: Logsource context
-# ------------------------------------------------------------------
+    # ------------------------------------------------------------------
+    # Chunk: Logsource context
+    # ------------------------------------------------------------------
     chunks.append(
         make_chunk(
             rule,
@@ -109,10 +108,9 @@ It should be mapped to fields that record relevant event attributes used by the 
     attack_tags = [tag for tag in tags if str(tag).startswith("attack.")]
 
     if attack_tags:
-
-# ------------------------------------------------------------------
-# Chunk: MITRE ATT&CK mapping
-# ------------------------------------------------------------------
+        # ------------------------------------------------------------------
+        # Chunk: MITRE ATT&CK mapping
+        # ------------------------------------------------------------------
         chunks.append(
             make_chunk(
                 rule,
@@ -132,9 +130,9 @@ This chunk describes the ATT&CK tactics and techniques associated with this Sigm
             )
         )
 
-# ------------------------------------------------------------------
-# Chunk: Detection condition
-# ------------------------------------------------------------------
+    # ------------------------------------------------------------------
+    # Chunk: Detection condition
+    # ------------------------------------------------------------------
     chunks.append(
         make_chunk(
             rule,
@@ -175,9 +173,9 @@ Interpretation: this condition defines how selection and filter blocks are combi
             ]
         )
 
-# ------------------------------------------------------------------
-# Chunk: Detection selection/filter block
-# ------------------------------------------------------------------
+        # ------------------------------------------------------------------
+        # Chunk: Detection selection/filter block
+        # ------------------------------------------------------------------
         chunks.append(
             make_chunk(
                 rule,
@@ -208,9 +206,9 @@ Raw block:
         for field_operator, values in by_field_operator.items():
             field, operator = split_field_operator(field_operator)
 
-# ------------------------------------------------------------------
-# Chunk: Field/operator group
-# ------------------------------------------------------------------
+            # ------------------------------------------------------------------
+            # Chunk: Field/operator group
+            # ------------------------------------------------------------------
             chunks.append(
                 make_chunk(
                     rule,
@@ -242,9 +240,9 @@ Values:
             field, operator = split_field_operator(fact["field_operator"])
             value = fact["value"]
 
-# ------------------------------------------------------------------
-# Chunk: Atomic indicator
-# ------------------------------------------------------------------
+            # ------------------------------------------------------------------
+            # Chunk: Atomic indicator
+            # ------------------------------------------------------------------
             chunks.append(
                 make_chunk(
                     rule,
@@ -276,9 +274,9 @@ A match on this value contributes to the rule condition: {condition}
     suspicious_values = [fact for fact in all_atomic_facts if not fact["is_filter"]]
     filter_values = [fact for fact in all_atomic_facts if fact["is_filter"]]
 
-# ------------------------------------------------------------------
-# Chunk: Indicator inventory
-# ------------------------------------------------------------------
+    # ------------------------------------------------------------------
+    # Chunk: Indicator inventory
+    # ------------------------------------------------------------------
     chunks.append(
         make_chunk(
             rule,
@@ -298,10 +296,10 @@ Filtered legitimate values:
             ],
         )
     )
-    
-# ------------------------------------------------------------------
-# Chunk: Investigation guidance
-# ------------------------------------------------------------------
+
+    # ------------------------------------------------------------------
+    # Chunk: Investigation guidance
+    # ------------------------------------------------------------------
     chunks.append(
         make_chunk(
             rule,
@@ -320,10 +318,10 @@ Baseline normal activity and tune filters accordingly.
             ],
         )
     )
-    
-# ------------------------------------------------------------------
-# Chunk: False positive context
-# ------------------------------------------------------------------
+
+    # ------------------------------------------------------------------
+    # Chunk: False positive context
+    # ------------------------------------------------------------------
     chunks.append(
         make_chunk(
             rule,
@@ -344,10 +342,10 @@ References:
             ],
         )
     )
-    
-# ------------------------------------------------------------------
-# Chunk: Natural language queries
-# ------------------------------------------------------------------
+
+    # ------------------------------------------------------------------
+    # Chunk: Natural language queries
+    # ------------------------------------------------------------------
     chunks.append(
         make_chunk(
             rule,
@@ -371,9 +369,9 @@ This rule is relevant for questions such as:
         )
     )
 
-# ------------------------------------------------------------------
-# Chunk: Backend mapping hints
-# ------------------------------------------------------------------
+    # ------------------------------------------------------------------
+    # Chunk: Backend mapping hints
+    # ------------------------------------------------------------------
     chunks.append(
         make_chunk(
             rule,

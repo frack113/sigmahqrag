@@ -22,13 +22,14 @@ class SigmaRefEmbeddingWorker(EmbeddingWorker):
         result = []
         for e in raw_entries:
             url_hash = e.get("url_hash") or ""
+            file_name = e.get("file_name") or f"{url_hash}.md"
             if not url_hash:
                 continue
             result.append(
                 {
                     "hash": url_hash,
-                    "file_name": f"{url_hash}.md",
-                    **{k: v for k, v in e.items() if k not in ("url_hash",)},
+                    "file_name": file_name,
+                    **{k: v for k, v in e.items() if k not in ("url_hash", "file_name")},
                 }
             )
         return result

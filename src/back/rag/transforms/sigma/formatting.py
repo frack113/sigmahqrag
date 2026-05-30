@@ -8,8 +8,8 @@ def format_value(value: Any, indent: int = 0) -> str:
         - value (Any): Valeur à formater (Dictionnaire, liste; ect...)
         - indent (int): Nbr espaces d'indentation
     Return:
-        - str: Chaine de caractères representant value sous forme de liste 
-        
+        - str: Chaine de caractères representant value sous forme de liste
+
     """
     prefix = " " * indent
     lines: list[str] = []
@@ -18,7 +18,7 @@ def format_value(value: Any, indent: int = 0) -> str:
         for key, val in value.items():
             lines.append(f"{prefix}- {key}:")
             lines.append(format_value(val, indent + 2))
-            
+
     elif isinstance(value, list):
         for item in value:
             if isinstance(item, (dict, list)):

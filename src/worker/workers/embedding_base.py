@@ -1,15 +1,56 @@
 import logging
+import re
 from abc import abstractmethod
+from html.parser import HTMLParser
 from pathlib import Path
 
 from llama_index.core.node_parser import MarkdownNodeParser
 from llama_index.core.schema import Document
 
 from src.back.rag.ingestion import IngestionPipelineBuilder
+from src.back.utils.identify_file_type import FileType
 from src.worker.base import BaseWorker
 from src.worker.enums import WorkerName, WorkerStatus
 
 logger = logging.getLogger(__name__)
+
+_OFFICE_TEXT_FORMATS = {".docx", ".doc", ".pptx", ".ppt", ".pptm"}
+_OFFICE_SKIP_FORMATS = {".xlsx", ".xls", ".ods", ".odp", ".xlsm", ".xlsb"}
+
+
+class _HTMLStripper(HTMLParser):
+    """HTMLParser subclass that strips tags and extracts text."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._text_parts: list[str] = []
+        self._skip = False
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag in ("script", "style"):
+            self._skip = True
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag in ("script", "style"):
+            self._skip = False
+        if tag in ("p", "br", "li", "h1", "h2", "h3", "h4", "h5", "h6", "tr", "div"):
+            self._text_parts.append("\n")
+
+    def handle_data(self, data: str) -> None:
+        if not self._skip:
+            self._text_parts.append(data)
+
+    def get_text(self) -> str:
+        text = "".join(self._text_parts)
+        text = re.sub(r"\n{3,}", "\n\n", text)
+        return text.strip()
+
+
+def _strip_html(html: str) -> str:
+    """Strip HTML tags and return plain text content."""
+    stripper = _HTMLStripper()
+    stripper.feed(html)
+    return stripper.get_text()
 
 
 class EmbeddingWorker(BaseWorker):
@@ -17,6 +58,27 @@ class EmbeddingWorker(BaseWorker):
 
     worker_type: WorkerName
     collection_name: str = ""
+
+    def _parse_binary_document(self, file_path: Path, content_type: str) -> list[Document]:
+        if content_type == FileType.PDF.value:
+            from llama_index.readers.file import PyMuPDFReader
+
+            return PyMuPDFReader().load_data(file_path)
+
+        if content_type == FileType.OFFICE_DOCUMENT.value:
+            ext = file_path.suffix.lower()
+            if ext in _OFFICE_TEXT_FORMATS:
+                if ext in (".docx", ".doc"):
+                    from llama_index.readers.file import DocxReader
+
+                    return DocxReader().load_data(file_path)
+                if ext in (".pptx", ".ppt", ".pptm"):
+                    from llama_index.readers.file import PptxReader
+
+                    return PptxReader().load_data(file_path)
+            raise ValueError(f"Unsupported office format: {ext}")
+
+        raise ValueError(f"Unsupported binary format: {content_type}")
 
     def process(self, task: dict) -> None:
         assert self.dispatcher is not None
@@ -58,6 +120,54 @@ class EmbeddingWorker(BaseWorker):
                 )
                 continue
 
+            metadata = self._build_metadata(entry, self._collection_name)
+            content_type = metadata.get("content_type", "")
+            source = metadata.get("source", "")
+
+            _binary_types = {FileType.PDF.value, FileType.OFFICE_DOCUMENT.value}
+            if content_type in _binary_types:
+                ext = file_path.suffix.lower()
+                if content_type == FileType.OFFICE_DOCUMENT.value and ext in _OFFICE_SKIP_FORMATS:
+                    logger.warning(
+                        f"[{self.__class__.__name__}] Skipping unsupported office format {ext}: "
+                        f"{file_path}"
+                    )
+                    skipped.append(current_file)
+                    self._update_status(entry, "skipped")
+                    self.dispatcher.update_worker_state(
+                        worker_type=self.worker_type,
+                        progress_percent=round(((idx + 1) / total) * 10, 2),
+                        current_file=current_file,
+                    )
+                    continue
+
+                try:
+                    reader_docs = self._parse_binary_document(file_path, content_type)
+                except Exception as e:
+                    logger.warning(
+                        f"[{self.__class__.__name__}] Error parsing {content_type} {file_path}: {e}"
+                    )
+                    errors.append({"file": current_file, "error": str(e)})
+                    self._update_status(entry, "error")
+                    self.dispatcher.update_worker_state(
+                        worker_type=self.worker_type,
+                        progress_percent=round(((idx + 1) / total) * 10, 2),
+                        current_file=current_file,
+                    )
+                    continue
+
+                for doc in reader_docs:
+                    merged_metadata = {**metadata, **doc.metadata}
+                    doc.metadata = merged_metadata
+                    valid_docs.append((doc, entry))
+
+                self.dispatcher.update_worker_state(
+                    worker_type=self.worker_type,
+                    progress_percent=round(((idx + 1) / total) * 10, 2),
+                    current_file=current_file,
+                )
+                continue
+
             try:
                 doc_text = file_path.read_text(encoding="utf-8")
             except Exception as e:
@@ -71,10 +181,8 @@ class EmbeddingWorker(BaseWorker):
                 )
                 continue
 
-            metadata = self._build_metadata(entry, self._collection_name)
-
-            source = metadata.get("source", "")
-            content_type = metadata.get("content_type", "")
+            if content_type == FileType.HTML.value:
+                doc_text = _strip_html(doc_text)
 
             if source in ("sigmaref", "github", "local") and content_type in ("markdown", ""):
                 md_parser = MarkdownNodeParser(include_metadata=True)

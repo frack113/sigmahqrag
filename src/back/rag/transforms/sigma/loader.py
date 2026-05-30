@@ -7,11 +7,11 @@ from .detectors import is_sigma_rule
 def load_sigma_rules(str_path: str) -> list[dict]:
     """Charge tout les fichiers yml/yaml du repo.
 
-    Arg: 
+    Arg:
         - str_path (str): Chemin du repo
     Return:
         - list[dict]: liste contenant les fichiers yml/yaml
-        
+
     """
     path = Path(str_path)
 

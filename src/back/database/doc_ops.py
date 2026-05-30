@@ -20,12 +20,19 @@ class DatabaseServiceDocOps:
 
     def get_doc_sigma_ref(self, limit: int = 100, offset: int = 0) -> list[dict]:
         with self._lock:
-            results = self._writer_conn.execute(
+            query = (
                 "SELECT url_hash, org, repo, content_type, file_name, content_sha256, file_size, "
                 "original_url, normalized_url, rule_id, title, timestamp, last_seen, embed_status "
-                "FROM doc_sigma_ref ORDER BY url_hash LIMIT ? OFFSET ?",
-                [limit, offset],
-            ).fetchall()
+                "FROM doc_sigma_ref ORDER BY url_hash"
+            )
+            params: list[int] = []
+            if limit > 0:
+                query += " LIMIT ?"
+                params.append(limit)
+            if offset > 0:
+                query += " OFFSET ?"
+                params.append(offset)
+            results = self._writer_conn.execute(query, params).fetchall()
             col_names = [desc[0] for desc in self._writer_conn.description]
         return [dict(zip(col_names, row)) for row in results]
 
@@ -95,9 +102,105 @@ class DatabaseServiceDocOps:
             )
             self._writer_conn.commit()
 
+    def batch_upsert_doc_sigma_ref(self, rows: list[dict]) -> None:
+        if not rows:
+            return
+        with self._lock:
+            self._writer_conn.executemany(
+                """INSERT INTO doc_sigma_ref (
+                    url_hash, org, repo, content_type, file_name, content_sha256, file_size,
+                    original_url, normalized_url, rule_id, title, timestamp, last_seen, embed_status
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (url_hash) DO UPDATE SET
+                    org = EXCLUDED.org,
+                    repo = EXCLUDED.repo,
+                    content_type = EXCLUDED.content_type,
+                    file_name = EXCLUDED.file_name,
+                    content_sha256 = EXCLUDED.content_sha256,
+                    file_size = EXCLUDED.file_size,
+                    original_url = EXCLUDED.original_url,
+                    normalized_url = EXCLUDED.normalized_url,
+                    rule_id = EXCLUDED.rule_id,
+                    title = EXCLUDED.title,
+                    timestamp = EXCLUDED.timestamp,
+                    last_seen = EXCLUDED.last_seen,
+                    embed_status = EXCLUDED.embed_status""",
+                [
+                    (
+                        r.get("url_hash"),
+                        r.get("org"),
+                        r.get("repo"),
+                        r.get("content_type"),
+                        r.get("file_name"),
+                        r.get("content_sha256"),
+                        r.get("file_size"),
+                        r.get("original_url"),
+                        r.get("normalized_url"),
+                        r.get("rule_id", "00000000-0000-0000-0000-000000000000"),
+                        r.get("title"),
+                        r.get("timestamp"),
+                        r.get("last_seen"),
+                        r.get("embed_status", "discovery"),
+                    )
+                    for r in rows
+                ],
+            )
+            self._writer_conn.commit()
+
     def doc_sigma_ref_exists(self, url_hash: str) -> bool:
         result = self._safe_query("SELECT 1 FROM doc_sigma_ref WHERE url_hash = ?", (url_hash,))
         return result is not None
+
+    # ------------------------------------------------------------------
+    # DOC_SIGMA_REF_ERROR table (broken link tracking)
+    # ------------------------------------------------------------------
+
+    def upsert_doc_sigma_ref_error(self, data: dict) -> None:
+        with self._lock:
+            self._writer_conn.execute(
+                """INSERT INTO doc_sigma_ref_error (
+                    url_hash, original_url, normalized_url,
+                    error_code, error_message, org, repo, timestamp
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (url_hash) DO UPDATE SET
+                    error_code = EXCLUDED.error_code,
+                    error_message = EXCLUDED.error_message,
+                    timestamp = EXCLUDED.timestamp""",
+                (
+                    data.get("url_hash"),
+                    data.get("original_url"),
+                    data.get("normalized_url"),
+                    data.get("error_code"),
+                    data.get("error_message"),
+                    data.get("org"),
+                    data.get("repo"),
+                    data.get("timestamp"),
+                ),
+            )
+            self._writer_conn.commit()
+
+    def get_doc_sigma_ref_error(self, limit: int = 1000, offset: int = 0) -> list[dict]:
+        with self._lock:
+            results = self._writer_conn.execute(
+                "SELECT url_hash, original_url, normalized_url, error_code, error_message, org, repo, timestamp "
+                "FROM doc_sigma_ref_error ORDER BY url_hash LIMIT ? OFFSET ?",
+                [limit, offset],
+            ).fetchall()
+            col_names = [desc[0] for desc in self._writer_conn.description]
+        return [dict(zip(col_names, row)) for row in results]
+
+    def doc_sigma_ref_error_exists(self, url_hash: str) -> bool:
+        result = self._safe_query(
+            "SELECT 1 FROM doc_sigma_ref_error WHERE url_hash = ?", (url_hash,)
+        )
+        return result is not None
+
+    def delete_doc_sigma_ref_error(self, url_hash: str) -> None:
+        with self._lock:
+            self._writer_conn.execute(
+                "DELETE FROM doc_sigma_ref_error WHERE url_hash = ?", (url_hash,)
+            )
+            self._writer_conn.commit()
 
     def delete_doc_sigma_ref_by_repo(self, org: str, repo: str) -> None:
         with self._lock:
@@ -147,6 +250,51 @@ class DatabaseServiceDocOps:
                     data.get("last_seen"),
                     data.get("embed_status", "discovery"),
                 ),
+            )
+            self._writer_conn.commit()
+
+    def batch_upsert_doc_registry(self, rows: list[dict]) -> None:
+        if not rows:
+            return
+        with self._lock:
+            self._writer_conn.executemany(
+                """INSERT INTO doc_registry (
+                    url_hash, org, repo, content_type, file_name, content_sha256, file_size,
+                    original_url, normalized_url, rule_id, title, timestamp, last_seen, embed_status
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (url_hash) DO UPDATE SET
+                    org = EXCLUDED.org,
+                    repo = EXCLUDED.repo,
+                    content_type = EXCLUDED.content_type,
+                    file_name = EXCLUDED.file_name,
+                    content_sha256 = EXCLUDED.content_sha256,
+                    file_size = EXCLUDED.file_size,
+                    original_url = EXCLUDED.original_url,
+                    normalized_url = EXCLUDED.normalized_url,
+                    rule_id = EXCLUDED.rule_id,
+                    title = EXCLUDED.title,
+                    timestamp = EXCLUDED.timestamp,
+                    last_seen = EXCLUDED.last_seen,
+                    embed_status = EXCLUDED.embed_status""",
+                [
+                    (
+                        r.get("url_hash"),
+                        r.get("org"),
+                        r.get("repo"),
+                        r.get("content_type"),
+                        r.get("file_name"),
+                        r.get("content_sha256"),
+                        r.get("file_size"),
+                        r.get("original_url"),
+                        r.get("normalized_url"),
+                        r.get("rule_id", "00000000-0000-0000-0000-000000000000"),
+                        r.get("title"),
+                        r.get("timestamp"),
+                        r.get("last_seen"),
+                        r.get("embed_status", "discovery"),
+                    )
+                    for r in rows
+                ],
             )
             self._writer_conn.commit()
 

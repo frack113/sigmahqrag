@@ -9,9 +9,9 @@ def flatten_detection_values(value: Any, path: str = "") -> list[dict]:
         - path (str): CHemin du champ courant
     Return:
         - list[dict]: Liste de dictionnaires contenant : champ et la valeur associee
-        
+
     """
-    
+
     facts: list[dict] = []
 
     if isinstance(value, dict):
@@ -37,8 +37,8 @@ def split_field_operator(field_operator: str) -> tuple[str, str]:
         - field_operator (str): Chaine contenant le champ + operateur separer par '|'
     Return:
         - tuple[str, str]: champ et operateur avec 'equals' comme op par defaul
-        
-    """    
+
+    """
     if "|" in field_operator:
         field, operator = field_operator.split("|", 1)
         return field, operator

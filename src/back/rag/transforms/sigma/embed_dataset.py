@@ -67,11 +67,7 @@ def mean_pooling(model_output: Any, attention_mask: torch.Tensor) -> torch.Tenso
     """
 
     token_embeddings = model_output.last_hidden_state
-    input_mask_expanded = (
-        attention_mask.unsqueeze(-1)
-        .expand(token_embeddings.size())
-        .float()
-    )
+    input_mask_expanded = attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()
 
     return torch.sum(token_embeddings * input_mask_expanded, dim=1) / torch.clamp(
         input_mask_expanded.sum(dim=1),
@@ -123,10 +119,7 @@ def encode_texts(
                 return_tensors="pt",
             )
 
-            encoded_input = {
-                key: value.to(device)
-                for key, value in encoded_input.items()
-            }
+            encoded_input = {key: value.to(device) for key, value in encoded_input.items()}
 
             model_output = model(**encoded_input)
 
@@ -162,7 +155,6 @@ def embed_dataset(
     Returns:
         - list[dict[str, Any]]: Dataset enrichi
     """
-
 
     if limit is not None:
         dataset = dataset[:limit]
@@ -200,7 +192,7 @@ def save_json_dataset(dataset: list[dict[str, Any]], output_path: str | Path) ->
     Return:
         - Path: Chemin du fichier sauvegarde
     """
-    
+
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -260,9 +252,7 @@ def main() -> None:
     Returns:
         - None: Cette fonction ne retourne rien.
     """
-    parser = argparse.ArgumentParser(
-        description="Embed a RAGAS Sigma dataset and save it as JSON."
-    )
+    parser = argparse.ArgumentParser(description="Embed a RAGAS Sigma dataset and save it as JSON.")
 
     parser.add_argument(
         "--input",

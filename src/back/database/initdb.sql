@@ -93,6 +93,18 @@ CREATE TABLE IF NOT EXISTS git_selected_dirs (
     PRIMARY KEY (repo_key, dir_path)
 );
 
+-- doc_sigma_ref_error (failed reference URLs — 30x/40x errors to skip on retry)
+CREATE TABLE IF NOT EXISTS doc_sigma_ref_error (
+    url_hash TEXT PRIMARY KEY,
+    original_url TEXT NOT NULL,
+    normalized_url TEXT NOT NULL,
+    error_code INTEGER,
+    error_message TEXT,
+    org TEXT,
+    repo TEXT,
+    timestamp TEXT
+);
+
 -- worker_state
 CREATE TABLE IF NOT EXISTS worker_state (
     worker_type TEXT PRIMARY KEY,

@@ -33,7 +33,7 @@ def _make_db(entries: list[dict] | None = None) -> MagicMock:
         for e in entries:
             data[e["url_hash"]] = dict(e)
 
-    def get_doc_sigma_ref() -> list[dict]:
+    def get_doc_sigma_ref(limit: int = 100, offset: int = 0) -> list[dict]:
         return [
             {
                 "url_hash": k,
@@ -44,6 +44,9 @@ def _make_db(entries: list[dict] | None = None) -> MagicMock:
                 "title": v.get("title"),
                 "timestamp": v.get("timestamp"),
                 "content_sha256": v.get("content_sha256"),
+                "embed_status": v.get("embed_status"),
+                "file_name": v.get("file_name", ""),
+                "file_size": v.get("file_size"),
             }
             for k, v in data.items()
         ]
@@ -51,9 +54,16 @@ def _make_db(entries: list[dict] | None = None) -> MagicMock:
     def upsert_doc_sigma_ref(entry: dict) -> None:
         data[entry["url_hash"]] = dict(entry)
 
+    def batch_upsert_doc_sigma_ref(rows: list[dict]) -> None:
+        for r in rows:
+            data[r["url_hash"]] = dict(r)
+
     db = MagicMock()
     db.get_doc_sigma_ref = get_doc_sigma_ref
     db.upsert_doc_sigma_ref = upsert_doc_sigma_ref
+    db.batch_upsert_doc_sigma_ref = batch_upsert_doc_sigma_ref
+    db.get_doc_sigma_ref_error = MagicMock(return_value=[])
+    db.upsert_doc_sigma_ref_error = MagicMock()
     return db
 
 
@@ -115,7 +125,7 @@ class TestDetectUrlType:
         assert _detect_url_type("https://example.com/doc.markdown") == "markdown"
 
     def test_unsupported_extension(self) -> None:
-        assert _detect_url_type("https://example.com/doc.pdf") is None
+        assert _detect_url_type("https://example.com/doc.exe") is None
 
     def test_no_extension_with_markdown_content_type(self) -> None:
         assert (
@@ -145,8 +155,9 @@ class TestDownloadFile:
             mock_response.content = b"# Hello"
             mock_response.status_code = 200
 
-            result = _download_file(url, output, timeout=30)
-            assert result is True
+            success, status_code = _download_file(url, output, timeout=30)
+            assert success is True
+            assert status_code is None
             assert output.read_text() == "# Hello"
 
     def test_retry_then_success(self, tmp_path: Path) -> None:
@@ -175,8 +186,9 @@ class TestDownloadFile:
             return FakeResponse()
 
         with patch.object(httpx.Client, "get", mock_get), patch("time.sleep"):
-            result = _download_file(url, output, timeout=30)
-            assert result is True
+            success, status_code = _download_file(url, output, timeout=30)
+            assert success is True
+            assert status_code is None
             assert output.read_text() == "success"
             assert len(attempts) == 3
 
@@ -193,8 +205,9 @@ class TestDownloadFile:
 
         with patch.object(httpx.Client, "get", failing_get):
             with patch("time.sleep"):
-                result = _download_file(url, output, timeout=30)
-                assert result is False
+                success, status_code = _download_file(url, output, timeout=30)
+                assert success is False
+                assert status_code == 500
                 assert not output.exists()
 
     def test_zero_retries(self, tmp_path: Path) -> None:
@@ -209,8 +222,9 @@ class TestDownloadFile:
             raise httpx.ConnectError("connection failed")
 
         with patch.object(httpx.Client, "get", failing_get):
-            result = _download_file(url, output, max_retries=0)
-            assert result is False
+            success, status_code = _download_file(url, output, max_retries=0)
+            assert success is False
+            assert status_code is None
             assert call_count == 0
 
     def test_network_error_retries(self, tmp_path: Path) -> None:
@@ -226,8 +240,9 @@ class TestDownloadFile:
 
         with patch.object(httpx.Client, "get", failing_get):
             with patch("time.sleep"):
-                result = _download_file(url, output, timeout=30)
-                assert result is False
+                success, status_code = _download_file(url, output, timeout=30)
+                assert success is False
+                assert status_code is None
                 assert call_count == 3
 
 
@@ -257,6 +272,9 @@ class TestRegistry:
                 "title": None,
                 "timestamp": None,
                 "content_sha256": None,
+                "embed_status": None,
+                "last_seen": None,
+                "file_name": "",
             }
         }
 
@@ -272,6 +290,31 @@ class TestRegistry:
         reg = _load_registry(tmp_path, db)
         assert "abc" in reg
         assert reg["abc"]["original_url"] == "https://example.com/doc.md"
+
+    def test_save_sets_embed_status_discovery(self, tmp_path: Path) -> None:
+        db = _make_db()
+        data = {
+            "abc": {
+                "original_url": "https://example.com/doc.md",
+                "timestamp": iso_now(),
+            }
+        }
+        _save_registry(data, tmp_path, db)
+        reg = _load_registry(tmp_path, db)
+        assert reg["abc"]["embed_status"] == "discovery"
+
+    def test_save_preserves_existing_embed_status(self, tmp_path: Path) -> None:
+        db = _make_db()
+        data = {
+            "abc": {
+                "original_url": "https://example.com/doc.md",
+                "timestamp": iso_now(),
+                "embed_status": "embedded",
+            }
+        }
+        _save_registry(data, tmp_path, db)
+        reg = _load_registry(tmp_path, db)
+        assert reg["abc"]["embed_status"] == "embedded"
 
 
 class TestSha256:
@@ -308,7 +351,7 @@ references:
         db = _make_db()
         with patch(
             "src.back.documents.sigma_ref_downloader._download_file",
-            return_value=True,
+            return_value=(True, None),
         ):
             result = download_references(str(rules_dir), str(tmp_path / "output"), db)
             assert result["downloaded"] == 1
@@ -326,7 +369,7 @@ detection:
     EventID: 4688
   condition: selection
 references:
-  - https://example.com/doc.pdf
+  - https://example.com/doc.exe
 """)
 
         db = _make_db()
@@ -351,10 +394,18 @@ references:
   - https://example.com/doc.md
 """)
 
+        written_files: list[Path] = []
+
+        def write_file(url: str, output_path: Path, **kwargs: object) -> tuple[bool, int | None]:
+            written_files.append(output_path)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text("# content")
+            return True, None
+
         db = _make_db()
         with patch(
             "src.back.documents.sigma_ref_downloader._download_file",
-            return_value=True,
+            write_file,
         ):
             first = download_references(str(rules_dir), str(output_dir), db)
             assert first["downloaded"] == 1
@@ -379,11 +430,13 @@ references:
   - https://github.com/user/repo/blob/main/docs/guide.md
 """)
 
-        def check_normalized_url(url: str, output_path: Path, timeout: int = 30) -> bool:
+        def check_normalized_url(
+            url: str, output_path: Path, **kwargs: object
+        ) -> tuple[bool, int | None]:
             assert "raw.githubusercontent.com" in url
             output_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.write_text("# content")
-            return True
+            return True, None
 
         db = _make_db()
         with patch(
@@ -425,7 +478,7 @@ references:
         db = _make_db()
         with patch(
             "src.back.documents.sigma_ref_downloader._download_file",
-            return_value=True,
+            return_value=(True, None),
         ):
             result = download_references(str(rules_dir), str(output_dir), db)
             assert result["downloaded"] == 1
@@ -450,7 +503,7 @@ references:
         db = _make_db()
         with patch(
             "src.back.documents.sigma_ref_downloader._download_file",
-            return_value=False,
+            return_value=(False, None),
         ):
             result = download_references(str(rules_dir), str(output_dir), db)
             assert result["failed"] == 1
@@ -477,11 +530,11 @@ references:
 
         urls_downloaded: list[str] = []
 
-        def capture_url(url: str, output_path: Path, timeout: int = 30) -> bool:
+        def capture_url(url: str, output_path: Path, **kwargs: object) -> tuple[bool, int | None]:
             urls_downloaded.append(url)
             output_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.write_text("# content")
-            return True
+            return True, None
 
         db = _make_db()
         with patch("src.back.documents.sigma_ref_downloader._download_file", capture_url):
@@ -512,11 +565,13 @@ references:
 
         written_files: list[Path] = []
 
-        def write_on_download(url: str, output_path: Path, timeout: int = 30) -> bool:
+        def write_on_download(
+            url: str, output_path: Path, **kwargs: object
+        ) -> tuple[bool, int | None]:
             written_files.append(output_path)
             output_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.write_text("# content")
-            return True
+            return True, None
 
         db = _make_db()
         with (
@@ -571,11 +626,13 @@ references:
 
         download_calls: list[str] = []
 
-        def tracking_download(url: str, output_path: Path, timeout: int = 30) -> bool:
+        def tracking_download(
+            url: str, output_path: Path, timeout: int = 30
+        ) -> tuple[bool, int | None]:
             download_calls.append(url)
             output_path.parent.mkdir(parents=True, exist_ok=True)
             output_path.write_text("new content")
-            return True
+            return True, None
 
         with (
             patch(
@@ -627,9 +684,11 @@ references:
 
         download_calls: list[str] = []
 
-        def tracking_download(url: str, output_path: Path, timeout: int = 30) -> bool:
+        def tracking_download(
+            url: str, output_path: Path, timeout: int = 30
+        ) -> tuple[bool, int | None]:
             download_calls.append(url)
-            return True
+            return True, None
 
         with (
             patch(
@@ -678,9 +737,11 @@ references:
 
         download_calls: list[str] = []
 
-        def tracking_download(url: str, output_path: Path, timeout: int = 30) -> bool:
+        def tracking_download(
+            url: str, output_path: Path, timeout: int = 30
+        ) -> tuple[bool, int | None]:
             download_calls.append(url)
-            return True
+            return True, None
 
         with (
             patch(
@@ -718,7 +779,7 @@ references:
         with (
             patch(
                 "src.back.documents.sigma_ref_downloader._download_file",
-                return_value=True,
+                return_value=(True, None),
             ),
             patch("time.sleep"),
         ):

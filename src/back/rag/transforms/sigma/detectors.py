@@ -1,4 +1,3 @@
-
 def is_sigma_rule(doc: dict) -> bool:
     """Determine si le fichier est une regle sigma
 
@@ -6,7 +5,7 @@ def is_sigma_rule(doc: dict) -> bool:
          - doc (dict): fichier yml
     Return:
         - bool: nature du fichier yml
-        
+
     """
     return (
         isinstance(doc, dict)

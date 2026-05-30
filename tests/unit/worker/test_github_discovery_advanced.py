@@ -25,8 +25,8 @@ class TestGithubDiscoveryWorkerAdvanced:
         file_path = tmp_path / "outside.md"
         file_path.write_text("test")
         base_path = tmp_path / "repo"
-        result = worker._process_file(file_path, base_path, "org", "repo")
-        assert result is False
+        result = worker._prepare_entry(file_path, base_path, "org", "repo")
+        assert result is None
 
     def test_process_file_handles_read_bytes_error(
         self, mock_db: MagicMock, tmp_path: Path
@@ -39,12 +39,11 @@ class TestGithubDiscoveryWorkerAdvanced:
         mock_db.get_git_metadata.return_value = {"branch": "main"}
 
         worker = GithubDiscoveryWorker(mock_db)
-        with patch.object(Path, "read_bytes", side_effect=PermissionError("denied")):
-            result = worker._process_file(file_path, repo_dir, "org", "repo")
-            assert result is True
-            call_args = mock_db.upsert_doc_registry.call_args[0][0]
-            assert call_args["content_sha256"] == ""
-            assert call_args["file_size"] == 0
+        with patch.object(worker, "_compute_sha256", return_value=("", 0)):
+            result = worker._prepare_entry(file_path, repo_dir, "org", "repo")
+            assert result is not None
+            assert result["content_sha256"] == ""
+            assert result["file_size"] == 0
 
     def test_process_file_handles_identify_error(self, mock_db: MagicMock, tmp_path: Path) -> None:
         repo_dir = tmp_path / "org" / "repo"
@@ -59,23 +58,9 @@ class TestGithubDiscoveryWorkerAdvanced:
             "src.worker.workers.discovery_base.identify",
             side_effect=ValueError("unknown type"),
         ):
-            result = worker._process_file(file_path, repo_dir, "org", "repo")
-            assert result is True
-            call_args = mock_db.upsert_doc_registry.call_args[0][0]
-            assert call_args["content_type"] == "unknown"
-
-    def test_process_file_handles_db_error(self, mock_db: MagicMock, tmp_path: Path) -> None:
-        repo_dir = tmp_path / "org" / "repo"
-        repo_dir.mkdir(parents=True)
-        file_path = repo_dir / "file.md"
-        file_path.write_text("test")
-
-        mock_db.get_git_metadata.return_value = {"branch": "main"}
-        mock_db.upsert_doc_registry.side_effect = RuntimeError("db error")
-
-        worker = GithubDiscoveryWorker(mock_db)
-        result = worker._process_file(file_path, repo_dir, "org", "repo")
-        assert result is False
+            result = worker._prepare_entry(file_path, repo_dir, "org", "repo")
+            assert result is not None
+            assert result["content_type"] == "unknown"
 
     def test_process_handles_invalid_repo_key(self, mock_db: MagicMock, tmp_path: Path) -> None:
         mock_db.get_repos_with_selected_dirs.return_value = ["invalid"]
@@ -102,7 +87,7 @@ class TestGithubDiscoveryWorkerAdvanced:
         }
         worker = GithubDiscoveryWorker(mock_db)
         worker.process(task)
-        assert mock_db.upsert_doc_registry.call_count >= 1
+        assert mock_db.batch_upsert_doc_registry.call_count >= 1
 
     def test_process_reports_progress(self, mock_db: MagicMock, tmp_path: Path) -> None:
         repo_dir = tmp_path / "org" / "repo"
@@ -168,7 +153,7 @@ class TestGithubDiscoveryWorkerAdvanced:
         mock_db.get_selected_dirs.return_value = []
 
         worker = GithubDiscoveryWorker(mock_db)
-        with patch.object(worker, "_process_file", return_value=False):
+        with patch.object(worker, "_prepare_entry", return_value=None):
             worker.process(
                 {
                     "task_id": "gh-adv-007",

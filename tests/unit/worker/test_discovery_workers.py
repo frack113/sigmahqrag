@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import ANY, MagicMock, patch
 
 import pytest
 
+from src.back.utils.identify_file_type import SUPPORTED_REFERENCE_DOC_TYPES
 from src.worker.workers.github_discovery_worker import GithubDiscoveryWorker
 from src.worker.workers.local_discovery_worker import LocalDiscoveryWorker
 from src.worker.workers.sigmaref_discovery_worker import SigmaRefDiscoveryWorker
@@ -28,14 +29,15 @@ class TestSigmaRefDiscoveryWorker:
             "src.worker.workers.sigmaref_discovery_worker.download_references",
             return_value=summary,
         ) as mock_download:
-            worker = SigmaRefDiscoveryWorker(mock_db)
+            worker = SigmaRefDiscoveryWorker(mock_db, MagicMock())
             worker.process(task)
 
         mock_download.assert_called_once_with(
             rules_dir="data/github",
             output_dir="data/documents/sigmaref",
             db=mock_db,
-            supported_types={"markdown"},
+            supported_types=SUPPORTED_REFERENCE_DOC_TYPES,
+            progress_callback=ANY,
         )
 
     def test_process_propagates_errors(self, mock_db: MagicMock) -> None:
@@ -49,7 +51,7 @@ class TestSigmaRefDiscoveryWorker:
             "src.worker.workers.sigmaref_discovery_worker.download_references",
             side_effect=RuntimeError("download failed"),
         ):
-            worker = SigmaRefDiscoveryWorker(mock_db)
+            worker = SigmaRefDiscoveryWorker(mock_db, MagicMock())
             with pytest.raises(RuntimeError, match="download failed"):
                 worker.process(task)
 
@@ -93,7 +95,9 @@ class TestGithubDiscoveryWorker:
         worker = GithubDiscoveryWorker(mock_db)
         worker.process(task)
 
-        assert mock_db.upsert_doc_registry.call_count == 3
+        mock_db.batch_upsert_doc_registry.assert_called_once()
+        entries = mock_db.batch_upsert_doc_registry.call_args[0][0]
+        assert len(entries) == 3
 
     def test_process_respects_selected_dirs(self, mock_db: MagicMock, tmp_path: Path) -> None:
         repo_dir = tmp_path / "test-org" / "test-repo"
@@ -117,7 +121,9 @@ class TestGithubDiscoveryWorker:
         worker = GithubDiscoveryWorker(mock_db)
         worker.process(task)
 
-        assert mock_db.upsert_doc_registry.call_count == 1
+        mock_db.batch_upsert_doc_registry.assert_called_once()
+        entries = mock_db.batch_upsert_doc_registry.call_args[0][0]
+        assert len(entries) == 1
 
     def test_process_skips_missing_repos(self, mock_db: MagicMock, tmp_path: Path) -> None:
         repo_dir = tmp_path / "test-org" / "test-repo"
@@ -140,7 +146,9 @@ class TestGithubDiscoveryWorker:
         worker = GithubDiscoveryWorker(mock_db)
         worker.process(task)
 
-        assert mock_db.upsert_doc_registry.call_count == 1
+        mock_db.batch_upsert_doc_registry.assert_called_once()
+        entries = mock_db.batch_upsert_doc_registry.call_args[0][0]
+        assert len(entries) == 1
 
     def test_process_sets_embed_status(self, mock_db: MagicMock, tmp_path: Path) -> None:
         repo_dir = tmp_path / "test-org" / "test-repo"
@@ -160,9 +168,9 @@ class TestGithubDiscoveryWorker:
         worker = GithubDiscoveryWorker(mock_db)
         worker.process(task)
 
-        assert mock_db.upsert_doc_registry.call_count >= 1
-        call_args = mock_db.upsert_doc_registry.call_args_list[0][0][0]
-        assert call_args["embed_status"] == "discovered"
+        mock_db.batch_upsert_doc_registry.assert_called_once()
+        entries = mock_db.batch_upsert_doc_registry.call_args[0][0]
+        assert entries[0]["embed_status"] == "discovery"
 
 
 class TestLocalDiscoveryWorker:
@@ -193,7 +201,9 @@ class TestLocalDiscoveryWorker:
         worker = LocalDiscoveryWorker(mock_db)
         worker.process(task)
 
-        assert mock_db.upsert_doc_registry.call_count == 2
+        mock_db.batch_upsert_doc_registry.assert_called_once()
+        entries = mock_db.batch_upsert_doc_registry.call_args[0][0]
+        assert len(entries) == 2
 
     def test_process_uses_default_path(self, mock_db: MagicMock) -> None:
         task = {
@@ -220,5 +230,6 @@ class TestLocalDiscoveryWorker:
         worker = LocalDiscoveryWorker(mock_db)
         worker.process(task)
 
-        calls = mock_db.upsert_doc_registry.call_args_list
-        assert all(c[0][0]["org"] == "local" for c in calls)
+        mock_db.batch_upsert_doc_registry.assert_called_once()
+        entries = mock_db.batch_upsert_doc_registry.call_args[0][0]
+        assert all(e["org"] == "local" for e in entries)

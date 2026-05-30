@@ -22,12 +22,12 @@ class TestLocalDiscoveryWorkerAdvanced:
         }
 
         worker = LocalDiscoveryWorker(mock_db)
-        with patch.object(Path, "read_bytes", side_effect=PermissionError("denied")):
+        with patch.object(worker, "_compute_sha256", return_value=("", 0)):
             worker.process(task)
-        mock_db.upsert_doc_registry.assert_called_once()
-        call_args = mock_db.upsert_doc_registry.call_args[0][0]
-        assert call_args["content_sha256"] == ""
-        assert call_args["file_size"] == 0
+        mock_db.batch_upsert_doc_registry.assert_called_once()
+        entries = mock_db.batch_upsert_doc_registry.call_args[0][0]
+        assert entries[0]["content_sha256"] == ""
+        assert entries[0]["file_size"] == 0
 
     def test_process_handles_identify_error(self, mock_db: MagicMock, tmp_path: Path) -> None:
         local_dir = tmp_path / "docs"
@@ -46,11 +46,15 @@ class TestLocalDiscoveryWorkerAdvanced:
             {".unknown": "unknown"},
         ):
             with patch(
-                "src.worker.workers.discovery_base.identify",
-                side_effect=ValueError("unknown"),
+                "src.worker.workers.local_discovery_worker.SUPPORTED_EXTENSIONS",
+                frozenset({".unknown"}),
             ):
-                worker.process(task)
-                # identify error handled gracefully by _identify_content_type
-                mock_db.upsert_doc_registry.assert_called_once()
-                call_args = mock_db.upsert_doc_registry.call_args[0][0]
-                assert call_args["content_type"] == "unknown"
+                with patch(
+                    "src.worker.workers.discovery_base.identify",
+                    side_effect=ValueError("unknown"),
+                ):
+                    worker.process(task)
+                    # identify error handled gracefully by _identify_content_type
+                    mock_db.batch_upsert_doc_registry.assert_called_once()
+                    entries = mock_db.batch_upsert_doc_registry.call_args[0][0]
+                    assert entries[0]["content_type"] == "unknown"
