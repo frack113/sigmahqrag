@@ -9,6 +9,7 @@ import threading
 import time
 import urllib.parse
 from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
 
@@ -46,6 +47,7 @@ MAX_RETRIES = 3
 BACKOFF_DELAYS = [1, 4, 9]
 RETRY_STATUSES = {429, 500, 502, 503, 504}
 DEFAULT_REQUEST_DELAY = 0.5
+DEFAULT_MAX_WORKERS = 5
 SUPPORTED_EXTENSIONS: dict[str, str] = {
     ext: ft.value for ext, ft in SUPPORTED_DOC_EXTENSION_MAP.items()
 }
@@ -260,25 +262,28 @@ def _load_registry(path: Path, db: DatabaseService) -> dict[str, Any]:
 
 
 def _save_registry(registry: dict[str, Any], path: Path, db: DatabaseService) -> None:
-    """Save the registry to DuckDB atomically."""
+    """Save the registry to DuckDB atomically in a single batch."""
+    rows = []
     for url_hash, entry in registry.items():
         if isinstance(entry, dict):
-            row = {
-                "url_hash": url_hash,
-                "original_url": entry.get("original_url", ""),
-                "normalized_url": entry.get("normalized_url"),
-                "content_type": entry.get("content_type"),
-                "rule_id": entry.get("rule_id"),
-                "title": entry.get("title"),
-                "timestamp": entry.get("timestamp"),
-                "content_sha256": entry.get("content_sha256"),
-                "org": entry.get("org", "sigmaref"),
-                "repo": entry.get("repo", "references"),
-                "file_name": entry.get("file_name", ""),
-                "file_size": entry.get("file_size"),
-                "embed_status": entry.get("embed_status", "discovery"),
-            }
-            db.upsert_doc_sigma_ref(row)
+            rows.append(
+                {
+                    "url_hash": url_hash,
+                    "original_url": entry.get("original_url", ""),
+                    "normalized_url": entry.get("normalized_url"),
+                    "content_type": entry.get("content_type"),
+                    "rule_id": entry.get("rule_id"),
+                    "title": entry.get("title"),
+                    "timestamp": entry.get("timestamp"),
+                    "content_sha256": entry.get("content_sha256"),
+                    "org": entry.get("org", "sigmaref"),
+                    "repo": entry.get("repo", "references"),
+                    "file_name": entry.get("file_name", ""),
+                    "file_size": entry.get("file_size"),
+                    "embed_status": entry.get("embed_status", "discovery"),
+                }
+            )
+    db.batch_upsert_doc_sigma_ref(rows)
 
 
 def _load_error_registry(db: DatabaseService) -> set[str]:
@@ -356,6 +361,7 @@ def download_references(
     supported_types: set[str] | None = None,
     request_delay: float = DEFAULT_REQUEST_DELAY,
     progress_callback: Callable[[int, int], None] | None = None,
+    max_workers: int = DEFAULT_MAX_WORKERS,
 ) -> dict[str, Any]:
     """Download all Sigma rule references matching supported document types.
 
@@ -368,8 +374,10 @@ def download_references(
         db: Database service instance.
         supported_types: Set of FileType values to accept (e.g. {"markdown"}).
             Defaults to {"markdown"}.
-        request_delay: Seconds to wait between download requests.
+        request_delay: Seconds to wait between download requests (sequential
+            phase only; parallel phase uses max_workers instead).
         progress_callback: Optional callback(current, total) called after each file.
+        max_workers: Max concurrent HTTP download threads.
 
     Returns:
         Dict with summary stats: total_rules, total_refs, downloaded, skipped, failed.
@@ -397,6 +405,9 @@ def download_references(
 
     yml_files: list[Path] = list(rules_path.rglob("*.yaml"))
     yml_files.extend(rules_path.rglob("*.yml"))
+
+    # Phase 1: scan YAML files, classify refs, build download work items
+    download_queue: list[dict[str, Any]] = []
 
     total_files = len(yml_files)
     for file_idx, yml_file in enumerate(yml_files):
@@ -466,35 +477,21 @@ def download_references(
             output_file = output_path / f"{url_hash}{ext}"
 
             if url_hash in registry:
-                existing = registry[url_hash]
                 if output_file.exists():
-                    existing_sha = existing.get("content_sha256")
+                    existing_sha = registry[url_hash].get("content_sha256")
                     if existing_sha is not None and _sha256_file(output_file) != existing_sha:
-                        logger.info("Content changed for %s, re-downloading", normalized)
-                        success, status_code = _download_file(normalized, output_file)
-                        if success:
-                            registry[url_hash] = _make_entry(
-                                url_hash=url_hash,
-                                original_url=ref,
-                                normalized_url=normalized,
-                                content_type=existing.get("content_type", "markdown"),
-                                rule_id=rule_id,
-                                title=rule_title,
-                                timestamp=iso_now(),
-                                content_sha256=_sha256_file(output_file),
-                                file_name=output_file.name,
-                                file_size=output_file.stat().st_size,
-                            )
-                            with _registry_lock:
-                                _save_registry(registry, output_path, db)
-                            downloaded += 1
-                        else:
-                            _maybe_record_error(
-                                db, url_hash, ref, normalized, status_code, rule_id, rule_title
-                            )
-                            failed += 1
-                        if request_delay > 0:
-                            time.sleep(request_delay)
+                        download_queue.append(
+                            {
+                                "url_hash": url_hash,
+                                "original_url": ref,
+                                "normalized_url": normalized,
+                                "output_file": output_file,
+                                "content_type": registry[url_hash].get("content_type", "markdown"),
+                                "rule_id": rule_id,
+                                "rule_title": rule_title,
+                                "is_redownload": True,
+                            }
+                        )
                         continue
                 skipped += 1
                 continue
@@ -513,8 +510,6 @@ def download_references(
                     file_name=output_file.name,
                     file_size=output_file.stat().st_size,
                 )
-                with _registry_lock:
-                    _save_registry(registry, output_path, db)
                 skipped += 1
                 continue
 
@@ -522,30 +517,63 @@ def download_references(
                 skipped += 1
                 continue
 
-            success, status_code = _download_file(normalized, output_file, max_retries=MAX_RETRIES)
-            if success:
-                content_hash = _sha256_file(output_file) if output_file.exists() else ""
-                registry[url_hash] = _make_entry(
-                    url_hash=url_hash,
-                    original_url=ref,
-                    normalized_url=normalized,
-                    content_type=ftype,
-                    rule_id=rule_id,
-                    title=rule_title,
-                    timestamp=iso_now(),
-                    content_sha256=content_hash,
-                    file_name=output_file.name,
-                    file_size=output_file.stat().st_size if output_file.exists() else None,
-                )
-                with _registry_lock:
-                    _save_registry(registry, output_path, db)
-                downloaded += 1
-            else:
-                _maybe_record_error(db, url_hash, ref, normalized, status_code, rule_id, rule_title)
-                failed += 1
+            download_queue.append(
+                {
+                    "url_hash": url_hash,
+                    "original_url": ref,
+                    "normalized_url": normalized,
+                    "output_file": output_file,
+                    "content_type": ftype,
+                    "rule_id": rule_id,
+                    "rule_title": rule_title,
+                    "is_redownload": False,
+                }
+            )
 
-            if request_delay > 0:
-                time.sleep(request_delay)
+    # Phase 2: download all queued refs in parallel
+    if download_queue:
+        logger.info("Downloading %d refs with %d workers", len(download_queue), max_workers)
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_map = {}
+            for item in download_queue:
+                future = executor.submit(
+                    _download_file, item["normalized_url"], item["output_file"]
+                )
+                future_map[future] = item
+
+            for future in as_completed(future_map):
+                item = future_map[future]
+                success, status_code = future.result()
+                if success:
+                    output_file = item["output_file"]
+                    content_hash = _sha256_file(output_file) if output_file.exists() else ""
+                    registry[item["url_hash"]] = _make_entry(
+                        url_hash=item["url_hash"],
+                        original_url=item["original_url"],
+                        normalized_url=item["normalized_url"],
+                        content_type=item["content_type"],
+                        rule_id=item["rule_id"],
+                        title=item["rule_title"],
+                        timestamp=iso_now(),
+                        content_sha256=content_hash,
+                        file_name=output_file.name,
+                        file_size=output_file.stat().st_size if output_file.exists() else None,
+                    )
+                    downloaded += 1
+                else:
+                    _maybe_record_error(
+                        db,
+                        item["url_hash"],
+                        item["original_url"],
+                        item["normalized_url"],
+                        status_code,
+                        item["rule_id"],
+                        item["rule_title"],
+                    )
+                    failed += 1
+
+    with _registry_lock:
+        _save_registry(registry, output_path, db)
 
     summary: dict[str, Any] = {
         "total_rules": total_rules,

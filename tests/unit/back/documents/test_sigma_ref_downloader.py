@@ -52,9 +52,14 @@ def _make_db(entries: list[dict] | None = None) -> MagicMock:
     def upsert_doc_sigma_ref(entry: dict) -> None:
         data[entry["url_hash"]] = dict(entry)
 
+    def batch_upsert_doc_sigma_ref(rows: list[dict]) -> None:
+        for r in rows:
+            data[r["url_hash"]] = dict(r)
+
     db = MagicMock()
     db.get_doc_sigma_ref = get_doc_sigma_ref
     db.upsert_doc_sigma_ref = upsert_doc_sigma_ref
+    db.batch_upsert_doc_sigma_ref = batch_upsert_doc_sigma_ref
     db.get_doc_sigma_ref_error = MagicMock(return_value=[])
     db.upsert_doc_sigma_ref_error = MagicMock()
     return db

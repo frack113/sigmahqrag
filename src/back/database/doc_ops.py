@@ -102,6 +102,51 @@ class DatabaseServiceDocOps:
             )
             self._writer_conn.commit()
 
+    def batch_upsert_doc_sigma_ref(self, rows: list[dict]) -> None:
+        if not rows:
+            return
+        with self._lock:
+            self._writer_conn.executemany(
+                """INSERT INTO doc_sigma_ref (
+                    url_hash, org, repo, content_type, file_name, content_sha256, file_size,
+                    original_url, normalized_url, rule_id, title, timestamp, last_seen, embed_status
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (url_hash) DO UPDATE SET
+                    org = EXCLUDED.org,
+                    repo = EXCLUDED.repo,
+                    content_type = EXCLUDED.content_type,
+                    file_name = EXCLUDED.file_name,
+                    content_sha256 = EXCLUDED.content_sha256,
+                    file_size = EXCLUDED.file_size,
+                    original_url = EXCLUDED.original_url,
+                    normalized_url = EXCLUDED.normalized_url,
+                    rule_id = EXCLUDED.rule_id,
+                    title = EXCLUDED.title,
+                    timestamp = EXCLUDED.timestamp,
+                    last_seen = EXCLUDED.last_seen,
+                    embed_status = EXCLUDED.embed_status""",
+                [
+                    (
+                        r.get("url_hash"),
+                        r.get("org"),
+                        r.get("repo"),
+                        r.get("content_type"),
+                        r.get("file_name"),
+                        r.get("content_sha256"),
+                        r.get("file_size"),
+                        r.get("original_url"),
+                        r.get("normalized_url"),
+                        r.get("rule_id", "00000000-0000-0000-0000-000000000000"),
+                        r.get("title"),
+                        r.get("timestamp"),
+                        r.get("last_seen"),
+                        r.get("embed_status", "discovery"),
+                    )
+                    for r in rows
+                ],
+            )
+            self._writer_conn.commit()
+
     def doc_sigma_ref_exists(self, url_hash: str) -> bool:
         result = self._safe_query("SELECT 1 FROM doc_sigma_ref WHERE url_hash = ?", (url_hash,))
         return result is not None
@@ -205,6 +250,51 @@ class DatabaseServiceDocOps:
                     data.get("last_seen"),
                     data.get("embed_status", "discovery"),
                 ),
+            )
+            self._writer_conn.commit()
+
+    def batch_upsert_doc_registry(self, rows: list[dict]) -> None:
+        if not rows:
+            return
+        with self._lock:
+            self._writer_conn.executemany(
+                """INSERT INTO doc_registry (
+                    url_hash, org, repo, content_type, file_name, content_sha256, file_size,
+                    original_url, normalized_url, rule_id, title, timestamp, last_seen, embed_status
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (url_hash) DO UPDATE SET
+                    org = EXCLUDED.org,
+                    repo = EXCLUDED.repo,
+                    content_type = EXCLUDED.content_type,
+                    file_name = EXCLUDED.file_name,
+                    content_sha256 = EXCLUDED.content_sha256,
+                    file_size = EXCLUDED.file_size,
+                    original_url = EXCLUDED.original_url,
+                    normalized_url = EXCLUDED.normalized_url,
+                    rule_id = EXCLUDED.rule_id,
+                    title = EXCLUDED.title,
+                    timestamp = EXCLUDED.timestamp,
+                    last_seen = EXCLUDED.last_seen,
+                    embed_status = EXCLUDED.embed_status""",
+                [
+                    (
+                        r.get("url_hash"),
+                        r.get("org"),
+                        r.get("repo"),
+                        r.get("content_type"),
+                        r.get("file_name"),
+                        r.get("content_sha256"),
+                        r.get("file_size"),
+                        r.get("original_url"),
+                        r.get("normalized_url"),
+                        r.get("rule_id", "00000000-0000-0000-0000-000000000000"),
+                        r.get("title"),
+                        r.get("timestamp"),
+                        r.get("last_seen"),
+                        r.get("embed_status", "discovery"),
+                    )
+                    for r in rows
+                ],
             )
             self._writer_conn.commit()
 

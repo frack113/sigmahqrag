@@ -164,7 +164,7 @@ class TestGithubDiscoveryWorker:
 
         assert mock_db.upsert_doc_registry.call_count >= 1
         call_args = mock_db.upsert_doc_registry.call_args_list[0][0][0]
-        assert call_args["embed_status"] == "discovered"
+        assert call_args["embed_status"] == "discovery"
 
 
 class TestLocalDiscoveryWorker:

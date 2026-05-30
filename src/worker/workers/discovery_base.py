@@ -59,5 +59,5 @@ class DiscoveryWorker(BaseWorker):
             "title": title,
             "timestamp": now,
             "last_seen": now,
-            "embed_status": "discovered",
+            "embed_status": "discovery",
         }
