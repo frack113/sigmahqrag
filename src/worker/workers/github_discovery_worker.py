@@ -29,39 +29,30 @@ class GithubDiscoveryWorker(DiscoveryWorker):
         normalized_url = f"https://raw.githubusercontent.com/{org}/{repo}/{branch}/{file_rel_path}"
         return original_url, normalized_url
 
-    def _process_file(self, file_path: Path, base_path: Path, org: str, repo: str) -> bool:
-        """Process a single file and register it in the database. Returns True on success."""
+    def _prepare_entry(self, file_path: Path, base_path: Path, org: str, repo: str) -> dict | None:
+        """Prepare a doc_registry entry for a single file. Returns None on error."""
         try:
             file_rel_path = file_path.relative_to(base_path).as_posix()
         except ValueError as e:
             logger.error(f"[GithubDiscoveryWorker] Cannot relativize {file_path}: {e}")
-            return False
+            return None
 
         content_hash, file_size = self._compute_sha256(file_path)
         content_type = self._identify_content_type(file_path)
         original_url, normalized_url = self._build_urls(org, repo, file_rel_path)
         title = file_path.stem
 
-        try:
-            self.db.upsert_doc_registry(
-                self._make_doc_registry_entry(
-                    org=org,
-                    repo=repo,
-                    file_rel_path=file_rel_path,
-                    content_type=content_type,
-                    content_hash=content_hash,
-                    file_size=file_size,
-                    original_url=original_url,
-                    normalized_url=normalized_url,
-                    title=title,
-                )
-            )
-            return True
-        except Exception as e:
-            logger.error(
-                f"[GithubDiscoveryWorker] DB error for {file_rel_path}: {e}", exc_info=True
-            )
-            return False
+        return self._make_doc_registry_entry(
+            org=org,
+            repo=repo,
+            file_rel_path=file_rel_path,
+            content_type=content_type,
+            content_hash=content_hash,
+            file_size=file_size,
+            original_url=original_url,
+            normalized_url=normalized_url,
+            title=title,
+        )
 
     def process(self, task: dict) -> None:
         from src.shared.config import get_config
@@ -120,9 +111,12 @@ class GithubDiscoveryWorker(DiscoveryWorker):
                 f"[GithubDiscoveryWorker] Found {total_files} files across {len(repo_keys)} repos"
             )
 
+            all_entries: list[dict] = []
             for file_path, base_path, org, repo in all_files:
                 try:
-                    if self._process_file(file_path, base_path, org, repo):
+                    entry = self._prepare_entry(file_path, base_path, org, repo)
+                    if entry is not None:
+                        all_entries.append(entry)
                         processed_count += 1
                     else:
                         skipped_count += 1
@@ -132,6 +126,12 @@ class GithubDiscoveryWorker(DiscoveryWorker):
                         exc_info=True,
                     )
                     skipped_count += 1
+
+            if all_entries:
+                try:
+                    self.db.batch_upsert_doc_registry(all_entries)
+                except Exception as e:
+                    logger.error(f"[GithubDiscoveryWorker] Batch upsert failed: {e}", exc_info=True)
 
                 if total_files > 0 and self.dispatcher is not None:
                     pct = int((processed_count + skipped_count) / total_files * 100)

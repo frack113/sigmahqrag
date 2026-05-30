@@ -30,18 +30,18 @@ class LocalDiscoveryWorker(DiscoveryWorker):
             if found_file.is_file() and found_file.suffix.lower() in SUPPORTED_EXTENSIONS:
                 files_to_process.append(found_file)
 
+        all_entries: list[dict] = []
         processed_count = 0
         skipped_count = 0
 
         for file_path in files_to_process:
             try:
                 file_rel_path = file_path.relative_to(base_path).as_posix()
-                processed_count += 1
 
                 content_hash, file_size = self._compute_sha256(file_path)
                 content_type = self._identify_content_type(file_path)
 
-                self.db.upsert_doc_registry(
+                all_entries.append(
                     self._make_doc_registry_entry(
                         org="local",
                         repo=collection_name,
@@ -54,9 +54,16 @@ class LocalDiscoveryWorker(DiscoveryWorker):
                         title=file_path.stem,
                     )
                 )
+                processed_count += 1
             except Exception as e:
                 logger.error(f"[LocalDiscoveryWorker] Error processing {file_path}: {e}")
                 skipped_count += 1
+
+        if all_entries:
+            try:
+                self.db.batch_upsert_doc_registry(all_entries)
+            except Exception as e:
+                logger.error(f"[LocalDiscoveryWorker] Batch upsert failed: {e}", exc_info=True)
 
         logger.info(
             f"[LocalDiscoveryWorker] Complete: {processed_count} discovered, {skipped_count} skipped"
