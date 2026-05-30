@@ -45,6 +45,8 @@ def _make_db(entries: list[dict] | None = None) -> MagicMock:
                 "timestamp": v.get("timestamp"),
                 "content_sha256": v.get("content_sha256"),
                 "embed_status": v.get("embed_status"),
+                "file_name": v.get("file_name", ""),
+                "file_size": v.get("file_size"),
             }
             for k, v in data.items()
         ]
@@ -271,6 +273,8 @@ class TestRegistry:
                 "timestamp": None,
                 "content_sha256": None,
                 "embed_status": None,
+                "last_seen": None,
+                "file_name": "",
             }
         }
 
@@ -390,10 +394,18 @@ references:
   - https://example.com/doc.md
 """)
 
+        written_files: list[Path] = []
+
+        def write_file(url: str, output_path: Path, **kwargs: object) -> tuple[bool, int | None]:
+            written_files.append(output_path)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text("# content")
+            return True, None
+
         db = _make_db()
         with patch(
             "src.back.documents.sigma_ref_downloader._download_file",
-            return_value=(True, None),
+            write_file,
         ):
             first = download_references(str(rules_dir), str(output_dir), db)
             assert first["downloaded"] == 1

@@ -338,14 +338,14 @@ async function checkAnyWorkerActive() {
     return results.some(s => s && isWorkerActive(s.status));
 }
 
-function setScanningButton(scanning, pct) {
+function setScanningButton(scanning, pct, label) {
     const btn = document.getElementById('list-document-btn');
     if (!btn) return;
     btn.disabled = scanning;
     if (scanning && pct !== undefined) {
-        btn.textContent = 'Scanning ' + pct + '%..';
+        btn.textContent = (label || 'Scanning') + ' ' + pct + '%..';
     } else {
-        btn.textContent = scanning ? 'Scanning...' : 'List document';
+        btn.textContent = scanning ? (label || 'Scanning') + '...' : 'List document';
     }
 }
 
@@ -369,7 +369,13 @@ function startDiscoveryPolling(onIdle) {
         }
         const sigmaref = results[2];
         if (sigmaref && isWorkerActive(sigmaref.status)) {
-            setScanningButton(true, Math.round(sigmaref.progress_percent));
+            const pct = Math.round(sigmaref.progress_percent);
+            const cf = sigmaref.current_file || '';
+            if (cf.startsWith('downloading')) {
+                setScanningButton(true, pct, 'Downloading');
+            } else {
+                setScanningButton(true, pct);
+            }
         } else {
             setScanningButton(true);
         }

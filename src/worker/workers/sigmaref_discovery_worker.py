@@ -24,13 +24,13 @@ class SigmaRefDiscoveryWorker(BaseWorker):
             f"[SigmaRefDiscoveryWorker] Starting discovery: rules={rules_dir}, output={output_dir}"
         )
 
-        def _on_progress(current: int, total: int) -> None:
+        def _on_progress(current: int, total: int, phase: str) -> None:
             pct = round((current / total) * 100, 1)
             dispatcher.update_worker_state(
                 worker_type=self.worker_type,
                 status=WorkerStatus.RUNNING,
                 progress_percent=pct,
-                current_file=f"{current}/{total}",
+                current_file=f"{phase}: {current}/{total}",
             )
 
         try:
