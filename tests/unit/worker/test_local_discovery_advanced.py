@@ -22,7 +22,7 @@ class TestLocalDiscoveryWorkerAdvanced:
         }
 
         worker = LocalDiscoveryWorker(mock_db)
-        with patch.object(Path, "read_bytes", side_effect=PermissionError("denied")):
+        with patch.object(worker, "_compute_sha256", return_value=("", 0)):
             worker.process(task)
         mock_db.upsert_doc_registry.assert_called_once()
         call_args = mock_db.upsert_doc_registry.call_args[0][0]
@@ -46,11 +46,15 @@ class TestLocalDiscoveryWorkerAdvanced:
             {".unknown": "unknown"},
         ):
             with patch(
-                "src.worker.workers.discovery_base.identify",
-                side_effect=ValueError("unknown"),
+                "src.worker.workers.local_discovery_worker.SUPPORTED_EXTENSIONS",
+                frozenset({".unknown"}),
             ):
-                worker.process(task)
-                # identify error handled gracefully by _identify_content_type
-                mock_db.upsert_doc_registry.assert_called_once()
-                call_args = mock_db.upsert_doc_registry.call_args[0][0]
-                assert call_args["content_type"] == "unknown"
+                with patch(
+                    "src.worker.workers.discovery_base.identify",
+                    side_effect=ValueError("unknown"),
+                ):
+                    worker.process(task)
+                    # identify error handled gracefully by _identify_content_type
+                    mock_db.upsert_doc_registry.assert_called_once()
+                    call_args = mock_db.upsert_doc_registry.call_args[0][0]
+                    assert call_args["content_type"] == "unknown"

@@ -13,10 +13,15 @@ class DiscoveryWorker(BaseWorker):
     """Base class for file-discovery workers with shared helpers."""
 
     def _compute_sha256(self, file_path: Path) -> tuple[str, int]:
-        """Returns (content_hash, file_size)."""
+        """Returns (content_hash, file_size) using streaming hash."""
+        h = hashlib.sha256()
+        size = 0
         try:
-            file_bytes = file_path.read_bytes()
-            return hashlib.sha256(file_bytes).hexdigest(), file_path.stat().st_size
+            with open(file_path, "rb") as f:
+                for chunk in iter(lambda: f.read(65536), b""):
+                    h.update(chunk)
+                    size += len(chunk)
+            return h.hexdigest(), size
         except Exception:
             return "", 0
 

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import ANY, MagicMock, patch
 
 import pytest
 
@@ -29,7 +29,7 @@ class TestSigmaRefDiscoveryWorker:
             "src.worker.workers.sigmaref_discovery_worker.download_references",
             return_value=summary,
         ) as mock_download:
-            worker = SigmaRefDiscoveryWorker(mock_db)
+            worker = SigmaRefDiscoveryWorker(mock_db, MagicMock())
             worker.process(task)
 
         mock_download.assert_called_once_with(
@@ -37,6 +37,7 @@ class TestSigmaRefDiscoveryWorker:
             output_dir="data/documents/sigmaref",
             db=mock_db,
             supported_types=SUPPORTED_REFERENCE_DOC_TYPES,
+            progress_callback=ANY,
         )
 
     def test_process_propagates_errors(self, mock_db: MagicMock) -> None:
@@ -50,7 +51,7 @@ class TestSigmaRefDiscoveryWorker:
             "src.worker.workers.sigmaref_discovery_worker.download_references",
             side_effect=RuntimeError("download failed"),
         ):
-            worker = SigmaRefDiscoveryWorker(mock_db)
+            worker = SigmaRefDiscoveryWorker(mock_db, MagicMock())
             with pytest.raises(RuntimeError, match="download failed"):
                 worker.process(task)
 

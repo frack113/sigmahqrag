@@ -20,12 +20,19 @@ class DatabaseServiceDocOps:
 
     def get_doc_sigma_ref(self, limit: int = 100, offset: int = 0) -> list[dict]:
         with self._lock:
-            results = self._writer_conn.execute(
+            query = (
                 "SELECT url_hash, org, repo, content_type, file_name, content_sha256, file_size, "
                 "original_url, normalized_url, rule_id, title, timestamp, last_seen, embed_status "
-                "FROM doc_sigma_ref ORDER BY url_hash LIMIT ? OFFSET ?",
-                [limit, offset],
-            ).fetchall()
+                "FROM doc_sigma_ref ORDER BY url_hash"
+            )
+            params: list[int] = []
+            if limit > 0:
+                query += " LIMIT ?"
+                params.append(limit)
+            if offset > 0:
+                query += " OFFSET ?"
+                params.append(offset)
+            results = self._writer_conn.execute(query, params).fetchall()
             col_names = [desc[0] for desc in self._writer_conn.description]
         return [dict(zip(col_names, row)) for row in results]
 

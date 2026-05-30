@@ -33,7 +33,7 @@ def _make_db(entries: list[dict] | None = None) -> MagicMock:
         for e in entries:
             data[e["url_hash"]] = dict(e)
 
-    def get_doc_sigma_ref() -> list[dict]:
+    def get_doc_sigma_ref(limit: int = 100, offset: int = 0) -> list[dict]:
         return [
             {
                 "url_hash": k,

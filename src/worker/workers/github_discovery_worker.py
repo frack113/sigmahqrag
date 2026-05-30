@@ -6,6 +6,8 @@ from src.back.utils.identify_file_type import SUPPORTED_DOC_EXTENSION_MAP
 
 logger = logging.getLogger(__name__)
 
+SUPPORTED_EXTENSIONS = frozenset(SUPPORTED_DOC_EXTENSION_MAP.keys())
+
 
 class GithubDiscoveryWorker(DiscoveryWorker):
     """Scans all cloned GitHub repositories with selected directories for supported documents."""
@@ -100,9 +102,8 @@ class GithubDiscoveryWorker(DiscoveryWorker):
                         f"[GithubDiscoveryWorker] Error fetching selected dirs for {repo_key}: {e}"
                     )
 
-                for ext in SUPPORTED_DOC_EXTENSION_MAP.keys():
-                    pattern = f"**/*{ext}"
-                    for found_file in base_path.glob(pattern):
+                for found_file in base_path.rglob("*"):
+                    if found_file.is_file() and found_file.suffix.lower() in SUPPORTED_EXTENSIONS:
                         if selected_dirs:
                             rel_to_repo = found_file.relative_to(base_path).as_posix()
                             if not any(

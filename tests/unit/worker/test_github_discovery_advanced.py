@@ -39,7 +39,7 @@ class TestGithubDiscoveryWorkerAdvanced:
         mock_db.get_git_metadata.return_value = {"branch": "main"}
 
         worker = GithubDiscoveryWorker(mock_db)
-        with patch.object(Path, "read_bytes", side_effect=PermissionError("denied")):
+        with patch.object(worker, "_compute_sha256", return_value=("", 0)):
             result = worker._process_file(file_path, repo_dir, "org", "repo")
             assert result is True
             call_args = mock_db.upsert_doc_registry.call_args[0][0]

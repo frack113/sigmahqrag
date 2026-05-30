@@ -7,6 +7,8 @@ from src.back.utils.identify_file_type import SUPPORTED_DOC_EXTENSION_MAP
 
 logger = logging.getLogger(__name__)
 
+SUPPORTED_EXTENSIONS = frozenset(SUPPORTED_DOC_EXTENSION_MAP.keys())
+
 
 class LocalDiscoveryWorker(DiscoveryWorker):
     """Scans a local directory for supported documents."""
@@ -24,9 +26,8 @@ class LocalDiscoveryWorker(DiscoveryWorker):
             return
 
         files_to_process = []
-        for ext in SUPPORTED_DOC_EXTENSION_MAP.keys():
-            pattern = f"**/*{ext}"
-            for found_file in base_path.glob(pattern):
+        for found_file in base_path.rglob("*"):
+            if found_file.is_file() and found_file.suffix.lower() in SUPPORTED_EXTENSIONS:
                 files_to_process.append(found_file)
 
         processed_count = 0

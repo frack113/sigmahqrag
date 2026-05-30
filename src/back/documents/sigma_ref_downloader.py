@@ -242,7 +242,7 @@ def _load_registry(path: Path, db: DatabaseService) -> dict[str, Any]:
 
     Returns an empty dict if DB not available.
     """
-    entries = db.get_doc_sigma_ref()
+    entries = db.get_doc_sigma_ref(limit=0)
     registry = {}
     for entry in entries:
         url_hash = entry["url_hash"]
@@ -395,10 +395,8 @@ def download_references(
     skipped = 0
     failed = 0
 
-    yml_patterns = ("*.yaml", "*.yml")
-    yml_files: list[Path] = []
-    for pattern in yml_patterns:
-        yml_files.extend(rules_path.rglob(pattern))
+    yml_files: list[Path] = list(rules_path.rglob("*.yaml"))
+    yml_files.extend(rules_path.rglob("*.yml"))
 
     total_files = len(yml_files)
     for file_idx, yml_file in enumerate(yml_files):
