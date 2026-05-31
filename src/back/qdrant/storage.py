@@ -19,7 +19,7 @@ async def store_embeddings(
     embeddings: list[list[float]],
     documents: list[str],
     metadata: list[dict[str, Any]] | None = None,
-    collection_name: str = "sigmaref",
+    collection_name: str = "sigma_docs",
     vector_size: int = DEFAULT_VECTOR_SIZE,
 ) -> bool:
     """Store embeddings in Qdrant.
@@ -124,13 +124,15 @@ async def upsert_by_key(
 
     try:
         client = get_qdrant_client()
-        client.recreate_collection(
-            collection_name=collection_name,
-            vectors_config=qdrant_client.models.VectorParams(
-                size=vector_size,
-                distance=qdrant_client.models.Distance.COSINE,
-            ),
-        )
+        existing_collections = [c.name for c in client.get_collections().collections]
+        if collection_name not in existing_collections:
+            client.recreate_collection(
+                collection_name=collection_name,
+                vectors_config=qdrant_client.models.VectorParams(
+                    size=vector_size,
+                    distance=qdrant_client.models.Distance.COSINE,
+                ),
+            )
         client.upsert(
             collection_name=collection_name,
             points=points,
@@ -144,7 +146,7 @@ async def upsert_by_key(
 
 async def search(
     query_embedding: list[float],
-    collection_name: str = "sigmaref",
+    collection_name: str = "sigma_docs",
     top_k: int = 5,
 ) -> list[dict[str, Any]]:
     """Search for similar vectors in Qdrant.

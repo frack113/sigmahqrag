@@ -184,7 +184,13 @@ class EmbeddingWorker(BaseWorker):
             if content_type == FileType.HTML.value:
                 doc_text = _strip_html(doc_text)
 
-            if source in ("sigmaref", "github", "local") and content_type in ("markdown", ""):
+            if source in (
+                "sigma_docs",
+                "sigma_spec",
+                "sigmaref",
+                "github",
+                "local",
+            ) and content_type in ("markdown", ""):
                 from src.back.rag.transforms import TransformRegistry
 
                 transform_cls = TransformRegistry.find_for_file(file_path)

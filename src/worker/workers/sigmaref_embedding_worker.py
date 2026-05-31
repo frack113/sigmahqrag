@@ -12,7 +12,7 @@ class SigmaRefEmbeddingWorker(EmbeddingWorker):
     """Embeds Sigma Reference documents from doc_sigma_ref into Qdrant."""
 
     worker_type = WorkerName.SIGMAREF_EMBEDDINGS
-    collection_name = "sigmaref"
+    collection_name = "sigma_docs"
 
     def _get_entries(self, task: dict) -> list[dict]:
         raw_entries = self.db.get_pending_sigma_ref()
@@ -58,7 +58,7 @@ class SigmaRefEmbeddingWorker(EmbeddingWorker):
     def _build_metadata(self, entry: dict, collection_name: str) -> dict:
         metadata = dict(entry)
         metadata.pop("hash", None)
-        metadata["source"] = "sigmaref"
+        metadata["source"] = "sigma_docs"
         metadata["collection"] = collection_name
         return metadata
 

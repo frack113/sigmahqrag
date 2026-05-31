@@ -33,7 +33,12 @@ TRANSFORM_COLLECTIONS: set[str] = {"sigma_rules"}
 
 # Chunkers optimized per source type
 SOURCE_CHUNK_CONFIG: dict[str, dict[str, Any]] = {
-    "sigmaref": {
+    "sigma_docs": {
+        "chunk_size": 1024,
+        "chunk_overlap": 100,
+        "use_markdown_parser": True,
+    },
+    "sigma_spec": {
         "chunk_size": 1024,
         "chunk_overlap": 100,
         "use_markdown_parser": True,
@@ -63,7 +68,7 @@ def _get_chunker_for_collection(collection_name: str) -> tuple[Any, dict[str, An
         parts = collection_name.lower().split("/")
         source = parts[0] if parts else collection_name
 
-    cfg = SOURCE_CHUNK_CONFIG.get(source, SOURCE_CHUNK_CONFIG["sigmaref"])
+    cfg = SOURCE_CHUNK_CONFIG.get(source, SOURCE_CHUNK_CONFIG["sigma_docs"])
     md_parser = MarkdownNodeParser(include_metadata=True) if cfg["use_markdown_parser"] else None
     splitter = SentenceSplitter(
         chunk_size=cfg["chunk_size"],
@@ -112,7 +117,7 @@ class IngestionPipelineBuilder:
             self._model_name = (config_data.get("model") or "") or DEFAULT_MODEL
         else:
             self._model_name = model_name
-        self._collection_name = collection_name or "sigmaref"
+        self._collection_name = collection_name or "sigma_docs"
         self._num_workers = num_workers
         self._embed_model = build_embed_model(self._model_name)
         self._pipeline: IngestionPipeline | None = None
@@ -401,7 +406,7 @@ def get_pipeline(
         config_data = DatabaseService.get_instance().get_embedding_config()
         model_name = config_data.get("model") or DEFAULT_MODEL
     model = model_name
-    collection = collection_name or "sigmaref"
+    collection = collection_name or "sigma_docs"
     key = (model, collection)
     if key not in _pipeline_registry:
         builder = IngestionPipelineBuilder(

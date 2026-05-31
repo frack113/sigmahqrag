@@ -41,7 +41,7 @@ class Config:
     qdrant_host: str = "127.0.0.1"
     qdrant_port: int = 6333
     qdrant_manage_internally: bool = True
-    qdrant_collection_name: str = "sigmaref"
+    qdrant_collection_name: str = "sigma_docs"
     qdrant_vector_size: int = 384
     qdrant_binary_path: str = "data/bin/qdrant"
     qdrant_storage_path: str = "data/qdrant_storage/database"
@@ -53,8 +53,8 @@ class Config:
     paths_github_dir: str = "data/github"
     paths_rag_cache_dir: str = "data/rag_cache"
     paths_model_registry: str = "data/models/registry.json"
-    paths_sigma_rules_dir: str = ""
     paths_sigma_ref_docs_dir: str = "data/sigma_ref_docs"
+    paths_sigma_spec_dir: str = "data/sigma-specification"
 
     local_documents_path: str = "data/documents/local"
     sigmaref_documents_path: str = "data/documents/sigmaref"

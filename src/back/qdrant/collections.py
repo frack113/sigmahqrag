@@ -29,12 +29,17 @@ def _count_sync(client, collection_name: str) -> int:
     return client.count(collection_name=collection_name).count
 
 
-def _create_collection_sync(client, collection_name: str, vectors_config):
+def _create_collection_sync(
+    client, collection_name: str, vectors_config, sparse_vectors_config=None
+):
     """Synchronous wrapper for client.create_collection()."""
-    client.create_collection(
-        collection_name=collection_name,
-        vectors_config=vectors_config,
-    )
+    kwargs = {
+        "collection_name": collection_name,
+        "vectors_config": vectors_config,
+    }
+    if sparse_vectors_config is not None:
+        kwargs["sparse_vectors_config"] = sparse_vectors_config
+    client.create_collection(**kwargs)
 
 
 def _delete_collection_sync(client, collection_name: str):
@@ -63,17 +68,28 @@ async def list_collections(host: str, port: int) -> list[dict[str, Any]]:
 
 
 async def create_collection(
-    host: str, port: int, collection_name: str, vector_size: int = 384
+    host: str, port: int, collection_name: str, vector_size: int = 384, enable_hybrid: bool = True
 ) -> bool:
-    """Create a new collection."""
+    """Create a new collection (with optional sparse vector support for hybrid search)."""
     try:
         client = get_qdrant_client(host=host, port=port)
         vectors_config = qdrant_client.models.VectorParams(
             size=vector_size,
             distance=qdrant_client.models.Distance.COSINE,
         )
-        await asyncio.to_thread(_create_collection_sync, client, collection_name, vectors_config)
-        logger.info("Collection '%s' created successfully.", collection_name)
+        sparse_vectors_config: dict[str, Any] | None = None
+        if enable_hybrid:
+            sparse_vectors_config = {
+                "text-sparse": qdrant_client.models.SparseVectorParams(
+                    index=qdrant_client.models.SparseIndexParams()
+                )
+            }
+        await asyncio.to_thread(
+            _create_collection_sync, client, collection_name, vectors_config, sparse_vectors_config
+        )
+        logger.info(
+            "Collection '%s' created successfully (hybrid=%s).", collection_name, enable_hybrid
+        )
         return True
     except Exception as e:
         logger.error(

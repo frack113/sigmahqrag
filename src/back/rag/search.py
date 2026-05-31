@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
@@ -27,9 +28,12 @@ def _get_search_embed_model() -> Any:
     return _async_embed_model
 
 
+DEFAULT_COLLECTIONS = ["sigma_rules", "sigma_docs", "sigma_spec"]
+
+
 async def search(
     query: str,
-    collection_name: str = "sigmaref",
+    collection_name: str = "sigma_docs",
     top_k: int = DEFAULT_TOP_K,
     similarity_threshold: float = SIMILARITY_THRESHOLD,
 ) -> list[dict[str, Any]]:
@@ -139,25 +143,68 @@ def get_citation(result: dict[str, Any]) -> str:
 
 
 class SearchEngine:
-    """Search engine for Sigma rules."""
+    """Search engine for multi-collection Sigma RAG."""
 
     def __init__(
         self,
-        collection_name: str = "sigmaref",
+        collection_names: list[str] | None = None,
         top_k: int = DEFAULT_TOP_K,
         similarity_threshold: float = SIMILARITY_THRESHOLD,
     ) -> None:
-        """Initialize search engine."""
-        self.collection_name = collection_name
+        """Initialize search engine.
+
+        Args:
+            collection_names: List of Qdrant collections to search.
+                Defaults to [sigma_rules, sigma_docs, sigma_spec].
+            top_k: Number of results per collection.
+            similarity_threshold: Minimum similarity score.
+        """
+        self.collection_names = collection_names or list(DEFAULT_COLLECTIONS)
         self.top_k = top_k
         self.similarity_threshold = similarity_threshold
 
     async def search(self, query: str, top_k: int | None = None) -> list[dict[str, Any]]:
-        """Search for relevant documents."""
+        """Search across all configured collections and fuse results with RRF.
+
+        Searches each collection in parallel, then fuses ranked lists
+        using Reciprocal Rank Fusion (RRF, k=60).
+        """
+        limit = top_k if top_k is not None else self.top_k
+        per_collection_k = max(limit * 2, 10)
+
+        tasks = [
+            search(
+                query=query,
+                collection_name=col,
+                top_k=per_collection_k,
+                similarity_threshold=self.similarity_threshold,
+            )
+            for col in self.collection_names
+        ]
+        all_results = await asyncio.gather(*tasks)
+
+        rrf_scores: dict[int, dict[str, Any]] = {}
+        for col_results in all_results:
+            for rank, result in enumerate(col_results, start=1):
+                rrf_score = 1.0 / (60 + rank)
+                result_id = id(result)
+                if result_id not in rrf_scores:
+                    result["rrf_score"] = rrf_score
+                    rrf_scores[result_id] = result
+                else:
+                    rrf_scores[result_id]["rrf_score"] += rrf_score
+
+        fused = sorted(rrf_scores.values(), key=lambda r: r["rrf_score"], reverse=True)
+        return fused[:limit]
+
+    async def search_collection(
+        self, query: str, collection_name: str, top_k: int | None = None
+    ) -> list[dict[str, Any]]:
+        """Search a single specific collection."""
         limit = top_k if top_k is not None else self.top_k
         return await search(
             query=query,
-            collection_name=self.collection_name,
+            collection_name=collection_name,
             top_k=limit,
             similarity_threshold=self.similarity_threshold,
         )

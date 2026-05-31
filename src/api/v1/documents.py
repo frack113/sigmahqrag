@@ -167,7 +167,7 @@ async def index_sigma_ref(
 ) -> JSONResponse:
     """Download and prepare Sigma reference documents."""
     cfg = get_config()
-    rules_dir = cfg.paths_sigma_rules_dir
+    rules_dir = cfg.paths_github_dir
     output_dir = cfg.paths_sigma_ref_docs_dir
 
     try:

@@ -210,15 +210,21 @@ class QdrantVectorService:
             logger.debug(f"Health check failed: {e}")
             return False
 
-    async def create_collection(self) -> None:
+    async def create_collection(self, enable_hybrid: bool = True) -> None:
         """Create the collection if it doesn't exist."""
         if self._vector_store is None:
             await self.initialize()
 
         from .collections import create_collection as _create
 
-        await _create(self.host, self.port, self.collection_name, self.vector_size)
-        logger.info(f"Collection {self.collection_name} ready")
+        await _create(
+            self.host,
+            self.port,
+            self.collection_name,
+            self.vector_size,
+            enable_hybrid=enable_hybrid,
+        )
+        logger.info(f"Collection {self.collection_name} ready (hybrid={enable_hybrid})")
 
     def __repr__(self) -> str:
         return f"QdrantService(collection={self.collection_name}, host={self.host}:{self.port})"
