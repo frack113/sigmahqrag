@@ -57,53 +57,6 @@ class ChunkMetadata:
     rule_meta: dict | None = None
 
 
-@dataclass
-class ChunkedDocument:
-    """A single chunk resulting from the chunk() stage.
-
-    Attributes:
-        content: The text content of the chunk.
-        metadata: Structured metadata for the chunk.
-        chunk_type: Category of chunk (e.g. 'summary', 'mapping').
-        source_file: Path to the original source file.
-        rule_id: Sigma rule ID if applicable.
-        eval_questions: Optional list of eval questions for RAGAS.
-    """
-
-    content: str
-    metadata: dict
-    chunk_type: str = "default"
-    source_file: Path | None = None
-    rule_id: str | None = None
-    eval_questions: list[str] | None = None
-
-    def to_document(self) -> Document:
-        """Convert to LlamaIndex Document with embedding disabled if rich chunks enabled."""
-        return Document(
-            text=self.content,
-            metadata={
-                **self.metadata,
-                "chunk_type": self.chunk_type,
-                "source_file": str(self.source_file) if self.source_file else None,
-                "rule_id": self.rule_id,
-                "_eval_questions": self.eval_questions,
-            },
-            excluded_llm_metadata_keys=["\n", "chunk_type", "source_file", "rule_id"],
-            excluded_embed_metadata_keys=["\n", "chunk_type", "source_file", "rule_id"]
-            if _rich_chunks_enabled()
-            else [],
-        )
-
-
-def _rich_chunks_enabled() -> bool:
-    """Check if rich chunking is globally enabled."""
-    from src.shared.config import get_config
-
-    config = get_config()
-    # Default to False if not configured
-    return getattr(config, "enable_rich_chunks", False)
-
-
 class DocumentTransform(ABC):
     """Base class all format-specific transforms must implement.
 

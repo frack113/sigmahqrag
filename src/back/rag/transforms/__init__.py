@@ -5,7 +5,7 @@ and automatically registers all format-specific transforms on import.
 """
 
 # Import base types first.
-from .base import DocumentTransform, TransformConfig, ChunkedDocument
+from .base import DocumentTransform, TransformConfig
 from .registry import TransformRegistry
 
 # Import sigma module to trigger registration.
@@ -15,6 +15,5 @@ from . import sigma  # noqa: F401
 __all__ = [
     "DocumentTransform",
     "TransformConfig",
-    "ChunkedDocument",
     "TransformRegistry",
 ]

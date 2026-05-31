@@ -1,7 +1,5 @@
 """Tests for document transforms package."""
 
-import os
-
 import pytest
 
 from src.back.rag.transforms.base import DocumentTransform, TransformConfig
@@ -265,63 +263,3 @@ class TestSigmaChunker:
 
         assert chunks[0].metadata.get("rule_id") == "12345678-1234-1234-1234-123456789012"
         assert "chunk_type" in chunks[0].metadata
-
-
-class TestChunkedDocument:
-    """Tests for ChunkedDocument dataclass."""
-
-    def test_to_document(self):
-        from src.back.rag.transforms.base import ChunkedDocument
-
-        meta = {"key": "value"}
-        chunked = ChunkedDocument(
-            content="Test content",
-            metadata=meta,
-            chunk_type="summary",
-            rule_id="12345",
-        )
-
-        doc = chunked.to_document()
-
-        assert doc.text == "Test content"
-        assert doc.metadata["chunk_type"] == "summary"
-        assert doc.metadata["rule_id"] == "12345"
-        assert doc.metadata["key"] == "value"
-
-    def test_to_document_with_eval_questions(self):
-        from src.back.rag.transforms.base import ChunkedDocument
-
-        chunked = ChunkedDocument(
-            content="Test content",
-            metadata={},
-            rule_id="12345",
-            eval_questions=["What is this?", "Explain this."],
-        )
-
-        doc = chunked.to_document()
-
-        assert doc.metadata["_eval_questions"] == ["What is this?", "Explain this."]
-
-    def test_to_document_with_rich_chunks_disabled(self):
-        from src.back.rag.transforms.base import ChunkedDocument
-
-        # Temporarily disable rich chunks
-        original = os.environ.get("RICH_CHUNKS_ENABLED")
-        if "RICH_CHUNKS_ENABLED" in os.environ:
-            del os.environ["RICH_CHUNKS_ENABLED"]
-
-        try:
-            chunked = ChunkedDocument(
-                content="Test content",
-                metadata={},
-                chunk_type="summary",
-                rule_id="12345",
-            )
-
-            doc = chunked.to_document()
-
-            # When rich chunks disabled, metadata keys should not be excluded
-            assert doc.excluded_embed_metadata_keys == []
-        finally:
-            if original:
-                os.environ["RICH_CHUNKS_ENABLED"] = original
