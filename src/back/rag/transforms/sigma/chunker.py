@@ -10,6 +10,7 @@ from llama_index.core.schema import Document
 from ..base import DocumentTransform
 from ..registry import TransformRegistry
 from .chunk_factory import make_chunk
+from .parser import SigmaParser
 from .flattening import flatten_detection_values, split_field_operator
 from .formatting import format_value
 
@@ -27,32 +28,27 @@ class SigmaChunker(DocumentTransform):
       natural_language_queries, backend_mapping_hints
     """
 
-    FORMAT_NAME = "sigma_rules"
+    FORMAT_NAME = "sigma_chunker"
     SUPPORTED_EXTENSIONS = (".yml", ".yaml")
 
     def parse(self, file_path: Path) -> list[Document]:
-        """Load Sigma rules from YAML (delegates to SigmaParser)."""
+        """Load Sigma rules from YAML and enrich with rule metadata for chunking."""
         from .loader import load_sigma_rules
         from .detectors import is_sigma_rule
 
         raw_rules = load_sigma_rules(str(file_path))
-        documents: list[Document] = []
-
+        rule_by_id: dict[str, dict] = {}
         for rule in raw_rules:
-            if not is_sigma_rule(rule):
-                continue
+            if is_sigma_rule(rule):
+                rule_by_id[rule.get("id", "unknown")] = rule
 
-            rule_id = rule.get("id", "unknown")
-            doc = Document(
-                text="",
-                metadata={
-                    "source_file": str(file_path),
-                    "doc_type": "sigma_rule",
-                    "rule_id": rule_id,
-                    "rule_meta": rule,
-                },
-            )
-            documents.append(doc)
+        parser = SigmaParser(config=self.config)
+        documents = parser.parse(file_path)
+
+        for doc in documents:
+            rule_id = doc.metadata.get("rule_id", "")
+            if rule_id in rule_by_id:
+                doc.metadata["rule_meta"] = rule_by_id[rule_id]
 
         logger.info("Rich-parsed %d rule(s) from %s", len(documents), file_path)
         return documents
@@ -488,7 +484,7 @@ class SigmaChunker(DocumentTransform):
 
 
 # Register SigmaChunker for rich mode.
-TransformRegistry.register(SigmaChunker, formats=["sigma_rules"])
+TransformRegistry.register(SigmaChunker)
 
 
 # ------------------------------------------------------------------

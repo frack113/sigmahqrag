@@ -5,20 +5,20 @@ def make_chunk(
     extra_meta: dict | None = None,
     eval_questions: list[str] | None = None,
 ) -> dict:
-    logsource = rule.get("logsource", {})
     """Creer un chunk structure a partir d une regle sigma
 
     Args:
-        - rule (dict): regle sigma 
+        - rule (dict): regle sigma
         - chunk_type (str): type de chunk genere
         - text (str): texte du chunk
         - extra_meta (dict): metadata supp
         - eval_questions: questions d'eval associee au chunk
     Return:
         - dict: Dictionnaire contenant le texte nettoye, avec metadata, et questions evals et ground_truth
-        
+
     """
 
+    logsource = rule.get("logsource", {})
     metadata = {
         "rule_id": rule.get("id"),
         "title": rule.get("title", "Untitled Sigma rule"),
