@@ -58,3 +58,4 @@ class IngestResult(BaseModel):
     success: bool
     rule_id: str | None = None
     error: str | None = None
+    chunks: int = 0

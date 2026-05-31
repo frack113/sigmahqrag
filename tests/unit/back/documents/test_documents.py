@@ -147,30 +147,33 @@ class TestDocumentsEndpoint:
         return TestClient(app)
 
     @patch("src.api.v1.documents.scan_directory")
-    @patch("src.api.v1.documents.index_sigma_rules")
+    @patch("src.api.v1.documents._ingest_with_pipeline")
     def test_ingest_success(
         self,
-        mock_index: AsyncMock,
+        mock_ingest: AsyncMock,
         mock_scan: AsyncMock,
         client: TestClient,
     ) -> None:
-        """Test successful ingestion (open in v0.1.0)."""
+        """Test successful ingestion with IngestionPipelineBuilder."""
         mock_scan.return_value = []
+        mock_ingest.return_value = ([], 0)
         response = client.post("/api/v1/documents/ingest")
 
         assert response.status_code == 200
         data = response.json()
-        # Accept any valid response
         assert "results" in data or "total_files" in data
 
     @patch("src.api.v1.documents.scan_directory")
+    @patch("src.api.v1.documents._ingest_with_pipeline")
     def test_ingest_no_files(
         self,
+        mock_ingest: AsyncMock,
         mock_scan: AsyncMock,
         client: TestClient,
     ) -> None:
         """Test ingestion with no files found."""
         mock_scan.return_value = []
+        mock_ingest.return_value = ([], 0)
 
         response = client.post(
             "/api/v1/documents/ingest",
