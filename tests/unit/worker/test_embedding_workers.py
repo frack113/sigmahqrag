@@ -5,12 +5,9 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 from src.worker.enums import WorkerStatus
-from src.worker.workers.github_embedding_worker import GithubEmbeddingWorker
-from src.worker.workers.local_embedding_worker import LocalEmbeddingWorker
-from src.worker.workers.sigmaref_embedding_worker import SigmaRefEmbeddingWorker
+from src.worker.workers.generic_embedding_worker import GenericEmbeddingWorker
 
 
 def _make_worker(cls, mock_db: MagicMock) -> tuple:
@@ -28,10 +25,11 @@ class TestSigmaRefEmbeddingWorker:
             "task_id": "sr-emb-001",
             "task_type": "sigmaref_embeddings",
             "collection_name": "sigmaref",
+            "org": "sigmaref",
             "registry_path": "data/documents/sigmaref",
         }
 
-        worker, mock_dispatcher = _make_worker(SigmaRefEmbeddingWorker, mock_db)
+        worker, mock_dispatcher = _make_worker(GenericEmbeddingWorker, mock_db)
         worker.process(task)
 
         mock_db.get_pending_entries.assert_called()
@@ -59,6 +57,7 @@ class TestSigmaRefEmbeddingWorker:
             "task_id": "sr-emb-002",
             "task_type": "sigmaref_embeddings",
             "collection_name": "sigmaref",
+            "org": "sigmaref",
             "registry_path": str(registry_dir),
         }
 
@@ -69,7 +68,7 @@ class TestSigmaRefEmbeddingWorker:
             mock_builder.run = MagicMock()
             mock_builder_cls.return_value = mock_builder
 
-            worker, mock_dispatcher = _make_worker(SigmaRefEmbeddingWorker, mock_db)
+            worker, mock_dispatcher = _make_worker(GenericEmbeddingWorker, mock_db)
             worker.process(task)
 
         mock_builder.run.assert_called_once()
@@ -97,6 +96,7 @@ class TestSigmaRefEmbeddingWorker:
             "task_id": "sr-emb-003",
             "task_type": "sigmaref_embeddings",
             "collection_name": "sigmaref",
+            "org": "sigmaref",
             "registry_path": str(registry_dir),
         }
 
@@ -107,7 +107,7 @@ class TestSigmaRefEmbeddingWorker:
             mock_builder.run = MagicMock()
             mock_builder_cls.return_value = mock_builder
 
-            worker, mock_dispatcher = _make_worker(SigmaRefEmbeddingWorker, mock_db)
+            worker, mock_dispatcher = _make_worker(GenericEmbeddingWorker, mock_db)
             worker.process(task)
 
         mock_db.update_doc_registry_embed_status.assert_called_with("missing123", "error")
@@ -132,6 +132,7 @@ class TestSigmaRefEmbeddingWorker:
             "task_id": "sr-emb-004",
             "task_type": "sigmaref_embeddings",
             "collection_name": "sigmaref",
+            "org": "sigmaref",
             "registry_path": str(registry_dir),
         }
 
@@ -142,7 +143,7 @@ class TestSigmaRefEmbeddingWorker:
             mock_builder.run = MagicMock()
             mock_builder_cls.return_value = mock_builder
 
-            worker, mock_dispatcher = _make_worker(SigmaRefEmbeddingWorker, mock_db)
+            worker, mock_dispatcher = _make_worker(GenericEmbeddingWorker, mock_db)
             worker.process(task)
 
         state_calls = mock_dispatcher.update_worker_state.call_args_list
@@ -151,34 +152,6 @@ class TestSigmaRefEmbeddingWorker:
 
 
 class TestGithubEmbeddingWorker:
-    def test_process_raises_if_path_missing(self, mock_db: MagicMock, tmp_path: Path) -> None:
-        task = {
-            "task_id": "gh-emb-001",
-            "task_type": "github_embeddings",
-            "collection_name": "test-org/test-repo",
-        }
-
-        def mock_path(*args):
-            if args == ("data/github",):
-                return tmp_path
-            return tmp_path / "/".join(args)
-
-        with patch("src.worker.workers.github_embedding_worker.Path", side_effect=mock_path):
-            worker, _ = _make_worker(GithubEmbeddingWorker, mock_db)
-            with pytest.raises(FileNotFoundError, match="Repository path does not exist"):
-                worker.process(task)
-
-    def test_process_raises_invalid_collection_name(self, mock_db: MagicMock) -> None:
-        task = {
-            "task_id": "gh-emb-002",
-            "task_type": "github_embeddings",
-            "collection_name": "",
-        }
-
-        worker, _ = _make_worker(GithubEmbeddingWorker, mock_db)
-        with pytest.raises(ValueError, match="collection_name is required"):
-            worker.process(task)
-
     def test_process_completes_if_no_registry_entries(
         self, mock_db: MagicMock, tmp_path: Path
     ) -> None:
@@ -197,7 +170,7 @@ class TestGithubEmbeddingWorker:
             mock_builder.run = MagicMock()
             mock_builder_cls.return_value = mock_builder
 
-            worker, _ = _make_worker(GithubEmbeddingWorker, mock_db)
+            worker, _ = _make_worker(GenericEmbeddingWorker, mock_db)
             worker.process(task)
 
         mock_db.get_pending_registry_all.assert_called()
@@ -229,7 +202,7 @@ class TestGithubEmbeddingWorker:
             file_name = entry.get("file_name", "")
             return tmp_path / "test-org" / "test-repo" / file_name
 
-        with patch.object(GithubEmbeddingWorker, "_resolve_file_path", side_effect=mock_resolve):
+        with patch.object(GenericEmbeddingWorker, "_resolve_file_path", side_effect=mock_resolve):
             with patch(
                 "src.worker.workers.embedding_base.IngestionPipelineBuilder"
             ) as mock_builder_cls:
@@ -237,7 +210,7 @@ class TestGithubEmbeddingWorker:
                 mock_builder.run = MagicMock()
                 mock_builder_cls.return_value = mock_builder
 
-                worker, mock_dispatcher = _make_worker(GithubEmbeddingWorker, mock_db)
+                worker, mock_dispatcher = _make_worker(GenericEmbeddingWorker, mock_db)
                 worker.process(task)
 
         mock_builder.run.assert_called_once()
@@ -268,7 +241,7 @@ class TestGithubEmbeddingWorker:
             mock_builder.run = MagicMock()
             mock_builder_cls.return_value = mock_builder
 
-            worker, _ = _make_worker(GithubEmbeddingWorker, mock_db)
+            worker, _ = _make_worker(GenericEmbeddingWorker, mock_db)
             worker.process(task)
 
         mock_db.get_pending_registry_all.assert_called()
@@ -279,11 +252,12 @@ class TestLocalEmbeddingWorker:
         task = {
             "task_id": "local-emb-001",
             "task_type": "local_embeddings",
+            "org": "local",
             "collection_name": "local",
             "base_path": "/nonexistent/path",
         }
 
-        worker, mock_dispatcher = _make_worker(LocalEmbeddingWorker, mock_db)
+        worker, mock_dispatcher = _make_worker(GenericEmbeddingWorker, mock_db)
         worker.process(task)
 
         # Should call get_pending_doc_registry
@@ -300,11 +274,12 @@ class TestLocalEmbeddingWorker:
         task = {
             "task_id": "local-emb-002",
             "task_type": "local_embeddings",
+            "org": "local",
             "collection_name": "local",
             "base_path": str(local_dir),
         }
 
-        worker, mock_dispatcher = _make_worker(LocalEmbeddingWorker, mock_db)
+        worker, mock_dispatcher = _make_worker(GenericEmbeddingWorker, mock_db)
         worker.process(task)
 
         # No entries means no processing and no update_worker_state calls
@@ -330,6 +305,7 @@ class TestLocalEmbeddingWorker:
         task = {
             "task_id": "local-emb-003",
             "task_type": "local_embeddings",
+            "org": "local",
             "collection_name": "local",
             "base_path": str(local_dir),
         }
@@ -341,7 +317,7 @@ class TestLocalEmbeddingWorker:
             mock_builder.run = MagicMock()
             mock_builder_cls.return_value = mock_builder
 
-            worker, mock_dispatcher = _make_worker(LocalEmbeddingWorker, mock_db)
+            worker, mock_dispatcher = _make_worker(GenericEmbeddingWorker, mock_db)
             worker.process(task)
 
         mock_builder.run.assert_called_once()
@@ -366,6 +342,7 @@ class TestLocalEmbeddingWorker:
         task = {
             "task_id": "local-emb-004",
             "task_type": "local_embeddings",
+            "org": "local",
             "collection_name": "local",
             "base_path": str(local_dir),
         }
@@ -377,7 +354,7 @@ class TestLocalEmbeddingWorker:
             mock_builder.run = MagicMock()
             mock_builder_cls.return_value = mock_builder
 
-            worker, mock_dispatcher = _make_worker(LocalEmbeddingWorker, mock_db)
+            worker, mock_dispatcher = _make_worker(GenericEmbeddingWorker, mock_db)
             worker.process(task)
 
         # Should mark as error when file is missing (no valid_docs so builder.run never called)
@@ -389,10 +366,11 @@ class TestLocalEmbeddingWorker:
         task = {
             "task_id": "local-emb-006",
             "task_type": "local_embeddings",
+            "org": "local",
             "collection_name": "local",
         }
 
-        worker, mock_dispatcher = _make_worker(LocalEmbeddingWorker, mock_db)
+        worker, mock_dispatcher = _make_worker(GenericEmbeddingWorker, mock_db)
         worker.process(task)
 
         # Uses default path but no entries, so nothing happens

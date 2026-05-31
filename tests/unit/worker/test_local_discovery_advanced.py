@@ -1,11 +1,11 @@
-"""Advanced tests for LocalDiscoveryWorker — error path coverage."""
+"""Advanced tests for GenericDiscoveryWorker — error path coverage."""
 
 from __future__ import annotations
 
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from src.worker.workers.local_discovery_worker import LocalDiscoveryWorker
+from src.worker.workers.generic_discovery_worker import GenericDiscoveryWorker, SourceType
 
 
 class TestLocalDiscoveryWorkerAdvanced:
@@ -21,7 +21,7 @@ class TestLocalDiscoveryWorkerAdvanced:
             "base_path": str(local_dir),
         }
 
-        worker = LocalDiscoveryWorker(mock_db)
+        worker = GenericDiscoveryWorker(mock_db, None, source_type=SourceType.LOCAL)
         with patch.object(worker, "_compute_sha256", return_value=("", 0)):
             worker.process(task)
         mock_db.batch_upsert_doc_registry.assert_called_once()
@@ -40,13 +40,13 @@ class TestLocalDiscoveryWorkerAdvanced:
             "base_path": str(local_dir),
         }
 
-        worker = LocalDiscoveryWorker(mock_db)
+        worker = GenericDiscoveryWorker(mock_db, None, source_type=SourceType.LOCAL)
         with patch(
-            "src.worker.workers.local_discovery_worker.SUPPORTED_DOC_EXTENSION_MAP",
+            "src.worker.workers.generic_discovery_worker.SUPPORTED_DOC_EXTENSION_MAP",
             {".unknown": "unknown"},
         ):
             with patch(
-                "src.worker.workers.local_discovery_worker.SUPPORTED_EXTENSIONS",
+                "src.worker.workers.generic_discovery_worker.SUPPORTED_EXTENSIONS",
                 frozenset({".unknown"}),
             ):
                 with patch(

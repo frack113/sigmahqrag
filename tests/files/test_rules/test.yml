@@ -1,0 +1,9 @@
+
+title: Test
+id: test-001
+detection:
+  selection:
+    EventID: 4688
+  condition: selection
+references:
+  - https://example.com/test.md

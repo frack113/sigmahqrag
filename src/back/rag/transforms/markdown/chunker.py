@@ -266,15 +266,15 @@ class MarkdownChunker(DocumentTransform):
                         )
                     )
 
-        # Filter chunks: remove near-empty chunks (heading-only or whitespace)
+        # Always keep at least the global chunk; filter other truly empty chunks
         filtered = [
             doc
             for doc in result
-            if (doc.text or "").strip() and len((doc.text or "").strip()) >= 50
+            if (doc.text or "").strip() or doc.metadata.get("chunk_type") == "global"
         ]
         kept = len(result) - len(filtered)
         if kept:
-            logger.debug("Filtered %d near-empty chunks from %d total", kept, len(result))
+            logger.debug("Filtered %d empty chunks from %d total", kept, len(result))
 
         logger.info(
             "Chunked %d doc(s) into %d markdown chunk(s)",

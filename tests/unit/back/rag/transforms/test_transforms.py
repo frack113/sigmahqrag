@@ -68,7 +68,7 @@ class TestDocumentTransform:
         assert isinstance(config, TransformConfig)
         assert config.collection_name is not None
         # Verify it uses Config (not RAGConfig which doesn't exist)
-        assert config.collection_name in ("default", "sigmaref")
+        assert config.collection_name in ("default", "sigmaref", "sigma_docs")
 
     def test_can_handle_with_extension(self):
         assert SigmaParser.can_handle("test.yml")

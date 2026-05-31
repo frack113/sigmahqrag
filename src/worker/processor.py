@@ -10,7 +10,7 @@ from src.worker.workers.generic_discovery_worker import GenericDiscoveryWorker
 from src.worker.workers.generic_embedding_worker import GenericEmbeddingWorker
 from src.worker.workers.local_repo_sync_worker import LocalRepoSyncWorker
 from src.worker.workers.model_sync_worker import ModelSyncWorker
-from src.worker.workers.sigmaref_worker import SigmaRefWorker
+from src.worker.workers.sigmaref_worker import SigmaRefProcessor
 
 from src.worker.enums import WorkerStatus, WorkerName
 
@@ -25,7 +25,7 @@ class TaskDispatcher:
     """
 
     _WORKER_TYPES: Dict[WorkerName, Type[BaseWorker]] = {
-        WorkerName.SIGMAREF_DISCOVERY: SigmaRefWorker,
+        WorkerName.SIGMAREF_DISCOVERY: SigmaRefProcessor,
         WorkerName.GITHUB_DISCOVERY: GenericDiscoveryWorker,
         WorkerName.LOCAL_DISCOVERY: GenericDiscoveryWorker,
         WorkerName.LOCAL_REPO_SYNC: LocalRepoSyncWorker,

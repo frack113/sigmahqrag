@@ -10,10 +10,6 @@ from typing import Any
 
 import httpx
 
-from src.back.database.doc_ops import (
-    get_pending_registry_all,
-    upsert_doc_registry,
-)
 from src.back.utils.identify_file_type import SUPPORTED_REFERENCE_DOC_TYPES
 from src.back.utils.sigma_utils import extract_sigma_references
 from src.shared.utils import iso_now
@@ -91,7 +87,7 @@ def process_sigma_refs(
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
 
-    entries = get_pending_registry_all(db)
+    entries = db.get_pending_registry_all()
     sigma_entries = [
         e
         for e in entries
@@ -239,7 +235,7 @@ def process_sigma_refs(
                         content_sha256=result[1] if result else "0",
                         file_size=result[1] if result else None,
                     )
-                    upsert_doc_registry(db, entry)
+                    db.batch_upsert_doc_registry([entry])
                     downloaded += 1
                 else:
                     failed += 1

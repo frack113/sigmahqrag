@@ -8,10 +8,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
 from src.worker.workers.discovery_base import DiscoveryWorker
+from src.worker.enums import WorkerName
 from src.back.utils.identify_file_type import SUPPORTED_DOC_EXTENSION_MAP
 
 if TYPE_CHECKING:
-    from src.worker.enums import WorkerName
+    from src.back.database.service import DatabaseService
+    from src.worker.processor import TaskDispatcher
 
 logger = logging.getLogger(__name__)
 
@@ -42,14 +44,17 @@ class GenericDiscoveryWorker(DiscoveryWorker):
 
     def __init__(
         self,
+        db: Optional["DatabaseService"] = None,
+        dispatcher: Optional["TaskDispatcher"] = None,
         *,
-        source_type: SourceType,
-        base_dir: Path,
+        source_type: SourceType = SourceType.LOCAL,
+        base_dir: Optional[Path] = None,
         github_base_dir: Optional[Path] = None,
         selected_dirs: Optional[list[str]] = None,
     ) -> None:
+        super().__init__(db, dispatcher)
         self.source_type = source_type
-        self.base_dir = base_dir.resolve()
+        self.base_dir = (base_dir or Path("/tmp")).resolve()
         self.github_base_dir = github_base_dir
         self.selected_dirs = selected_dirs or []
 

@@ -13,7 +13,7 @@ from src.back.utils.identify_file_type import SUPPORTED_REFERENCE_DOC_TYPES
 logger = logging.getLogger(__name__)
 
 
-class SigmaRefWorker(BaseWorker):
+class SigmaRefProcessor(BaseWorker):
     """Downloads reference documents for Sigma rules already in doc_registry."""
 
     worker_type = WorkerName.SIGMAREF_DISCOVERY
@@ -24,7 +24,7 @@ class SigmaRefWorker(BaseWorker):
         cfg = get_config()
         output_dir = task.get("output_dir") or str(cfg.sigmaref_documents_path)
 
-        logger.info(f"[SigmaRefWorker] Starting: output_dir={output_dir}")
+        logger.info(f"[SigmaRefProcessor] Starting: output_dir={output_dir}")
 
         def _on_progress(current: int, total: int, phase: str) -> None:
             if total == 0:
@@ -44,7 +44,11 @@ class SigmaRefWorker(BaseWorker):
                 supported_types=SUPPORTED_REFERENCE_DOC_TYPES,
                 progress_callback=_on_progress,
             )
-            logger.info(f"[SigmaRefWorker] Complete: {summary}")
+            logger.info(f"[SigmaRefProcessor] Complete: {summary}")
         except Exception as e:
-            logger.error(f"[SigmaRefWorker] Failed: {e}", exc_info=True)
+            logger.error(f"[SigmaRefProcessor] Failed: {e}", exc_info=True)
             raise
+
+
+# Backwards alias
+SigmaRefWorker = SigmaRefProcessor
