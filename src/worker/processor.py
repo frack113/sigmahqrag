@@ -6,14 +6,11 @@ from typing import Dict, Type
 
 from src.back.database.service import DatabaseService
 from src.worker.base import BaseWorker
-from src.worker.workers.github_discovery_worker import GithubDiscoveryWorker
-from src.worker.workers.github_embedding_worker import GithubEmbeddingWorker
-from src.worker.workers.local_discovery_worker import LocalDiscoveryWorker
-from src.worker.workers.local_embedding_worker import LocalEmbeddingWorker
+from src.worker.workers.generic_discovery_worker import GenericDiscoveryWorker
+from src.worker.workers.generic_embedding_worker import GenericEmbeddingWorker
 from src.worker.workers.local_repo_sync_worker import LocalRepoSyncWorker
 from src.worker.workers.model_sync_worker import ModelSyncWorker
-from src.worker.workers.sigmaref_discovery_worker import SigmaRefDiscoveryWorker
-from src.worker.workers.sigmaref_embedding_worker import SigmaRefEmbeddingWorker
+from src.worker.workers.sigmaref_worker import SigmaRefWorker
 
 from src.worker.enums import WorkerStatus, WorkerName
 
@@ -28,13 +25,13 @@ class TaskDispatcher:
     """
 
     _WORKER_TYPES: Dict[WorkerName, Type[BaseWorker]] = {
-        WorkerName.SIGMAREF_DISCOVERY: SigmaRefDiscoveryWorker,
-        WorkerName.GITHUB_DISCOVERY: GithubDiscoveryWorker,
-        WorkerName.LOCAL_DISCOVERY: LocalDiscoveryWorker,
+        WorkerName.SIGMAREF_DISCOVERY: SigmaRefWorker,
+        WorkerName.GITHUB_DISCOVERY: GenericDiscoveryWorker,
+        WorkerName.LOCAL_DISCOVERY: GenericDiscoveryWorker,
         WorkerName.LOCAL_REPO_SYNC: LocalRepoSyncWorker,
-        WorkerName.SIGMAREF_EMBEDDINGS: SigmaRefEmbeddingWorker,
-        WorkerName.GITHUB_EMBEDDINGS: GithubEmbeddingWorker,
-        WorkerName.LOCAL_EMBEDDINGS: LocalEmbeddingWorker,
+        WorkerName.SIGMAREF_EMBEDDINGS: GenericEmbeddingWorker,
+        WorkerName.GITHUB_EMBEDDINGS: GenericEmbeddingWorker,
+        WorkerName.LOCAL_EMBEDDINGS: GenericEmbeddingWorker,
         WorkerName.MODEL_SYNC: ModelSyncWorker,
     }
 
