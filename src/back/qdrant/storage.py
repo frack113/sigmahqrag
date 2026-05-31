@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import uuid
 from typing import Any
 
 import qdrant_client
@@ -37,23 +38,107 @@ async def store_embeddings(
         logger.error("Document count must match embedding count")
         return False
 
+    points = []
+    meta_list = metadata or [{}] * len(documents)
+
+    for emb, doc, meta in zip(embeddings, documents, meta_list, strict=True):
+        point_id = str(uuid.uuid4())
+        points.append(
+            qdrant_client.models.VectorPointStruct(
+                id=point_id,
+                vector=emb,
+                payload={
+                    "text": doc,
+                    **meta,
+                },
+            )
+        )
+
     try:
-        from src.back.qdrant import QdrantService
-
-        service = QdrantService(
+        client = get_qdrant_client()
+        client.upsert(
             collection_name=collection_name,
-            vector_size=vector_size,
+            points=points,
         )
-        await service.initialize()
-
-        await service.add_vectors(
-            embeddings=embeddings,
-            documents=documents,
-            metadata=metadata,
-        )
+        logger.info(f"Stored {len(points)} vectors in {collection_name}")
         return True
     except Exception as e:
         logger.error(f"Failed to store embeddings: {e}")
+        return False
+
+
+async def upsert_by_key(
+    embeddings: list[list[float]],
+    documents: list[str],
+    metadata: list[dict[str, Any]],
+    collection_name: str = "sigma_rules",
+    vector_size: int = DEFAULT_VECTOR_SIZE,
+    key_fields: list[str] | None = None,
+) -> bool:
+    """Store embeddings in Qdrant using composite key for upsert.
+
+    Uses (rule_id, chunk_type) as upsert key to avoid duplicates.
+
+    Args:
+        embeddings: Embedding vectors
+        documents: Original documents
+        metadata: Metadata dicts containing rule_id and chunk_type
+        collection_name: Qdrant collection name
+        vector_size: Vector dimension
+        key_fields: Override default key fields
+
+    Returns:
+        True if successful
+    """
+    if key_fields is None:
+        key_fields = ["rule_id", "chunk_type"]
+
+    if len(documents) != len(embeddings) != len(metadata):
+        logger.error("Document, embedding, and metadata counts must match")
+        return False
+
+    points = []
+    for emb, doc, meta in zip(embeddings, documents, metadata, strict=True):
+        # Build composite key from specified fields
+        key_parts = []
+        for field in key_fields:
+            value = meta.get(field)
+            if value:
+                key_parts.append(str(value))
+
+        if not key_parts:
+            logger.warning("Missing key fields, skipping point")
+            continue
+
+        point_id = f"{collection_name}_{'_'.join(key_parts)}"
+        points.append(
+            qdrant_client.models.VectorPointStruct(
+                id=point_id,
+                vector=emb,
+                payload={
+                    "text": doc,
+                    **meta,
+                },
+            )
+        )
+
+    try:
+        client = get_qdrant_client()
+        client.recreate_collection(
+            collection_name=collection_name,
+            vectors_config=qdrant_client.models.VectorParams(
+                size=vector_size,
+                distance=qdrant_client.models.Distance.COSINE,
+            ),
+        )
+        client.upsert(
+            collection_name=collection_name,
+            points=points,
+        )
+        logger.info(f"Upserted {len(points)} vectors with composite keys in {collection_name}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to upsert embeddings: {e}")
         return False
 
 

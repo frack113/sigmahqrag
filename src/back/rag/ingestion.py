@@ -27,6 +27,9 @@ DEFAULT_EMBED_BATCH_SIZE = 8
 DEFAULT_NUM_WORKERS = 4
 DEFAULT_SIMILARITY_TOP_K = 5
 
+# Collection names that use the transform system instead of SentenceSplitter.
+TRANSFORM_COLLECTIONS: set[str] = {"sigma_rules"}
+
 
 # Chunkers optimized per source type
 SOURCE_CHUNK_CONFIG: dict[str, dict[str, Any]] = {
@@ -139,7 +142,46 @@ class IngestionPipelineBuilder:
         except Exception:
             return False
 
-    def build(self) -> IngestionPipeline:
+    def _get_transform(self) -> Any | None:
+        """Detect and return a transform for the current collection.
+
+        Returns:
+            A DocumentTransform instance, or None if no transform matches.
+        """
+        source = ""
+        if self._collection_name:
+            parts = self._collection_name.lower().split("/")
+            source = parts[0] if parts else self._collection_name
+
+        from .transforms import TransformRegistry
+
+        transform_cls = TransformRegistry.get(source)
+        if transform_cls is None:
+            return None
+
+        from .transforms.base import TransformConfig
+
+        from src.shared.config import get_config as _get_config
+
+        cfg = _get_config()
+        config = TransformConfig(
+            collection_name=self._collection_name,
+            model_name=self._model_name,
+            chunk_size=SOURCE_CHUNK_CONFIG.get(source, {}).get("chunk_size", 512),
+            chunk_overlap=SOURCE_CHUNK_CONFIG.get(source, {}).get("chunk_overlap", 50),
+            enable_rich_chunks=cfg.enable_rich_chunks,
+        )
+        return transform_cls(config=config)
+
+    def _uses_transform(self) -> bool:
+        """Check if the current collection should use a transform."""
+        source = ""
+        if self._collection_name:
+            parts = self._collection_name.lower().split("/")
+            source = parts[0] if parts else self._collection_name
+        return source in TRANSFORM_COLLECTIONS
+
+    def build(self, skip_transform_transformations: bool = False) -> IngestionPipeline:
         if self._pipeline is not None and self._cached:
             return self._pipeline
 
@@ -150,13 +192,23 @@ class IngestionPipelineBuilder:
         cache_dir = Path(get_config().paths_rag_cache_dir)
         cache_dir.mkdir(parents=True, exist_ok=True)
 
-        md_parser, splitter = _get_chunker_for_collection(self._collection_name)
+        # For transform-based collections, skip SentenceSplitter — the transform
+        # already produces appropriately-sized chunks.
+        use_transform = not skip_transform_transformations and self._uses_transform()
+
+        if use_transform:
+            md_parser = None
+            splitter = None
+            logger.info("Using transform-based pipeline for collection '%s'", self._collection_name)
+        else:
+            md_parser, splitter = _get_chunker_for_collection(self._collection_name)
 
         transformations: list[Any] = [self._embed_model]
 
         if md_parser is not None:
             transformations.insert(0, md_parser)
-        transformations.insert(0, splitter)
+        if splitter is not None:
+            transformations.insert(0, splitter)
 
         self._pipeline = IngestionPipeline(
             transformations=transformations,
@@ -215,6 +267,71 @@ class IngestionPipelineBuilder:
                 logger.warning("Failed to persist pipeline cache: %s", e)
 
         return list(nodes)
+
+    def run_files(
+        self,
+        file_paths: list[str | Path],
+        num_workers: int | None = None,
+    ) -> list[Any]:
+        """Run ingestion with automatic transform detection per file.
+
+        For each file, detects a suitable DocumentTransform via the registry,
+        runs the full transform pipeline (parse -> chunk -> post_process),
+        then feeds the resulting Documents through the LlamaIndex pipeline.
+
+        Args:
+            file_paths: List of file paths to ingest.
+            num_workers: Override number of workers for the pipeline.
+
+        Returns:
+            List of nodes produced by the pipeline.
+        """
+        from .transforms import TransformRegistry
+
+        all_documents: list[Document] = []
+
+        for file_path in file_paths:
+            transform = TransformRegistry.find_for_file(file_path)
+            if transform is not None:
+                try:
+                    transform_instance = transform(config=self._make_transform_config(file_path))
+                    docs = transform_instance.run(Path(file_path))
+                    all_documents.extend(docs)
+                    logger.info(
+                        "Transform %s produced %d document(s) from %s",
+                        transform.__name__,
+                        len(docs),
+                        file_path,
+                    )
+                except Exception:
+                    logger.exception("Transform %s failed for %s", transform.__name__, file_path)
+                    continue
+            else:
+                logger.debug("No transform registered for file '%s', skipping", file_path)
+
+        return self.run(all_documents, num_workers=num_workers)
+
+    def _make_transform_config(self, file_path: str | Path) -> Any:
+        """Build a TransformConfig suited for a specific file."""
+        from .transforms.base import TransformConfig
+
+        from src.shared.config import get_config as _get_config
+
+        source = ""
+        if self._collection_name:
+            parts = self._collection_name.lower().split("/")
+            source = parts[0] if parts else self._collection_name
+
+        cfg = _get_config()
+        chunk_cfg = SOURCE_CHUNK_CONFIG.get(source, {})
+
+        return TransformConfig(
+            collection_name=self._collection_name,
+            model_name=self._model_name,
+            chunk_size=chunk_cfg.get("chunk_size", 512),
+            chunk_overlap=chunk_cfg.get("chunk_overlap", 50),
+            enable_rich_chunks=cfg.enable_rich_chunks,
+        )
 
     async def arun(
         self,

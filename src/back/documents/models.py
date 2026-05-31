@@ -48,6 +48,7 @@ class IngestRequest(BaseModel):
 
     directory: str | None = None
     recursive: bool = True
+    mode: str = "flat"
 
 
 class IngestResult(BaseModel):

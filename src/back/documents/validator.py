@@ -62,7 +62,7 @@ def validate_sigma_rule(rule: SigmaRule) -> ValidationResult:
             )
 
     if rule.status is not None:
-        valid_statuses = ["experimental", "stable", "testing", "deprecated"]
+        valid_statuses = ["experimental", "stable", "testing", "deprecated", "test", "unsupported"]
         if rule.status.lower() not in valid_statuses:
             errors.append(
                 ValidationError(

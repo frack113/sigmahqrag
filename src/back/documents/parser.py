@@ -13,7 +13,7 @@ from src.back.documents.models import SigmaRule
 
 logger = logging.getLogger(__name__)
 
-REQUIRED_FIELDS = {"title", "detection", "condition"}
+REQUIRED_FIELDS = {"title", "detection"}
 MAX_FILE_SIZE = 1024 * 1024
 
 
@@ -78,15 +78,22 @@ def parse_sigma_rule(file_path: str) -> SigmaRule | None:
         rule_id = os.path.splitext(os.path.basename(file_path))[0]
 
     try:
+        condition = data.get("condition") or (data.get("detection") or {}).get("condition", "")
+        date_val = data.get("date")
+        if hasattr(date_val, "isoformat"):
+            date_val = date_val.isoformat()
+        modified_val = data.get("modified")
+        if hasattr(modified_val, "isoformat"):
+            modified_val = modified_val.isoformat()
         return SigmaRule(
             id=rule_id,
             title=data.get("title", ""),
             detection=data.get("detection", {}),
-            condition=data.get("condition", ""),
+            condition=condition,
             description=data.get("description"),
             author=data.get("author"),
-            date=data.get("date"),
-            modified=data.get("modified"),
+            date=date_val,
+            modified=modified_val,
             references=data.get("references", []),
             tags=data.get("tags", []),
             level=data.get("level"),

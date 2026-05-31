@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
-
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
@@ -25,27 +24,8 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/documents", tags=["v1-documents"])
 
 
-def get_sigma_rules_dir() -> str:
-    """Get Sigma rules directory from environment."""
-    directory = os.environ.get("SIGMA_RULES_DIR")
-    if not directory:
-        raise ValueError("SIGMA_RULES_DIR environment variable not set")
-    return directory
-
-
 def _validate_directory_path(directory: str, base_dir: str) -> str:
-    """Validate and resolve a directory path to prevent path traversal.
-
-    Args:
-        directory: User-provided directory path
-        base_dir: Allowed base directory (from SIGMA_RULES_DIR)
-
-    Returns:
-        Resolved, validated absolute path
-
-    Raises:
-        ValueError: If path traversal is detected
-    """
+    """Validate and resolve a directory path to prevent path traversal."""
     resolved = Path(directory).resolve()
     base = Path(base_dir).resolve()
     try:
@@ -59,26 +39,37 @@ def _validate_directory_path(directory: str, base_dir: str) -> str:
 async def ingest_sigma_rules(
     request: IngestRequest | None = None,
 ) -> JSONResponse:
-    """Ingest Sigma rules from configured directory."""
+    """Ingest Sigma rules from configured directory.
+
+    Args:
+        request: Optional directory/recursive parameters.
+        mode: 'flat' (default) or 'rich' chunking mode.
+
+    Returns:
+        JSONResponse with ingestion results.
+    """
+    # Read parameters from request body
+    mode = request.mode if request and request.mode else "flat"
     directory = request.directory if request else None
-    recursive = request.recursive if request else True
+    recursive = request.recursive if request and request.recursive is not None else True
 
-    if not directory:
-        directory = get_sigma_rules_dir()
+    # Scan both github dir (Sigma rules) and local_documents_dir (reference docs)
+    if directory:
+        directories = [directory]
     else:
-        try:
-            base_dir = get_sigma_rules_dir()
-            directory = _validate_directory_path(directory, base_dir)
-        except ValueError as e:
-            return JSONResponse(
-                status_code=400,
-                content={"success": False, "error": str(e)},
-            )
+        from src.shared.config import get_config
 
-    logger.info(f"Scanning directory: {directory} (recursive={recursive})")
+        cfg = get_config()
+        directories = [cfg.paths_github_dir, cfg.local_documents_path]
 
-    files = scan_directory(directory, recursive=recursive)
-    logger.info(f"Found {len(files)} YAML files")
+    all_files: list[str] = []
+    for d in directories:
+        files = scan_directory(d, recursive=recursive)
+        logger.info(f"Found {len(files)} YAML files in {d}")
+        all_files.extend(files)
+
+    files = sorted(all_files)
+    logger.info(f"Found {len(files)} YAML files total")
 
     results: list[IngestResult] = []
     successful_rules = []
@@ -129,7 +120,10 @@ async def ingest_sigma_rules(
 
     if successful_rules:
         try:
-            await index_sigma_rules(successful_rules)
+            result = await index_sigma_rules(successful_rules, mode=mode)
+            logger.info(
+                f"Indexing complete: {result.get('indexed', 0)} chunks for {len(successful_rules)} rules"
+            )
         except Exception as e:
             logger.error(f"Failed to index rules: {e}")
 
@@ -139,6 +133,7 @@ async def ingest_sigma_rules(
             "total": len(results),
             "successful": len(successful_rules),
             "failed": len(results) - len(successful_rules),
+            "mode": mode,
             "results": [r.model_dump() for r in results],
         }
     )
