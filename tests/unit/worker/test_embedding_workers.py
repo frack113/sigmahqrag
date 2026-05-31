@@ -176,7 +176,7 @@ class TestGithubEmbeddingWorker:
     def test_process_completes_if_no_registry_entries(
         self, mock_db: MagicMock, tmp_path: Path
     ) -> None:
-        mock_db.get_pending_doc_registry.return_value = []
+        mock_db.get_pending_registry_all.return_value = []
 
         task = {
             "task_id": "gh-emb-003",
@@ -194,14 +194,14 @@ class TestGithubEmbeddingWorker:
             worker, _ = _make_worker(GithubEmbeddingWorker, mock_db)
             worker.process(task)
 
-        mock_db.get_pending_doc_registry.assert_called()
+        mock_db.get_pending_registry_all.assert_called()
 
     def test_process_embeds_discovered_files(self, mock_db: MagicMock, tmp_path: Path) -> None:
         repo_dir = tmp_path / "test-org" / "test-repo" / "rules"
         repo_dir.mkdir(parents=True)
         (repo_dir / "rule1.md").write_text("# Rule 1")
 
-        mock_db.get_pending_sigma_ref.return_value = [
+        mock_db.get_pending_registry_all.return_value = [
             {
                 "url_hash": "hash1",
                 "org": "test-org",
@@ -235,10 +235,10 @@ class TestGithubEmbeddingWorker:
                 worker.process(task)
 
         mock_builder.run.assert_called_once()
-        mock_db.update_sigma_ref_embed_status.assert_called()
+        mock_db.update_doc_registry_embed_status.assert_called()
 
     def test_process_filters_by_org_and_repo(self, mock_db: MagicMock, tmp_path: Path) -> None:
-        mock_db.get_pending_sigma_ref.return_value = [
+        mock_db.get_pending_registry_all.return_value = [
             {
                 "url_hash": "hash2",
                 "org": "test-org",
@@ -265,7 +265,7 @@ class TestGithubEmbeddingWorker:
             worker, _ = _make_worker(GithubEmbeddingWorker, mock_db)
             worker.process(task)
 
-        mock_db.get_pending_sigma_ref.assert_called()
+        mock_db.get_pending_registry_all.assert_called()
 
 
 class TestLocalEmbeddingWorker:

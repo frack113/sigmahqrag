@@ -16,13 +16,13 @@ from src.back.rag.search import (
 class TestSearchEngine:
     def test_init_defaults(self) -> None:
         engine = SearchEngine()
-        assert engine.collection_name == "sigmaref"
+        assert engine.collection_names == ["sigma_rules", "sigma_docs", "sigma_spec"]
         assert engine.top_k == 15
         assert engine.similarity_threshold == 0.0
 
     def test_init_custom(self) -> None:
-        engine = SearchEngine(collection_name="custom", top_k=5, similarity_threshold=0.5)
-        assert engine.collection_name == "custom"
+        engine = SearchEngine(collection_names=["custom"], top_k=5, similarity_threshold=0.5)
+        assert engine.collection_names == ["custom"]
         assert engine.top_k == 5
         assert engine.similarity_threshold == 0.5
 
@@ -205,19 +205,21 @@ class TestSearchEngineSearch:
         engine = SearchEngine()
         with patch("src.back.rag.search.search", AsyncMock(return_value=[{"text": "a"}])):
             results = await engine.search("q")
-        assert results == [{"text": "a"}]
+        assert len(results) == 1
+        assert results[0]["text"] == "a"
+        assert "rrf_score" in results[0]
 
     @pytest.mark.asyncio
     async def test_custom_top_k(self) -> None:
         engine = SearchEngine()
         with patch("src.back.rag.search.search", AsyncMock()) as mock_search:
             await engine.search("q", top_k=3)
-        mock_search.assert_called_once_with(
-            query="q",
-            collection_name="sigmaref",
-            top_k=3,
-            similarity_threshold=0.0,
-        )
+        # per_collection_k = max(3 * 2, 10) = 10
+        assert mock_search.call_count == len(engine.collection_names)
+        for call in mock_search.call_args_list:
+            assert call.kwargs["query"] == "q"
+            assert call.kwargs["top_k"] == 10
+            assert call.kwargs["similarity_threshold"] == 0.0
 
 
 class TestFormatSearchResult:

@@ -20,7 +20,7 @@ class TestGithubEmbeddingWorkerAdvanced:
     def test_get_entries_specific_repo_exists(self, mock_db: MagicMock, tmp_path: Path) -> None:
         repo_dir = tmp_path / "org" / "repo"
         repo_dir.mkdir(parents=True)
-        mock_db.get_pending_sigma_ref.return_value = [{"file_name": "doc.md"}]
+        mock_db.get_pending_doc_registry.return_value = [{"file_name": "doc.md"}]
 
         task = {"task_id": "adv-2", "collection_name": "org/repo"}
         with patch("src.worker.workers.github_embedding_worker.get_config") as mock_cfg:
@@ -28,7 +28,7 @@ class TestGithubEmbeddingWorkerAdvanced:
             worker = GithubEmbeddingWorker(mock_db, MagicMock())
             entries = worker._get_entries(task)
             assert len(entries) == 1
-            mock_db.get_pending_sigma_ref.assert_called_with("org", "repo")
+            mock_db.get_pending_doc_registry.assert_called_with("org", "repo")
 
     def test_resolve_file_path_returns_none_when_missing_fields(self, mock_db: MagicMock) -> None:
         worker = GithubEmbeddingWorker(mock_db, MagicMock())
