@@ -367,6 +367,7 @@ def download_references(
     request_delay: float = DEFAULT_REQUEST_DELAY,
     progress_callback: Callable[[int, int, str], None] | None = None,
     max_workers: int = DEFAULT_MAX_WORKERS,
+    selected_dirs: list[str] | None = None,
 ) -> dict[str, Any]:
     """Download all Sigma rule references matching supported document types.
 
@@ -383,6 +384,9 @@ def download_references(
             phase only; parallel phase uses max_workers instead).
         progress_callback: Optional callback(current, total) called after each file.
         max_workers: Max concurrent HTTP download threads.
+        selected_dirs: Optional list of relative directory paths to scan.
+            If provided, only files within these directories are processed.
+            Directories not in this list are excluded from scanning.
 
     Returns:
         Dict with summary stats: total_rules, total_refs, downloaded, skipped, failed.
@@ -408,8 +412,42 @@ def download_references(
     skipped = 0
     failed = 0
 
-    yml_files: list[Path] = list(rules_path.rglob("*.yaml"))
-    yml_files.extend(rules_path.rglob("*.yml"))
+    _EXCLUDE_DIRS = {".github", ".git", "__pycache__", ".vscode", ".idea", ".pytest_cache"}
+
+    def _is_sigma_rule(data: dict[str, Any]) -> bool:
+        """Check if the YAML data looks like a valid Sigma rule (has logsource)."""
+        return "logsource" in data
+
+    def _is_selected_dir(yml_file: Path) -> bool:
+        """Check if the file is within any of the selected directories."""
+        if not selected_dirs:
+            return False
+        try:
+            rel_path = yml_file.relative_to(rules_path).with_suffix("")
+            rel_str = rel_path.as_posix()
+            for sd in selected_dirs:
+                clean_sd = sd.lstrip("./").rstrip("/")
+                if not clean_sd:
+                    return True
+                if rel_str == clean_sd or rel_str.startswith(clean_sd + "/"):
+                    return True
+        except (ValueError, TypeError):
+            pass
+        return False
+
+    def _collect_yaml_files() -> list[Path]:
+        yml_files: list[Path] = []
+        for pattern in ("*.yaml", "*.yml"):
+            for yml_file in rules_path.rglob(pattern):
+                parts = yml_file.parts
+                if any(part in _EXCLUDE_DIRS for part in parts):
+                    continue
+                if not _is_selected_dir(yml_file):
+                    continue
+                yml_files.append(yml_file)
+        return yml_files
+
+    yml_files = _collect_yaml_files()
 
     # Phase 1: scan YAML files, classify refs
     download_queue: list[dict[str, Any]] = []
@@ -427,7 +465,8 @@ def download_references(
             logger.warning("Failed to parse YAML %s: %s", yml_file, exc)
             continue
         if not isinstance(data, dict):
-            logger.warning("YAML %s is not a dict, skipping", yml_file)
+            continue
+        if not _is_sigma_rule(data):
             continue
 
         total_rules += 1

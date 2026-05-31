@@ -172,11 +172,15 @@ async def index_sigma_ref(
 
     try:
         db = DatabaseService.get_instance()
+        selected_dirs: list[str] = []
+        if request and request.selected_dirs:
+            selected_dirs = request.selected_dirs
         summary = download_references(
             rules_dir=rules_dir,
             output_dir=output_dir,
             db=db,
             supported_types=SUPPORTED_REFERENCE_DOC_TYPES,
+            selected_dirs=selected_dirs,
         )
         return JSONResponse(content=summary)
     except Exception as e:

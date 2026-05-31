@@ -19,9 +19,13 @@ class SigmaRefDiscoveryWorker(BaseWorker):
         cfg = get_config()
         rules_dir = task.get("rules_dir", cfg.paths_github_dir)
         output_dir = task.get("output_dir") or str(cfg.sigmaref_documents_path)
+        selected_dirs = task.get("selected_dirs", [])
+        if not selected_dirs:
+            logger.info("[SigmaRefDiscoveryWorker] No selected_dirs provided, skipping scan")
+            return
 
         logger.info(
-            f"[SigmaRefDiscoveryWorker] Starting discovery: rules={rules_dir}, output={output_dir}"
+            f"[SigmaRefDiscoveryWorker] Starting discovery: rules={rules_dir}, selected_dirs={selected_dirs}"
         )
 
         def _on_progress(current: int, total: int, phase: str) -> None:
@@ -40,8 +44,10 @@ class SigmaRefDiscoveryWorker(BaseWorker):
                 db=self.db,
                 supported_types=SUPPORTED_REFERENCE_DOC_TYPES,
                 progress_callback=_on_progress,
+                selected_dirs=selected_dirs,
             )
             logger.info(f"[SigmaRefDiscoveryWorker] Complete: {summary}")
         except Exception as e:
             logger.error(f"[SigmaRefDiscoveryWorker] Failed: {e}", exc_info=True)
+            raise
             raise

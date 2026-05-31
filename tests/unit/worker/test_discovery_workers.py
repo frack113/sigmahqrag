@@ -21,6 +21,7 @@ class TestSigmaRefDiscoveryWorker:
             "collection_name": "sigmaref",
             "rules_dir": "data/github",
             "output_dir": "data/documents/sigmaref",
+            "selected_dirs": [""],
         }
 
         summary = {"total_rules": 10, "total_refs": 5, "downloaded": 3, "skipped": 2, "failed": 0}
@@ -38,6 +39,7 @@ class TestSigmaRefDiscoveryWorker:
             db=mock_db,
             supported_types=SUPPORTED_REFERENCE_DOC_TYPES,
             progress_callback=ANY,
+            selected_dirs=[""],
         )
 
     def test_process_propagates_errors(self, mock_db: MagicMock) -> None:
@@ -45,6 +47,7 @@ class TestSigmaRefDiscoveryWorker:
             "task_id": "sr-disc-003",
             "task_type": "sigmaref_discovery",
             "collection_name": "sigmaref",
+            "selected_dirs": [""],
         }
 
         with patch(

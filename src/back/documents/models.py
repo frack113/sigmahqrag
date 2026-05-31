@@ -40,6 +40,8 @@ class IngestRequest(BaseModel):
     directory: str | None = None
     recursive: bool = True
     mode: str = "flat"
+    selected_dirs: list[str] = Field(default_factory=list)
+    selected_dirs: list[str] = Field(default_factory=list)
 
 
 class IngestResult(BaseModel):
