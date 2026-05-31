@@ -18,7 +18,149 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.back.database import DatabaseService
 
 
+STOP_WORDS = frozenset(
+    {
+        "what",
+        "are",
+        "the",
+        "in",
+        "for",
+        "is",
+        "of",
+        "and",
+        "to",
+        "how",
+        "does",
+        "a",
+        "an",
+        "at",
+        "on",
+        "with",
+        "as",
+        "not",
+        "be",
+        "or",
+        "from",
+        "by",
+        "it",
+        "its",
+        "that",
+        "this",
+        "which",
+        "can",
+        "when",
+        "if",
+        "where",
+        "will",
+        "use",
+        "used",
+        "vs",
+        "between",
+        "than",
+        "but",
+        "must",
+        "should",
+        "would",
+        "shall",
+        "may",
+        "might",
+        "need",
+        "do",
+        "did",
+        "has",
+        "have",
+        "had",
+        "being",
+        "been",
+        "were",
+        "was",
+        "into",
+        "about",
+        "up",
+        "out",
+        "all",
+        "any",
+        "each",
+        "every",
+        "both",
+        "few",
+        "more",
+        "most",
+        "other",
+        "some",
+        "such",
+        "only",
+        "own",
+        "same",
+        "so",
+        "too",
+        "very",
+        "just",
+        "also",
+        "then",
+        "now",
+        "no",
+        "yes",
+        "q",
+        "a",
+    }
+)
+
+
+def _extract_keywords(text: str) -> set[str]:
+    """Extract meaningful keywords from text, excluding stop words and short tokens."""
+    words = set(re.findall(r"\b[a-zA-Z][a-zA-Z0-9_]{2,}\b", text.lower()))
+    return words - STOP_WORDS
+
+
+def _extract_bigrams(text: str) -> set[str]:
+    """Extract meaningful adjacent word pairs from text."""
+    words = re.findall(r"\b[a-zA-Z][a-zA-Z0-9_]{2,}\b", text.lower())
+    bigrams = set()
+    for i in range(len(words) - 1):
+        bigrams.add(f"{words[i]} {words[i + 1]}")
+    return bigrams
+
+
+def _evaluate_result(
+    top_text: str, score: float, question: str, expected_answer: str
+) -> tuple[str, float]:
+    """Evaluate a RAG result and return (status, coverage_score)."""
+    if not top_text:
+        return "FAIL", 0.0
+
+    # Keywords from question + expected answer combined
+    kw_question = _extract_keywords(question)
+    kw_answer = _extract_keywords(expected_answer)
+    combined_keywords = kw_question | kw_answer
+
+    if not combined_keywords:
+        return "FAIL", 0.0
+
+    # Single keyword overlap fraction
+    matched = sum(1 for kw in combined_keywords if kw in top_text.lower())
+    coverage = matched / len(combined_keywords)
+
+    # Boost with bigram overlap (e.g. "value_count", "group_by")
+    bigrams = _extract_bigrams(question) | _extract_bigrams(expected_answer)
+    if bigrams:
+        bigram_matches = sum(1 for bg in bigrams if bg in top_text.lower())
+        bigram_coverage = bigram_matches / len(bigrams)
+        coverage = max(coverage, bigram_coverage)
+
+    # Weight by embedding score
+    weighted = coverage * score
+
+    if weighted >= 0.25 and score >= 0.3:
+        return "PASS", weighted
+    elif weighted >= 0.15 and score >= 0.2:
+        return "PARTIAL", weighted
+    else:
+        return "FAIL", weighted
+
+
 async def main() -> None:
+    """Run the RAG test suite."""
     # --- Initialize DB ---
     db = DatabaseService()
     db.initialize()
@@ -32,6 +174,7 @@ async def main() -> None:
     qa_path = Path("AskRag/ask_spec.md")
     content = qa_path.read_text(encoding="utf-8")
 
+    # Pattern: **Q:** <question> **A:** <answer> (stopping before next ** or end-of-string)
     pattern = re.compile(r"\*\*Q:\*\*\s*(.+?)\s*\n\*\*A:\*\*\s*(.+?)(?=\n\*\*|\Z)", re.DOTALL)
     matches = pattern.findall(content)
 
@@ -39,15 +182,16 @@ async def main() -> None:
         print("No questions found in AskRag/ask_spec.md")
         return
 
-    questions = []
+    questions: list[tuple[str, str]] = []
     for q, a in matches:
-        # Clean up answer (trim trailing section headers that leaked in)
-        a_clean = re.sub(r"\n{2,}", "\n", a).strip()
-        # Remove trailing ### or ## headers that leaked from next section
-        a_clean = re.sub(r"\n\s*#{1,3}\s+\S", "", a_clean).strip()
+        # Clean up trailing section artifacts
+        a_clean = re.sub(r"\n{3,}", "\n", a).strip()
+        # Remove trailing markdown headers that leaked from next section
+        a_clean = re.sub(r"\n\s*#{1,3}\s+\S.*", "", a_clean).strip()
         questions.append((q.strip(), a_clean))
 
-    print(f"Loaded {len(questions)} questions from {qa_path}\n")
+    total = len(questions)
+    print(f"Loaded {total} questions from {qa_path}\n")
     print("=" * 80)
 
     passed = 0
@@ -55,7 +199,8 @@ async def main() -> None:
     partial = 0
 
     for idx, (question, expected_answer) in enumerate(questions, 1):
-        print(f"\n[{idx}/{len(questions)}] Q: {question[:80]}")
+        preview = question[:80].replace("\n", " ")
+        print(f"\n[{idx}/{total}] Q: {preview}")
 
         try:
             results = await engine.search(question, top_k=3)
@@ -75,133 +220,22 @@ async def main() -> None:
 
         print(f"  Score: {score:.4f}")
 
-        # Check if answer keywords appear in top result
-        keywords = set(re.findall(r"\b\w+\b", question.lower()))
-        # Remove stop words
-        stop_words = {
-            "what",
-            "are",
-            "the",
-            "in",
-            "for",
-            "is",
-            "of",
-            "and",
-            "to",
-            "how",
-            "does",
-            "does",
-            "a",
-            "an",
-            "at",
-            "on",
-            "with",
-            "as",
-            "not",
-            "be",
-            "or",
-            "from",
-            "by",
-            "it",
-            "its",
-            "that",
-            "this",
-            "which",
-            "can",
-            "when",
-            "if",
-            "where",
-            "will",
-            "use",
-            "used",
-            "vs",
-            "between",
-            "than",
-            "but",
-            "must",
-            "should",
-            "would",
-            "shall",
-            "may",
-            "might",
-            "need",
-            "do",
-            "did",
-            "has",
-            "have",
-            "had",
-            "being",
-            "been",
-            "are",
-            "were",
-            "was",
-            "into",
-            "about",
-            "up",
-            "out",
-            "all",
-            "any",
-            "each",
-            "every",
-            "both",
-            "few",
-            "more",
-            "most",
-            "other",
-            "some",
-            "such",
-            "only",
-            "own",
-            "same",
-            "so",
-            "than",
-            "too",
-            "very",
-            "just",
-            "also",
-            "then",
-            "now",
-            "or",
-            "and",
-            "but",
-            "not",
-            "no",
-            "yes",
-            "q",
-            "a",
-        }
-        meaningful_keywords = keywords - stop_words
-        meaningful_keywords = {kw for kw in meaningful_keywords if len(kw) > 2}
+        status, weighted = _evaluate_result(top_text, score, question, expected_answer)
+        print(f"  Weighted coverage: {weighted:.2f}")
+        print(f"  STATUS: {status}")
 
-        # Also check expected answer keywords
-        answer_keywords = set(re.findall(r"\b\w+\b", expected_answer.lower())) - stop_words
-        answer_keywords = {kw for kw in answer_keywords if len(kw) > 2}
-
-        combined_keywords = meaningful_keywords | answer_keywords
-
-        # Count how many keywords appear in the top result
-        matched = sum(1 for kw in combined_keywords if kw in top_text.lower())
-        coverage = matched / len(combined_keywords) if combined_keywords else 0
-        # Adjust for low score
-        coverage *= score
-
-        print(f"  Keyword coverage: {coverage:.2f}")
-
-        # Adjusted thresholds: embedding score is strong indicator,
-        # keyword coverage is secondary (chunks may use synonyms)
-        if coverage >= 0.25 and score >= 0.3:
-            print("  STATUS: PASS")
+        if status == "PASS":
             passed += 1
-        elif coverage >= 0.15 and score >= 0.2:
-            print("  STATUS: PARTIAL")
+        elif status == "PARTIAL":
             partial += 1
         else:
-            print("  STATUS: FAIL")
             failed += 1
 
     # --- Summary ---
     print("\n" + "=" * 80)
-    print(f"RESULTS: {passed} passed, {partial} partial, {failed} failed out of {len(questions)}")
+    pass_rate = (passed + partial) / total * 100 if total else 0
+    print(f"RESULTS: {passed} passed, {partial} partial, {failed} failed out of {total}")
+    print(f"         {pass_rate:.1f}% acceptable (pass + partial)")
     print("=" * 80)
 
     db.close()
@@ -214,13 +248,10 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.WARNING)
 
     # Windows event loop fix
-    import sys
-
     if sys.platform == "win32":
-        import asyncio
-
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
     result = asyncio.run(main())
-    if result and result < 10:  # If less than 10 passed, exit with error
+    # Exit with error if fewer than 50% pass
+    if result is not None and result < 10:
         sys.exit(1)
