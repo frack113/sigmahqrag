@@ -28,7 +28,7 @@ DEFAULT_NUM_WORKERS = 4
 DEFAULT_SIMILARITY_TOP_K = 5
 
 # Collection names that use the transform system instead of SentenceSplitter.
-TRANSFORM_COLLECTIONS: set[str] = {"sigma_rules"}
+TRANSFORM_COLLECTIONS: set[str] = {"sigma_rules", "sigma_spec"}
 
 
 # Chunkers optimized per source type
@@ -165,16 +165,20 @@ class IngestionPipelineBuilder:
             return None
 
         from .transforms.base import TransformConfig
+        from src.back.rag.transforms.markdown.chunker import _get_llm_client
 
         from src.shared.config import get_config as _get_config
 
         cfg = _get_config()
+        llm_client = _get_llm_client()
         config = TransformConfig(
             collection_name=self._collection_name,
             model_name=self._model_name,
             chunk_size=SOURCE_CHUNK_CONFIG.get(source, {}).get("chunk_size", 512),
             chunk_overlap=SOURCE_CHUNK_CONFIG.get(source, {}).get("chunk_overlap", 50),
-            enable_rich_chunks=cfg.enable_rich_chunks,
+            enable_rich_chunks=cfg.rag_enable_rich_chunks,
+            llm_client=llm_client,
+            enable_llm_enrichment=True,
         )
         return transform_cls(config=config)
 
@@ -248,9 +252,17 @@ class IngestionPipelineBuilder:
         if not documents:
             return []
 
+        # Filter documents with no text before embedding
+        non_empty = [d for d in documents if (d.text or "").strip()]
+        skipped = len(documents) - len(non_empty)
+        if skipped:
+            logger.warning("Filtered %d documents with empty text before embedding", skipped)
+        if not non_empty:
+            return []
+
         pipeline = self.build()
         nodes = pipeline.run(
-            documents=documents,
+            documents=non_empty,
             num_workers=num_workers or self._num_workers,
         )
 
@@ -314,6 +326,13 @@ class IngestionPipelineBuilder:
             else:
                 logger.debug("No transform registered for file '%s', skipping", file_path)
 
+        # Filter out documents with no text
+        non_empty = [d for d in all_documents if (d.text or "").strip()]
+        skipped = len(all_documents) - len(non_empty)
+        if skipped:
+            logger.warning("Filtered %d documents with empty text before embedding", skipped)
+        all_documents = non_empty
+
         return self.run(all_documents, num_workers=num_workers)
 
     def _make_transform_config(self, file_path: str | Path) -> Any:
@@ -335,7 +354,7 @@ class IngestionPipelineBuilder:
             model_name=self._model_name,
             chunk_size=chunk_cfg.get("chunk_size", 512),
             chunk_overlap=chunk_cfg.get("chunk_overlap", 50),
-            enable_rich_chunks=cfg.enable_rich_chunks,
+            enable_rich_chunks=cfg.rag_enable_rich_chunks,
         )
 
     async def arun(
@@ -346,9 +365,16 @@ class IngestionPipelineBuilder:
         if not documents:
             return []
 
+        non_empty = [d for d in documents if (d.text or "").strip()]
+        skipped = len(documents) - len(non_empty)
+        if skipped:
+            logger.warning("Filtered %d documents with empty text before embedding", skipped)
+        if not non_empty:
+            return []
+
         pipeline = self.build()
         nodes = await pipeline.arun(
-            documents=documents,
+            documents=non_empty,
             num_workers=num_workers or self._num_workers,
         )
 

@@ -5,12 +5,9 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import Any
 
 from llama_index.core.schema import Document
-
-if TYPE_CHECKING:
-    pass
 
 
 @dataclass
@@ -27,6 +24,8 @@ class TransformConfig:
         enable_sbert: Use sentence-transformers for embedding.
         enable_rich_chunks: Skip LlamaIndex SentenceSplitter for pre-chunked output.
         enable_eval_questions: Generate eval questions for RAGAS evaluation.
+        enable_llm_enrichment: Enable LLM-based keyword extraction per chunk.
+        llm_client: Optional LLM client for keyword generation.
     """
 
     collection_name: str = "default"
@@ -38,6 +37,8 @@ class TransformConfig:
     enable_sbert: bool = True
     enable_rich_chunks: bool = False
     enable_eval_questions: bool = False
+    enable_llm_enrichment: bool = True
+    llm_client: Any = None
     max_heading_level: int = 2
     """Max heading depth for markdown chunking (1=H1 only, 2=H1+H2, 3=H1+H2+H3)."""
 

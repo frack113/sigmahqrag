@@ -9,6 +9,8 @@ from typing import Any
 
 import qdrant_client
 
+from qdrant_client.http.exceptions import UnexpectedResponse
+
 from .client import get_qdrant_client
 
 logger = logging.getLogger(__name__)
@@ -91,6 +93,18 @@ async def create_collection(
             "Collection '%s' created successfully (hybrid=%s).", collection_name, enable_hybrid
         )
         return True
+    except UnexpectedResponse as e:
+        # Collection already exists (409 Conflict) - that is acceptable
+        if "already exists" in str(e):
+            logger.info("Collection '%s' already exists.", collection_name)
+            return True
+        logger.error(
+            "Qdrant error for collection '%s': %s",
+            collection_name,
+            e,
+            exc_info=True,
+        )
+        raise
     except Exception as e:
         logger.error(
             "Failed to create collection '%s': %s: %s",
