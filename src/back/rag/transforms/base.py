@@ -38,6 +38,8 @@ class TransformConfig:
     enable_sbert: bool = True
     enable_rich_chunks: bool = False
     enable_eval_questions: bool = False
+    max_heading_level: int = 2
+    """Max heading depth for markdown chunking (1=H1 only, 2=H1+H2, 3=H1+H2+H3)."""
 
 
 @dataclass

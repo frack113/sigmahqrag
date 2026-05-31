@@ -108,21 +108,25 @@ def parse_sigma_rule(file_path: str) -> SigmaRule | None:
 
 
 def scan_directory(directory: str, recursive: bool = True) -> list[str]:
-    """Scan directory for Sigma rule files.
+    """Scan directory for all files.
+
+    The caller is responsible for filtering by registered transforms
+    (e.g. via TransformRegistry.find_for_file). This function returns
+    every file so that future transforms are automatically picked up.
 
     Args:
         directory: Directory to scan
         recursive: Whether to scan subdirectories
 
     Returns:
-        List of YAML file paths
+        List of file paths
     """
     dir_path = Path(directory)
 
     if not dir_path.exists() or not dir_path.is_dir():
         return []
 
-    pattern = "**/*.y*ml" if recursive else "*.y*ml"
+    pattern = "**/*" if recursive else "*"
     files = sorted(dir_path.glob(pattern))
 
     return [str(f) for f in files if f.is_file()]

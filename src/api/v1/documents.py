@@ -137,11 +137,11 @@ async def ingest_sigma_rules(
     all_files: list[str] = []
     for d in directories:
         files = scan_directory(d, recursive=recursive)
-        logger.info("Found %d YAML files in %s", len(files), d)
+        logger.info("Found %d files in %s", len(files), d)
         all_files.extend(files)
 
     files = sorted(all_files)
-    logger.info("Found %d YAML files total", len(files))
+    logger.info("Found %d files total", len(files))
 
     results, total_chunks = _ingest_with_pipeline(files, mode)
 

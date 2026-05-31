@@ -8,9 +8,9 @@ and automatically registers all format-specific transforms on import.
 from .base import DocumentTransform, TransformConfig
 from .registry import TransformRegistry
 
-# Import sigma module to trigger registration.
-# This side-effect registers SigmaParser (flat) and SigmaChunker (rich).
+# Import sigma and markdown modules to trigger registration.
 from . import sigma  # noqa: F401
+from . import markdown  # noqa: F401
 
 __all__ = [
     "DocumentTransform",

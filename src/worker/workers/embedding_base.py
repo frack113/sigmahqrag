@@ -185,12 +185,26 @@ class EmbeddingWorker(BaseWorker):
                 doc_text = _strip_html(doc_text)
 
             if source in ("sigmaref", "github", "local") and content_type in ("markdown", ""):
-                md_parser = MarkdownNodeParser(include_metadata=True)
-                doc = Document(text=doc_text, metadata=metadata)
-                parsed_nodes = md_parser.get_nodes_from_documents([doc])
-                for node in parsed_nodes:
-                    enriched_metadata = {**metadata, **node.metadata}
-                    valid_docs.append((Document(text=node.text, metadata=enriched_metadata), entry))
+                from src.back.rag.transforms import TransformRegistry
+
+                transform_cls = TransformRegistry.find_for_file(file_path)
+                if transform_cls is not None:
+                    from src.back.rag.transforms.base import TransformConfig
+
+                    config = TransformConfig()
+                    transform = transform_cls(config=config)
+                    for doc in transform.run(file_path):
+                        doc.metadata = {**metadata, **doc.metadata}
+                        valid_docs.append((doc, entry))
+                else:
+                    md_parser = MarkdownNodeParser(include_metadata=True)
+                    doc = Document(text=doc_text, metadata=metadata)
+                    parsed_nodes = md_parser.get_nodes_from_documents([doc])
+                    for node in parsed_nodes:
+                        enriched_metadata = {**metadata, **node.metadata}
+                        valid_docs.append(
+                            (Document(text=node.text, metadata=enriched_metadata), entry)
+                        )
             else:
                 valid_docs.append((Document(text=doc_text, metadata=metadata), entry))
 
