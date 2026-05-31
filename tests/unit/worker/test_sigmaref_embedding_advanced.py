@@ -10,7 +10,7 @@ from src.worker.workers.sigmaref_embedding_worker import SigmaRefEmbeddingWorker
 
 class TestSigmaRefEmbeddingWorkerAdvanced:
     def test_get_entries_skips_missing_url_hash(self, mock_db: MagicMock) -> None:
-        mock_db.get_pending_sigma_ref.return_value = [
+        mock_db.get_pending_entries.return_value = [
             {"original_url": "https://example.com/doc"},
         ]
         worker = SigmaRefEmbeddingWorker(mock_db, MagicMock())

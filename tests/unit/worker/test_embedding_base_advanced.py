@@ -123,7 +123,7 @@ class TestEmbeddingBaseBinaryProcess:
         pdf_file = registry_dir / "hash001.pdf"
         pdf_file.write_text("dummy pdf content")
 
-        mock_db.get_pending_sigma_ref.return_value = [
+        mock_db.get_pending_entries.return_value = [
             _make_sigmaref_entry(
                 url_hash="hash001",
                 file_name="hash001.pdf",
@@ -152,14 +152,14 @@ class TestEmbeddingBaseBinaryProcess:
 
         mock_parse.assert_called_once()
         mock_builder.run.assert_called_once()
-        mock_db.update_sigma_ref_embed_status.assert_called_with("hash001", "embedded")
+        mock_db.update_doc_registry_embed_status.assert_called_with("hash001", "embedded")
 
     def test_embeds_docx_via_sigmaref_worker(self, mock_db: MagicMock, tmp_path: Path) -> None:
         registry_dir = tmp_path / "sigmaref"
         registry_dir.mkdir()
         (registry_dir / "hash002.docx").write_text("dummy docx")
 
-        mock_db.get_pending_sigma_ref.return_value = [
+        mock_db.get_pending_entries.return_value = [
             _make_sigmaref_entry(
                 url_hash="hash002",
                 file_name="hash002.docx",
@@ -186,14 +186,14 @@ class TestEmbeddingBaseBinaryProcess:
 
         mock_parse.assert_called_once()
         mock_builder.run.assert_called_once()
-        mock_db.update_sigma_ref_embed_status.assert_called_with("hash002", "embedded")
+        mock_db.update_doc_registry_embed_status.assert_called_with("hash002", "embedded")
 
     def test_skips_unsupported_office_format(self, mock_db: MagicMock, tmp_path: Path) -> None:
         registry_dir = tmp_path / "sigmaref"
         registry_dir.mkdir()
         (registry_dir / "data.xlsx").write_text("fake excel")
 
-        mock_db.get_pending_sigma_ref.return_value = [
+        mock_db.get_pending_entries.return_value = [
             _make_sigmaref_entry(
                 url_hash="xls001",
                 file_name="data.xlsx",
@@ -214,14 +214,14 @@ class TestEmbeddingBaseBinaryProcess:
             worker.process(task)
 
         mock_builder.run.assert_not_called()
-        mock_db.update_sigma_ref_embed_status.assert_called_with("xls001", "skipped")
+        mock_db.update_doc_registry_embed_status.assert_called_with("xls001", "skipped")
 
     def test_handles_binary_parse_error(self, mock_db: MagicMock, tmp_path: Path) -> None:
         registry_dir = tmp_path / "sigmaref"
         registry_dir.mkdir()
         (registry_dir / "bad.pdf").write_text("not a real pdf")
 
-        mock_db.get_pending_sigma_ref.return_value = [
+        mock_db.get_pending_entries.return_value = [
             _make_sigmaref_entry(
                 url_hash="bad001",
                 file_name="bad.pdf",
@@ -247,14 +247,14 @@ class TestEmbeddingBaseBinaryProcess:
             worker.process(task)
 
         mock_builder.run.assert_not_called()
-        mock_db.update_sigma_ref_embed_status.assert_called_with("bad001", "error")
+        mock_db.update_doc_registry_embed_status.assert_called_with("bad001", "error")
 
     def test_merges_metadata_from_reader(self, mock_db: MagicMock, tmp_path: Path) -> None:
         registry_dir = tmp_path / "sigmaref"
         registry_dir.mkdir()
         (registry_dir / "meta001.pdf").write_text("dummy")
 
-        mock_db.get_pending_sigma_ref.return_value = [
+        mock_db.get_pending_entries.return_value = [
             _make_sigmaref_entry(
                 url_hash="meta001",
                 file_name="meta001.pdf",
@@ -301,7 +301,7 @@ class TestEmbeddingBaseBinaryProcess:
         (registry_dir / "hash001.pdf").write_text("dummy")
         (registry_dir / "hash002.md").write_text("# Markdown doc")
 
-        mock_db.get_pending_sigma_ref.return_value = [
+        mock_db.get_pending_entries.return_value = [
             _make_sigmaref_entry(
                 url_hash="hash001",
                 file_name="hash001.pdf",
@@ -335,7 +335,7 @@ class TestEmbeddingBaseBinaryProcess:
 
         mock_parse.assert_called_once()
         assert mock_builder.run.call_count == 2
-        calls = mock_db.update_sigma_ref_embed_status.call_args_list
+        calls = mock_db.update_doc_registry_embed_status.call_args_list
         statuses = {c[0][0]: c[0][1] for c in calls}
         assert statuses["hash001"] == "embedded"
         assert statuses["hash002"] == "embedded"
@@ -348,12 +348,12 @@ class TestEmbeddingBaseReadError:
         bad_file = registry_dir / "bad123.md"
         bad_file.write_text("ok", encoding="utf-8")
 
-        mock_db.get_pending_sigma_ref.return_value = [
+        mock_db.get_pending_entries.return_value = [
             {
                 "url_hash": "bad123",
                 "original_url": "https://example.com/doc",
                 "content_type": "markdown",
-                "embed_status": "discovered",
+                "embed_status": "discovery",
             }
         ]
 
@@ -374,19 +374,19 @@ class TestEmbeddingBaseReadError:
             worker, _ = _make_worker(SigmaRefEmbeddingWorker, mock_db)
             worker.process(task)
 
-        mock_db.update_sigma_ref_embed_status.assert_called_with("bad123", "error")
+        mock_db.update_doc_registry_embed_status.assert_called_with("bad123", "error")
 
     def test_handles_builder_run_failure(self, mock_db: MagicMock, tmp_path: Path) -> None:
         registry_dir = tmp_path / "sigmaref"
         registry_dir.mkdir()
         (registry_dir / "abc123.md").write_text("# Test")
 
-        mock_db.get_pending_sigma_ref.return_value = [
+        mock_db.get_pending_entries.return_value = [
             {
                 "url_hash": "abc123",
                 "original_url": "https://example.com/doc",
                 "content_type": "markdown",
-                "embed_status": "discovered",
+                "embed_status": "discovery",
             }
         ]
 
@@ -406,7 +406,7 @@ class TestEmbeddingBaseReadError:
             worker, _ = _make_worker(SigmaRefEmbeddingWorker, mock_db)
             worker.process(task)
 
-        mock_db.update_sigma_ref_embed_status.assert_called_with("abc123", "error")
+        mock_db.update_doc_registry_embed_status.assert_called_with("abc123", "error")
 
 
 class TestEmbeddingBaseLocalReadError:

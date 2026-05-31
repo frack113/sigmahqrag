@@ -187,30 +187,57 @@ class TestModels:
 
 class TestDocSigmaRef:
     def test_empty(self, db: DatabaseService) -> None:
-        assert db.get_doc_sigma_ref() == []
+        assert db.get_entries_by_org("sigmaref") == []
 
     def test_upsert_and_get(self, db: DatabaseService) -> None:
-        db.upsert_doc_sigma_ref(
+        db.upsert_doc_registry(
             {
                 "url_hash": "abc123",
+                "org": "sigmaref",
+                "repo": "sigmaref",
                 "original_url": "https://example.com/doc",
                 "content_type": "markdown",
+                "file_name": "doc.md",
                 "rule_id": "rule-001",
             }
         )
-        entries = db.get_doc_sigma_ref()
+        entries = db.get_entries_by_org("sigmaref")
         assert len(entries) == 1
         assert entries[0]["url_hash"] == "abc123"
 
     def test_exists(self, db: DatabaseService) -> None:
-        assert not db.doc_sigma_ref_exists("hash1")
-        db.upsert_doc_sigma_ref({"url_hash": "hash1", "original_url": "http://x"})
-        assert db.doc_sigma_ref_exists("hash1")
+        assert not db.entry_exists("hash1")
+        db.upsert_doc_registry(
+            {
+                "url_hash": "hash1",
+                "org": "sigmaref",
+                "repo": "sigmaref",
+                "original_url": "http://x",
+                "file_name": "x.md",
+            }
+        )
+        assert db.entry_exists("hash1")
 
     def test_upsert_overwrite(self, db: DatabaseService) -> None:
-        db.upsert_doc_sigma_ref({"url_hash": "h1", "original_url": "http://a"})
-        db.upsert_doc_sigma_ref({"url_hash": "h1", "original_url": "http://b"})
-        entries = db.get_doc_sigma_ref()
+        db.upsert_doc_registry(
+            {
+                "url_hash": "h1",
+                "org": "sigmaref",
+                "repo": "sigmaref",
+                "original_url": "http://a",
+                "file_name": "a.md",
+            }
+        )
+        db.upsert_doc_registry(
+            {
+                "url_hash": "h1",
+                "org": "sigmaref",
+                "repo": "sigmaref",
+                "original_url": "http://b",
+                "file_name": "b.md",
+            }
+        )
+        entries = db.get_entries_by_org("sigmaref")
         assert entries[0]["original_url"] == "http://b"
 
 
@@ -503,7 +530,7 @@ class TestLocalFiles:
                 "file_size": 0,
             }
         )
-        db.upsert_doc_sigma_ref(
+        db.upsert_doc_registry(
             {
                 "url_hash": "sigma1",
                 "org": "local",
@@ -512,6 +539,7 @@ class TestLocalFiles:
                 "content_type": "yaml",
                 "original_url": f"file://{test_file}",
                 "file_size": 0,
+                "normalized_url": "file://" + test_file,
             }
         )
         result = db.resync_local_file_sizes(doc_dir)
@@ -731,8 +759,16 @@ class TestRoundtrip:
         db.upsert_model({"repo_id": "org/m", "model_type": "llm"})
         assert len(db.get_models()) >= 1
 
-        db.upsert_doc_sigma_ref({"url_hash": "h1", "original_url": "http://x"})
-        assert db.doc_sigma_ref_exists("h1")
+        db.upsert_doc_registry(
+            {
+                "url_hash": "h1",
+                "org": "x",
+                "repo": "x",
+                "original_url": "http://x",
+                "file_name": "x.md",
+            }
+        )
+        assert db.entry_exists("h1")
 
         db.set_git_metadata(
             "org/repo", {"org": "org", "name": "repo", "url": "http://x", "branch": "main"}
@@ -853,69 +889,99 @@ class TestModelsFilesJsonError:
 
 class TestDocSigmaRefPending:
     def test_get_pending_all(self, db: DatabaseService) -> None:
-        db.upsert_doc_sigma_ref(
-            {"url_hash": "h1", "original_url": "http://x", "embed_status": "discovery"}
+        db.upsert_doc_registry(
+            {
+                "url_hash": "h1",
+                "org": "sigmaref",
+                "repo": "sigmaref",
+                "original_url": "http://x",
+                "embed_status": "discovery",
+                "file_name": "x.md",
+            }
         )
-        db.upsert_doc_sigma_ref(
-            {"url_hash": "h2", "original_url": "http://y", "embed_status": "embedded"}
+        db.upsert_doc_registry(
+            {
+                "url_hash": "h2",
+                "org": "sigmaref",
+                "repo": "sigmaref",
+                "original_url": "http://y",
+                "embed_status": "embedded",
+                "file_name": "y.md",
+            }
         )
-        pending = db.get_pending_sigma_ref()
+        pending = db.get_pending_entries(org="sigmaref")
         assert len(pending) == 1
         assert pending[0]["url_hash"] == "h1"
 
     def test_get_pending_filtered_by_org_repo(self, db: DatabaseService) -> None:
-        db.upsert_doc_sigma_ref(
+        db.upsert_doc_registry(
             {
                 "url_hash": "pa",
                 "org": "a",
                 "repo": "b",
                 "original_url": "http://a",
                 "embed_status": "discovery",
+                "file_name": "a.md",
             }
         )
-        db.upsert_doc_sigma_ref(
+        db.upsert_doc_registry(
             {
                 "url_hash": "pb",
                 "org": "c",
                 "repo": "d",
                 "original_url": "http://c",
                 "embed_status": "discovery",
+                "file_name": "c.md",
             }
         )
-        pending = db.get_pending_sigma_ref(org="a", repo="b")
+        pending = db.get_pending_entries(org="a", repo="b")
         assert len(pending) == 1
         assert pending[0]["url_hash"] == "pa"
 
     def test_update_embed_status(self, db: DatabaseService) -> None:
-        db.upsert_doc_sigma_ref(
-            {"url_hash": "up1", "original_url": "http://u", "embed_status": "discovery"}
+        db.upsert_doc_registry(
+            {
+                "url_hash": "up1",
+                "org": "sigmaref",
+                "repo": "sigmaref",
+                "original_url": "http://u",
+                "embed_status": "discovery",
+                "file_name": "u.md",
+            }
         )
-        db.update_sigma_ref_embed_status("up1", "embedded")
-        refs = db.get_doc_sigma_ref()
+        db.update_embed_status("up1", "embedded")
+        refs = db.get_entries_by_org("sigmaref")
         assert refs[0]["embed_status"] == "embedded"
 
     def test_delete_by_repo(self, db: DatabaseService) -> None:
-        db.upsert_doc_sigma_ref(
-            {"url_hash": "dr1", "org": "x", "repo": "y", "original_url": "http://d"}
+        db.upsert_doc_registry(
+            {
+                "url_hash": "dr1",
+                "org": "x",
+                "repo": "y",
+                "original_url": "http://d",
+                "file_name": "d.md",
+            }
         )
-        db.delete_doc_sigma_ref_by_repo("x", "y")
-        refs = db.get_doc_sigma_ref()
+        db.delete_entries_by_org_repo("x", "y")
+        refs = db.get_entries_by_org("x")
         assert all(r["org"] != "x" or r["repo"] != "y" for r in refs)
 
 
 class TestResetEmbedStatus:
     def test_sigmaref_collection(self, db: DatabaseService) -> None:
-        db.upsert_doc_sigma_ref(
+        db.upsert_doc_registry(
             {
                 "url_hash": "s1",
                 "org": "sigmaref",
                 "repo": "sigmaref",
                 "original_url": "http://s",
                 "embed_status": "embedded",
+                "file_name": "s.md",
             }
         )
         db.reset_embed_status_for_collection("sigmaref")
-        refs = db.get_doc_sigma_ref()
+        refs = db.get_entries_by_org("sigmaref")
         assert refs[0]["embed_status"] == "discovery"
 
     def test_local_collection(self, db: DatabaseService) -> None:
@@ -926,6 +992,7 @@ class TestResetEmbedStatus:
                 "repo": "local",
                 "original_url": "http://l",
                 "embed_status": "embedded",
+                "file_name": "l.md",
             }
         )
         db.reset_embed_status_for_collection("local")
@@ -933,13 +1000,14 @@ class TestResetEmbedStatus:
         assert refs[0]["embed_status"] == "discovery"
 
     def test_custom_collection(self, db: DatabaseService) -> None:
-        db.upsert_doc_sigma_ref(
+        db.upsert_doc_registry(
             {
                 "url_hash": "c1",
                 "org": "myorg",
                 "repo": "myrepo",
                 "original_url": "http://c",
                 "embed_status": "embedded",
+                "file_name": "c.md",
             }
         )
         db.upsert_doc_registry(
@@ -949,13 +1017,12 @@ class TestResetEmbedStatus:
                 "repo": "myrepo",
                 "original_url": "http://c2",
                 "embed_status": "embedded",
+                "file_name": "c2.md",
             }
         )
         db.reset_embed_status_for_collection("myorg/myrepo")
-        refs_sigma = db.get_doc_sigma_ref()
-        refs_reg = db.get_doc_registry()
-        assert refs_sigma[0]["embed_status"] == "discovery"
-        assert refs_reg[0]["embed_status"] == "discovery"
+        refs_all = db.get_entries_by_org("myorg")
+        assert all(r["embed_status"] == "discovery" for r in refs_all)
 
 
 class TestResyncLocalFileSizesEdgeCases:

@@ -32,15 +32,14 @@ def _initdb_sql() -> str:
     return sql_path.read_text(encoding="utf-8")
 
 
-# Tables the application expects (subset from _VALID_TABLES + main.py check)
+# Tables the application expects (subset from _VALID_TABLES)
 EXPECTED_TABLES: set[str] = {
     "config",
     "embedding_config",
     "system_prompts",
     "models",
-    "doc_sigma_ref",
     "doc_registry",
-    "doc_sigma_ref_error",
+    "doc_error",
     "git_metadata",
     "git_selected_dirs",
     "worker_state",
@@ -118,18 +117,17 @@ def fix_stale_workers(conn: duckdb.DuckDBPyConnection) -> int:
 
 def fix_stuck_embeddings(conn: duckdb.DuckDBPyConnection) -> int:
     total = 0
-    for table in ("doc_sigma_ref", "doc_registry"):
-        affected = conn.execute(
-            f"""UPDATE {table}
-                SET embed_status = 'discovery'
-                WHERE embed_status = 'embedding'
-            """
-        ).fetchone()
-        count = affected[0] if affected else 0
-        if count:
-            conn.commit()
-            print(f"  Reset {count} stuck 'embedding' entries to 'discovery' in {table}.")
-        total += count
+    affected = conn.execute(
+        """UPDATE doc_registry
+            SET embed_status = 'discovery'
+            WHERE embed_status = 'embedding'
+        """
+    ).fetchone()
+    count = affected[0] if affected else 0
+    if count:
+        conn.commit()
+        print(f"  Reset {count} stuck 'embedding' entries to 'discovery' in doc_registry.")
+    total += count
     if not total:
         print("  No stuck embeddings found.")
     return total
@@ -137,11 +135,11 @@ def fix_stuck_embeddings(conn: duckdb.DuckDBPyConnection) -> int:
 
 def fix_orphaned_error_entries(conn: duckdb.DuckDBPyConnection) -> int:
     affected = conn.execute(
-        """DELETE FROM doc_sigma_ref_error
+        """DELETE FROM doc_error
            WHERE url_hash IN (
                SELECT e.url_hash
-               FROM doc_sigma_ref_error e
-               LEFT JOIN doc_sigma_ref r ON e.url_hash = r.url_hash
+               FROM doc_error e
+               LEFT JOIN doc_registry r ON e.url_hash = r.url_hash
                WHERE r.url_hash IS NOT NULL
                  AND r.embed_status = 'discovery'
            )
@@ -157,36 +155,35 @@ def fix_orphaned_error_entries(conn: duckdb.DuckDBPyConnection) -> int:
 def resync_local_file_sizes(conn: duckdb.DuckDBPyConnection) -> int:
     base_path = Path("data/github")
     updated = 0
-    for table in ("doc_registry", "doc_sigma_ref"):
-        rows = conn.execute(
-            f"""SELECT url_hash, file_name, original_url
-                FROM {table}
-                WHERE org = 'local' AND repo = 'local'
-                  AND (file_size IS NULL OR file_size = 0)
-            """
-        ).fetchall()
-        for url_hash, file_name, original_url in rows:
-            if not file_name:
+    rows = conn.execute(
+        """SELECT url_hash, file_name, original_url
+            FROM doc_registry
+            WHERE org = 'local' AND repo = 'local'
+              AND (file_size IS NULL OR file_size = 0)
+        """
+    ).fetchall()
+    for url_hash, file_name, original_url in rows:
+        if not file_name:
+            continue
+        fpath: Path = (
+            Path(original_url) if original_url.startswith("file://") else base_path / file_name
+        )
+        if not fpath.exists():
+            local = base_path / file_name
+            if local.exists():
+                fpath = local
+            else:
                 continue
-            fpath: Path = (
-                Path(original_url) if original_url.startswith("file://") else base_path / file_name
+        try:
+            fsize = fpath.stat().st_size
+            sha = hashlib.sha256(fpath.read_bytes()).hexdigest()
+            conn.execute(
+                "UPDATE doc_registry SET file_size = ?, content_sha256 = ? WHERE url_hash = ?",
+                [fsize, sha, url_hash],
             )
-            if not fpath.exists():
-                local = base_path / file_name
-                if local.exists():
-                    fpath = local
-                else:
-                    continue
-            try:
-                fsize = fpath.stat().st_size
-                sha = hashlib.sha256(fpath.read_bytes()).hexdigest()
-                conn.execute(
-                    f"UPDATE {table} SET file_size = ?, content_sha256 = ? WHERE url_hash = ?",
-                    [fsize, sha, url_hash],
-                )
-                updated += 1
-            except Exception:
-                continue
+            updated += 1
+        except Exception:
+            continue
     if updated:
         conn.commit()
         print(f"  Resynced {updated} local file(s).")
@@ -203,15 +200,14 @@ def _iso_now() -> str:
 
 def fix_missing_last_seen(conn: duckdb.DuckDBPyConnection) -> int:
     updated = 0
-    for table in ("doc_sigma_ref", "doc_registry"):
-        count = conn.execute(f"SELECT COUNT(*) FROM {table} WHERE last_seen IS NULL").fetchone()
-        n = count[0] if count else 0
-        if n:
-            now = _iso_now()
-            conn.execute(f"UPDATE {table} SET last_seen = ? WHERE last_seen IS NULL", [now])
-            conn.commit()
-            print(f"  Set last_seen on {n} row(s) in {table}.")
-            updated += n
+    count = conn.execute("SELECT COUNT(*) FROM doc_registry WHERE last_seen IS NULL").fetchone()
+    n = count[0] if count else 0
+    if n:
+        now = _iso_now()
+        conn.execute("UPDATE doc_registry SET last_seen = ? WHERE last_seen IS NULL", [now])
+        conn.commit()
+        print(f"  Set last_seen on {n} row(s) in doc_registry.")
+        updated += n
     if not updated:
         print("  No missing last_seen values.")
     return updated
@@ -223,7 +219,7 @@ def _find_sigma_ref_dirs() -> list[Path]:
 
 
 def reconcile_sigma_ref_files(conn: duckdb.DuckDBPyConnection) -> dict[str, list[str]]:
-    """Cross-check sigma ref doc files on disk against the doc_sigma_ref table.
+    """Cross-check sigma ref doc files on disk against the doc_registry table (org='sigmaref').
 
     Returns dict with 'disk_not_db' (files on disk not in DB) and 'db_not_disk' (DB entries missing files).
     """
@@ -236,7 +232,7 @@ def reconcile_sigma_ref_files(conn: duckdb.DuckDBPyConnection) -> dict[str, list
         return {"db_not_disk": db_not_disk, "disk_not_db": disk_not_db}
 
     db_hashes: set[str] = set()
-    for row in conn.execute("SELECT url_hash FROM doc_sigma_ref").fetchall():
+    for row in conn.execute("SELECT url_hash FROM doc_registry WHERE org = 'sigmaref'").fetchall():
         db_hashes.add(row[0])
 
     disk_hashes: set[str] = set()
@@ -266,9 +262,9 @@ def reconcile_sigma_ref_files(conn: duckdb.DuckDBPyConnection) -> dict[str, list
         db_not_disk.append(h)
 
     if disk_not_db:
-        print(f"  Files on disk NOT in doc_sigma_ref: {len(disk_not_db)}")
+        print(f"  Sigma ref files on disk NOT in doc_registry: {len(disk_not_db)}")
     if db_not_disk:
-        print(f"  DB entries in doc_sigma_ref with missing files: {len(db_not_disk)}")
+        print(f"  doc_registry sigma ref entries with missing files: {len(db_not_disk)}")
     if not disk_not_db and not db_not_disk:
         print("  Sigma ref files are in sync with DB.")
     return {"db_not_disk": db_not_disk, "disk_not_db": disk_not_db}
@@ -365,12 +361,17 @@ def cleanup_temp_files(db_path: Path) -> int:
     return removed
 
 
-def register_orphan_sigma_ref_files(conn: duckdb.DuckDBPyConnection) -> int:
-    """Register orphan sigma ref doc files (on disk but not in doc_sigma_ref) into the DB."""
+def register_orphan_sigmaref_files(conn: duckdb.DuckDBPyConnection) -> int:
+    """Register orphan sigma ref doc files (on disk but not in doc_registry) into the DB."""
     ref_dirs = _find_sigma_ref_dirs()
     if not ref_dirs:
         return 0
-    db_hashes = {row[0] for row in conn.execute("SELECT url_hash FROM doc_sigma_ref").fetchall()}
+    db_hashes = {
+        row[0]
+        for row in conn.execute(
+            "SELECT url_hash FROM doc_registry WHERE org = 'sigmaref'"
+        ).fetchall()
+    }
     now = _iso_now()
     rows = []
     for ref_dir in ref_dirs:
@@ -419,7 +420,7 @@ def register_orphan_sigma_ref_files(conn: duckdb.DuckDBPyConnection) -> int:
         print("  No orphan files to register.")
         return 0
     conn.executemany(
-        """INSERT INTO doc_sigma_ref (
+        """INSERT INTO doc_registry (
             url_hash, org, repo, content_type, file_name, content_sha256, file_size,
             original_url, normalized_url, rule_id, title, timestamp, last_seen, embed_status
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
@@ -444,7 +445,7 @@ def register_orphan_sigma_ref_files(conn: duckdb.DuckDBPyConnection) -> int:
         ],
     )
     conn.commit()
-    print(f"  Registered {len(rows)} orphan file(s) in doc_sigma_ref.")
+    print(f"  Registered {len(rows)} orphan file(s) in doc_registry.")
     return len(rows)
 
 
@@ -523,7 +524,7 @@ def main() -> int:
 
     if args.register:
         print("\n--- Register orphan files ---")
-        register_orphan_sigma_ref_files(conn)
+        register_orphan_sigmaref_files(conn)
 
     conn.close()
 

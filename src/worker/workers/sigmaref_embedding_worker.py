@@ -9,13 +9,13 @@ logger = logging.getLogger(__name__)
 
 
 class SigmaRefEmbeddingWorker(EmbeddingWorker):
-    """Embeds Sigma Reference documents from doc_sigma_ref into Qdrant."""
+    """Embeds Sigma Reference documents from doc_registry (org='sigmaref') into Qdrant."""
 
     worker_type = WorkerName.SIGMAREF_EMBEDDINGS
     collection_name = "sigma_docs"
 
     def _get_entries(self, task: dict) -> list[dict]:
-        raw_entries = self.db.get_pending_sigma_ref()
+        raw_entries = self.db.get_pending_entries(org="sigmaref")
         if not raw_entries:
             return []
 
@@ -63,4 +63,4 @@ class SigmaRefEmbeddingWorker(EmbeddingWorker):
         return metadata
 
     def _update_status(self, entry: dict, status: str) -> None:
-        self.db.update_sigma_ref_embed_status(entry.get("hash", ""), status)
+        self.db.update_doc_registry_embed_status(entry.get("hash", ""), status)

@@ -22,7 +22,7 @@ def _make_worker(cls, mock_db: MagicMock) -> tuple:
 
 class TestSigmaRefEmbeddingWorker:
     def test_process_completes_if_no_entries(self, mock_db: MagicMock) -> None:
-        mock_db.get_pending_sigma_ref.return_value = []
+        mock_db.get_pending_entries.return_value = []
 
         task = {
             "task_id": "sr-emb-001",
@@ -34,7 +34,7 @@ class TestSigmaRefEmbeddingWorker:
         worker, mock_dispatcher = _make_worker(SigmaRefEmbeddingWorker, mock_db)
         worker.process(task)
 
-        mock_db.get_pending_sigma_ref.assert_called()
+        mock_db.get_pending_entries.assert_called()
         mock_dispatcher.update_worker_state.assert_not_called()
 
     def test_process_embeds_entries(self, mock_db: MagicMock, tmp_path: Path) -> None:
@@ -42,14 +42,16 @@ class TestSigmaRefEmbeddingWorker:
         registry_dir.mkdir()
         (registry_dir / "abc123.md").write_text("# Test Doc")
 
-        mock_db.get_pending_sigma_ref.return_value = [
+        mock_db.get_pending_entries.return_value = [
             {
                 "url_hash": "abc123",
+                "org": "sigmaref",
+                "repo": "sigmaref",
                 "original_url": "https://example.com/doc1",
                 "content_type": "markdown",
                 "rule_id": "rule-001",
                 "title": "Test Doc",
-                "embed_status": "discovered",
+                "embed_status": "discovery",
             }
         ]
 
@@ -71,21 +73,23 @@ class TestSigmaRefEmbeddingWorker:
             worker.process(task)
 
         mock_builder.run.assert_called_once()
-        mock_db.update_sigma_ref_embed_status.assert_called_with("abc123", "embedded")
+        mock_db.update_doc_registry_embed_status.assert_called_with("abc123", "embedded")
         mock_dispatcher.update_worker_state.assert_called()
 
     def test_process_skips_missing_files(self, mock_db: MagicMock, tmp_path: Path) -> None:
         registry_dir = tmp_path / "sigmaref"
         registry_dir.mkdir()
 
-        mock_db.get_pending_sigma_ref.return_value = [
+        mock_db.get_pending_entries.return_value = [
             {
                 "url_hash": "missing123",
+                "org": "sigmaref",
+                "repo": "sigmaref",
                 "original_url": "https://example.com/missing",
                 "content_type": "markdown",
                 "rule_id": "rule-002",
                 "title": "Missing Doc",
-                "embed_status": "discovered",
+                "embed_status": "discovery",
             }
         ]
 
@@ -106,19 +110,21 @@ class TestSigmaRefEmbeddingWorker:
             worker, mock_dispatcher = _make_worker(SigmaRefEmbeddingWorker, mock_db)
             worker.process(task)
 
-        mock_db.update_sigma_ref_embed_status.assert_called_with("missing123", "error")
+        mock_db.update_doc_registry_embed_status.assert_called_with("missing123", "error")
 
     def test_process_reports_running_status(self, mock_db: MagicMock, tmp_path: Path) -> None:
         registry_dir = tmp_path / "sigmaref"
         registry_dir.mkdir()
         (registry_dir / "abc123.md").write_text("# Test")
 
-        mock_db.get_pending_sigma_ref.return_value = [
+        mock_db.get_pending_entries.return_value = [
             {
                 "url_hash": "abc123",
+                "org": "sigmaref",
+                "repo": "sigmaref",
                 "original_url": "https://example.com/doc",
                 "content_type": "markdown",
-                "embed_status": "discovered",
+                "embed_status": "discovery",
             }
         ]
 

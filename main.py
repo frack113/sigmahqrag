@@ -40,7 +40,7 @@ def _ensure_duckdb_tables() -> None:
             "embedding_config",
             "system_prompts",
             "models",
-            "doc_sigma_ref",
+            "doc_registry",
             "worker_state",
             "git_metadata",
             "git_selected_dirs",

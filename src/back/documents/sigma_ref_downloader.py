@@ -240,11 +240,11 @@ def _get_retry_after(response: httpx.Response) -> int | None:
 
 
 def _load_registry(path: Path, db: DatabaseService) -> dict[str, Any]:
-    """Load the registry from DuckDB.
+    """Load the registry from doc_registry for sigmaref org.
 
     Returns an empty dict if DB not available.
     """
-    entries = db.get_doc_sigma_ref(limit=0)
+    entries = db.get_entries_by_org("sigmaref", limit=0)
     registry = {}
     for entry in entries:
         url_hash = entry["url_hash"]
@@ -264,7 +264,7 @@ def _load_registry(path: Path, db: DatabaseService) -> dict[str, Any]:
 
 
 def _save_registry(registry: dict[str, Any], path: Path, db: DatabaseService) -> None:
-    """Save the registry to DuckDB atomically in a single batch."""
+    """Save the registry to doc_registry atomically in a single batch."""
     rows = []
     now = iso_now()
     for url_hash, entry in registry.items():
@@ -287,13 +287,13 @@ def _save_registry(registry: dict[str, Any], path: Path, db: DatabaseService) ->
                     "last_seen": entry.get("last_seen", now),
                 }
             )
-    db.batch_upsert_doc_sigma_ref(rows)
+    db.batch_upsert_doc_registry(rows)
 
 
 def _load_error_registry(db: DatabaseService) -> set[str]:
     """Load the set of url_hash values that have previously failed (30x/40x)."""
     try:
-        entries = db.get_doc_sigma_ref_error()
+        entries = db.get_doc_errors()
         return {e["url_hash"] for e in entries}
     except Exception:
         logger.warning("Failed to load error registry from DuckDB — proceeding without it")
@@ -309,12 +309,12 @@ def _maybe_record_error(
     rule_id: str,
     rule_title: str,
 ) -> None:
-    """Record a 30x/40x download error in doc_sigma_ref_error so it is skipped on retry."""
+    """Record a 30x/40x download error in doc_error so it is skipped on retry."""
     if status_code is None:
         return
     if 300 <= status_code < 500 or (status_code >= 500 and status_code not in RETRY_STATUSES):
         try:
-            db.upsert_doc_sigma_ref_error(
+            db.upsert_doc_error(
                 {
                     "url_hash": url_hash,
                     "original_url": original_url,
