@@ -17,3 +17,4 @@ class WorkerName(Enum):
     LOCAL_EMBEDDINGS = "local_embeddings"
     MODEL_SYNC = "model_sync"
     LOCAL_REPO_SYNC = "local_repo_sync"
+    DOC_GC = "doc_gc"

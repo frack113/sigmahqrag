@@ -181,11 +181,17 @@ class SearchEngine:
             )
             for col in self.collection_names
         ]
-        all_results = await asyncio.gather(*tasks)
+        all_results = await asyncio.gather(*tasks, return_exceptions=True)
 
         rrf_scores: dict[int, dict[str, Any]] = {}
         for col_results in all_results:
-            for rank, result in enumerate(col_results, start=1):
+            if isinstance(col_results, Exception):
+                logger.warning(
+                    "Collection search failed during RRF fusion, skipping: %s", col_results
+                )
+                continue
+            # mypy narrowing: after isinstance(Exception) check, col_results is list[dict[str, Any]]
+            for rank, result in enumerate(col_results, start=1):  # type: ignore[arg-type]
                 rrf_score = 1.0 / (60 + rank)
                 result_id = id(result)
                 if result_id not in rrf_scores:

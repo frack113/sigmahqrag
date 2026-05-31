@@ -320,6 +320,25 @@ class DatabaseServiceDocOps:
             col_names = [desc[0] for desc in self._writer_conn.description]
         return [dict(zip(col_names, row)) for row in results]
 
+    def get_pending_registry_all(self) -> list[dict]:
+        """Return all pending entries from doc_registry (used by GithubEmbeddingWorker for 'all' collection)."""
+        with self._lock:
+            results = self._writer_conn.execute(
+                "SELECT url_hash, org, repo, content_type, file_name, content_sha256, file_size, "
+                "original_url, normalized_url, rule_id, title, timestamp, last_seen, embed_status "
+                "FROM doc_registry WHERE embed_status = 'discovery' ORDER BY url_hash"
+            ).fetchall()
+            col_names = [desc[0] for desc in self._writer_conn.description]
+        return [dict(zip(col_names, row)) for row in results]
+
+    def reset_github_all(self) -> None:
+        """Reset embed_status to 'discovery' for all GitHub entries in doc_registry."""
+        with self._lock:
+            self._writer_conn.execute(
+                "UPDATE doc_registry SET embed_status = 'discovery' WHERE org NOT IN ('local', 'sigmaref')"
+            )
+            self._writer_conn.commit()
+
     def update_doc_registry_embed_status(self, url_hash: str, status: str) -> None:
         with self._lock:
             self._writer_conn.execute(
@@ -333,6 +352,10 @@ class DatabaseServiceDocOps:
             if collection_name == "sigmaref":
                 self._writer_conn.execute(
                     "UPDATE doc_sigma_ref SET embed_status = 'discovery' WHERE org = 'sigmaref'"
+                )
+            elif collection_name == "github":
+                self._writer_conn.execute(
+                    "UPDATE doc_registry SET embed_status = 'discovery' WHERE org NOT IN ('local', 'sigmaref')"
                 )
             elif collection_name == "local":
                 self._writer_conn.execute(

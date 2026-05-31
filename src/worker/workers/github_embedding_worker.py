@@ -19,7 +19,7 @@ class GithubEmbeddingWorker(EmbeddingWorker):
             raise ValueError("collection_name is required for github embeddings")
 
         if collection_name == "all":
-            all_pending = self.db.get_pending_sigma_ref()
+            all_pending = self.db.get_pending_registry_all()
             return [
                 e for e in all_pending if e.get("org") and e.get("org") not in ("local", "sigmaref")
             ]
@@ -33,7 +33,7 @@ class GithubEmbeddingWorker(EmbeddingWorker):
         if not base_path.exists():
             raise FileNotFoundError(f"Repository path does not exist: {base_path}")
 
-        return self.db.get_pending_sigma_ref(org, repo)
+        return self.db.get_pending_doc_registry(org, repo)
 
     def _resolve_file_path(self, entry: dict) -> Path | None:
         org = entry.get("org") or ""
@@ -56,4 +56,4 @@ class GithubEmbeddingWorker(EmbeddingWorker):
         }
 
     def _update_status(self, entry: dict, status: str) -> None:
-        self.db.update_sigma_ref_embed_status(entry.get("url_hash", ""), status)
+        self.db.update_doc_registry_embed_status(entry.get("url_hash", ""), status)

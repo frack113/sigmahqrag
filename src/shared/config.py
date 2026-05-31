@@ -53,7 +53,7 @@ class Config:
     paths_github_dir: str = "data/github"
     paths_rag_cache_dir: str = "data/rag_cache"
     paths_model_registry: str = "data/models/registry.json"
-    paths_sigma_ref_docs_dir: str = "data/sigma_ref_docs"
+    paths_sigma_ref_docs_dir: str = "data/documents/sigmaref"
     paths_sigma_spec_dir: str = "data/sigma-specification"
 
     local_documents_path: str = "data/documents/local"
