@@ -7,7 +7,7 @@ from typing import Any
 
 from llama_index.core.schema import TextNode
 
-from src.back.documents.models import SigmaRule
+from src.shared.schemas.sigma_rule import SigmaRule
 from src.back.qdrant import QdrantService
 from src.shared import get_config
 

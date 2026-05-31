@@ -36,9 +36,9 @@ async def test_admin_health_route(app: Any):
 
 @pytest.mark.asyncio
 async def test_admin_logs_route(app: Any):
-    """Test that /admin/logs returns the logs view."""
+    """Test that /admin/logs redirects to /logs."""
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
-        response = await ac.get("/admin/logs")
-        assert response.status_code == 200
-        assert "Logs" in response.text
+        response = await ac.get("/admin/logs", follow_redirects=False)
+        assert response.status_code in (307, 302)
+        assert response.headers.get("location") == "/logs"

@@ -9,7 +9,7 @@ from typing import Any
 
 import yaml
 
-from src.back.documents.models import SigmaRule
+from src.shared.schemas.sigma_rule import SigmaRule
 
 logger = logging.getLogger(__name__)
 

@@ -8,13 +8,13 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from src.api.v1 import admin
+from src.api.v1.admin_models import router as admin_router
 
 
 @pytest.fixture
 def app() -> FastAPI:
     test_app = FastAPI()
-    test_app.include_router(admin.router)
+    test_app.include_router(admin_router)
     return test_app
 
 

@@ -23,7 +23,7 @@ def load_sigma_rules(str_path: str) -> list[dict]:
     elif path.is_dir():
         files = list(path.rglob("*.yml")) + list(path.rglob("*.yaml"))
     else:
-        raise ValueError(f"[DEBUG] Wrong path: {path}")
+        raise ValueError(f"Unsupported path type (not a file or directory): {path}")
 
     rules: list[dict] = []
 

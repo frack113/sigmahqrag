@@ -1,6 +1,5 @@
 """RAG pipeline components."""
 
-from src.back.rag.chunker import SigmaChunker, chunk_sigma_rule
 from src.back.rag.embeddings import EmbeddingGenerator, embed_documents
 from src.back.rag.ingestion import IngestionPipelineBuilder, get_pipeline
 from src.back.rag.search import (
@@ -11,8 +10,6 @@ from src.back.rag.search import (
 )
 
 __all__ = [
-    "SigmaChunker",
-    "chunk_sigma_rule",
     "EmbeddingGenerator",
     "embed_documents",
     "IngestionPipelineBuilder",

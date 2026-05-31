@@ -184,3 +184,7 @@ class DatabaseServiceCore:
                 (key, json.dumps(value)),
             )
             self._writer_conn.commit()
+            try:
+                self.persist()
+            except Exception:
+                logger.warning("Auto-persist after set_config failed (non-fatal)")
