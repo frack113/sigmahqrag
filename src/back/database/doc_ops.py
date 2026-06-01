@@ -277,6 +277,10 @@ class DatabaseServiceDocOps:
                 self._writer_conn.execute(
                     "UPDATE doc_registry SET embed_status = 'discovery' WHERE org = 'local'"
                 )
+            elif collection_name == "sigma_spec":
+                self._writer_conn.execute(
+                    "UPDATE doc_registry SET embed_status = 'discovery' WHERE org = 'sigma_spec'"
+                )
             elif "/" in collection_name:
                 parts = collection_name.split("/", 2)
                 if len(parts) == 2:
@@ -285,6 +289,15 @@ class DatabaseServiceDocOps:
                         "UPDATE doc_registry SET embed_status = 'discovery' WHERE org = ? AND repo = ?",
                         (org, repo),
                     )
+            self._writer_conn.commit()
+
+    def mark_spec_stale_entries_skipped(self) -> None:
+        """Mark pending sigma_spec entries as skipped before a rescan,
+        so stale files from previously selected directories are not embedded."""
+        with self._lock:
+            self._writer_conn.execute(
+                "UPDATE doc_registry SET embed_status = 'skipped' WHERE org = 'sigma_spec' AND embed_status = 'discovery'"
+            )
             self._writer_conn.commit()
 
     def delete_doc_registry_by_repo(self, org: str, repo: str) -> None:

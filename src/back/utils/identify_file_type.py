@@ -33,6 +33,8 @@ class FileType(Enum):
     UNKNOWN = "unknown"
 
 
+SIGMA_RULE_EXTENSIONS: frozenset[str] = frozenset({".yml", ".yaml"})
+
 SUPPORTED_DOC_EXTENSION_MAP: dict[str, FileType] = {
     ".md": FileType.MARKDOWN,
     ".markdown": FileType.MARKDOWN,

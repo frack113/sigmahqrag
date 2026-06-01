@@ -10,14 +10,14 @@ from typing import TYPE_CHECKING, Optional
 from src.back.database.service import DatabaseService
 from src.worker.workers.discovery_base import DiscoveryWorker
 from src.worker.enums import WorkerName
-from src.back.utils.identify_file_type import SUPPORTED_DOC_EXTENSION_MAP
+from src.back.utils.identify_file_type import SIGMA_RULE_EXTENSIONS, SUPPORTED_DOC_EXTENSION_MAP
 
 if TYPE_CHECKING:
     from src.worker.processor import TaskDispatcher
 
 logger = logging.getLogger(__name__)
 
-SUPPORTED_EXTENSIONS = frozenset(SUPPORTED_DOC_EXTENSION_MAP.keys())
+SUPPORTED_EXTENSIONS = frozenset(SUPPORTED_DOC_EXTENSION_MAP.keys()) | SIGMA_RULE_EXTENSIONS
 
 
 class SourceType(str, Enum):

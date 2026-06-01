@@ -81,11 +81,15 @@ async function onDirToggle() {
     const checkboxes = document.querySelectorAll('#dirs-container input[type="checkbox"]');
     const selected = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value);
     try {
-        await fetch('/api/v1/spec/selected-dirs', {
+        const resp = await fetch('/api/v1/spec/selected-dirs', {
             method: 'PUT',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({selected}),
         });
+        const data = await resp.json();
+        if (!data.success) {
+            console.error('Failed to save selection:', data.error);
+        }
     } catch (error) {
         console.error('Failed to save selection:', error);
     }

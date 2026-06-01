@@ -88,5 +88,10 @@ if __name__ == "__main__":
     log_config["handlers"]["access"]["filters"] = ["filter2xx"]
 
     uvicorn.run(
-        "src.main:create_app", host="0.0.0.0", port=7860, factory=True, log_config=log_config
+        "src.main:create_app",
+        host="0.0.0.0",
+        port=7860,
+        factory=True,
+        log_config=log_config,
+        timeout_graceful_shutdown=5,
     )

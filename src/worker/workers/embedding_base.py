@@ -124,6 +124,17 @@ class EmbeddingWorker(BaseWorker):
             content_type = metadata.get("content_type", "")
             source = metadata.get("source", "")
 
+            if content_type == FileType.YAML.value:
+                logger.debug(f"[{self.__class__.__name__}] Skipping generic YAML: {file_path}")
+                skipped.append(current_file)
+                self._update_status(entry, "skipped")
+                self.dispatcher.update_worker_state(
+                    worker_type=self.worker_type,
+                    progress_percent=round(((idx + 1) / total) * 10, 2),
+                    current_file=current_file,
+                )
+                continue
+
             _binary_types = {FileType.PDF.value, FileType.OFFICE_DOCUMENT.value}
             if content_type in _binary_types:
                 ext = file_path.suffix.lower()

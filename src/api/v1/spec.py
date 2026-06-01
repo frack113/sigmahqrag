@@ -28,7 +28,7 @@ class SpecResponse(BaseModel):
 
 
 _SELECTED_DIRS_KEY = "sigma_spec_selected_dirs"
-_SUPPORTED_EXTS = frozenset({".md", ".yaml", ".yml", ".json", ".txt"})
+_SUPPORTED_EXTS = frozenset({".md"})
 
 
 def _spec_dir() -> Path:
@@ -51,16 +51,22 @@ def _set_selected(dirs: list[str]) -> None:
 def _walk_selected(spec_dir: Path) -> list[Path]:
     """Walk files only from selected directories. Returns empty if none selected."""
     selected = _get_selected()
+    logger.debug("_walk_selected: selected=%s", selected)
     if not selected:
+        logger.debug("_walk_selected: no selection, returning empty")
         return []
 
     files: list[Path] = []
     for entry in spec_dir.iterdir():
         if entry.is_dir() and entry.name in selected:
+            logger.debug("_walk_selected: walking dir %s", entry.name)
             for f in entry.rglob("*"):
                 if f.is_file() and f.suffix.lower() in _SUPPORTED_EXTS:
                     files.append(f)
+        else:
+            logger.debug("_walk_selected: skipping dir %s (not in %s)", entry.name, selected)
 
+    logger.debug("_walk_selected: found %d files", len(files))
     return sorted(set(files))
 
 
@@ -127,6 +133,12 @@ async def scan_spec_files() -> SpecResponse:
         return SpecResponse(success=False, error=f"Spec directory not found: {spec_dir}")
 
     db = DatabaseService.get_instance()
+
+    # Mark stale pending entries as skipped so they are not picked up
+    # by embed after the user changes directory selection.
+    db.mark_spec_stale_entries_skipped()
+    logger.info("Marked stale sigma_spec entries as skipped")
+
     entries: list[dict[str, Any]] = []
 
     for f in _walk_selected(spec_dir):
