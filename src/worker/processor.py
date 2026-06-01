@@ -6,7 +6,7 @@ from typing import Dict, Type
 
 from src.back.database.service import DatabaseService
 from src.worker.base import BaseWorker
-from src.worker.workers.generic_discovery_worker import GenericDiscoveryWorker
+from src.worker.workers.generic_discovery_worker import GenericDiscoveryWorker, SourceType
 from src.worker.workers.generic_embedding_worker import GenericEmbeddingWorker
 from src.worker.workers.local_repo_sync_worker import LocalRepoSyncWorker
 from src.worker.workers.model_sync_worker import ModelSyncWorker
@@ -139,7 +139,14 @@ class TaskDispatcher:
 
         self._db = DatabaseService.get_instance()
 
-        self._workers = {name: cls(self._db, self) for name, cls in self._WORKER_TYPES.items()}
+        self._workers = {
+            name: (
+                cls(self._db, self, source_type=SourceType.GITHUB)
+                if name == WorkerName.GITHUB_DISCOVERY and cls is GenericDiscoveryWorker
+                else cls(self._db, self)
+            )
+            for name, cls in self._WORKER_TYPES.items()
+        }
         for name in self._WORKER_TYPES:
             self._worker_states[name] = {
                 "status": WorkerStatus.IDLE,

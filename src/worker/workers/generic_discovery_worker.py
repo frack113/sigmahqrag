@@ -7,12 +7,12 @@ from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
+from src.back.database.service import DatabaseService
 from src.worker.workers.discovery_base import DiscoveryWorker
 from src.worker.enums import WorkerName
 from src.back.utils.identify_file_type import SUPPORTED_DOC_EXTENSION_MAP
 
 if TYPE_CHECKING:
-    from src.back.database.service import DatabaseService
     from src.worker.processor import TaskDispatcher
 
 logger = logging.getLogger(__name__)

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import logging
 from pathlib import Path
 from typing import Any
@@ -46,26 +45,21 @@ def _get_selected() -> list[str]:
 
 def _set_selected(dirs: list[str]) -> None:
     db = DatabaseService.get_instance()
-    db.set_config(_SELECTED_DIRS_KEY, json.dumps(dirs))
+    db.set_config(_SELECTED_DIRS_KEY, dirs)
 
 
 def _walk_selected(spec_dir: Path) -> list[Path]:
-    """Walk files only from selected directories (or all if none selected)."""
+    """Walk files only from selected directories. Returns empty if none selected."""
     selected = _get_selected()
     if not selected:
-        return sorted(
-            f for f in spec_dir.rglob("*") if f.is_file() and f.suffix.lower() in _SUPPORTED_EXTS
-        )
+        return []
 
     files: list[Path] = []
     for entry in spec_dir.iterdir():
-        if entry.is_dir():
-            if entry.name in selected:
-                for f in entry.rglob("*"):
-                    if f.is_file() and f.suffix.lower() in _SUPPORTED_EXTS:
-                        files.append(f)
-        elif entry.is_file() and entry.suffix.lower() in _SUPPORTED_EXTS:
-            files.append(entry)
+        if entry.is_dir() and entry.name in selected:
+            for f in entry.rglob("*"):
+                if f.is_file() and f.suffix.lower() in _SUPPORTED_EXTS:
+                    files.append(f)
 
     return sorted(set(files))
 

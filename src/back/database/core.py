@@ -176,7 +176,9 @@ class DatabaseServiceCore:
                 return result[0]
         return None
 
-    def set_config(self, key: str, value: dict[str, Any] | str | int | bool | None) -> None:
+    def set_config(
+        self, key: str, value: dict[str, Any] | list[Any] | str | int | bool | None
+    ) -> None:
         with self._lock:
             self._writer_conn.execute(
                 "INSERT INTO config (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
