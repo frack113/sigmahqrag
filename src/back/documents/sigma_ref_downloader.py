@@ -11,7 +11,7 @@ import urllib.parse
 from collections.abc import Callable
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import httpx
 import yaml
@@ -421,7 +421,7 @@ def download_references(
     def _is_selected_dir(yml_file: Path) -> bool:
         """Check if the file is within any of the selected directories."""
         if not selected_dirs:
-            return False
+            return True
         try:
             rel_path = yml_file.relative_to(rules_path).with_suffix("")
             rel_str = rel_path.as_posix()
@@ -665,7 +665,9 @@ def download_references(
             future_map = {}
             for item in download_queue:
                 future = executor.submit(
-                    _download_file, item["normalized_url"], item["output_file"]
+                    _download_file,
+                    item["normalized_url"],
+                    item["output_file"],  # type: ignore[arg-type]
                 )
                 future_map[future] = item
 
@@ -673,7 +675,7 @@ def download_references(
                 if progress_callback:
                     progress_callback(idx + 1, queue_size, "downloading")
                 item = future_map[future]
-                success, status_code = future.result()
+                success, status_code = cast(tuple[bool, int | None], future.result())
                 if success:
                     output_file = item["output_file"]
                     content_hash = _sha256_file(output_file) if output_file.exists() else ""

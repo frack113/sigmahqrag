@@ -6,6 +6,11 @@ import hashlib
 import logging
 import os
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    import duckdb
+    import threading
 
 
 logger = logging.getLogger(__name__)
@@ -13,6 +18,12 @@ logger = logging.getLogger(__name__)
 
 class DatabaseServiceDocOps:
     """Document registry operations (doc_registry) and error tracking (doc_error)."""
+
+    # Provided by DatabaseServiceCore mixin
+    _lock: threading.RLock
+    _writer_conn: duckdb.DuckDBPyConnection
+
+    def _safe_query(self, query: str, params: tuple = ()) -> Any: ...
 
     # ------------------------------------------------------------------
     # DOC_REGISTRY table (unified document registry)
@@ -233,15 +244,8 @@ class DatabaseServiceDocOps:
         return [dict(zip(col_names, row)) for row in results]
 
     def get_pending_registry_all(self) -> list[dict]:
-        """Return all pending entries from doc_registry (used by GithubEmbeddingWorker for 'all' collection)."""
-        with self._lock:
-            results = self._writer_conn.execute(
-                "SELECT url_hash, org, repo, content_type, file_name, content_sha256, file_size, "
-                "original_url, normalized_url, rule_id, title, timestamp, last_seen, embed_status "
-                "FROM doc_registry WHERE embed_status = 'discovery' ORDER BY url_hash"
-            ).fetchall()
-            col_names = [desc[0] for desc in self._writer_conn.description]
-        return [dict(zip(col_names, row)) for row in results]
+        """Return all pending entries from doc_registry."""
+        return self.get_pending_entries()
 
     def reset_github_all(self) -> None:
         """Reset embed_status to 'discovery' for all GitHub entries in doc_registry."""
@@ -267,7 +271,7 @@ class DatabaseServiceDocOps:
                 )
             elif collection_name == "github":
                 self._writer_conn.execute(
-                    "UPDATE doc_registry SET embed_status = 'discovery' WHERE org NOT IN ('local', 'sigmaref')"
+                    "UPDATE doc_registry SET embed_status = 'discovery' WHERE org NOT IN ('local', 'sigmaref', 'sigma_spec')"
                 )
             elif collection_name == "local":
                 self._writer_conn.execute(
@@ -313,7 +317,7 @@ class DatabaseServiceDocOps:
             result = self._writer_conn.execute(
                 "SELECT COUNT(*) FROM doc_registry WHERE org = 'local' AND repo = 'local'"
             ).fetchone()
-        return result[0]
+        return result[0] if result else 0
 
     def resync_local_file_sizes(self, base_path: str) -> dict[str, int]:
         updated = 0
@@ -346,7 +350,7 @@ class DatabaseServiceDocOps:
                 logger.warning(f"[resync_local_file_sizes] Cannot read {path}: {e}")
                 return None
 
-        snapshot: list[tuple[str, str | None]] = []
+        snapshot: list[tuple[str, str | None, str | None]] = []
         with self._lock:
             results = self._writer_conn.execute(
                 "SELECT url_hash, file_name, content_sha256 FROM doc_registry "

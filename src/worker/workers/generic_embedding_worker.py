@@ -79,18 +79,19 @@ class GenericEmbeddingWorker(EmbeddingWorker):
 
     def _resolve_file_path(self, entry: dict) -> Path | None:
         cfg = get_config()
-        org = entry.get("org", "")
-        file_name = entry.get("file_name", "")
+        org: str = entry.get("org", "") or ""
+        file_name: str = entry.get("file_name", "") or ""
 
         if not file_name:
-            url_hash = entry.get("url_hash", "") or entry.get("hash", "")
+            url_hash: str = entry.get("url_hash", "") or entry.get("hash", "") or ""
             file_name = url_hash
 
-        source_type = entry.get("source", "")
+        source_type: str = entry.get("source", "") or ""
 
         if source_type == "local" or org == "local":
             config_base_path = Path(cfg.local_documents_path).resolve()
-            task_base_path = self._task.get("base_path")
+            task = getattr(self, "_task", {}) or {}
+            task_base_path = task.get("base_path")
             base_path = Path(task_base_path) if task_base_path else config_base_path
             return base_path / file_name
 
@@ -100,7 +101,7 @@ class GenericEmbeddingWorker(EmbeddingWorker):
             if task_registry:
                 registry_path = Path(task_registry)
 
-            file_hash = entry.get("hash", "")
+            file_hash: str = entry.get("hash", "") or ""
             if file_hash:
                 for candidate in (registry_path / file_hash, registry_path / f"{file_hash}.md"):
                     if candidate.exists():
@@ -118,7 +119,7 @@ class GenericEmbeddingWorker(EmbeddingWorker):
 
         # GitHub
         if org:
-            repo = entry.get("repo", "")
+            repo: str = entry.get("repo", "") or ""
             if repo:
                 return Path(cfg.paths_github_dir) / org / repo / file_name
 

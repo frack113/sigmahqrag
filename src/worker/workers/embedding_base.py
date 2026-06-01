@@ -209,7 +209,7 @@ class EmbeddingWorker(BaseWorker):
                     for node in parsed_nodes:
                         enriched_metadata = {**metadata, **node.metadata}
                         valid_docs.append(
-                            (Document(text=node.text, metadata=enriched_metadata), entry)
+                            (Document(text=node.get_content(), metadata=enriched_metadata), entry)
                         )
             else:
                 valid_docs.append((Document(text=doc_text, metadata=metadata), entry))
@@ -235,21 +235,21 @@ class EmbeddingWorker(BaseWorker):
             for i in range(0, len(entry_groups), batch_size):
                 batch = entry_groups[i : i + batch_size]
                 batch_docs = []
-                for e, docs in batch:
+                for ent, docs in batch:
                     batch_docs.extend(docs)
 
                 try:
                     builder.run(documents=batch_docs)
-                    for e, _ in batch:
-                        self._update_status(e, "embedded")
-                except Exception as e:
-                    logger.error(f"[{self.__class__.__name__}] Error embedding batch: {e}")
+                    for ent, _ in batch:
+                        self._update_status(ent, "embedded")
+                except Exception as exc:
+                    logger.error(f"[{self.__class__.__name__}] Error embedding batch: {exc}")
                     for entry_obj, _ in batch:
                         self._update_status(entry_obj, "error")
                         errors.append(
                             {
                                 "file": entry_obj.get("file_name", "") or entry_obj.get("hash", ""),
-                                "error": str(e),
+                                "error": str(exc),
                             }
                         )
 

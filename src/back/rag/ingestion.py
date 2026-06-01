@@ -61,7 +61,7 @@ SOURCE_CHUNK_CONFIG: dict[str, dict[str, Any]] = {
 }
 
 
-def _get_chunker_for_collection(collection_name: str) -> tuple[Any, dict[str, Any]]:
+def _get_chunker_for_collection(collection_name: str) -> tuple[Any, Any]:
     """Return (markdown_parser, sentence_splitter) for the given collection."""
     source = ""
     if collection_name:

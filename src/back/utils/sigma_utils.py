@@ -42,7 +42,7 @@ def get_sigma_rule_id(file_path: Path) -> Optional[str]:
         data = yaml.safe_load(file_path.read_text(encoding="utf-8"))
         if not isinstance(data, dict):
             return None
-        rule_id = data.get("id")
+        rule_id: str | None = data.get("id")
         if rule_id and isinstance(rule_id, str):
             return rule_id
     except Exception:

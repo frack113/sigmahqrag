@@ -33,7 +33,7 @@ def _build_download_entry(
     """Build a doc_registry entry for a downloaded reference document."""
     now = iso_now()
     return {
-        "url_hash": normalized_url,
+        "url_hash": _sha256_bytes(normalized_url.encode()),
         "org": "sigmaref",
         "repo": "references",
         "content_type": content_type,
@@ -130,14 +130,11 @@ def process_sigma_refs(
 
             # Check if already in registry
             norm_url = _normalize_url(ref_url_clean)
-            try:
-                existing = db.get_doc_registry(norm_url)
-                if existing:
-                    logger.debug("Reference already registered: %s", ref_url_clean)
-                    skipped += 1
-                    continue
-            except Exception:
-                pass
+            url_hash = _sha256_bytes(norm_url.encode())
+            if db.entry_exists(url_hash):
+                logger.debug("Reference already registered: %s", ref_url_clean)
+                skipped += 1
+                continue
 
             download_queue.append(
                 {
@@ -189,32 +186,26 @@ def process_sigma_refs(
         )
 
     # Phase 2: Parallel downloads
-    def _download_one(item: dict[str, Any]) -> tuple[str, int] | None:
+    def _download_one(item: dict[str, Any]) -> tuple[str, str, int] | None:
         url = item["final_url"]
         output_path = Path(output_dir)
         file_path = output_path / _sanitize_filename(url)
 
-        if file_path.exists():
-            try:
-                existing = db.get_doc_registry(url)
-                if existing:
-                    return None
-            except Exception:
-                pass
+        if file_path.exists() and db.entry_exists(_sha256_bytes(url.encode())):
+            return None
 
         try:
-            with (
-                httpx.Timeout(30.0),
-                httpx.Client(headers={"User-Agent": "SigmaRAG/1.0"}) as client,
-            ):
+            with httpx.Client(
+                timeout=httpx.Timeout(30.0), headers={"User-Agent": "SigmaRAG/1.0"}
+            ) as client:
                 resp = client.get(url)
                 resp.raise_for_status()
                 content = resp.content
             file_path.write_bytes(content)
-            return ("ok", len(content))
+            return ("ok", _sha256_bytes(content), len(content))
         except Exception as e:
             logger.error("Download failed: %s - %s", url, e)
-            return ("fail", 0)
+            return ("fail", "", 0)
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures: dict[Future, dict[str, Any]] = {
@@ -232,8 +223,8 @@ def process_sigma_refs(
                         content_type=item["content_type"],
                         rule_id=item["rule_id"],
                         title=item["rule_title"],
-                        content_sha256=result[1] if result else "0",
-                        file_size=result[1] if result else None,
+                        content_sha256=result[1] if result else "",
+                        file_size=result[2] if result else None,
                     )
                     db.batch_upsert_doc_registry([entry])
                     downloaded += 1
@@ -274,7 +265,9 @@ def _normalize_url(url: str) -> str:
 def _head_request(url: str, delay: float = 0.0) -> tuple[str | None, int | None, str | None]:
     """HEAD request to resolve content type and size."""
     try:
-        with httpx.Timeout(15.0), httpx.Client(headers={"User-Agent": "SigmaRAG/1.0"}) as client:
+        with httpx.Client(
+            timeout=httpx.Timeout(15.0), headers={"User-Agent": "SigmaRAG/1.0"}
+        ) as client:
             resp = client.head(url, follow_redirects=True)
             resp.raise_for_status()
             ctype = resp.headers.get("content-type", "").split(";")[0].strip()

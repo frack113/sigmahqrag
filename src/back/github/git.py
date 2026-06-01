@@ -451,6 +451,6 @@ def is_repo_outdated(org: str, name: str, repos_dir: Path | None = None) -> bool
         if remote_ref not in repo.refs:
             return True
         remote_commit = repo.refs[remote_ref].commit.hexsha
-        return local_commit != remote_commit  # type: ignore[no-any-return]
+        return local_commit != remote_commit
     except Exception:
         return False

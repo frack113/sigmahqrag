@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, Type
+from typing import TYPE_CHECKING, Iterator, Type
 
 from .base import DocumentTransform
 
@@ -90,7 +90,7 @@ class TransformRegistry:
         return None
 
     @classmethod
-    def _iter(cls):
+    def _iter(cls) -> Iterator[tuple[str, Type[DocumentTransform]]]:
         """Iterate over all registered (format_name, transform_class) pairs."""
         yield from _register.items()
 

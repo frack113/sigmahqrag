@@ -52,7 +52,7 @@ class GenericDiscoveryWorker(DiscoveryWorker):
         github_base_dir: Optional[Path] = None,
         selected_dirs: Optional[list[str]] = None,
     ) -> None:
-        super().__init__(db, dispatcher)
+        super().__init__(db or DatabaseService.get_instance(), dispatcher)
         self.source_type = source_type
         self.base_dir = (base_dir or Path("/tmp")).resolve()
         self.github_base_dir = github_base_dir
@@ -99,7 +99,9 @@ class GenericDiscoveryWorker(DiscoveryWorker):
             scan_dir, files_to_process, org="local", repo=collection_name
         )
 
-        self._write_entries(entries, worker_name, len(files_to_process), processed_count, "local")
+        self._write_entries(
+            entries, worker_name, len(files_to_process), processed_count, skipped_count
+        )
 
     # ------------------------------------------------------------------
     # GitHub source
@@ -159,7 +161,9 @@ class GenericDiscoveryWorker(DiscoveryWorker):
 
         if all_files:
             entries, processed_count, skipped_count = self._scan_all_github(all_files, worker_name)
-            self._write_entries(entries, worker_name, len(all_files), processed_count, "github")
+            self._write_entries(
+                entries, worker_name, len(all_files), processed_count, skipped_count
+            )
 
     # ------------------------------------------------------------------
     # Shared scanning logic

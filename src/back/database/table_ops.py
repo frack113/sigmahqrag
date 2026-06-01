@@ -5,7 +5,11 @@ from __future__ import annotations
 import json
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    import duckdb
+    import threading
 
 from src.shared.utils import iso_now
 
@@ -14,6 +18,12 @@ logger = logging.getLogger(__name__)
 
 class DatabaseServiceTableOps:
     """Table-specific operations (models, system_prompts, git, worker_state, embedding_config)."""
+
+    # Provided by DatabaseServiceCore mixin
+    _lock: threading.RLock
+    _writer_conn: duckdb.DuckDBPyConnection
+
+    def _safe_query(self, query: str, params: tuple = ()) -> Any: ...
 
     # ------------------------------------------------------------------
     # MODELS table

@@ -6,7 +6,7 @@ import json
 import logging
 import threading
 from pathlib import Path
-from typing import Any
+from typing import Any, Self, cast
 
 import duckdb
 
@@ -55,12 +55,12 @@ class DatabaseServiceCore:
         logger.info("DatabaseService initialized in-memory (persist path: %s)", self.db_path)
 
     @classmethod
-    def get_instance(cls) -> DatabaseServiceCore:
+    def get_instance(cls: type[Self]) -> Self:
         if DatabaseServiceCore._instance is None:
             raise RuntimeError(
                 "DatabaseService not initialized. Call main() first or run python main.py"
             )
-        return DatabaseServiceCore._instance
+        return cast(Self, DatabaseServiceCore._instance)
 
     def initialize(self) -> None:
         if self._initialized:
@@ -118,8 +118,8 @@ class DatabaseServiceCore:
     def close(self) -> None:
         if getattr(self, "_writer_conn", None) is not None:
             self._writer_conn.close()
-            self._writer_conn = None
-            self._conn = None
+            self._writer_conn = None  # type: ignore[assignment]
+            self._conn = None  # type: ignore[assignment]
         DatabaseServiceCore._instance = None
         logger.info("DatabaseService closed")
 

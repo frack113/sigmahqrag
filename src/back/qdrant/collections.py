@@ -16,7 +16,7 @@ from .client import get_qdrant_client
 logger = logging.getLogger(__name__)
 
 
-def _get_collections_sync(client) -> list:
+def _get_collections_sync(client) -> Any:
     """Synchronous wrapper for client.get_collections()."""
     return client.get_collections()
 
@@ -28,7 +28,8 @@ def _get_collection_sync(client, collection_name: str):
 
 def _count_sync(client, collection_name: str) -> int:
     """Synchronous wrapper for client.count()."""
-    return client.count(collection_name=collection_name).count
+    result = client.count(collection_name=collection_name)
+    return result.count if result else 0
 
 
 def _create_collection_sync(

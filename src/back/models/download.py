@@ -75,7 +75,6 @@ class HFDownloadService:
         path = snapshot_download(
             repo_id=repo.full_id,
             local_dir=target_dir,
-            local_dir_use_symlinks=False,
             token=self.token,
         )
         return Path(path)
@@ -102,7 +101,7 @@ class HFDownloadService:
 
         api = HfApi(token=self.token)
         try:
-            results = api.search_models(query, sort="downloads", direction=-1)
+            results = api.list_models(search=query, sort="downloads")
             return [HFRepo.from_string(r.id) for r in results]
         except Exception as e:
             raise DownloadError(f"Failed to search models: {e}") from e

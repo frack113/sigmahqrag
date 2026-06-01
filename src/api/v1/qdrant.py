@@ -141,6 +141,7 @@ async def qdrant_action(
 
         elif isinstance(payload, ProgressPayload):
             return JSONResponse(
+                content=None,
                 status_code=307,
                 headers={"Location": f"/api/v1/qdrant/progress/{payload.download_id}"},
             )

@@ -166,7 +166,6 @@ async def download_llm_model(
                 repo_id=repo_id,
                 filename=resolved_filename,
                 local_dir=dest_dir,
-                local_dir_use_symlinks=False,
             )
 
             db = get_database_service()

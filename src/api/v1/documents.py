@@ -185,6 +185,4 @@ async def index_sigma_ref(
         return JSONResponse(content=summary)
     except Exception as e:
         logger.error("Failed to index sigma ref: %s", e, exc_info=True)
-        return JSONResponse(
-            status_code=500, content={"success": False, "error": "An internal error occurred"}
-        )
+        return JSONResponse(status_code=500, content={"success": False, "error": str(e)})

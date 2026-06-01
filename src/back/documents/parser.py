@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
+from datetime import date, datetime
 from typing import Any
 
 import yaml
@@ -80,10 +81,10 @@ def parse_sigma_rule(file_path: str) -> SigmaRule | None:
     try:
         condition = data.get("condition") or (data.get("detection") or {}).get("condition", "")
         date_val = data.get("date")
-        if hasattr(date_val, "isoformat"):
+        if isinstance(date_val, (date, datetime)):
             date_val = date_val.isoformat()
         modified_val = data.get("modified")
-        if hasattr(modified_val, "isoformat"):
+        if isinstance(modified_val, (date, datetime)):
             modified_val = modified_val.isoformat()
         return SigmaRule(
             id=rule_id,

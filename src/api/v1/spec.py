@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 from pathlib import Path
 from typing import Any
@@ -45,7 +46,7 @@ def _get_selected() -> list[str]:
 
 def _set_selected(dirs: list[str]) -> None:
     db = DatabaseService.get_instance()
-    db.set_config(_SELECTED_DIRS_KEY, dirs)
+    db.set_config(_SELECTED_DIRS_KEY, json.dumps(dirs))
 
 
 def _walk_selected(spec_dir: Path) -> list[Path]:

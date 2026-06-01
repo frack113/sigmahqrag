@@ -20,7 +20,7 @@ router = APIRouter(prefix="/api/v1/admin", tags=["admin-v1"])
 # In-memory store for idempotency keys (ephemeral for MVP)
 # Format: {key: (response_content, timestamp, endpoint)}
 # TODO Growth: Replace with Redis for multi-worker support
-_idempotency_store: dict[str, tuple[dict[str, Any], float, str]] = {}
+_idempotency_store: dict[str, tuple[Any, float, str]] = {}
 _IDEMPOTENCY_TTL = 3600  # 1 hour TTL for MVP
 _IDEMPOTENCY_MAX_SIZE = 1000  # Prevent memory leaks
 

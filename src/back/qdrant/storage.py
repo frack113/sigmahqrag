@@ -44,7 +44,7 @@ async def store_embeddings(
     for emb, doc, meta in zip(embeddings, documents, meta_list, strict=True):
         point_id = str(uuid.uuid4())
         points.append(
-            qdrant_client.models.VectorPointStruct(
+            qdrant_client.models.PointStruct(
                 id=point_id,
                 vector=emb,
                 payload={
@@ -112,7 +112,7 @@ async def upsert_by_key(
 
         point_id = f"{collection_name}_{'_'.join(key_parts)}"
         points.append(
-            qdrant_client.models.VectorPointStruct(
+            qdrant_client.models.PointStruct(
                 id=point_id,
                 vector=emb,
                 payload={

@@ -276,9 +276,10 @@ class MarkdownChunker(DocumentTransform):
         if kept:
             logger.debug("Filtered %d empty chunks from %d total", kept, len(result))
 
+        source = documents[0].metadata.get("file_name", "?") if documents else "?"
         logger.info(
-            "Chunked %d doc(s) into %d markdown chunk(s)",
-            len(documents),
+            "Chunked %s into %d markdown chunk(s)",
+            source,
             len(filtered),
         )
         return filtered

@@ -183,7 +183,7 @@ class SearchEngine:
         ]
         all_results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        rrf_scores: dict[int, dict[str, Any]] = {}
+        rrf_scores: dict[tuple[str, str], dict[str, Any]] = {}
         for col_results in all_results:
             if isinstance(col_results, Exception):
                 logger.warning(
@@ -193,12 +193,15 @@ class SearchEngine:
             # mypy narrowing: after isinstance(Exception) check, col_results is list[dict[str, Any]]
             for rank, result in enumerate(col_results, start=1):  # type: ignore[arg-type]
                 rrf_score = 1.0 / (60 + rank)
-                result_id = id(result)
-                if result_id not in rrf_scores:
+                text = result.get("text", "")
+                meta = result.get("metadata", {})
+                file_path = meta.get("file_path", "") if isinstance(meta, dict) else ""
+                dedup_key = (file_path, text[:64])
+                if dedup_key not in rrf_scores:
                     result["rrf_score"] = rrf_score
-                    rrf_scores[result_id] = result
+                    rrf_scores[dedup_key] = result
                 else:
-                    rrf_scores[result_id]["rrf_score"] += rrf_score
+                    rrf_scores[dedup_key]["rrf_score"] += rrf_score
 
         fused = sorted(rrf_scores.values(), key=lambda r: r["rrf_score"], reverse=True)
         return fused[:limit]
