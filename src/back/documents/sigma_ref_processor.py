@@ -119,6 +119,7 @@ def process_sigma_refs(
         # Extract reference URLs from Sigma rule
         refs = extract_sigma_references(file_path)
         rule_title = rule_entry.get("title", file_name)
+        logger.info("Rule %s processed: %d reference(s) found", rule_id, len(refs))
 
         if not refs:
             continue
@@ -146,8 +147,7 @@ def process_sigma_refs(
                 }
             )
 
-    if progress_callback:
-        progress_callback(total_rules, total_rules, "queue loaded")
+    total_queue = len(download_queue)
 
     if not download_queue:
         logger.info("No references to download")
@@ -181,11 +181,10 @@ def process_sigma_refs(
             logger.warning("HEAD failed for %s: %s", url, e)
             failed += 1
 
+        if progress_callback:
+            progress_callback(idx + 1, total_queue, "resolving URLs")
+
     total_to_download = len(head_pending)
-    if progress_callback:
-        progress_callback(
-            total_rules + total_to_download, total_rules + total_to_download, "downloading"
-        )
 
     # Phase 2: Parallel downloads
     def _download_one(item: dict[str, Any]) -> tuple[str, str, int] | None:
@@ -235,6 +234,14 @@ def process_sigma_refs(
             except Exception as e:
                 logger.error("Download task failed: %s", e)
                 failed += 1
+
+            if progress_callback:
+                completed = downloaded + failed
+                progress_callback(
+                    total_queue + completed,
+                    total_queue + total_to_download,
+                    "downloading",
+                )
 
     return {
         "total_rules": total_rules,

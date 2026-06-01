@@ -367,14 +367,21 @@ function startDiscoveryPolling(onIdle) {
             if (onIdle) onIdle();
             return;
         }
-        const sigmaref = results[2];
-        if (sigmaref && isWorkerActive(sigmaref.status)) {
-            const pct = Math.round(sigmaref.progress_percent);
-            const cf = sigmaref.current_file || '';
-            if (cf.startsWith('downloading')) {
+        // Show progress from the best active worker
+        const best = results.reduce((best, s, i) => {
+            if (s && isWorkerActive(s.status)) {
+                const pct = s.progress_percent || 0;
+                const label = DISCOVERY_WORKERS[i] === 'sigmaref_discovery' ? 'References' : 'Scanning';
+                if (!best || pct > (best.pct || 0)) best = { pct, label, file: s.current_file || '' };
+            }
+            return best;
+        }, null);
+        if (best) {
+            const pct = Math.round(best.pct);
+            if (best.file.startsWith('downloading')) {
                 setScanningButton(true, pct, 'Downloading');
             } else {
-                setScanningButton(true, pct);
+                setScanningButton(true, pct, best.label);
             }
         } else {
             setScanningButton(true);

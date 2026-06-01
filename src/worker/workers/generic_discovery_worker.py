@@ -256,6 +256,14 @@ class GenericDiscoveryWorker(DiscoveryWorker):
             content_type = self._identify_content_type(file_path)
             title = file_path.stem
 
+            rule_id = "00000000-0000-0000-0000-000000000000"
+            if content_type == "sigma_rule":
+                from src.back.utils.sigma_utils import get_sigma_rule_id
+
+                rid = get_sigma_rule_id(file_path)
+                if rid:
+                    rule_id = rid
+
             return self._make_doc_registry_entry(
                 org=org,
                 repo=repo,
@@ -266,6 +274,7 @@ class GenericDiscoveryWorker(DiscoveryWorker):
                 original_url=original_url,
                 normalized_url=normalized_url,
                 title=title,
+                rule_id=rule_id,
             )
         except Exception as e:
             logger.error(f"[GenericDiscoveryWorker] Cannot prepare entry for {file_path}: {e}")

@@ -171,7 +171,7 @@ class TaskDispatcher:
         self._running = False
         self._stop_event.set()
         if self._executor:
-            self._executor.shutdown(wait=True, cancel_futures=True)
+            self._executor.shutdown(wait=False, cancel_futures=True)
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=5)
         logger.info("TaskDispatcher stopped.")

@@ -42,6 +42,7 @@ class DiscoveryWorker(BaseWorker):
         original_url: str,
         normalized_url: str,
         title: str,
+        rule_id: str = "00000000-0000-0000-0000-000000000000",
     ) -> dict:
         url_hash = hashlib.sha256(normalized_url.encode()).hexdigest()
         now = iso_now()
@@ -55,7 +56,7 @@ class DiscoveryWorker(BaseWorker):
             "file_size": file_size,
             "original_url": original_url,
             "normalized_url": normalized_url,
-            "rule_id": "00000000-0000-0000-0000-000000000000",
+            "rule_id": rule_id,
             "title": title,
             "timestamp": now,
             "last_seen": now,
