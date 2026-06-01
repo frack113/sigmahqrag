@@ -140,7 +140,10 @@ def _is_sigma_rule(file_path: str, content: str) -> bool:
         data = yaml.safe_load(content)
         if not isinstance(data, dict):
             return False
-        return all(k in data for k in ("title", "detection", "condition"))
+        if "title" not in data or "detection" not in data:
+            return False
+        detection = data.get("detection")
+        return "condition" in data or (isinstance(detection, dict) and "condition" in detection)
     except Exception:
         return False
 

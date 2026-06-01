@@ -58,9 +58,10 @@ async def file_list(
         [
             (WorkerName.GITHUB_DISCOVERY, "all"),
             (WorkerName.LOCAL_DISCOVERY, "local"),
-            (WorkerName.SIGMAREF_DISCOVERY, "sigmaref"),
         ],
     )
+    # SIGMAREF_DISCOVERY is chained automatically after GITHUB_DISCOVERY
+    # completes, so they are not dispatched in parallel.
 
     if busy:
         return FileResponse(
