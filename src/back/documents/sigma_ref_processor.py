@@ -12,6 +12,7 @@ import httpx
 
 from src.back.utils.identify_file_type import SUPPORTED_REFERENCE_DOC_TYPES
 from src.back.utils.sigma_utils import extract_sigma_references
+from src.shared.config import get_config
 from src.shared.utils import iso_now
 
 logger = logging.getLogger(__name__)
@@ -102,13 +103,14 @@ def process_sigma_refs(
 
     download_queue: list[dict[str, Any]] = []
 
+    cfg = get_config()
     for rule_entry in sigma_entries:
         rule_id = rule_entry.get("rule_id", "00000000-0000-0000-0000-000000000000")
         original_url = rule_entry.get("original_url", "")
         file_name = rule_entry.get("file_name", "")
 
-        # Resolve the actual file path
-        file_path = _resolve_file_path(original_url)
+        # Resolve the actual file path from org/repo/file_name
+        file_path = _resolve_rule_path(rule_entry, cfg)
         if not file_path or not file_path.exists():
             logger.warning("Rule file not found, skipping: %s (url=%s)", file_name, original_url)
             skipped += 1
@@ -248,13 +250,28 @@ def process_sigma_refs(
 # ------------------------------------------------------------------
 
 
-def _resolve_file_path(url: str) -> Path | None:
-    """Try to resolve a file path from original_url (file:// or http(s)://)."""
-    if url.startswith("file://"):
-        return Path(url[7:])
-    if url.startswith("http"):
-        return None  # can't resolve remote URLs to local paths
-    return Path(url)
+def _resolve_rule_path(entry: dict, cfg: Any) -> Path | None:
+    """Resolve the local file path for a sigma rule entry."""
+    org = entry.get("org", "")
+    repo = entry.get("repo", "")
+    file_name = entry.get("file_name", "")
+
+    if not file_name:
+        return None
+
+    if org == "local":
+        base = Path(str(cfg.local_documents_path))
+        return Path(base, file_name)
+
+    if org == "sigmaref":
+        base = Path(str(cfg.sigmaref_documents_path))
+        return Path(base, file_name)
+
+    if org and repo:
+        base = Path(str(cfg.paths_github_dir))
+        return Path(base, org, repo, file_name)
+
+    return None
 
 
 def _normalize_url(url: str) -> str:
