@@ -162,11 +162,14 @@ def process_sigma_refs(
     # Phase 1: HEAD requests to resolve content types
     head_pending: list[dict[str, Any]] = []
     for idx, item in enumerate(download_queue):
+        if progress_callback:
+            progress_callback(idx + 1, total_queue, "resolving URLs")
+
         url = item["url"]
         try:
             content_type, size, final_url = _head_request(url, request_delay)
             if content_type not in supported_types:
-                logger.debug("Skipping unsupported content type for %s: %s", url, content_type)
+                logger.info("Reference skipped (unsupported type): %s (%s)", url, content_type)
                 skipped += 1
                 continue
             head_pending.append(
@@ -181,9 +184,6 @@ def process_sigma_refs(
             logger.warning("HEAD failed for %s: %s", url, e)
             failed += 1
 
-        if progress_callback:
-            progress_callback(idx + 1, total_queue, "resolving URLs")
-
     total_to_download = len(head_pending)
 
     # Phase 2: Parallel downloads
@@ -193,6 +193,7 @@ def process_sigma_refs(
         file_path = output_path / _sanitize_filename(url)
 
         if file_path.exists() and db.entry_exists(_sha256_bytes(url.encode())):
+            logger.info("Reference already present: %s", url)
             return None
 
         try:
@@ -203,9 +204,10 @@ def process_sigma_refs(
                 resp.raise_for_status()
                 content = resp.content
             file_path.write_bytes(content)
+            logger.info("Reference downloaded: %s", url)
             return ("ok", _sha256_bytes(content), len(content))
         except Exception as e:
-            logger.error("Download failed: %s - %s", url, e)
+            logger.error("Reference download failed: %s - %s", url, e)
             return ("fail", "", 0)
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -217,15 +219,17 @@ def process_sigma_refs(
             item = futures[future]
             try:
                 result = future.result()
-                if result and result[0] == "ok":
+                if result is None:
+                    skipped += 1
+                elif result[0] == "ok":
                     final_url = item["final_url"]
                     entry = _build_download_entry(
                         normalized_url=final_url,
                         content_type=item["content_type"],
                         rule_id=item["rule_id"],
                         title=item["rule_title"],
-                        content_sha256=result[1] if result else "",
-                        file_size=result[2] if result else None,
+                        content_sha256=result[1],
+                        file_size=result[2],
                     )
                     db.batch_upsert_doc_registry([entry])
                     downloaded += 1
