@@ -19,4 +19,6 @@ repos:
     hooks:
       - id: ruff-check
         args: [--fix]
+        types: [python]
       - id: ruff-format
+        types: [python]
