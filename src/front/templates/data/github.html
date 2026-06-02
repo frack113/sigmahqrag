@@ -12,6 +12,7 @@
         <button id="sync-all-btn" class="btn btn-success" onclick="syncAllRepos()">Sync All</button>
         <button id="refresh-btn" class="btn btn-primary" onclick="loadRepos()">Refresh list</button>
         <button id="list-document-btn" class="btn btn-primary" onclick="listDocuments()">List document</button>
+        <button id="download-ref-btn" class="btn" onclick="downloadReferences()">Download Ref</button>
     </div>
 
     <div id="repos-list" class="repos-grid"></div>
@@ -338,15 +339,16 @@ async function checkAnyWorkerActive() {
     return results.some(s => s && isWorkerActive(s.status));
 }
 
-function setScanningButton(scanning, pct, label) {
-    const btn = document.getElementById('list-document-btn');
-    if (!btn) return;
-    btn.disabled = scanning;
-    if (scanning && pct !== undefined) {
-        btn.textContent = (label || 'Scanning') + ' ' + pct + '%..';
-    } else {
-        btn.textContent = scanning ? (label || 'Scanning') + '...' : 'List document';
-    }
+function setButtonText(id, text) {
+    const btn = document.getElementById(id);
+    if (btn) btn.textContent = text;
+}
+
+function setButtonsDisabled(disabled) {
+    ['list-document-btn', 'download-ref-btn'].forEach(id => {
+        const btn = document.getElementById(id);
+        if (btn) btn.disabled = disabled;
+    });
 }
 
 function stopDiscoveryPolling() {
@@ -358,59 +360,85 @@ function stopDiscoveryPolling() {
 
 function startDiscoveryPolling(onIdle) {
     stopDiscoveryPolling();
+    setButtonsDisabled(true);
     _discoveryPollInterval = setInterval(async () => {
         const results = await Promise.all(DISCOVERY_WORKERS.map(pollWorkerStatus));
-        const active = results.some(s => s && isWorkerActive(s.status));
-        if (!active) {
+
+        const gh = results[0], local = results[1], sr = results[2];
+        const ghActive = gh && isWorkerActive(gh.status);
+        const localActive = local && isWorkerActive(local.status);
+        const srActive = sr && isWorkerActive(sr.status);
+        const anyActive = ghActive || localActive || srActive;
+
+        if (!anyActive) {
             stopDiscoveryPolling();
-            setScanningButton(false);
+            setButtonsDisabled(false);
+            setButtonText('list-document-btn', 'List document');
+            setButtonText('download-ref-btn', 'Download Ref');
             if (onIdle) onIdle();
             return;
         }
-        // Show progress from the best active worker
-        const best = results.reduce((best, s, i) => {
-            if (s && isWorkerActive(s.status)) {
-                const pct = s.progress_percent || 0;
-                const label = DISCOVERY_WORKERS[i] === 'sigmaref_discovery' ? 'References' : 'Scanning';
-                if (!best || pct > (best.pct || 0)) best = { pct, label, file: s.current_file || '' };
-            }
-            return best;
-        }, null);
-        if (best) {
-            if (best.pct > 0 && best.file.startsWith('downloading')) {
-                setScanningButton(true, Math.round(best.pct), 'Downloading');
-            } else if (best.pct > 0) {
-                setScanningButton(true, Math.round(best.pct), best.label);
-            } else {
-                setScanningButton(true, undefined, best.label);
-            }
+
+        // "List document" button: github/local discovery progress
+        if (ghActive || localActive) {
+            const src = ghActive ? gh : local;
+            const pct = src.progress_percent > 0 ? Math.round(src.progress_percent) : undefined;
+            setButtonText('list-document-btn', pct !== undefined ? 'Scanning ' + pct + '%..' : 'Scanning...');
         } else {
-            setScanningButton(true);
+            setButtonText('list-document-btn', 'List document');
+        }
+
+        // "Download Ref" button: sigmaref reference progress
+        if (srActive) {
+            const pct = sr.progress_percent > 0 ? Math.round(sr.progress_percent) : undefined;
+            setButtonText('download-ref-btn', pct !== undefined ? 'References ' + pct + '%..' : 'References...');
+        } else {
+            setButtonText('download-ref-btn', 'Download Ref');
         }
     }, 2000);
 }
 
 async function listDocuments() {
-    setScanningButton(true);
+    setButtonText('list-document-btn', 'Scanning...');
     try {
         const response = await fetch('/api/v1/files/list', { method: 'POST' });
         const result = await response.json();
         if (result.success) {
             startDiscoveryPolling(() => loadRepos());
         } else {
-            alert(result.error || 'Scan failed');
-            setScanningButton(false);
+            setButtonText('list-document-btn', 'List document');
         }
     } catch (error) {
-        alert('Failed to initiate scan');
-        setScanningButton(false);
+        setButtonText('list-document-btn', 'List document');
+    }
+}
+
+async function downloadReferences() {
+    setButtonText('download-ref-btn', 'References...');
+    try {
+        const response = await fetch('/api/v1/dispatcher/ask', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ worker_type: 'sigmaref_discovery', task_params: {} }),
+        });
+        if (response.status === 409) {
+            // Worker busy — polling already active, just show message
+            return;
+        }
+        const result = await response.json();
+        if (result.task_id) {
+            startDiscoveryPolling(() => loadRepos());
+        } else {
+            setButtonText('download-ref-btn', 'Download Ref');
+        }
+    } catch (error) {
+        setButtonText('download-ref-btn', 'Download Ref');
     }
 }
 
 async function checkRunningWorkersOnLoad() {
     const active = await checkAnyWorkerActive();
     if (active) {
-        setScanningButton(true);
         startDiscoveryPolling(() => loadRepos());
     }
 }

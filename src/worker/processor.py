@@ -257,22 +257,6 @@ class TaskDispatcher:
             if self._db is not None:
                 self._db.persist()
 
-        # Chain sigma-ref discovery after github discovery completes
-        if worker_type == WorkerName.GITHUB_DISCOVERY and error is None:
-            logger.info("[TaskDispatcher] Chaining sigma-ref discovery after github discovery...")
-            self._chain_sigmaref_discovery()
-
-    def _chain_sigmaref_discovery(self) -> None:
-        """Queue sigma-ref discovery if not already busy."""
-        if self.ask_for_worker(
-            WorkerName.SIGMAREF_DISCOVERY,
-            task_type=WorkerName.SIGMAREF_DISCOVERY.value,
-            collection_name="sigmaref",
-        ):
-            logger.info("[TaskDispatcher] Sigma-ref discovery queued.")
-        else:
-            logger.info("[TaskDispatcher] Sigma-ref discovery skipped (already busy or queued).")
-
     def _on_task_done(self, future: Future) -> None:
         """Callback executed when a future completes."""
         try:
