@@ -167,6 +167,29 @@ class DatabaseServiceDocOps:
         result = self._safe_query("SELECT 1 FROM doc_registry WHERE url_hash = ?", (url_hash,))
         return result is not None
 
+    def get_entry(self, url_hash: str) -> dict | None:
+        result = self._safe_query(
+            "SELECT url_hash, org, repo, content_type, file_name, content_sha256, "
+            "original_url, normalized_url, rule_id, title, embed_status "
+            "FROM doc_registry WHERE url_hash = ?",
+            (url_hash,),
+        )
+        if result is None:
+            return None
+        return {
+            "url_hash": result[0],
+            "org": result[1],
+            "repo": result[2],
+            "content_type": result[3],
+            "file_name": result[4],
+            "content_sha256": result[5] or "",
+            "original_url": result[6],
+            "normalized_url": result[7],
+            "rule_id": result[8],
+            "title": result[9],
+            "embed_status": result[10],
+        }
+
     def delete_entries_by_org_repo(self, org: str, repo: str) -> None:
         with self._lock:
             self._writer_conn.execute(

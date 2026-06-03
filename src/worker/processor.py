@@ -174,6 +174,13 @@ class TaskDispatcher:
             self._executor.shutdown(wait=False, cancel_futures=True)
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=5)
+        # Detach any remaining executor threads so the process can exit
+        for t in threading.enumerate():
+            if t is threading.current_thread() or t.daemon:
+                continue
+            if t.name and t.name.startswith("WorkerExecutor"):
+                logger.debug("Detaching executor thread: %s", t.name)
+                t.daemon = True
         logger.info("TaskDispatcher stopped.")
 
     # ------------------------------------------------------------------
