@@ -14,8 +14,8 @@ from pydantic import BaseModel
 from src.api.dependencies import get_dispatcher
 from src.back.database.service import DatabaseService
 from src.shared.config import get_config
-from src.worker.enums import WorkerName
 from src.back.utils.identify_file_type import SUPPORTED_DOC_EXTENSION_MAP, identify
+from src.worker.enums import WorkerName
 from src.shared.utils import iso_now
 
 logger = logging.getLogger(__name__)
@@ -73,34 +73,6 @@ async def file_list(
     return FileResponse(
         success=True,
         message=f"Discovery queued for: {', '.join(triggered)}",
-        data={"tasks": triggered},
-    )
-
-
-@router.post("/embed", response_model=FileResponse)
-async def file_embed(
-    dispatcher=Depends(get_dispatcher),
-) -> FileResponse:
-    """Trigger file embedding across all sources (GitHub, Local, SigmaRef)."""
-    triggered, busy = _dispatch_workers(
-        dispatcher,
-        [
-            (WorkerName.GITHUB_EMBEDDINGS, "all"),
-            (WorkerName.LOCAL_EMBEDDINGS, "local"),
-            (WorkerName.SIGMAREF_EMBEDDINGS, "sigmaref"),
-        ],
-    )
-
-    if busy:
-        return FileResponse(
-            success=False,
-            error=f"Workers already busy: {', '.join(busy)}",
-            data={"triggered": triggered} if triggered else None,
-        )
-
-    return FileResponse(
-        success=True,
-        message=f"Embedding queued for: {', '.join(triggered)}",
         data={"tasks": triggered},
     )
 

@@ -75,6 +75,18 @@ CREATE TABLE IF NOT EXISTS git_selected_dirs (
     PRIMARY KEY (repo_key, dir_path)
 );
 
+-- sigma_spec (dedicated spec document table — markdown, PDF, Office, etc.)
+CREATE TABLE IF NOT EXISTS sigma_spec (
+    url_hash TEXT PRIMARY KEY,
+    file_name TEXT NOT NULL,
+    content_type TEXT,
+    content_sha256 TEXT,
+    file_size BIGINT,
+    original_url TEXT NOT NULL,
+    title TEXT,
+    embed_status TEXT DEFAULT 'discovery'
+);
+
 -- doc_error (failed URLs — 30x/40x errors to skip on retry)
 CREATE TABLE IF NOT EXISTS doc_error (
     url_hash TEXT PRIMARY KEY,

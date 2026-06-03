@@ -9,11 +9,10 @@ from llama_index.core.schema import TextNode
 
 from src.shared.schemas.sigma_rule import SigmaRule
 from src.back.qdrant import QdrantService
+from src.rag.ingestion import get_embedding_dimension
 from src.shared import get_config
 
 logger = logging.getLogger(__name__)
-
-EMBEDDING_DIM = 384
 
 
 async def index_sigma_rules(
@@ -36,10 +35,11 @@ async def index_sigma_rules(
 
     config = get_config()
     collection = collection_name or config.qdrant_collection_name
+    embed_dim = get_embedding_dimension()
 
     service = QdrantService(
         collection_name=collection,
-        vector_size=EMBEDDING_DIM,
+        vector_size=embed_dim,
         host=config.qdrant_host,
         port=config.qdrant_port,
     )
@@ -127,7 +127,7 @@ def _sigma_rule_to_metadata(rule: SigmaRule) -> dict[str, Any]:
 
 def _sigma_rule_to_rich_chunks(rule: SigmaRule) -> list[TextNode]:
     """Convert SigmaRule to multiple enriched chunks for rich mode."""
-    from src.back.rag.transforms.sigma.chunker import chunk_sigma_rules_rich
+    from src.rag.transforms.sigma.chunker import chunk_sigma_rules_rich
 
     # Reconstruct a dict from SigmaRule for the chunker
     rule_dict = {
@@ -166,15 +166,9 @@ def _sigma_rule_to_rich_chunks(rule: SigmaRule) -> list[TextNode]:
 
 
 async def _generate_embeddings(nodes: list[TextNode]) -> list[list[float]]:
-    """Generate embeddings for nodes."""
-    from src.back.rag.embeddings import get_embedding_model
+    """Generate embeddings for nodes using batched inference."""
+    from src.rag.embeddings import embed_documents
+    from llama_index.core.schema import Document
 
-    embed_model = get_embedding_model()
-    texts = [node.text for node in nodes]
-
-    embeddings: list[list[float]] = []
-    for text in texts:
-        embedding = await embed_model.aget_text_embedding(text)
-        embeddings.append(embedding)
-
-    return embeddings
+    docs = [Document(text=node.text) for node in nodes]
+    return await embed_documents(docs)

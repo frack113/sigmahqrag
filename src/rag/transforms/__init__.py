@@ -8,9 +8,12 @@ and automatically registers all format-specific transforms on import.
 from .base import DocumentTransform, TransformConfig
 from .registry import TransformRegistry
 
-# Import sigma and markdown modules to trigger registration.
-from . import sigma  # noqa: F401
-from . import markdown  # noqa: F401
+# Import modules to trigger registration (order matters — generique last).
+from . import sigma  # noqa: F401 — .yml/.yaml
+from . import markdown  # noqa: F401 — .md/.markdown
+from . import pdf  # noqa: F401 — .pdf
+from . import office  # noqa: F401 — .docx/.pptx
+from . import generique  # noqa: F401 — catch-all (must be last!)
 
 __all__ = [
     "DocumentTransform",

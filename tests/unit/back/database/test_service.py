@@ -619,13 +619,13 @@ class TestLocalFiles:
 class TestEmbedProgress:
     def test_upsert_and_get(self, db: DatabaseService) -> None:
         db.upsert_worker_state(
-            worker_type="github_embeddings",
+            worker_type="github_discovery",
             status="running",
             current_task_id="repo-123",
             progress_percent=0.42,
             current_file="file.txt",
         )
-        entry = db.get_worker_progress("github_embeddings")
+        entry = db.get_worker_progress("github_discovery")
         assert entry is not None
         assert entry["status"] == "running"
         assert entry["progress_percent"] == pytest.approx(0.42, abs=0.01)
@@ -635,29 +635,29 @@ class TestEmbedProgress:
 
     def test_update_progress(self, db: DatabaseService) -> None:
         db.upsert_worker_state(
-            worker_type="sigmaref_embeddings",
+            worker_type="sigmaref_discovery",
             status="running",
             current_task_id="task-1",
             progress_percent=0.0,
         )
-        db.update_worker_progress("sigmaref_embeddings", 50.0, "doc.md")
-        entry = db.get_worker_progress("sigmaref_embeddings")
+        db.update_worker_progress("sigmaref_discovery", 50.0, "doc.md")
+        entry = db.get_worker_progress("sigmaref_discovery")
         assert entry["progress_percent"] == pytest.approx(50.0, abs=0.01)
         assert entry["current_file"] == "doc.md"
 
     def test_reset_stale(self, db: DatabaseService) -> None:
         db.upsert_worker_state(
-            worker_type="github_embeddings",
+            worker_type="github_discovery",
             status="running",
             current_task_id="stale-task",
         )
         db._conn.execute(
             "UPDATE worker_state SET last_heartbeat = '2020-01-01T00:00:00Z' WHERE worker_type = ?",
-            ("github_embeddings",),
+            ("github_discovery",),
         )
         db._conn.commit()
         db.reset_stale_workers(stale_seconds=60)
-        entry = db.get_worker_progress("github_embeddings")
+        entry = db.get_worker_progress("github_discovery")
         assert entry is not None
         assert entry["status"] == "idle"
 

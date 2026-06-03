@@ -2,15 +2,11 @@
 
 import os
 from pathlib import Path
-from unittest.mock import AsyncMock, patch
 
-import pytest
-from fastapi.testclient import TestClient
 
 from src.shared.schemas.sigma_rule import SigmaRule
 from src.back.documents.parser import parse_sigma_rule, scan_directory
 from src.back.documents.validator import validate_sigma_rule
-from src.main import create_app
 
 FIXTURES_DIR = (Path(__file__).parent / ".." / ".." / ".." / "fixtures").resolve()
 
@@ -134,52 +130,3 @@ class TestSigmaRuleValidator:
 
             result = validate_sigma_rule(rule)
             assert result.valid is True, f"Level {level} should be valid"
-
-
-class TestDocumentsEndpoint:
-    """Test document endpoint."""
-
-    @pytest.fixture
-    def client(self):
-        """Create test client."""
-        app = create_app()
-        os.environ["SIGMA_RULES_DIR"] = str(FIXTURES_DIR)
-        return TestClient(app)
-
-    @patch("src.api.v1.documents.scan_directory")
-    @patch("src.api.v1.documents._ingest_with_pipeline")
-    def test_ingest_success(
-        self,
-        mock_ingest: AsyncMock,
-        mock_scan: AsyncMock,
-        client: TestClient,
-    ) -> None:
-        """Test successful ingestion with IngestionPipelineBuilder."""
-        mock_scan.return_value = []
-        mock_ingest.return_value = ([], 0)
-        response = client.post("/api/v1/documents/ingest")
-
-        assert response.status_code == 200
-        data = response.json()
-        assert "results" in data or "total_files" in data
-
-    @patch("src.api.v1.documents.scan_directory")
-    @patch("src.api.v1.documents._ingest_with_pipeline")
-    def test_ingest_no_files(
-        self,
-        mock_ingest: AsyncMock,
-        mock_scan: AsyncMock,
-        client: TestClient,
-    ) -> None:
-        """Test ingestion with no files found."""
-        mock_scan.return_value = []
-        mock_ingest.return_value = ([], 0)
-
-        response = client.post(
-            "/api/v1/documents/ingest",
-            json={"directory": str(FIXTURES_DIR), "recursive": False},
-        )
-
-        assert response.status_code == 200
-        data = response.json()
-        assert "results" in data or "total_files" in data

@@ -6,9 +6,9 @@ from typing import Any
 
 import pytest
 
-from src.back.rag.transforms.base import TransformConfig
-from src.back.rag.transforms.sigma.chunker import SigmaChunker
-from src.back.rag.transforms.sigma.parser import SigmaParser
+from src.rag.transforms.base import TransformConfig
+from src.rag.transforms.sigma.chunker import SigmaChunker
+from src.rag.transforms.sigma.parser import SigmaParser
 
 
 def _make_rule(title: str, i: int) -> str:

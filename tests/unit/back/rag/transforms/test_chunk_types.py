@@ -2,8 +2,8 @@
 
 import pytest
 
-from src.back.rag.transforms.sigma.chunker import SigmaChunker
-from src.back.rag.transforms.base import TransformConfig
+from src.rag.transforms.sigma.chunker import SigmaChunker
+from src.rag.transforms.base import TransformConfig
 
 ALL_CHUNK_TYPES = frozenset(
     {

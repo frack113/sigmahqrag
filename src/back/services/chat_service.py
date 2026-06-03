@@ -10,7 +10,7 @@ from typing import Any
 
 from src.back.services.rag_pipeline import RAGPipeline
 from src.back.services.sigma_validator import SigmaValidator
-from src.back.rag.search import SearchEngine
+from src.rag.search import SearchEngine
 from src.shared.schemas.chat_mode import ChatMode
 
 logger = logging.getLogger(__name__)

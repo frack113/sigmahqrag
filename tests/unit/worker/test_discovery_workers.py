@@ -67,8 +67,9 @@ class TestGithubDiscoveryWorker:
             "collection_name": "all",
         }
 
-        worker = GenericDiscoveryWorker(source_type=SourceType.GITHUB, base_dir=Path("/tmp"))
-        worker.db = mock_db
+        worker = GenericDiscoveryWorker(
+            db=mock_db, source_type=SourceType.GITHUB, base_dir=Path("/tmp")
+        )
         worker.process(task)
 
     def test_process_scans_multiple_repos(self, mock_db: MagicMock, tmp_path: Path) -> None:
@@ -94,8 +95,9 @@ class TestGithubDiscoveryWorker:
             "github_base_dir": str(tmp_path),
         }
 
-        worker = GenericDiscoveryWorker(source_type=SourceType.GITHUB, base_dir=tmp_path)
-        worker.db = mock_db
+        worker = GenericDiscoveryWorker(
+            db=mock_db, source_type=SourceType.GITHUB, base_dir=tmp_path
+        )
         worker.process(task)
 
         mock_db.batch_upsert_doc_registry.assert_called_once()
@@ -121,8 +123,9 @@ class TestGithubDiscoveryWorker:
             "github_base_dir": str(tmp_path),
         }
 
-        worker = GenericDiscoveryWorker(source_type=SourceType.GITHUB, base_dir=tmp_path)
-        worker.db = mock_db
+        worker = GenericDiscoveryWorker(
+            db=mock_db, source_type=SourceType.GITHUB, base_dir=tmp_path
+        )
         worker.process(task)
 
         mock_db.batch_upsert_doc_registry.assert_called_once()
@@ -147,8 +150,9 @@ class TestGithubDiscoveryWorker:
             "github_base_dir": str(tmp_path),
         }
 
-        worker = GenericDiscoveryWorker(source_type=SourceType.GITHUB, base_dir=tmp_path)
-        worker.db = mock_db
+        worker = GenericDiscoveryWorker(
+            db=mock_db, source_type=SourceType.GITHUB, base_dir=tmp_path
+        )
         worker.process(task)
 
         mock_db.batch_upsert_doc_registry.assert_called_once()
@@ -170,8 +174,9 @@ class TestGithubDiscoveryWorker:
             "github_base_dir": str(tmp_path),
         }
 
-        worker = GenericDiscoveryWorker(source_type=SourceType.GITHUB, base_dir=tmp_path)
-        worker.db = mock_db
+        worker = GenericDiscoveryWorker(
+            db=mock_db, source_type=SourceType.GITHUB, base_dir=tmp_path
+        )
         worker.process(task)
 
         mock_db.batch_upsert_doc_registry.assert_called_once()
@@ -188,8 +193,9 @@ class TestLocalDiscoveryWorker:
             "base_path": "/nonexistent/path",
         }
 
-        worker = GenericDiscoveryWorker(source_type=SourceType.LOCAL, base_dir=Path("/nonexistent"))
-        worker.db = mock_db
+        worker = GenericDiscoveryWorker(
+            db=mock_db, source_type=SourceType.LOCAL, base_dir=Path("/nonexistent")
+        )
         worker.process(task)
 
     def test_process_scans_local_directory(self, mock_db: MagicMock, tmp_path: Path) -> None:
@@ -205,8 +211,7 @@ class TestLocalDiscoveryWorker:
             "base_path": str(local_dir),
         }
 
-        worker = GenericDiscoveryWorker(source_type=SourceType.LOCAL, base_dir=tmp_path)
-        worker.db = mock_db
+        worker = GenericDiscoveryWorker(db=mock_db, source_type=SourceType.LOCAL, base_dir=tmp_path)
         worker.process(task)
 
         mock_db.batch_upsert_doc_registry.assert_called_once()
@@ -220,8 +225,9 @@ class TestLocalDiscoveryWorker:
             "collection_name": "local",
         }
 
-        worker = GenericDiscoveryWorker(source_type=SourceType.LOCAL, base_dir=Path("/tmp"))
-        worker.db = mock_db
+        worker = GenericDiscoveryWorker(
+            db=mock_db, source_type=SourceType.LOCAL, base_dir=Path("/tmp")
+        )
         worker.process(task)
 
     def test_process_reports_source_type(self, mock_db: MagicMock, tmp_path: Path) -> None:
@@ -236,8 +242,7 @@ class TestLocalDiscoveryWorker:
             "base_path": str(local_dir),
         }
 
-        worker = GenericDiscoveryWorker(source_type=SourceType.LOCAL, base_dir=tmp_path)
-        worker.db = mock_db
+        worker = GenericDiscoveryWorker(db=mock_db, source_type=SourceType.LOCAL, base_dir=tmp_path)
         worker.process(task)
 
         mock_db.batch_upsert_doc_registry.assert_called_once()

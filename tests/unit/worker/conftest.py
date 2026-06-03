@@ -93,37 +93,3 @@ def sample_local_discovery_task() -> dict:
         "source_type": "local_discovery",
         "base_path": "data/documents/local",
     }
-
-
-@pytest.fixture
-def sample_sigmaref_embedding_task() -> dict:
-    return {
-        "task_id": "sigmaref-emb-001",
-        "task_type": "sigmaref_embeddings",
-        "collection_name": "sigmaref",
-        "source_type": "sigmaref_embeddings",
-        "registry_path": "data/documents/sigmaref",
-    }
-
-
-@pytest.fixture
-def sample_github_embedding_task() -> dict:
-    return {
-        "task_id": "github-emb-001",
-        "task_type": "github_embeddings",
-        "collection_name": "test-org/test-repo",
-        "source_type": "github_embeddings",
-        "org": "test-org",
-        "repo": "test-repo",
-    }
-
-
-@pytest.fixture
-def sample_local_embedding_task() -> dict:
-    return {
-        "task_id": "local-emb-001",
-        "task_type": "local_embeddings",
-        "collection_name": "local",
-        "source_type": "local_embeddings",
-        "base_path": "data/documents/local",
-    }

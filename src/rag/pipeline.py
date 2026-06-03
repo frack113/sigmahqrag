@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from src.back.rag.search import SearchEngine
+from src.rag.search import SearchEngine
 
 logger = logging.getLogger(__name__)
 

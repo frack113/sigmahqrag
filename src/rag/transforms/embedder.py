@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from src.back.rag.ingestion import DEFAULT_MODEL, build_embed_model
+from src.rag.ingestion import DEFAULT_MODEL, build_embed_model
 
 
 class Embedder:

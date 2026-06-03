@@ -166,7 +166,7 @@ async def main() -> None:
     db.initialize()
     db.set_embedding_config("intfloat/multilingual-e5-small")
 
-    from src.back.rag.search import SearchEngine
+    from src.rag.search import SearchEngine
 
     engine = SearchEngine(collection_names=["sigma_spec"], top_k=3)
 

@@ -26,6 +26,7 @@ _VALID_TABLES = frozenset(
         "system_prompts",
         "models",
         "doc_registry",
+        "sigma_spec",
         "doc_error",
         "git_metadata",
         "git_selected_dirs",

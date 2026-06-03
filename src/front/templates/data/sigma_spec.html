@@ -10,7 +10,6 @@
     <div class="github-actions">
         <button id="scan-btn" class="btn btn-primary" onclick="scanSpec()">Scan for new files</button>
         <button id="refresh-btn" class="btn btn-primary" onclick="loadSpecFiles()">Refresh</button>
-        <button id="embed-btn" class="btn btn-success" onclick="embedSpec()">Embed all to Qdrant</button>
     </div>
 
     <div class="repo-info card" style="margin-top: 1rem;">
@@ -156,28 +155,6 @@ async function scanSpec() {
     } finally {
         btn.disabled = false;
         btn.textContent = 'Scan for new files';
-    }
-}
-
-async function embedSpec() {
-    if (!confirm('Start embedding specification files to Qdrant collection sigma_spec?')) return;
-    const btn = document.getElementById('embed-btn');
-    btn.disabled = true;
-    btn.textContent = 'Embedding...';
-    try {
-        const response = await fetch('/api/v1/spec/embed', { method: 'POST' });
-        const result = await response.json();
-        if (result.success) {
-            alert('Embedding completed: ' + (result.data?.count || 0) + ' files processed.');
-            loadSpecFiles();
-        } else {
-            alert(result.error || 'Failed to start embedding');
-        }
-    } catch (error) {
-        alert('Failed to start embedding');
-    } finally {
-        btn.disabled = false;
-        btn.textContent = 'Embed all to Qdrant';
     }
 }
 

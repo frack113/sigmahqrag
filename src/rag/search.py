@@ -8,7 +8,7 @@ from typing import Any
 
 from src.back.database import DatabaseService
 from src.back.qdrant.client import get_qdrant_client
-from src.back.rag.ingestion import build_embed_model, DEFAULT_MODEL
+from src.rag.ingestion import build_embed_model, DEFAULT_MODEL
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +17,12 @@ SIMILARITY_THRESHOLD = 0.0
 
 
 _async_embed_model: Any | None = None
+
+
+def reset_search_embed_model() -> None:
+    """Reset the cached search embedding model singleton."""
+    global _async_embed_model
+    _async_embed_model = None
 
 
 def _get_search_embed_model() -> Any:
@@ -74,7 +80,12 @@ async def search(
                 text = payload.get("text", "")
                 metadata = {}
 
-                if not text:
+                if text:
+                    # Flat payload — collect remaining fields as metadata
+                    metadata = {
+                        k: v for k, v in payload.items() if k not in ("text", "_node_content")
+                    }
+                else:
                     # Fallback: try _node_content format
                     node_content = payload.get("_node_content", "{}")
                     if isinstance(node_content, str):

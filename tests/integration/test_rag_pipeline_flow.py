@@ -8,10 +8,10 @@ from typing import Any
 import pytest
 import yaml
 
-from src.back.rag.search import format_search_result, get_citation
-from src.back.rag.transforms.base import TransformConfig
-from src.back.rag.transforms.sigma.chunker import SigmaChunker
-from src.back.rag.transforms.sigma.parser import SigmaParser
+from src.rag.search import format_search_result, get_citation
+from src.rag.transforms.base import TransformConfig
+from src.rag.transforms.sigma.chunker import SigmaChunker
+from src.rag.transforms.sigma.parser import SigmaParser
 
 
 @pytest.fixture

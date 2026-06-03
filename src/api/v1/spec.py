@@ -11,9 +11,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from src.back.database import DatabaseService
-from src.back.rag.ingestion import IngestionPipelineBuilder
 from src.shared.config import get_config
-from src.shared.utils import iso_now
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +26,7 @@ class SpecResponse(BaseModel):
 
 
 _SELECTED_DIRS_KEY = "sigma_spec_selected_dirs"
-_SUPPORTED_EXTS = frozenset({".md"})
+_SUPPORTED_EXTS = frozenset({".md", ".pdf", ".docx", ".doc", ".pptx", ".ppt"})
 
 
 def _spec_dir() -> Path:
@@ -135,7 +133,7 @@ async def scan_spec_files() -> SpecResponse:
     db = DatabaseService.get_instance()
 
     # Mark stale pending entries as skipped so they are not picked up
-    # by embed after the user changes directory selection.
+    # by the indexer after the user changes directory selection.
     db.mark_spec_stale_entries_skipped()
     logger.info("Marked stale sigma_spec entries as skipped")
 
@@ -149,30 +147,34 @@ async def scan_spec_files() -> SpecResponse:
         content_hash = hashlib.sha256(f.read_bytes()).hexdigest()
         file_size = f.stat().st_size
 
-        ct = "markdown" if f.suffix.lower() == ".md" else f.suffix.lower().lstrip(".")
+        ext = f.suffix.lower()
+        if ext == ".md":
+            ct = "markdown"
+        elif ext in (".pdf",):
+            ct = "pdf"
+        elif ext in (".docx", ".doc"):
+            ct = "docx"
+        elif ext in (".pptx", ".ppt"):
+            ct = "pptx"
+        else:
+            ct = ext.lstrip(".")
 
         entries.append(
             {
                 "url_hash": url_hash,
-                "org": "sigma_spec",
-                "repo": "sigma-specification",
-                "content_type": ct,
                 "file_name": rel,
+                "content_type": ct,
                 "content_sha256": content_hash,
                 "file_size": file_size,
                 "original_url": url,
-                "normalized_url": url,
-                "rule_id": "00000000-0000-0000-0000-000000000000",
                 "title": f.stem,
-                "timestamp": iso_now(),
-                "last_seen": iso_now(),
                 "embed_status": "discovery",
             }
         )
 
     if entries:
         try:
-            db.batch_upsert_doc_registry(entries)
+            db.batch_upsert_sigma_spec(entries)
         except Exception as e:
             logger.error(f"Failed to batch upsert spec entries: {e}")
             return SpecResponse(success=False, error=str(e))
@@ -181,52 +183,4 @@ async def scan_spec_files() -> SpecResponse:
         success=True,
         message=f"Scanned {len(entries)} specification files.",
         data={"count": len(entries)},
-    )
-
-
-@router.post("/embed", response_model=SpecResponse)
-async def embed_spec_files() -> SpecResponse:
-    """Embed all discovered sigma-spec files into Qdrant."""
-    db = DatabaseService.get_instance()
-    pending = db.get_pending_doc_registry(org="sigma_spec", repo="sigma-specification")
-    if not pending:
-        return SpecResponse(success=False, error="No pending spec files to embed. Run scan first.")
-
-    cfg = get_config()
-    spec_dir = Path(cfg.paths_sigma_spec_dir).resolve()
-
-    from src.back.qdrant import QdrantVectorService
-
-    qdrant = QdrantVectorService(collection_name="sigma_spec")
-    await qdrant.create_collection(enable_hybrid=True)
-
-    builder = IngestionPipelineBuilder(collection_name="sigma_spec")
-    processed = 0
-    errors: list[str] = []
-
-    for entry in pending:
-        file_path = spec_dir / entry.get("file_name", "")
-        if not file_path.exists():
-            errors.append(f"File not found: {file_path}")
-            continue
-        try:
-            docs = builder.run_files([str(file_path)])
-            if docs:
-                db.update_doc_registry_embed_status(entry["url_hash"], "embedded")
-                processed += 1
-            else:
-                errors.append(f"No docs produced for {file_path.name}")
-        except Exception as e:
-            logger.error(f"Failed to embed {file_path}: {e}")
-            errors.append(f"{file_path.name}: {e}")
-
-    msg = f"Embedded {processed} spec files"
-    if errors:
-        msg += f", {len(errors)} errors (first: {errors[0]})"
-
-    db.persist()
-    return SpecResponse(
-        success=True,
-        message=msg,
-        data={"count": processed, "errors": errors[:5]},
     )

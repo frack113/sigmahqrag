@@ -79,18 +79,43 @@ def _get_chunker_for_collection(collection_name: str) -> tuple[Any, Any]:
 
 
 _pipeline_registry: dict[tuple[str, str], IngestionPipeline] = {}
+_embed_dim: int | None = None
+
+
+def reset_pipeline_registry() -> None:
+    """Clear all cached pipelines — call after changing the embedding model."""
+    _pipeline_registry.clear()
+
+
+def get_embedding_dimension() -> int:
+    """Return the detected embedding dimension, or 384 as fallback."""
+    return _embed_dim or 384
+
+
+def _detect_embed_dim(model: BaseEmbedding) -> int:
+    """Infer embedding dimension by encoding a short probe string."""
+    try:
+        vec = model.get_text_embedding("probe")
+        return len(vec)
+    except Exception:
+        return 384
 
 
 def build_embed_model(model_name: str) -> BaseEmbedding:
     local_path = Path(get_config().embeddings_dir) / model_name
     model_path = str(local_path) if local_path.exists() else model_name
+    global _embed_dim
+
     try:
         logger.info("Loading embedding model from %s", model_path)
-        return HuggingFaceEmbedding(
+        model = HuggingFaceEmbedding(
             model_name=model_path,
             device="cpu",
             embed_batch_size=DEFAULT_EMBED_BATCH_SIZE,
         )
+        _embed_dim = _detect_embed_dim(model)
+        logger.info("Detected embedding dimension: %d", _embed_dim)
+        return model
     except Exception as e:
         logger.error(
             "Embedding model %s failed to load (path: %s): %s",
@@ -165,7 +190,7 @@ class IngestionPipelineBuilder:
             return None
 
         from .transforms.base import TransformConfig
-        from src.back.rag.transforms.markdown.chunker import _get_llm_client
+        from src.rag.transforms.markdown.chunker import _get_llm_client
 
         from src.shared.config import get_config as _get_config
 
@@ -190,7 +215,9 @@ class IngestionPipelineBuilder:
             source = parts[0] if parts else self._collection_name
         return source in TRANSFORM_COLLECTIONS
 
-    def build(self, skip_transform_transformations: bool = False) -> IngestionPipeline:
+    def build(
+        self, skip_splitter: bool = False, skip_transform_transformations: bool = False
+    ) -> IngestionPipeline:
         if self._pipeline is not None and self._cached:
             return self._pipeline
 
@@ -205,10 +232,15 @@ class IngestionPipelineBuilder:
         # already produces appropriately-sized chunks.
         use_transform = not skip_transform_transformations and self._uses_transform()
 
-        if use_transform:
+        if use_transform or skip_splitter:
             md_parser = None
             splitter = None
-            logger.info("Using transform-based pipeline for collection '%s'", self._collection_name)
+            if skip_splitter:
+                logger.debug("Skipping SentenceSplitter for collection '%s'", self._collection_name)
+            if use_transform:
+                logger.info(
+                    "Using transform-based pipeline for collection '%s'", self._collection_name
+                )
         else:
             md_parser, splitter = _get_chunker_for_collection(self._collection_name)
 
@@ -248,6 +280,7 @@ class IngestionPipelineBuilder:
         self,
         documents: list[Document],
         num_workers: int | None = None,
+        skip_splitter: bool = False,
     ) -> list[Any]:
         if not documents:
             return []
@@ -260,7 +293,7 @@ class IngestionPipelineBuilder:
         if not non_empty:
             return []
 
-        pipeline = self.build()
+        pipeline = self.build(skip_splitter=skip_splitter)
         nodes = pipeline.run(
             documents=non_empty,
             num_workers=num_workers or self._num_workers,
@@ -361,6 +394,7 @@ class IngestionPipelineBuilder:
         self,
         documents: list[Document],
         num_workers: int | None = None,
+        skip_splitter: bool = False,
     ) -> list[Any]:
         if not documents:
             return []
@@ -372,7 +406,7 @@ class IngestionPipelineBuilder:
         if not non_empty:
             return []
 
-        pipeline = self.build()
+        pipeline = self.build(skip_splitter=skip_splitter)
         nodes = await pipeline.arun(
             documents=non_empty,
             num_workers=num_workers or self._num_workers,
@@ -403,22 +437,17 @@ class IngestionPipelineBuilder:
     ):
         self.build()
 
-        if self._vector_store is None:
-            from llama_index.core.vector_stores import SimpleVectorStore
+        if self._vector_store is not None:
+            try:
+                index = VectorStoreIndex.from_vector_store(vector_store=self._vector_store)
+                return index.as_query_engine(similarity_top_k=similarity_top_k)
+            except Exception as e:
+                logger.warning("Failed to build index from Qdrant vector store: %s", e)
 
-            logger.warning("Qdrant unavailable, using in-memory vector store")
-            vs: QdrantVectorStore | SimpleVectorStore = SimpleVectorStore()
-        else:
-            vs = self._vector_store
-
-        try:
-            index = VectorStoreIndex.from_vector_store(vector_store=vs)
-        except Exception as e:
-            logger.warning("Failed to build index from vector store: %s", e)
-            from llama_index.core.vector_stores import SimpleVectorStore
-
-            index = VectorStoreIndex.from_vector_store(vector_store=SimpleVectorStore())
-        return index.as_query_engine(similarity_top_k=similarity_top_k)
+        logger.warning(
+            "Qdrant unavailable or failed, cannot serve queries — returning empty engine"
+        )
+        return None
 
 
 def get_pipeline(

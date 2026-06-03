@@ -3,20 +3,32 @@
 from __future__ import annotations
 
 import logging
+import threading
 from typing import Any
 
 from llama_index.core.schema import Document
 
 from src.back.database import DatabaseService
 from src.back.qdrant.storage import store_embeddings as _store_embeddings
-from src.back.rag.ingestion import DEFAULT_MODEL
+from src.rag.ingestion import DEFAULT_MODEL, get_embedding_dimension
 
 logger = logging.getLogger(__name__)
 
 BATCH_SIZE = 32
-EMBEDDING_DIM = 384
 
 _embed_model: Any | None = None
+_embed_model_lock = threading.Lock()
+
+
+def reset_embedding_model() -> None:
+    """Reset the cached embedding model singleton.
+
+    Call this after changing the model config via set_embedding_config()
+    so the next get_embedding_model() call loads the new model.
+    """
+    global _embed_model
+    with _embed_model_lock:
+        _embed_model = None
 
 
 def get_embedding_model() -> Any:
@@ -26,7 +38,11 @@ def get_embedding_model() -> Any:
     if _embed_model is not None:
         return _embed_model
 
-    from src.back.rag.ingestion import build_embed_model
+    with _embed_model_lock:
+        if _embed_model is not None:
+            return _embed_model
+
+    from src.rag.ingestion import build_embed_model
 
     config_data = DatabaseService.get_instance().get_embedding_config()
     model_name = config_data.get("model") or DEFAULT_MODEL
@@ -75,7 +91,7 @@ async def store_embeddings(
         documents=texts,
         metadata=metadata,
         collection_name=collection_name,
-        vector_size=EMBEDDING_DIM,
+        vector_size=get_embedding_dimension(),
     )
 
 
@@ -85,11 +101,11 @@ class EmbeddingGenerator:
     def __init__(
         self,
         batch_size: int = BATCH_SIZE,
-        embedding_dim: int = EMBEDDING_DIM,
+        embedding_dim: int | None = None,
     ) -> None:
         """Initialize embedding generator."""
         self.batch_size = batch_size
-        self.embedding_dim = embedding_dim
+        self.embedding_dim = embedding_dim or get_embedding_dimension()
         self._embed_model: Any | None = None
 
     def _get_embed_model(self) -> Any:

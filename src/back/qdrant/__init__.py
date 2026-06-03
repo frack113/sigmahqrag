@@ -159,7 +159,7 @@ class QdrantVectorService:
         from llama_index.core.schema import TextNode
 
         nodes: list[TextNode] = []
-        meta_list = metadata or [{}] * len(documents)
+        meta_list = metadata if metadata is not None else [{} for _ in documents]
         for emb, doc, meta in zip(embeddings, documents, meta_list, strict=True):
             node = TextNode(text=doc, metadata=meta)
             node.embedding = emb

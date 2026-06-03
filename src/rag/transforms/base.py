@@ -39,7 +39,7 @@ class TransformConfig:
     enable_eval_questions: bool = False
     enable_llm_enrichment: bool = True
     llm_client: Any = None
-    max_heading_level: int = 2
+    max_heading_level: int = 3
     """Max heading depth for markdown chunking (1=H1 only, 2=H1+H2, 3=H1+H2+H3)."""
 
 

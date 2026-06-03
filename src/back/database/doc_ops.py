@@ -198,6 +198,107 @@ class DatabaseServiceDocOps:
             self._writer_conn.commit()
 
     # ------------------------------------------------------------------
+    # SIGMA_SPEC table (dedicated spec documents)
+    # ------------------------------------------------------------------
+
+    def get_pending_sigma_spec(self) -> list[dict]:
+        """Return all pending entries from sigma_spec table."""
+        with self._lock:
+            results = self._writer_conn.execute(
+                "SELECT url_hash, file_name, content_type, content_sha256, file_size, "
+                "original_url, title, embed_status "
+                "FROM sigma_spec WHERE embed_status = 'discovery' ORDER BY url_hash"
+            ).fetchall()
+            col_names = [desc[0] for desc in self._writer_conn.description]
+        return [dict(zip(col_names, row)) for row in results]
+
+    def update_spec_status(self, url_hash: str, status: str) -> None:
+        with self._lock:
+            self._writer_conn.execute(
+                "UPDATE sigma_spec SET embed_status = ? WHERE url_hash = ?",
+                (status, url_hash),
+            )
+            self._writer_conn.commit()
+
+    def reset_spec_status(self) -> None:
+        with self._lock:
+            self._writer_conn.execute("UPDATE sigma_spec SET embed_status = 'discovery'")
+            self._writer_conn.commit()
+
+    def mark_spec_stale_entries_skipped(self) -> None:
+        with self._lock:
+            self._writer_conn.execute(
+                "UPDATE sigma_spec SET embed_status = 'skipped' WHERE embed_status = 'discovery'"
+            )
+            self._writer_conn.commit()
+
+    def upsert_sigma_spec(self, data: dict) -> None:
+        with self._lock:
+            self._writer_conn.execute(
+                """INSERT INTO sigma_spec (
+                    url_hash, file_name, content_type, content_sha256, file_size,
+                    original_url, title, embed_status
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (url_hash) DO UPDATE SET
+                    file_name = EXCLUDED.file_name,
+                    content_type = EXCLUDED.content_type,
+                    content_sha256 = EXCLUDED.content_sha256,
+                    file_size = EXCLUDED.file_size,
+                    original_url = EXCLUDED.original_url,
+                    title = EXCLUDED.title,
+                    embed_status = EXCLUDED.embed_status""",
+                (
+                    data.get("url_hash"),
+                    data.get("file_name"),
+                    data.get("content_type"),
+                    data.get("content_sha256"),
+                    data.get("file_size"),
+                    data.get("original_url"),
+                    data.get("title"),
+                    data.get("embed_status", "discovery"),
+                ),
+            )
+            self._writer_conn.commit()
+
+    def batch_upsert_sigma_spec(self, rows: list[dict]) -> None:
+        if not rows:
+            return
+        with self._lock:
+            self._writer_conn.executemany(
+                """INSERT INTO sigma_spec (
+                    url_hash, file_name, content_type, content_sha256, file_size,
+                    original_url, title, embed_status
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT (url_hash) DO UPDATE SET
+                    file_name = EXCLUDED.file_name,
+                    content_type = EXCLUDED.content_type,
+                    content_sha256 = EXCLUDED.content_sha256,
+                    file_size = EXCLUDED.file_size,
+                    original_url = EXCLUDED.original_url,
+                    title = EXCLUDED.title,
+                    embed_status = EXCLUDED.embed_status""",
+                [
+                    (
+                        r.get("url_hash"),
+                        r.get("file_name"),
+                        r.get("content_type"),
+                        r.get("content_sha256"),
+                        r.get("file_size"),
+                        r.get("original_url"),
+                        r.get("title"),
+                        r.get("embed_status", "discovery"),
+                    )
+                    for r in rows
+                ],
+            )
+            self._writer_conn.commit()
+
+    def delete_sigma_spec(self, url_hash: str) -> None:
+        with self._lock:
+            self._writer_conn.execute("DELETE FROM sigma_spec WHERE url_hash = ?", (url_hash,))
+            self._writer_conn.commit()
+
+    # ------------------------------------------------------------------
     # DOC_ERROR table (failed URLs — 30x/40x errors to skip on retry)
     # ------------------------------------------------------------------
 
@@ -270,6 +371,26 @@ class DatabaseServiceDocOps:
         """Return all pending entries from doc_registry."""
         return self.get_pending_entries()
 
+    def get_pending_by_content_type(self, content_type: str | None = None) -> list[dict]:
+        """Return pending entries from doc_registry, optionally filtered by content_type."""
+        with self._lock:
+            if content_type:
+                results = self._writer_conn.execute(
+                    "SELECT url_hash, org, repo, content_type, file_name, content_sha256, file_size, "
+                    "original_url, normalized_url, rule_id, title, timestamp, last_seen, embed_status "
+                    "FROM doc_registry WHERE embed_status = 'discovery' AND content_type = ? ORDER BY url_hash",
+                    (content_type,),
+                ).fetchall()
+            else:
+                results = self._writer_conn.execute(
+                    "SELECT url_hash, org, repo, content_type, file_name, content_sha256, file_size, "
+                    "original_url, normalized_url, rule_id, title, timestamp, last_seen, embed_status "
+                    "FROM doc_registry WHERE embed_status = 'discovery' "
+                    "AND (content_type IS NULL OR content_type != 'sigma_rule') ORDER BY url_hash"
+                ).fetchall()
+            col_names = [desc[0] for desc in self._writer_conn.description]
+        return [dict(zip(col_names, row)) for row in results]
+
     def reset_github_all(self) -> None:
         """Reset embed_status to 'discovery' for all GitHub entries in doc_registry."""
         with self._lock:
@@ -294,16 +415,14 @@ class DatabaseServiceDocOps:
                 )
             elif collection_name == "github":
                 self._writer_conn.execute(
-                    "UPDATE doc_registry SET embed_status = 'discovery' WHERE org NOT IN ('local', 'sigmaref', 'sigma_spec')"
+                    "UPDATE doc_registry SET embed_status = 'discovery' WHERE org NOT IN ('local', 'sigmaref')"
                 )
             elif collection_name == "local":
                 self._writer_conn.execute(
                     "UPDATE doc_registry SET embed_status = 'discovery' WHERE org = 'local'"
                 )
             elif collection_name == "sigma_spec":
-                self._writer_conn.execute(
-                    "UPDATE doc_registry SET embed_status = 'discovery' WHERE org = 'sigma_spec'"
-                )
+                self._writer_conn.execute("UPDATE sigma_spec SET embed_status = 'discovery'")
             elif "/" in collection_name:
                 parts = collection_name.split("/", 2)
                 if len(parts) == 2:
@@ -312,15 +431,6 @@ class DatabaseServiceDocOps:
                         "UPDATE doc_registry SET embed_status = 'discovery' WHERE org = ? AND repo = ?",
                         (org, repo),
                     )
-            self._writer_conn.commit()
-
-    def mark_spec_stale_entries_skipped(self) -> None:
-        """Mark pending sigma_spec entries as skipped before a rescan,
-        so stale files from previously selected directories are not embedded."""
-        with self._lock:
-            self._writer_conn.execute(
-                "UPDATE doc_registry SET embed_status = 'skipped' WHERE org = 'sigma_spec' AND embed_status = 'discovery'"
-            )
             self._writer_conn.commit()
 
     def delete_doc_registry_by_repo(self, org: str, repo: str) -> None:

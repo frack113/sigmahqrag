@@ -39,7 +39,7 @@ async def store_embeddings(
         return False
 
     points = []
-    meta_list = metadata or [{}] * len(documents)
+    meta_list = metadata if metadata is not None else [{} for _ in documents]
 
     for emb, doc, meta in zip(embeddings, documents, meta_list, strict=True):
         point_id = str(uuid.uuid4())
@@ -56,6 +56,14 @@ async def store_embeddings(
 
     try:
         client = get_qdrant_client()
+        existing_collections = [c.name for c in client.get_collections().collections]
+        if collection_name not in existing_collections:
+            from qdrant_client.models import Distance, VectorParams
+
+            client.recreate_collection(
+                collection_name=collection_name,
+                vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE),
+            )
         client.upsert(
             collection_name=collection_name,
             points=points,

@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from src.back.rag.transforms.base import TransformConfig
-from src.back.rag.transforms.markdown.chunker import MarkdownChunker
+from src.rag.transforms.base import TransformConfig
+from src.rag.transforms.markdown.chunker import MarkdownChunker
 
 
 SAMPLE_MD = """# Chapter 1

@@ -7,7 +7,6 @@ from typing import Dict, Type
 from src.back.database.service import DatabaseService
 from src.worker.base import BaseWorker
 from src.worker.workers.generic_discovery_worker import GenericDiscoveryWorker, SourceType
-from src.worker.workers.generic_embedding_worker import GenericEmbeddingWorker
 from src.worker.workers.local_repo_sync_worker import LocalRepoSyncWorker
 from src.worker.workers.model_sync_worker import ModelSyncWorker
 from src.worker.workers.sigmaref_worker import SigmaRefProcessor
@@ -29,9 +28,6 @@ class TaskDispatcher:
         WorkerName.GITHUB_DISCOVERY: GenericDiscoveryWorker,
         WorkerName.LOCAL_DISCOVERY: GenericDiscoveryWorker,
         WorkerName.LOCAL_REPO_SYNC: LocalRepoSyncWorker,
-        WorkerName.SIGMAREF_EMBEDDINGS: GenericEmbeddingWorker,
-        WorkerName.GITHUB_EMBEDDINGS: GenericEmbeddingWorker,
-        WorkerName.LOCAL_EMBEDDINGS: GenericEmbeddingWorker,
         WorkerName.MODEL_SYNC: ModelSyncWorker,
     }
 
