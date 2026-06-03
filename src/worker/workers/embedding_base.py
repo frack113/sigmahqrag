@@ -58,6 +58,7 @@ class EmbeddingWorker(BaseWorker):
 
     worker_type: WorkerName
     collection_name: str = ""
+    _collection_name: str = ""
 
     def _parse_binary_document(self, file_path: Path, content_type: str) -> list[Document]:
         if content_type == FileType.PDF.value:
@@ -79,6 +80,17 @@ class EmbeddingWorker(BaseWorker):
             raise ValueError(f"Unsupported office format: {ext}")
 
         raise ValueError(f"Unsupported binary format: {content_type}")
+
+    # Map routing tags to canonical Qdrant collection names
+    _COLLECTION_ROUTING: dict[str, str] = {
+        "all": "sigma_docs",
+        "sigmaref": "sigma_docs",
+    }
+
+    def _resolve_qdrant_collection(self) -> str:
+        if self._collection_name in self._COLLECTION_ROUTING:
+            return self._COLLECTION_ROUTING[self._collection_name]
+        return self._collection_name
 
     def process(self, task: dict) -> None:
         assert self.dispatcher is not None
@@ -102,7 +114,8 @@ class EmbeddingWorker(BaseWorker):
             progress_percent=0.0,
         )
 
-        builder = IngestionPipelineBuilder(collection_name=self._collection_name)
+        qdrant_collection = self._resolve_qdrant_collection()
+        builder = IngestionPipelineBuilder(collection_name=qdrant_collection)
         valid_docs: list[tuple[Document, dict]] = []
 
         for idx, entry in enumerate(entries):
