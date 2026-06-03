@@ -6,7 +6,7 @@ import logging
 from collections.abc import Callable
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import httpx
 
@@ -191,60 +191,75 @@ def process_sigma_refs(
             else:
                 head_queue.append(base)
 
-    total_queue = len(head_queue)
+    total_head = len(head_queue)
     total_download_ready = len(download_ready)
 
-    # Phase 1: HEAD requests to resolve content types
+    # Phase 1: Parallel HEAD requests to resolve content types
     head_pending: list[dict[str, Any]] = []
-    for idx, item in enumerate(head_queue):
-        if progress_callback:
-            progress_callback(idx + 1, total_queue + total_download_ready, "resolving URLs")
+    head_completed = 0
+    head_futures: dict[Future, dict[str, Any]] = {}
 
-        url = item["url"]
-        try:
-            content_type, size, final_url = _head_request(url, request_delay)
-            norm_url = _normalize_url(final_url or url)
-            url_hash = _sha256_bytes(norm_url.encode())
+    total_head = len(head_queue)
+    with ThreadPoolExecutor(max_workers=max_workers) as head_executor:
+        for item in head_queue:
+            future = head_executor.submit(_head_request, item["url"])
+            head_futures[future] = item
 
-            if content_type not in supported_types:
-                logger.info("Reference skipped (unsupported type): %s (%s)", url, content_type)
+        for future in as_completed(head_futures):
+            head_completed += 1
+            if progress_callback:
+                progress_callback(
+                    head_completed,
+                    total_head + total_download_ready,
+                    "resolving URLs",
+                )
+
+            item = head_futures[future]
+            url = item["url"]
+            try:
+                content_type, size, final_url = future.result()
+                norm_url = _normalize_url(final_url or url)
+                url_hash = _sha256_bytes(norm_url.encode())
+
+                if content_type not in supported_types:
+                    logger.info("Reference skipped (unsupported type): %s (%s)", url, content_type)
+                    db.batch_upsert_doc_registry(
+                        [
+                            _build_head_entry(
+                                normalized_url=norm_url,
+                                content_type=content_type or "unknown",
+                                rule_id=item["rule_id"],
+                                title=item["rule_title"],
+                            )
+                        ]
+                    )
+                    skipped += 1
+                    continue
+
+                # Cache HEAD result immediately
                 db.batch_upsert_doc_registry(
                     [
                         _build_head_entry(
                             normalized_url=norm_url,
-                            content_type=content_type or "unknown",
+                            content_type=content_type,
                             rule_id=item["rule_id"],
                             title=item["rule_title"],
+                            file_size=size,
                         )
                     ]
                 )
-                skipped += 1
-                continue
-
-            # Cache HEAD result immediately
-            db.batch_upsert_doc_registry(
-                [
-                    _build_head_entry(
-                        normalized_url=norm_url,
-                        content_type=content_type,
-                        rule_id=item["rule_id"],
-                        title=item["rule_title"],
-                        file_size=size,
-                    )
-                ]
-            )
-            head_pending.append(
-                {
-                    **item,
-                    "content_type": content_type,
-                    "size": size,
-                    "final_url": final_url or url,
-                    "url_hash": url_hash,
-                }
-            )
-        except Exception as e:
-            logger.warning("HEAD failed for %s: %s", url, e)
-            failed += 1
+                head_pending.append(
+                    {
+                        **item,
+                        "content_type": content_type,
+                        "size": size,
+                        "final_url": final_url or url,
+                        "url_hash": url_hash,
+                    }
+                )
+            except Exception as e:
+                logger.warning("HEAD failed for %s: %s", url, e)
+                failed += 1
 
     total_to_download = len(head_pending) + total_download_ready
 
@@ -291,13 +306,14 @@ def process_sigma_refs(
                     skipped += 1
                 elif result[0] == "ok":
                     final_url = item["final_url"]
+                    head_result = cast("tuple[str, str, int]", result)
                     entry = _build_download_entry(
                         normalized_url=final_url,
                         content_type=item["content_type"],
                         rule_id=item["rule_id"],
                         title=item["rule_title"],
-                        content_sha256=result[1],
-                        file_size=result[2],
+                        content_sha256=head_result[1],
+                        file_size=head_result[2],
                     )
                     db.batch_upsert_doc_registry([entry])
                     downloaded += 1
@@ -310,8 +326,8 @@ def process_sigma_refs(
             if progress_callback:
                 completed = downloaded + failed
                 progress_callback(
-                    total_queue + completed,
-                    total_queue + total_to_download,
+                    total_head + completed,
+                    total_head + total_to_download,
                     "downloading",
                 )
 
