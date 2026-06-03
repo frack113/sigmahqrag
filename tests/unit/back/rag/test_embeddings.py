@@ -56,8 +56,8 @@ class TestEmbedDocuments:
 
     @pytest.mark.asyncio
     async def test_success(self) -> None:
-        mock_model = AsyncMock()
-        mock_model.aembed_documents = AsyncMock(return_value=[[0.1], [0.2]])
+        mock_model = MagicMock()
+        mock_model.get_text_embedding_batch = MagicMock(return_value=[[0.1], [0.2]])
         docs = [MagicMock(text="a"), MagicMock(text="b")]
         with patch("src.rag.embeddings.get_embedding_model", return_value=mock_model):
             result = await embed_documents(docs)

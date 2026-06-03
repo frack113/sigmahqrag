@@ -18,7 +18,12 @@ from llama_index.vector_stores.qdrant import QdrantVectorStore
 
 from src.shared.config import get_config
 
+import threading
+
 logger = logging.getLogger(__name__)
+
+_embed_model: Any | None = None
+_embed_model_lock = threading.Lock()
 
 DEFAULT_MODEL = "intfloat/multilingual-e5-small"
 DEFAULT_CHUNK_SIZE = 1024
@@ -129,6 +134,9 @@ def build_embed_model(model_name: str) -> BaseEmbedding:
 class IngestionPipelineBuilder:
     """Builds and manages a LlamaIndex IngestionPipeline with config-driven model selection."""
 
+    _MODEL_NAME_TO_EMBED: dict[str, Any] = {}
+    _MODEL_NAME_LOCK: threading.Lock = threading.Lock()
+
     def __init__(
         self,
         model_name: str | None = None,
@@ -144,7 +152,10 @@ class IngestionPipelineBuilder:
             self._model_name = model_name
         self._collection_name = collection_name or "sigma_docs"
         self._num_workers = num_workers
-        self._embed_model = build_embed_model(self._model_name)
+        with self._MODEL_NAME_LOCK:
+            if self._model_name not in self._MODEL_NAME_TO_EMBED:
+                self._MODEL_NAME_TO_EMBED[self._model_name] = build_embed_model(self._model_name)
+            self._embed_model = self._MODEL_NAME_TO_EMBED[self._model_name]
         self._pipeline: IngestionPipeline | None = None
         self._vector_store: QdrantVectorStore | None = None
         self._cached = False

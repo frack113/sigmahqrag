@@ -82,9 +82,6 @@ class SigmaChunker(DocumentTransform):
         if not self.config.enable_eval_questions:
             return documents
 
-        for doc in documents:
-            # Eval questions are already set in the chunk dict by make_chunk.
-            pass
         return documents
 
     def _chunk_rule(self, rule: dict) -> list[dict]:

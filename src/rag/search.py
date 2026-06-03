@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import threading
 from typing import Any
 
 from src.back.database import DatabaseService
 from src.back.qdrant.client import get_qdrant_client
-from src.rag.ingestion import build_embed_model, DEFAULT_MODEL
+from src.rag.ingestion import DEFAULT_MODEL, build_embed_model
 
 logger = logging.getLogger(__name__)
 
@@ -17,17 +18,23 @@ SIMILARITY_THRESHOLD = 0.0
 
 
 _async_embed_model: Any | None = None
+_search_embed_model_lock = threading.Lock()
 
 
 def reset_search_embed_model() -> None:
     """Reset the cached search embedding model singleton."""
     global _async_embed_model
-    _async_embed_model = None
+    with _search_embed_model_lock:
+        _async_embed_model = None
 
 
 def _get_search_embed_model() -> Any:
     global _async_embed_model
-    if _async_embed_model is None:
+    if _async_embed_model is not None:
+        return _async_embed_model
+    with _search_embed_model_lock:
+        if _async_embed_model is not None:
+            return _async_embed_model
         config_data = DatabaseService.get_instance().get_embedding_config()
         model_name = config_data.get("model") or DEFAULT_MODEL
         _async_embed_model = build_embed_model(model_name)

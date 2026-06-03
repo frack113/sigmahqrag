@@ -6,9 +6,9 @@ Uses LLM to generate dynamic keywords per chunk for better semantic recall.
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import re
+import threading
 from pathlib import Path
 
 import httpx
@@ -55,7 +55,7 @@ class _StaticLlamaClient:
 
     def generate(self, prompt: str, max_tokens: int = 512, temperature: float = 0.3) -> str:
         try:
-            with httpx.Client(timeout=120.0) as client:
+            with httpx.Client(timeout=15.0) as client:
                 resp = client.post(
                     f"{self.base_url}/v1/completions",
                     json={
@@ -75,13 +75,15 @@ class _StaticLlamaClient:
 
 # Global LLM client singleton (lazy-initialized)
 _llm_client: _StaticLlamaClient | None = None
-_llm_lock = asyncio.Lock()
+_llm_lock = threading.Lock()
 
 
 def _get_llm_client() -> _StaticLlamaClient:
     global _llm_client
     if _llm_client is None:
-        _llm_client = _StaticLlamaClient()
+        with _llm_lock:
+            if _llm_client is None:
+                _llm_client = _StaticLlamaClient()
     return _llm_client
 
 

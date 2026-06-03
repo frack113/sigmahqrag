@@ -29,7 +29,7 @@ class PDFTransform(DocumentTransform):
             chunk_size=self.config.chunk_size,
             chunk_overlap=self.config.chunk_overlap,
         )
-        return splitter(documents)
+        return splitter(documents)  # type: ignore[return-value]
 
 
 TransformRegistry.register(PDFTransform)

@@ -42,11 +42,11 @@ def get_embedding_model() -> Any:
         if _embed_model is not None:
             return _embed_model
 
-    from src.rag.ingestion import build_embed_model
+        from src.rag.ingestion import build_embed_model
 
-    config_data = DatabaseService.get_instance().get_embedding_config()
-    model_name = config_data.get("model") or DEFAULT_MODEL
-    _embed_model = build_embed_model(model_name)
+        config_data = DatabaseService.get_instance().get_embedding_config()
+        model_name = config_data.get("model") or DEFAULT_MODEL
+        _embed_model = build_embed_model(model_name)
     return _embed_model
 
 
@@ -64,10 +64,13 @@ async def embed_documents(documents: list[Document]) -> list[list[float]]:
 
     try:
         embed_model = get_embedding_model()
-        embeddings = await embed_model.aembed_documents([doc.text for doc in documents])
-        return list(embeddings)
+        texts = [doc.text for doc in documents if doc.text]
+        if not texts:
+            return []
+        batch = embed_model.get_text_embedding_batch(texts)
+        return [list(emb) for emb in batch if emb]
     except Exception as e:
-        logger.error(f"Failed to generate embeddings: {e}")
+        logger.error("Failed to generate embeddings: %s", e)
         return []
 
 

@@ -30,6 +30,8 @@ def load_sigma_rules(str_path: str) -> list[dict]:
     for file in files:
         with file.open(encoding="utf-8") as f:
             for doc in yaml.safe_load_all(f):
+                if doc is None:
+                    continue
                 if is_sigma_rule(doc):
                     rules.append(doc)
 

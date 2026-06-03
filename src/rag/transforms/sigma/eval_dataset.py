@@ -10,7 +10,8 @@ def build_ragas_dataset(chunks: list[dict]) -> list[dict]:
         questions = chunk.get("eval_questions", [])
 
         if not questions:
-            questions = [f"What information is contained in this {chunk['chunk_type']} chunk?"]
+            chunk_type = chunk.get("chunk_type", "chunk")
+            questions = [f"What information is contained in this {chunk_type} chunk?"]
 
         for question in questions:
             rows.append(
