@@ -18,6 +18,7 @@ router = APIRouter(prefix="/api/v1/search", tags=["v1-search"])
 async def search_rules_endpoint(
     query: str = Query(..., description="Search query"),
     limit: int = Query(default=10, ge=1, le=100),
+    use_router: bool = Query(default=False, description="Enable LLM query routing"),
 ) -> SearchResponse:
     """Search Sigma rules by query."""
     if not query.strip():
@@ -27,11 +28,11 @@ async def search_rules_endpoint(
         )
 
     try:
-        engine = SearchEngine()
+        engine = SearchEngine(use_router=use_router)
         results = await engine.search(query, top_k=limit)
         return SearchResponse(
             data=results,
-            meta={"total": len(results), "query": query},
+            meta={"total": len(results), "query": query, "routed": use_router},
         )
     except Exception as e:
         logger.error("Search failed: %s", e)

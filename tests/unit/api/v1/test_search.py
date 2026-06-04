@@ -33,7 +33,7 @@ class TestSearchAPI:
 
         assert response.status_code == 200
         data = response.json()
-        assert data == {"data": [], "meta": {"total": 0, "query": "test"}}
+        assert data == {"data": [], "meta": {"total": 0, "query": "test", "routed": False}}
 
     @patch("src.rag.search.SearchEngine.search", new_callable=AsyncMock)
     def test_search_returns_results(self, mock_search: AsyncMock, client: TestClient) -> None:

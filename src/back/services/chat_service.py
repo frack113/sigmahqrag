@@ -21,8 +21,8 @@ MAX_HISTORY = 50
 class ChatService:
     """Service layer for chat operations."""
 
-    def __init__(self) -> None:
-        self.search_engine = SearchEngine()
+    def __init__(self, use_router: bool = True) -> None:
+        self.search_engine = SearchEngine(use_router=use_router)
         self.rag_pipeline = RAGPipeline()
         self.validator = SigmaValidator()
         self._history: list[dict[str, str]] = []

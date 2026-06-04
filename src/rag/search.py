@@ -10,6 +10,7 @@ from typing import Any
 from src.back.database import DatabaseService
 from src.back.qdrant.client import get_qdrant_client
 from src.rag.ingestion import DEFAULT_MODEL, build_embed_model
+from src.rag.router import route_query
 
 logger = logging.getLogger(__name__)
 
@@ -214,6 +215,7 @@ class SearchEngine:
         collection_names: list[str] | None = None,
         top_k: int = DEFAULT_TOP_K,
         similarity_threshold: float = SIMILARITY_THRESHOLD,
+        use_router: bool = False,
     ) -> None:
         """Initialize search engine.
 
@@ -222,19 +224,35 @@ class SearchEngine:
                 Defaults to [sigma_rules, sigma_docs, sigma_spec].
             top_k: Number of results per collection.
             similarity_threshold: Minimum similarity score.
+            use_router: Enable LLM-based query routing to search only
+                relevant collections instead of all three.
         """
         self.collection_names = collection_names or list(DEFAULT_COLLECTIONS)
         self.top_k = top_k
         self.similarity_threshold = similarity_threshold
+        self.use_router = use_router
 
     async def search(self, query: str, top_k: int | None = None) -> list[dict[str, Any]]:
-        """Search across all configured collections and fuse results with RRF.
+        """Search across configured collections and fuse results with RRF.
 
-        Searches each collection in parallel, then fuses ranked lists
-        using Reciprocal Rank Fusion (RRF, k=60).
+        When ``use_router`` is enabled, classifies the query first and
+        searches only the relevant collections.  Falls back to all
+        collections if routing fails.
         """
         limit = top_k if top_k is not None else self.top_k
         per_collection_k = max(limit * 2, 10)
+
+        # Determine which collections to search
+        if self.use_router:
+            try:
+                routed = await route_query(query)
+                cols = [c for c in routed if c in self.collection_names]
+                if not cols:
+                    cols = self.collection_names
+            except Exception:
+                cols = self.collection_names
+        else:
+            cols = self.collection_names
 
         tasks = [
             search(
@@ -243,7 +261,7 @@ class SearchEngine:
                 top_k=per_collection_k,
                 similarity_threshold=self.similarity_threshold,
             )
-            for col in self.collection_names
+            for col in cols
         ]
         all_results = await asyncio.gather(*tasks, return_exceptions=True)
 

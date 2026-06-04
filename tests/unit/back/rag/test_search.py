@@ -350,3 +350,55 @@ class TestFormatResultByCollection:
         assert "score" in formatted
         assert "collection" in formatted
         assert "source_file" in formatted
+
+
+class TestSearchEngineWithRouter:
+    def test_init_use_router_default_false(self) -> None:
+        engine = SearchEngine()
+        assert engine.use_router is False
+
+    def test_init_use_router_true(self) -> None:
+        engine = SearchEngine(use_router=True)
+        assert engine.use_router is True
+
+    @pytest.mark.asyncio
+    async def test_router_disabled_searches_all_collections(self) -> None:
+        engine = SearchEngine(use_router=False)
+        with patch("src.rag.search.search", AsyncMock(return_value=[{"text": "a"}])) as mock_search:
+            await engine.search("q")
+        assert mock_search.call_count == 3
+
+    @pytest.mark.asyncio
+    async def test_router_enabled_filters_collections(self) -> None:
+        engine = SearchEngine(use_router=True)
+        with (
+            patch("src.rag.search.route_query", AsyncMock(return_value=["sigma_rules"])),
+            patch("src.rag.search.search", AsyncMock(return_value=[{"text": "a"}])) as mock_search,
+        ):
+            await engine.search("q")
+        assert mock_search.call_count == 1
+        assert mock_search.call_args_list[0].kwargs["collection_name"] == "sigma_rules"
+
+    @pytest.mark.asyncio
+    async def test_router_returns_unknown_collection_falls_back(self) -> None:
+        engine = SearchEngine(use_router=True)
+        with (
+            patch(
+                "src.rag.search.route_query",
+                AsyncMock(return_value=["unknown_collection"]),
+            ),
+            patch("src.rag.search.search", AsyncMock(return_value=[{"text": "a"}])) as mock_search,
+        ):
+            await engine.search("q")
+        # Falls back to all collections when routed results don't match
+        assert mock_search.call_count == 3
+
+    @pytest.mark.asyncio
+    async def test_router_failure_falls_back(self) -> None:
+        engine = SearchEngine(use_router=True)
+        with (
+            patch("src.rag.search.route_query", AsyncMock(side_effect=Exception("timeout"))),
+            patch("src.rag.search.search", AsyncMock(return_value=[{"text": "a"}])) as mock_search,
+        ):
+            await engine.search("q")
+        assert mock_search.call_count == 3
