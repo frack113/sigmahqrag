@@ -1,6 +1,7 @@
 """Unified document indexer — reads from DuckDB, transforms, embeds, stores in Qdrant.
 
-No if/else chains: routing is driven by IndexRoute dataclass and TransformRegistry.
+Routing is driven by IndexRoute dataclass and TransformRegistry.
+Storage uses a single store_embeddings() call for all collection types.
 """
 
 from __future__ import annotations
@@ -9,7 +10,7 @@ import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 from src.back.database import DatabaseService
-from src.back.qdrant.storage import store_embeddings, upsert_by_key
+from src.back.qdrant.storage import store_embeddings
 from src.rag.embeddings import embed_documents
 from src.rag.transforms import TransformRegistry
 from src.rag.transforms.generique.parser import GenericTransform
@@ -26,7 +27,6 @@ class IndexRoute:
         table_name: DuckDB table to read pending entries from.
         qdrant_collection: Target Qdrant collection name.
         content_type: Optional filter on content_type column.
-            When None, excludes sigma_rule entries (they have their own route).
     """
 
     table_name: str
@@ -93,20 +93,12 @@ class UnifiedIndexer:
 
                 embeddings = await embed_documents(docs)
 
-                if route.qdrant_collection == "sigma_rules":
-                    await upsert_by_key(
-                        embeddings=embeddings,
-                        documents=[d.text for d in docs],
-                        metadata=[d.metadata for d in docs],
-                        collection_name=route.qdrant_collection,
-                    )
-                else:
-                    await store_embeddings(
-                        embeddings=embeddings,
-                        documents=[d.text for d in docs],
-                        metadata=[d.metadata for d in docs],
-                        collection_name=route.qdrant_collection,
-                    )
+                await store_embeddings(
+                    embeddings=embeddings,
+                    documents=[d.text for d in docs],
+                    metadata=[d.metadata for d in docs],
+                    collection_name=route.qdrant_collection,
+                )
 
                 self._update_status(route.table_name, row, "embedded")
                 result.processed += 1

@@ -142,6 +142,52 @@ def format_search_result(result: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def format_result_by_collection(result: dict[str, Any]) -> dict[str, Any]:
+    """Format a search result adapted to its source collection.
+
+    Reads ``collection`` from metadata (injected by transforms via TransformConfig)
+    and returns a display-oriented dict with collection-specific fields.
+
+    Args:
+        result: Raw search result from Qdrant
+
+    Returns:
+        Formatted result with collection-appropriate fields
+    """
+    meta = result.get("metadata", {})
+    collection = meta.get("collection", "")
+
+    base = {
+        "text": result.get("text", ""),
+        "score": result.get("score", 0.0),
+        "collection": collection,
+        "source_file": meta.get("source_file", ""),
+    }
+
+    if collection == "sigma_rules":
+        return {
+            **base,
+            "rule_id": meta.get("rule_id", ""),
+            "title": meta.get("title", ""),
+            "level": meta.get("level", ""),
+            "status": meta.get("status", ""),
+            "chunk_type": meta.get("chunk_type", ""),
+            "product": meta.get("product", ""),
+            "category": meta.get("category", ""),
+        }
+
+    if collection == "sigma_docs":
+        return {
+            **base,
+            "doc_type": meta.get("doc_type", ""),
+            "heading_text": meta.get("heading_text", ""),
+            "heading_level": meta.get("heading_level", 0),
+        }
+
+    # sigma_spec or unknown
+    return base
+
+
 def get_citation(result: dict[str, Any]) -> str:
     """Get citation string for a result.
 

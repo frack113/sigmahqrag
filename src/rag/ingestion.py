@@ -209,6 +209,7 @@ class IngestionPipelineBuilder:
         llm_client = _get_llm_client()
         config = TransformConfig(
             collection_name=self._collection_name,
+            collection=self._collection_name,
             model_name=self._model_name,
             chunk_size=SOURCE_CHUNK_CONFIG.get(source, {}).get("chunk_size", 512),
             chunk_overlap=SOURCE_CHUNK_CONFIG.get(source, {}).get("chunk_overlap", 50),
@@ -395,6 +396,7 @@ class IngestionPipelineBuilder:
 
         return TransformConfig(
             collection_name=self._collection_name,
+            collection=self._collection_name,
             model_name=self._model_name,
             chunk_size=chunk_cfg.get("chunk_size", 512),
             chunk_overlap=chunk_cfg.get("chunk_overlap", 50),

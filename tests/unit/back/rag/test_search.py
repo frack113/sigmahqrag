@@ -7,6 +7,7 @@ import pytest
 from src.rag.search import (
     SearchEngine,
     _get_search_embed_model,
+    format_result_by_collection,
     format_search_result,
     get_citation,
     search,
@@ -266,3 +267,86 @@ class TestGetCitation:
     def test_no_metadata(self) -> None:
         result = get_citation({})
         assert result == ""
+
+
+class TestFormatResultByCollection:
+    def test_sigma_rules_format(self) -> None:
+        result = {
+            "text": "detection text",
+            "score": 0.9,
+            "metadata": {
+                "collection": "sigma_rules",
+                "source_file": "/rules/test.yml",
+                "rule_id": "abc-123",
+                "title": "Test Rule",
+                "level": "high",
+                "status": "stable",
+                "chunk_type": "executive_summary",
+                "product": "windows",
+                "category": "process_creation",
+            },
+        }
+        formatted = format_result_by_collection(result)
+        assert formatted["collection"] == "sigma_rules"
+        assert formatted["rule_id"] == "abc-123"
+        assert formatted["title"] == "Test Rule"
+        assert formatted["level"] == "high"
+        assert formatted["chunk_type"] == "executive_summary"
+        assert formatted["text"] == "detection text"
+        assert formatted["score"] == 0.9
+
+    def test_sigma_docs_format(self) -> None:
+        result = {
+            "text": "CVE description",
+            "score": 0.85,
+            "metadata": {
+                "collection": "sigma_docs",
+                "source_file": "/docs/cve.md",
+                "doc_type": "markdown",
+                "heading_text": "CVE-2024-1234",
+                "heading_level": 2,
+            },
+        }
+        formatted = format_result_by_collection(result)
+        assert formatted["collection"] == "sigma_docs"
+        assert formatted["doc_type"] == "markdown"
+        assert formatted["heading_text"] == "CVE-2024-1234"
+        assert formatted["heading_level"] == 2
+        assert "rule_id" not in formatted
+
+    def test_sigma_spec_format(self) -> None:
+        result = {
+            "text": "spec content",
+            "score": 0.7,
+            "metadata": {
+                "collection": "sigma_spec",
+                "source_file": "/spec/format.md",
+            },
+        }
+        formatted = format_result_by_collection(result)
+        assert formatted["collection"] == "sigma_spec"
+        assert formatted["source_file"] == "/spec/format.md"
+        assert "rule_id" not in formatted
+        assert "heading_text" not in formatted
+
+    def test_unknown_collection_format(self) -> None:
+        result = {
+            "text": "some text",
+            "score": 0.5,
+            "metadata": {},
+        }
+        formatted = format_result_by_collection(result)
+        assert formatted["collection"] == ""
+        assert formatted["text"] == "some text"
+
+    def test_base_fields_always_present(self) -> None:
+        result = {
+            "text": "text",
+            "score": 0.9,
+            "metadata": {"collection": "sigma_rules"},
+        }
+        formatted = format_result_by_collection(result)
+        assert "text" in formatted
+        assert "score" in formatted
+        assert "collection" in formatted
+        assert "source_file" in formatted

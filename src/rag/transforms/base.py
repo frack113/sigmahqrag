@@ -29,6 +29,7 @@ class TransformConfig:
     """
 
     collection_name: str = "default"
+    collection: str = "default"
     model_name: str = "intfloat/multilingual-e5-small"
     chunk_size: int = 1024
     chunk_overlap: int = 100
@@ -128,8 +129,10 @@ class DocumentTransform(ABC):
         from src.shared.config import get_config
 
         cfg = get_config()
+        collection_name = getattr(cfg, "qdrant_collection_name", "default")
         return TransformConfig(
-            collection_name=getattr(cfg, "qdrant_collection_name", "default"),
+            collection_name=collection_name,
+            collection=collection_name,
             model_name=getattr(cfg, "embedding_model_name", "intfloat/multilingual-e5-small"),
             chunk_size=getattr(cfg, "chunk_size", 1024),
             chunk_overlap=getattr(cfg, "chunk_overlap", 100),
@@ -156,6 +159,8 @@ class DocumentTransform(ABC):
     def run(self, file_path: Path) -> list[Document]:
         """Execute the full transform pipeline: parse -> chunk -> post_process.
 
+        Injects ``collection`` into each document's metadata for unified storage routing.
+
         Args:
             file_path: Path to the source file.
 
@@ -164,4 +169,7 @@ class DocumentTransform(ABC):
         """
         documents = self.parse(file_path)
         chunks = self.chunk(documents)
-        return self.post_process(chunks)
+        result = self.post_process(chunks)
+        for doc in result:
+            doc.metadata["collection"] = self.config.collection
+        return result

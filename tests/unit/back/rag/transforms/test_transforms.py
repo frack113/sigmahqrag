@@ -263,3 +263,39 @@ class TestSigmaChunker:
 
         assert chunks[0].metadata.get("rule_id") == "12345678-1234-1234-1234-123456789012"
         assert "chunk_type" in chunks[0].metadata
+
+
+class TestCollectionInjection:
+    """Tests that DocumentTransform.run() injects collection into metadata."""
+
+    def test_run_injects_collection(self, sample_sigma_file):
+        config = TransformConfig(
+            enable_rich_chunks=False,
+            collection="sigma_rules",
+        )
+        parser = SigmaParser(config)
+        result = parser.run(sample_sigma_file)
+
+        assert len(result) > 0
+        for doc in result:
+            assert doc.metadata.get("collection") == "sigma_rules"
+
+    def test_run_injects_collection_rich_mode(self, sample_sigma_file):
+        config = TransformConfig(
+            enable_rich_chunks=True,
+            collection="sigma_rules",
+        )
+        chunker = SigmaChunker(config)
+        result = chunker.run(sample_sigma_file)
+
+        assert len(result) > 0
+        for doc in result:
+            assert doc.metadata.get("collection") == "sigma_rules"
+
+    def test_default_collection_when_not_set(self, sample_sigma_file):
+        config = TransformConfig(enable_rich_chunks=False)
+        parser = SigmaParser(config)
+        result = parser.run(sample_sigma_file)
+
+        for doc in result:
+            assert doc.metadata.get("collection") == "default"
