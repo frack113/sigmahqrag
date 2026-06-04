@@ -118,7 +118,8 @@ async def upsert_by_key(
             logger.warning("Missing key fields, skipping point")
             continue
 
-        point_id = f"{collection_name}_{'_'.join(key_parts)}"
+        raw_key = f"{collection_name}_{'_'.join(key_parts)}"
+        point_id = str(uuid.uuid5(uuid.NAMESPACE_URL, raw_key))
         points.append(
             qdrant_client.models.PointStruct(
                 id=point_id,
