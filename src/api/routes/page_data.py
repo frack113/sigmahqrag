@@ -25,6 +25,12 @@ async def data_github_page(request: Request):
     return templates.TemplateResponse(request=request, name="data/github.html")
 
 
+@router.get("/data/sigma-spec")
+async def data_sigma_spec_page(request: Request):
+    """Serve the Sigma Specification management page."""
+    return templates.TemplateResponse(request=request, name="data/sigma_spec.html")
+
+
 @router.get("/data/embedding")
 async def data_embedding_page(request: Request):
     """Serve the embedding configuration page."""

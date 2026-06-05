@@ -6,14 +6,10 @@ from typing import Dict, Type
 
 from src.back.database.service import DatabaseService
 from src.worker.base import BaseWorker
-from src.worker.workers.github_discovery_worker import GithubDiscoveryWorker
-from src.worker.workers.github_embedding_worker import GithubEmbeddingWorker
-from src.worker.workers.local_discovery_worker import LocalDiscoveryWorker
-from src.worker.workers.local_embedding_worker import LocalEmbeddingWorker
+from src.worker.workers.generic_discovery_worker import GenericDiscoveryWorker, SourceType
 from src.worker.workers.local_repo_sync_worker import LocalRepoSyncWorker
 from src.worker.workers.model_sync_worker import ModelSyncWorker
-from src.worker.workers.sigmaref_discovery_worker import SigmaRefDiscoveryWorker
-from src.worker.workers.sigmaref_embedding_worker import SigmaRefEmbeddingWorker
+from src.worker.workers.sigmaref_worker import SigmaRefProcessor
 
 from src.worker.enums import WorkerStatus, WorkerName
 
@@ -28,13 +24,10 @@ class TaskDispatcher:
     """
 
     _WORKER_TYPES: Dict[WorkerName, Type[BaseWorker]] = {
-        WorkerName.SIGMAREF_DISCOVERY: SigmaRefDiscoveryWorker,
-        WorkerName.GITHUB_DISCOVERY: GithubDiscoveryWorker,
-        WorkerName.LOCAL_DISCOVERY: LocalDiscoveryWorker,
+        WorkerName.SIGMAREF_DISCOVERY: SigmaRefProcessor,
+        WorkerName.GITHUB_DISCOVERY: GenericDiscoveryWorker,
+        WorkerName.LOCAL_DISCOVERY: GenericDiscoveryWorker,
         WorkerName.LOCAL_REPO_SYNC: LocalRepoSyncWorker,
-        WorkerName.SIGMAREF_EMBEDDINGS: SigmaRefEmbeddingWorker,
-        WorkerName.GITHUB_EMBEDDINGS: GithubEmbeddingWorker,
-        WorkerName.LOCAL_EMBEDDINGS: LocalEmbeddingWorker,
         WorkerName.MODEL_SYNC: ModelSyncWorker,
     }
 
@@ -142,7 +135,14 @@ class TaskDispatcher:
 
         self._db = DatabaseService.get_instance()
 
-        self._workers = {name: cls(self._db, self) for name, cls in self._WORKER_TYPES.items()}
+        self._workers = {
+            name: (
+                cls(self._db, self, source_type=SourceType.GITHUB)
+                if name == WorkerName.GITHUB_DISCOVERY and cls is GenericDiscoveryWorker
+                else cls(self._db, self)
+            )
+            for name, cls in self._WORKER_TYPES.items()
+        }
         for name in self._WORKER_TYPES:
             self._worker_states[name] = {
                 "status": WorkerStatus.IDLE,
@@ -167,9 +167,16 @@ class TaskDispatcher:
         self._running = False
         self._stop_event.set()
         if self._executor:
-            self._executor.shutdown(wait=True, cancel_futures=True)
+            self._executor.shutdown(wait=False, cancel_futures=True)
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=5)
+        # Detach any remaining executor threads so the process can exit
+        for t in threading.enumerate():
+            if t is threading.current_thread() or t.daemon:
+                continue
+            if t.name and t.name.startswith("WorkerExecutor"):
+                logger.debug("Detaching executor thread: %s", t.name)
+                t.daemon = True
         logger.info("TaskDispatcher stopped.")
 
     # ------------------------------------------------------------------

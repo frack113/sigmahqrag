@@ -28,6 +28,7 @@ from src.api.v1.explain import router as explain_v1_router
 from src.api.v1.feedback import router as feedback_v1_router
 from src.api.v1.files import router as files_v1_router
 from src.api.v1.github import router as github_v1_router
+from src.api.v1.spec import router as spec_v1_router
 from src.api.v1.llamacpp import router as llama_router
 from src.api.v1.logs import router as logs_v1_router
 from src.api.v1.models_llm import router as models_llm_router
@@ -81,6 +82,18 @@ def _setup_logging(level: str = "INFO", max_size: str = "10M", max_files: int = 
 
     for noisy in ("httpx", "httpcore", "urllib3", "uvicorn.access"):
         logging.getLogger(noisy).setLevel(logging.WARNING)
+
+
+async def _init_qdrant_collections() -> None:
+    """Ensure all RAG collections exist with hybrid search enabled."""
+    from src.back.qdrant import QdrantVectorService
+
+    for col in ("sigma_rules", "sigma_docs", "sigma_spec"):
+        try:
+            svc = QdrantVectorService(collection_name=col)
+            await svc.create_collection(enable_hybrid=True)
+        except Exception as e:
+            logger.warning("Could not create Qdrant collection '%s': %s", col, e)
 
 
 def _clean_at_startup() -> None:
@@ -192,6 +205,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         logger.info("llama.cpp started.")
         await start_qdrant()
         logger.info("Qdrant started.")
+
+        await _init_qdrant_collections()
+        logger.info("Qdrant collections initialized.")
+
         logger.info("=== Application startup complete ===")
     except BaseException as e:
         logger.error(f"Startup failed: {e}", exc_info=True)
@@ -273,6 +290,7 @@ def create_app() -> FastAPI:
     app.include_router(models_embedding_router)
     app.include_router(qdrant_router)
     app.include_router(search_v1_router)
+    app.include_router(spec_v1_router)
     app.include_router(prompts_v1_router)
     app.include_router(chat_v1_router)
     app.include_router(chat_page_router)

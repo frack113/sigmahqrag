@@ -189,7 +189,10 @@ class SubprocessManager:
                 process_info.process.wait(timeout=10)
             except subprocess.TimeoutExpired:
                 process_info.process.kill()
-                process_info.process.wait()
+                try:
+                    process_info.process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    logger.warning(f"Could not kill {name} (PID {process_info.pid})")
 
             if process_info.log_handle is not None:
                 process_info.log_handle.close()

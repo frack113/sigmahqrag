@@ -41,49 +41,33 @@
         </div>
     </div>
 
-    <!-- SigmaRef Embedding Card -->
-    <div class="card w-100" id="sigmaref-embed-card">
+    <!-- Unified Indexer Card -->
+    <div class="card w-100" id="indexer-card">
         <div class="card-header">
-            <h2>Embed documents</h2>
+            <h2>Indexer les documents en attente</h2>
         </div>
         <div class="card-body">
-            <table class="table table-hover" id="embed-table">
-                <thead>
-                    <tr>
-                        <th>Source</th>
-                        <th>Progress</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr id="github-progress-row">
-                         <td>Github repo</td>
-                        <td>
-                            <div id="github-progress-section" class="progress-bar-container">
-                                <div class="progress-blue-gradient">
-                                    <div class="progress-blue-gradient-fill" id="github-progress-fill"></div>
-                                </div>
-                                <span class="progress-text" id="github-progress-text">0%</span>
-                            </div>
-                            <div id="github-message" class="vectordb-message" style="display:none;"></div>
-                        </td>
-                    </tr>
-                    <tr id="sigmaref-progress-row">
-                        <td>Sigma Reference</td>
-                        <td>
-                            <div id="sigmaref-progress-section" class="progress-bar-container">
-                                <div class="progress-blue-gradient">
-                                    <div class="progress-blue-gradient-fill" id="sigmaref-progress-fill"></div>
-                                </div>
-                                <span class="progress-text" id="sigmaref-progress-text">0%</span>
-                            </div>
-                            <div id="sigmaref-message" class="vectordb-message" style="display:none;"></div>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
+            <p>Parcourt les tables doc_registry et sigma_spec pour indexer les fichiers non encore traités vers Qdrant.</p>
+
+            <div id="indexer-progress-spec" class="progress-bar-container" >
+                <div class="progress-label">Spécification (<span id="indexer-progress-spec-text">En attente</span>)</div>
+                <div class="progress-blue-gradient">
+                    <div class="progress-blue-gradient-fill" id="indexer-progress-spec-fill" style="width:0%"></div>
+                </div>
+            </div>
+
+            <div id="indexer-progress-docs" class="progress-bar-container">
+                <div class="progress-label">Documents (<span id="indexer-progress-docs-text">En attente</span>)</div>
+                <div class="progress-blue-gradient">
+                    <div class="progress-blue-gradient-fill" id="indexer-progress-docs-fill" style="width:0%"></div>
+                </div>
+            </div>
+
+            <div id="indexer-result" class="vectordb-message" ></div>
+            <div id="indexer-error" class="vectordb-message" style="display:none;color:#f44336;"></div>
         </div>
         <div class="card-footer vectordb-card-actions">
-            <button class="btn btn-success" id="btn-index-docs" onclick="startSigmaRefEmbedding()">index docs</button>
+            <button class="btn btn-success" id="btn-index-docs" onclick="startUnifiedIndex()">Indexer</button>
         </div>
     </div>
 </div>

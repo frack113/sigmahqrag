@@ -9,12 +9,14 @@ from typing import Any
 
 import qdrant_client
 
+from qdrant_client.http.exceptions import UnexpectedResponse
+
 from .client import get_qdrant_client
 
 logger = logging.getLogger(__name__)
 
 
-def _get_collections_sync(client) -> list:
+def _get_collections_sync(client) -> Any:
     """Synchronous wrapper for client.get_collections()."""
     return client.get_collections()
 
@@ -26,15 +28,21 @@ def _get_collection_sync(client, collection_name: str):
 
 def _count_sync(client, collection_name: str) -> int:
     """Synchronous wrapper for client.count()."""
-    return client.count(collection_name=collection_name).count
+    result = client.count(collection_name=collection_name)
+    return result.count if result else 0
 
 
-def _create_collection_sync(client, collection_name: str, vectors_config):
+def _create_collection_sync(
+    client, collection_name: str, vectors_config, sparse_vectors_config=None
+):
     """Synchronous wrapper for client.create_collection()."""
-    client.create_collection(
-        collection_name=collection_name,
-        vectors_config=vectors_config,
-    )
+    kwargs = {
+        "collection_name": collection_name,
+        "vectors_config": vectors_config,
+    }
+    if sparse_vectors_config is not None:
+        kwargs["sparse_vectors_config"] = sparse_vectors_config
+    client.create_collection(**kwargs)
 
 
 def _delete_collection_sync(client, collection_name: str):
@@ -63,18 +71,41 @@ async def list_collections(host: str, port: int) -> list[dict[str, Any]]:
 
 
 async def create_collection(
-    host: str, port: int, collection_name: str, vector_size: int = 384
+    host: str, port: int, collection_name: str, vector_size: int = 384, enable_hybrid: bool = True
 ) -> bool:
-    """Create a new collection."""
+    """Create a new collection (with optional sparse vector support for hybrid search)."""
     try:
         client = get_qdrant_client(host=host, port=port)
         vectors_config = qdrant_client.models.VectorParams(
             size=vector_size,
             distance=qdrant_client.models.Distance.COSINE,
         )
-        await asyncio.to_thread(_create_collection_sync, client, collection_name, vectors_config)
-        logger.info("Collection '%s' created successfully.", collection_name)
+        sparse_vectors_config: dict[str, Any] | None = None
+        if enable_hybrid:
+            sparse_vectors_config = {
+                "text-sparse": qdrant_client.models.SparseVectorParams(
+                    index=qdrant_client.models.SparseIndexParams()
+                )
+            }
+        await asyncio.to_thread(
+            _create_collection_sync, client, collection_name, vectors_config, sparse_vectors_config
+        )
+        logger.info(
+            "Collection '%s' created successfully (hybrid=%s).", collection_name, enable_hybrid
+        )
         return True
+    except UnexpectedResponse as e:
+        # Collection already exists (409 Conflict) - that is acceptable
+        if "already exists" in str(e):
+            logger.info("Collection '%s' already exists.", collection_name)
+            return True
+        logger.error(
+            "Qdrant error for collection '%s': %s",
+            collection_name,
+            e,
+            exc_info=True,
+        )
+        raise
     except Exception as e:
         logger.error(
             "Failed to create collection '%s': %s: %s",

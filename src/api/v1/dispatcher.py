@@ -91,6 +91,9 @@ async def worker_status_stream(
 
                 if status_data.get("status") in (WorkerStatus.IDLE.value, WorkerStatus.ERROR.value):
                     break
+            except asyncio.CancelledError:
+                logger.debug(f"SSE stream cancelled for {worker_type}")
+                break
             except Exception as e:
                 logger.error(f"SSE error for {worker_type}: {e}")
                 yield f"data: {json.dumps({'status': 'error', 'message': 'An internal error occurred'})}\n\n"

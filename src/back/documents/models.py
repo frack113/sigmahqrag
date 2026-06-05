@@ -2,29 +2,20 @@
 
 from __future__ import annotations
 
-from typing import Any
+import warnings
 
 from pydantic import BaseModel, Field
 
+from src.shared.schemas.sigma_rule import SigmaRule as _SigmaRule
 
-class SigmaRule(BaseModel):
-    """Sigma rule schema."""
+warnings.warn(
+    "Import SigmaRule from src.back.documents.models is deprecated; "
+    "use src.shared.schemas.sigma_rule.SigmaRule instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
-    id: str
-    title: str
-    detection: dict[str, Any]
-    condition: str
-    description: str | None = None
-    author: str | None = None
-    date: str | None = None
-    modified: str | None = None
-    references: list[str] = Field(default_factory=list)
-    tags: list[str] = Field(default_factory=list)
-    level: str | None = None
-    falsepositives: list[str] = Field(default_factory=list)
-    logsource: dict[str, Any] = Field(default_factory=dict)
-    status: str | None = None
-    license: str | None = None
+SigmaRule = _SigmaRule
 
 
 class ValidationError(BaseModel):
@@ -48,6 +39,8 @@ class IngestRequest(BaseModel):
 
     directory: str | None = None
     recursive: bool = True
+    mode: str = "flat"
+    selected_dirs: list[str] = Field(default_factory=list)
 
 
 class IngestResult(BaseModel):
@@ -57,3 +50,4 @@ class IngestResult(BaseModel):
     success: bool
     rule_id: str | None = None
     error: str | None = None
+    chunks: int = 0

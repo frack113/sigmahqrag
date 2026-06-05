@@ -9,6 +9,7 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
+from src.back.database.service import DatabaseService
 from src.shared import get_config
 
 logger = logging.getLogger(__name__)
@@ -49,7 +50,11 @@ async def update_config(request: ConfigUpdateRequest) -> JSONResponse:
             if gpu_val:
                 config.gpu_type = gpu_val
 
-            config.save()
+            db = DatabaseService.get_instance()
+            if os_val is not None:
+                db.set_config("backend.os", os_val)
+            if gpu_val is not None:
+                db.set_config("backend.gpu_type", gpu_val)
 
         return JSONResponse(
             content={

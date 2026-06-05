@@ -26,11 +26,11 @@ def test_progress_ok():
     app.state.dispatcher = MagicMock()
     app.state.dispatcher.get_progress_worker.return_value = 42
 
-    response = client.get("/api/v1/dispatcher/progress/sigmaref_embeddings")
+    response = client.get("/api/v1/dispatcher/progress/sigmaref_discovery")
     assert response.status_code == 200
     data = response.json()
     assert data["progress_percent"] == 42
-    assert data["worker_type"] == "sigmaref_embeddings"
+    assert data["worker_type"] == "sigmaref_discovery"
 
 
 # ── POST /api/v1/dispatcher/ask ──────────────────────────────────────────────
@@ -51,7 +51,7 @@ def test_ask_worker_busy():
 
     response = client.post(
         "/api/v1/dispatcher/ask",
-        json={"worker_type": "sigmaref_embeddings", "task_params": {"collection_name": "test"}},
+        json={"worker_type": "sigmaref_discovery", "task_params": {"collection_name": "test"}},
     )
     assert response.status_code == 409
 
@@ -62,12 +62,12 @@ def test_ask_worker_ok():
 
     response = client.post(
         "/api/v1/dispatcher/ask",
-        json={"worker_type": "github_embeddings", "task_params": {}},
+        json={"worker_type": "github_discovery", "task_params": {}},
     )
     assert response.status_code == 200
     data = response.json()
     assert data["task_id"] == "task-123"
-    assert data["worker_type"] == "github_embeddings"
+    assert data["worker_type"] == "github_discovery"
 
 
 # ── GET /api/v1/dispatcher/status/{worker_type} ──────────────────────────────
@@ -88,7 +88,7 @@ def test_status_ok():
         "progress_percent": 50.0,
     }
 
-    response = client.get("/api/v1/dispatcher/status/sigmaref_embeddings")
+    response = client.get("/api/v1/dispatcher/status/sigmaref_discovery")
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "running"
@@ -114,7 +114,7 @@ def test_status_stream_ok():
         "progress_percent": 100.0,
     }
 
-    response = client.get("/api/v1/dispatcher/status/sigmaref_embeddings/stream")
+    response = client.get("/api/v1/dispatcher/status/sigmaref_discovery/stream")
     assert response.status_code == 200
     assert "text/event-stream" in response.headers["content-type"]
 
@@ -125,7 +125,7 @@ def test_status_stream_ok():
 def test_all_worker_status():
     app.state.dispatcher = MagicMock()
     app.state.dispatcher.get_all_worker_states.return_value = [
-        {"worker_type": "sigmaref_embeddings", "status": "idle"},
+        {"worker_type": "sigmaref_discovery", "status": "idle"},
         {"worker_type": "model_sync", "status": "running"},
     ]
 

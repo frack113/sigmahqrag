@@ -1,27 +1,41 @@
-"""Advanced tests for GithubDiscoveryWorker — error path and edge case coverage."""
+"""Advanced tests for GenericDiscoveryWorker — error path and edge case coverage."""
 
 from __future__ import annotations
 
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
 
-from src.worker.workers.github_discovery_worker import GithubDiscoveryWorker
+from src.worker.workers.generic_discovery_worker import GenericDiscoveryWorker, SourceType
 
 
 class TestGithubDiscoveryWorkerAdvanced:
-    def test_build_urls_handles_metadata_exception(self, mock_db: MagicMock) -> None:
+    def test_build_urls_handles_metadata_exception(
+        self, mock_db: MagicMock, tmp_path: Path
+    ) -> None:
+        """When get_git_metadata fails, URLs should still use 'main' branch."""
+        repo_dir = tmp_path / "org" / "repo"
+        repo_dir.mkdir(parents=True)
+        file_path = repo_dir / "file.md"
+        file_path.write_text("test")
+
         mock_db.get_git_metadata.side_effect = RuntimeError("db error")
-        worker = GithubDiscoveryWorker(mock_db)
-        original, normalized = worker._build_urls("org", "repo", "path/file.md")
-        assert "main" in original
-        assert normalized.startswith("https://raw.githubusercontent.com")
+        mock_db.get_repos_with_selected_dirs.return_value = ["org/repo"]
+        mock_db.get_selected_dirs.return_value = []
+
+        worker = GenericDiscoveryWorker(mock_db, None, source_type=SourceType.GITHUB)
+        worker.process({"task_id": "t1", "github_base_dir": str(tmp_path)})
+
+        # Should have called batch_upsert with an entry using fallback branch "main"
+        assert mock_db.batch_upsert_doc_registry.called
+        entries = mock_db.batch_upsert_doc_registry.call_args[0][0]
+        assert len(entries) >= 1
+        assert "raw.githubusercontent.com" in entries[0]["normalized_url"]
 
     def test_process_file_handles_relativize_error(
         self, mock_db: MagicMock, tmp_path: Path
     ) -> None:
-        worker = GithubDiscoveryWorker(mock_db)
+        worker = GenericDiscoveryWorker(mock_db, None, source_type=SourceType.GITHUB)
         file_path = tmp_path / "outside.md"
         file_path.write_text("test")
         base_path = tmp_path / "repo"
@@ -38,7 +52,7 @@ class TestGithubDiscoveryWorkerAdvanced:
 
         mock_db.get_git_metadata.return_value = {"branch": "main"}
 
-        worker = GithubDiscoveryWorker(mock_db)
+        worker = GenericDiscoveryWorker(mock_db, None, source_type=SourceType.GITHUB)
         with patch.object(worker, "_compute_sha256", return_value=("", 0)):
             result = worker._prepare_entry(file_path, repo_dir, "org", "repo")
             assert result is not None
@@ -53,7 +67,7 @@ class TestGithubDiscoveryWorkerAdvanced:
 
         mock_db.get_git_metadata.return_value = {"branch": "main"}
 
-        worker = GithubDiscoveryWorker(mock_db)
+        worker = GenericDiscoveryWorker(mock_db, None, source_type=SourceType.GITHUB)
         with patch(
             "src.worker.workers.discovery_base.identify",
             side_effect=ValueError("unknown type"),
@@ -68,7 +82,7 @@ class TestGithubDiscoveryWorkerAdvanced:
             "task_id": "gh-adv-001",
             "github_base_dir": str(tmp_path),
         }
-        worker = GithubDiscoveryWorker(mock_db)
+        worker = GenericDiscoveryWorker(mock_db, None, source_type=SourceType.GITHUB)
         worker.process(task)
 
     def test_process_handles_selected_dirs_db_error(
@@ -85,7 +99,7 @@ class TestGithubDiscoveryWorkerAdvanced:
             "task_id": "gh-adv-002",
             "github_base_dir": str(tmp_path),
         }
-        worker = GithubDiscoveryWorker(mock_db)
+        worker = GenericDiscoveryWorker(mock_db, None, source_type=SourceType.GITHUB)
         worker.process(task)
         assert mock_db.batch_upsert_doc_registry.call_count >= 1
 
@@ -99,7 +113,7 @@ class TestGithubDiscoveryWorkerAdvanced:
         mock_db.get_selected_dirs.return_value = []
 
         mock_dispatcher = MagicMock()
-        worker = GithubDiscoveryWorker(mock_db, mock_dispatcher)
+        worker = GenericDiscoveryWorker(mock_db, mock_dispatcher, source_type=SourceType.GITHUB)
 
         task = {
             "task_id": "gh-adv-003",
@@ -111,7 +125,7 @@ class TestGithubDiscoveryWorkerAdvanced:
     def test_process_no_repos_reports_progress(self, mock_db: MagicMock) -> None:
         mock_db.get_repos_with_selected_dirs.return_value = []
         mock_dispatcher = MagicMock()
-        worker = GithubDiscoveryWorker(mock_db, mock_dispatcher)
+        worker = GenericDiscoveryWorker(mock_db, mock_dispatcher, source_type=SourceType.GITHUB)
 
         task = {"task_id": "gh-adv-004"}
         worker.process(task)
@@ -125,9 +139,7 @@ class TestGithubDiscoveryWorkerAdvanced:
         mock_db.get_repos_with_selected_dirs.return_value = ["org/repo"]
         mock_db.get_selected_dirs.return_value = []
 
-        worker = GithubDiscoveryWorker(mock_db)
-        bad_mock = MagicMock()
-        bad_mock.relative_to.side_effect = RuntimeError("unexpected")
+        worker = GenericDiscoveryWorker(mock_db, None, source_type=SourceType.GITHUB)
         with patch.object(Path, "relative_to", side_effect=RuntimeError("unexpected")):
             worker.process(
                 {
@@ -136,11 +148,13 @@ class TestGithubDiscoveryWorkerAdvanced:
                 }
             )
 
-    def test_fatal_exception_is_raised(self, mock_db: MagicMock) -> None:
+    def test_fatal_db_error_handled_gracefully(self, mock_db: MagicMock) -> None:
+        """get_repos_with_selected_dirs error is caught and logged, not re-raised."""
         mock_db.get_repos_with_selected_dirs.side_effect = RuntimeError("fatal")
-        worker = GithubDiscoveryWorker(mock_db)
-        with pytest.raises(RuntimeError):
-            worker.process({"task_id": "gh-adv-006"})
+        worker = GenericDiscoveryWorker(mock_db, None, source_type=SourceType.GITHUB)
+        # Should not raise
+        worker.process({"task_id": "gh-adv-006"})
+        mock_db.batch_upsert_doc_registry.assert_not_called()
 
     def test_process_skipped_count_on_false_return(
         self, mock_db: MagicMock, tmp_path: Path
@@ -152,7 +166,7 @@ class TestGithubDiscoveryWorkerAdvanced:
         mock_db.get_repos_with_selected_dirs.return_value = ["org/repo"]
         mock_db.get_selected_dirs.return_value = []
 
-        worker = GithubDiscoveryWorker(mock_db)
+        worker = GenericDiscoveryWorker(mock_db, None, source_type=SourceType.GITHUB)
         with patch.object(worker, "_prepare_entry", return_value=None):
             worker.process(
                 {

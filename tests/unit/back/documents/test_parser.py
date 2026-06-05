@@ -126,15 +126,16 @@ class TestParseSigmaRule:
 
 
 class TestScanDirectory:
-    def test_scans_yaml_files(self, tmp_path: Path) -> None:
+    def test_scans_all_files(self, tmp_path: Path) -> None:
         (tmp_path / "rule1.yaml").write_text("title: R1", encoding="utf-8")
         (tmp_path / "rule2.yml").write_text("title: R2", encoding="utf-8")
         (tmp_path / "note.txt").write_text("text", encoding="utf-8")
 
         files = scan_directory(str(tmp_path), recursive=False)
-        assert len(files) == 2
+        assert len(files) == 3
         assert any(f.endswith("rule1.yaml") for f in files)
         assert any(f.endswith("rule2.yml") for f in files)
+        assert any(f.endswith("note.txt") for f in files)
 
     def test_recursive_scan(self, tmp_path: Path) -> None:
         sub = tmp_path / "subdir"

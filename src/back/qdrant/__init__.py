@@ -159,7 +159,7 @@ class QdrantVectorService:
         from llama_index.core.schema import TextNode
 
         nodes: list[TextNode] = []
-        meta_list = metadata or [{}] * len(documents)
+        meta_list = metadata if metadata is not None else [{} for _ in documents]
         for emb, doc, meta in zip(embeddings, documents, meta_list, strict=True):
             node = TextNode(text=doc, metadata=meta)
             node.embedding = emb
@@ -210,15 +210,21 @@ class QdrantVectorService:
             logger.debug(f"Health check failed: {e}")
             return False
 
-    async def create_collection(self) -> None:
+    async def create_collection(self, enable_hybrid: bool = True) -> None:
         """Create the collection if it doesn't exist."""
         if self._vector_store is None:
             await self.initialize()
 
         from .collections import create_collection as _create
 
-        await _create(self.host, self.port, self.collection_name, self.vector_size)
-        logger.info(f"Collection {self.collection_name} ready")
+        await _create(
+            self.host,
+            self.port,
+            self.collection_name,
+            self.vector_size,
+            enable_hybrid=enable_hybrid,
+        )
+        logger.info(f"Collection {self.collection_name} ready (hybrid={enable_hybrid})")
 
     def __repr__(self) -> str:
         return f"QdrantService(collection={self.collection_name}, host={self.host}:{self.port})"

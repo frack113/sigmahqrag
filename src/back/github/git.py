@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import ipaddress
 import logging
+import os
 import re
 import shutil
+import stat
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -228,6 +230,16 @@ def update_repo(
         return {"success": False, "error": str(e)}
 
 
+def _remove_readonly(
+    func: Any,
+    path: str,
+    excinfo: Any,
+) -> None:
+    """Clear read-only bit and retry deletion (Windows fix for .git/pack files)."""
+    os.chmod(path, stat.S_IWRITE)
+    func(path)
+
+
 def delete_repo(org: str, name: str, repos_dir: Path | None = None) -> dict[str, Any]:
     """Delete a local repository."""
     repos_dir = Path(repos_dir or get_config().paths_github_dir).resolve()
@@ -238,7 +250,7 @@ def delete_repo(org: str, name: str, repos_dir: Path | None = None) -> dict[str,
         return {"success": False, "error": f"Repository '{org}/{name}' not found"}
 
     try:
-        shutil.rmtree(repo_path)
+        shutil.rmtree(repo_path, onerror=_remove_readonly)
         logger.info(f"Deleted repository: {org}/{name}")
 
         org_path = repos_dir / org
@@ -439,6 +451,6 @@ def is_repo_outdated(org: str, name: str, repos_dir: Path | None = None) -> bool
         if remote_ref not in repo.refs:
             return True
         remote_commit = repo.refs[remote_ref].commit.hexsha
-        return local_commit != remote_commit  # type: ignore[no-any-return]
+        return local_commit != remote_commit
     except Exception:
         return False

@@ -26,17 +26,19 @@ from src.back.documents.sigma_ref_downloader import (
 
 
 def _make_db(entries: list[dict] | None = None) -> MagicMock:
-    """Create a mock DatabaseService with in-memory doc_sigma_ref."""
+    """Create a mock DatabaseService with in-memory doc_registry."""
 
     data: dict[str, dict] = {}
     if entries:
         for e in entries:
             data[e["url_hash"]] = dict(e)
 
-    def get_doc_sigma_ref(limit: int = 100, offset: int = 0) -> list[dict]:
+    def get_entries_by_org(org: str, limit: int = 100, offset: int = 0) -> list[dict]:
         return [
             {
                 "url_hash": k,
+                "org": v.get("org", org),
+                "repo": v.get("repo", org),
                 "original_url": v.get("original_url", ""),
                 "normalized_url": v.get("normalized_url"),
                 "content_type": v.get("content_type"),
@@ -51,19 +53,25 @@ def _make_db(entries: list[dict] | None = None) -> MagicMock:
             for k, v in data.items()
         ]
 
-    def upsert_doc_sigma_ref(entry: dict) -> None:
+    def upsert_doc_registry(entry: dict) -> None:
         data[entry["url_hash"]] = dict(entry)
 
-    def batch_upsert_doc_sigma_ref(rows: list[dict]) -> None:
+    def batch_upsert_doc_registry(rows: list[dict]) -> None:
         for r in rows:
             data[r["url_hash"]] = dict(r)
 
+    def get_doc_errors(limit: int = 1000, offset: int = 0) -> list[dict]:
+        return []
+
+    def upsert_doc_error(data_entry: dict) -> None:
+        pass
+
     db = MagicMock()
-    db.get_doc_sigma_ref = get_doc_sigma_ref
-    db.upsert_doc_sigma_ref = upsert_doc_sigma_ref
-    db.batch_upsert_doc_sigma_ref = batch_upsert_doc_sigma_ref
-    db.get_doc_sigma_ref_error = MagicMock(return_value=[])
-    db.upsert_doc_sigma_ref_error = MagicMock()
+    db.get_entries_by_org = get_entries_by_org
+    db.upsert_doc_registry = upsert_doc_registry
+    db.batch_upsert_doc_registry = batch_upsert_doc_registry
+    db.get_doc_errors = get_doc_errors
+    db.upsert_doc_error = upsert_doc_error
     return db
 
 
@@ -338,6 +346,9 @@ class TestDownloadReferences:
         rule.write_text("""
 title: Test Rule
 id: rule-001
+logsource:
+  category: process_creation
+  product: windows
 detection:
   selection:
     EventID: 4688
@@ -353,7 +364,9 @@ references:
             "src.back.documents.sigma_ref_downloader._download_file",
             return_value=(True, None),
         ):
-            result = download_references(str(rules_dir), str(tmp_path / "output"), db)
+            result = download_references(
+                str(rules_dir), str(tmp_path / "output"), db, selected_dirs=[""]
+            )
             assert result["downloaded"] == 1
             assert result["total_refs"] == 1
 
@@ -364,6 +377,9 @@ references:
         rule.write_text("""
 title: Test Rule
 id: rule-002
+logsource:
+  category: process_creation
+  product: windows
 detection:
   selection:
     EventID: 4688
@@ -373,7 +389,9 @@ references:
 """)
 
         db = _make_db()
-        result = download_references(str(rules_dir), str(tmp_path / "output"), db)
+        result = download_references(
+            str(rules_dir), str(tmp_path / "output"), db, selected_dirs=[""]
+        )
         assert result["downloaded"] == 0
         assert result["skipped"] == 1
         assert result["total_rules"] == 1
@@ -386,6 +404,9 @@ references:
         rule.write_text("""
 title: Test Rule
 id: rule-003
+logsource:
+  category: process_creation
+  product: windows
 detection:
   selection:
     EventID: 4688
@@ -407,10 +428,10 @@ references:
             "src.back.documents.sigma_ref_downloader._download_file",
             write_file,
         ):
-            first = download_references(str(rules_dir), str(output_dir), db)
+            first = download_references(str(rules_dir), str(output_dir), db, selected_dirs=[""])
             assert first["downloaded"] == 1
 
-            second = download_references(str(rules_dir), str(output_dir), db)
+            second = download_references(str(rules_dir), str(output_dir), db, selected_dirs=[""])
             assert second["downloaded"] == 0
             assert second["skipped"] >= 1
 
@@ -422,6 +443,9 @@ references:
         rule.write_text("""
 title: Test Rule
 id: rule-004
+logsource:
+  category: process_creation
+  product: windows
 detection:
   selection:
     EventID: 4688
@@ -443,11 +467,11 @@ references:
             "src.back.documents.sigma_ref_downloader._download_file",
             check_normalized_url,
         ):
-            result = download_references(str(rules_dir), str(output_dir), db)
+            result = download_references(str(rules_dir), str(output_dir), db, selected_dirs=[""])
             assert result["downloaded"] == 1
 
-            entries = db.get_doc_sigma_ref()
-            entry = list(entries)[0]
+            entries = db.get_entries_by_org("sigmaref")
+            entry = entries[0]
             assert "raw.githubusercontent.com" in entry["normalized_url"]
             assert "/blob/" not in entry["normalized_url"]
 
@@ -455,7 +479,9 @@ references:
         empty_dir = tmp_path / "empty"
         empty_dir.mkdir()
         db = _make_db()
-        result = download_references(str(empty_dir), str(tmp_path / "output"), db)
+        result = download_references(
+            str(empty_dir), str(tmp_path / "output"), db, selected_dirs=[""]
+        )
         assert result["total_rules"] == 0
         assert result["downloaded"] == 0
 
@@ -467,6 +493,9 @@ references:
         rule.write_text("""
 title: Test Rule
 id: rule-005
+logsource:
+  category: process_creation
+  product: windows
 detection:
   selection:
     EventID: 4688
@@ -480,7 +509,7 @@ references:
             "src.back.documents.sigma_ref_downloader._download_file",
             return_value=(True, None),
         ):
-            result = download_references(str(rules_dir), str(output_dir), db)
+            result = download_references(str(rules_dir), str(output_dir), db, selected_dirs=[""])
             assert result["downloaded"] == 1
             assert output_dir.exists()
 
@@ -492,6 +521,9 @@ references:
         rule.write_text("""
 title: Test Rule
 id: rule-006
+logsource:
+  category: process_creation
+  product: windows
 detection:
   selection:
     EventID: 4688
@@ -505,10 +537,10 @@ references:
             "src.back.documents.sigma_ref_downloader._download_file",
             return_value=(False, None),
         ):
-            result = download_references(str(rules_dir), str(output_dir), db)
+            result = download_references(str(rules_dir), str(output_dir), db, selected_dirs=[""])
             assert result["failed"] == 1
             assert result["downloaded"] == 0
-            assert len(db.get_doc_sigma_ref()) == 0
+            assert len(db.get_entries_by_org("sigmaref")) == 0
 
     def test_same_filename_diff_content(self, tmp_path: Path) -> None:
         """Two different URLs with same filename -> stored under different hashes."""
@@ -519,6 +551,9 @@ references:
         rule.write_text("""
 title: Test Rule
 id: rule-007
+logsource:
+  category: process_creation
+  product: windows
 detection:
   selection:
     EventID: 4688
@@ -538,12 +573,12 @@ references:
 
         db = _make_db()
         with patch("src.back.documents.sigma_ref_downloader._download_file", capture_url):
-            result = download_references(str(rules_dir), str(output_dir), db)
+            result = download_references(str(rules_dir), str(output_dir), db, selected_dirs=[""])
             assert result["downloaded"] == 2
             assert len(urls_downloaded) == 2
             assert urls_downloaded[0] != urls_downloaded[1]
 
-            assert len(db.get_doc_sigma_ref()) == 2
+            assert len(db.get_entries_by_org("sigmaref")) == 2
 
 
 class TestContentSha256:
@@ -555,6 +590,9 @@ class TestContentSha256:
         rule.write_text("""
 title: Test Rule
 id: rule-008
+logsource:
+  category: process_creation
+  product: windows
 detection:
   selection:
     EventID: 4688
@@ -581,10 +619,12 @@ references:
             ),
             patch("time.sleep"),
         ):
-            result = download_references(str(rules_dir), str(output_dir), db, request_delay=0)
+            result = download_references(
+                str(rules_dir), str(output_dir), db, selected_dirs=[""], request_delay=0
+            )
             assert result["downloaded"] == 1
-            entries = db.get_doc_sigma_ref()
-            entry = list(entries)[0]
+            entries = db.get_entries_by_org("sigmaref")
+            entry = entries[0]
             assert "content_sha256" in entry
             assert entry["content_sha256"] != ""
 
@@ -597,6 +637,9 @@ references:
         rule.write_text("""
 title: Test Rule
 id: rule-009
+logsource:
+  category: process_creation
+  product: windows
 detection:
   selection:
     EventID: 4688
@@ -641,7 +684,9 @@ references:
             ),
             patch("time.sleep"),
         ):
-            result = download_references(str(rules_dir), str(output_dir), db, request_delay=0)
+            result = download_references(
+                str(rules_dir), str(output_dir), db, selected_dirs=[""], request_delay=0
+            )
             assert result["downloaded"] == 1
             assert len(download_calls) == 1
 
@@ -654,6 +699,9 @@ references:
         rule.write_text("""
 title: Test Rule
 id: rule-010
+logsource:
+  category: process_creation
+  product: windows
 detection:
   selection:
     EventID: 4688
@@ -696,7 +744,9 @@ references:
                 tracking_download,
             ),
         ):
-            result = download_references(str(rules_dir), str(output_dir), db, request_delay=0)
+            result = download_references(
+                str(rules_dir), str(output_dir), db, selected_dirs=[""], request_delay=0
+            )
             assert result["skipped"] >= 1
             assert len(download_calls) == 0
 
@@ -709,6 +759,9 @@ references:
         rule.write_text("""
 title: Test Rule
 id: rule-011
+logsource:
+  category: process_creation
+  product: windows
 detection:
   selection:
     EventID: 4688
@@ -749,7 +802,9 @@ references:
                 tracking_download,
             ),
         ):
-            result = download_references(str(rules_dir), str(output_dir), db, request_delay=0)
+            result = download_references(
+                str(rules_dir), str(output_dir), db, selected_dirs=[""], request_delay=0
+            )
             assert result["skipped"] >= 1
             assert len(download_calls) == 0
 
@@ -767,6 +822,9 @@ class TestUppercaseScheme:
         rule.write_text("""
 title: Test Rule
 id: rule-012
+logsource:
+  category: process_creation
+  product: windows
 detection:
   selection:
     EventID: 4688
@@ -783,7 +841,9 @@ references:
             ),
             patch("time.sleep"),
         ):
-            result = download_references(str(rules_dir), str(output_dir), db, request_delay=0)
+            result = download_references(
+                str(rules_dir), str(output_dir), db, selected_dirs=[""], request_delay=0
+            )
             assert result["downloaded"] == 1
 
     def test_uppercase_github_blob(self) -> None:

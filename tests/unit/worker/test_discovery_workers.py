@@ -3,55 +3,56 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import ANY, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.back.utils.identify_file_type import SUPPORTED_REFERENCE_DOC_TYPES
-from src.worker.workers.github_discovery_worker import GithubDiscoveryWorker
-from src.worker.workers.local_discovery_worker import LocalDiscoveryWorker
-from src.worker.workers.sigmaref_discovery_worker import SigmaRefDiscoveryWorker
+from src.worker.workers.generic_discovery_worker import GenericDiscoveryWorker, SourceType
+from src.worker.workers.sigmaref_worker import SigmaRefProcessor
 
 
-class TestSigmaRefDiscoveryWorker:
-    def test_process_calls_download_references(self, mock_db: MagicMock) -> None:
+class TestSigmaRefProcessor:
+    def test_process_calls_process_sigma_refs(self, mock_db: MagicMock) -> None:
         task = {
             "task_id": "sr-disc-001",
             "task_type": "sigmaref_discovery",
             "collection_name": "sigmaref",
             "rules_dir": "data/github",
             "output_dir": "data/documents/sigmaref",
+            "selected_dirs": [""],
         }
 
         summary = {"total_rules": 10, "total_refs": 5, "downloaded": 3, "skipped": 2, "failed": 0}
 
         with patch(
-            "src.worker.workers.sigmaref_discovery_worker.download_references",
+            "src.worker.workers.sigmaref_worker.process_sigma_refs",
             return_value=summary,
-        ) as mock_download:
-            worker = SigmaRefDiscoveryWorker(mock_db, MagicMock())
+        ) as mock_process:
+            dispatcher = MagicMock()
+            dispatcher.update_worker_state = MagicMock()
+            worker = SigmaRefProcessor(mock_db, dispatcher)
             worker.process(task)
 
-        mock_download.assert_called_once_with(
-            rules_dir="data/github",
-            output_dir="data/documents/sigmaref",
-            db=mock_db,
-            supported_types=SUPPORTED_REFERENCE_DOC_TYPES,
-            progress_callback=ANY,
-        )
+        mock_process.assert_called_once()
+        call_kwargs = mock_process.call_args[1]
+        assert call_kwargs["db"] == mock_db
+        assert call_kwargs["output_dir"] == "data/documents/sigmaref"
 
     def test_process_propagates_errors(self, mock_db: MagicMock) -> None:
         task = {
             "task_id": "sr-disc-003",
             "task_type": "sigmaref_discovery",
             "collection_name": "sigmaref",
+            "selected_dirs": [""],
         }
 
         with patch(
-            "src.worker.workers.sigmaref_discovery_worker.download_references",
+            "src.worker.workers.sigmaref_worker.process_sigma_refs",
             side_effect=RuntimeError("download failed"),
         ):
-            worker = SigmaRefDiscoveryWorker(mock_db, MagicMock())
+            dispatcher = MagicMock()
+            dispatcher.update_worker_state = MagicMock()
+            worker = SigmaRefProcessor(mock_db, dispatcher)
             with pytest.raises(RuntimeError, match="download failed"):
                 worker.process(task)
 
@@ -66,7 +67,9 @@ class TestGithubDiscoveryWorker:
             "collection_name": "all",
         }
 
-        worker = GithubDiscoveryWorker(mock_db)
+        worker = GenericDiscoveryWorker(
+            db=mock_db, source_type=SourceType.GITHUB, base_dir=Path("/tmp")
+        )
         worker.process(task)
 
     def test_process_scans_multiple_repos(self, mock_db: MagicMock, tmp_path: Path) -> None:
@@ -92,7 +95,9 @@ class TestGithubDiscoveryWorker:
             "github_base_dir": str(tmp_path),
         }
 
-        worker = GithubDiscoveryWorker(mock_db)
+        worker = GenericDiscoveryWorker(
+            db=mock_db, source_type=SourceType.GITHUB, base_dir=tmp_path
+        )
         worker.process(task)
 
         mock_db.batch_upsert_doc_registry.assert_called_once()
@@ -118,7 +123,9 @@ class TestGithubDiscoveryWorker:
             "github_base_dir": str(tmp_path),
         }
 
-        worker = GithubDiscoveryWorker(mock_db)
+        worker = GenericDiscoveryWorker(
+            db=mock_db, source_type=SourceType.GITHUB, base_dir=tmp_path
+        )
         worker.process(task)
 
         mock_db.batch_upsert_doc_registry.assert_called_once()
@@ -143,7 +150,9 @@ class TestGithubDiscoveryWorker:
             "github_base_dir": str(tmp_path),
         }
 
-        worker = GithubDiscoveryWorker(mock_db)
+        worker = GenericDiscoveryWorker(
+            db=mock_db, source_type=SourceType.GITHUB, base_dir=tmp_path
+        )
         worker.process(task)
 
         mock_db.batch_upsert_doc_registry.assert_called_once()
@@ -165,7 +174,9 @@ class TestGithubDiscoveryWorker:
             "github_base_dir": str(tmp_path),
         }
 
-        worker = GithubDiscoveryWorker(mock_db)
+        worker = GenericDiscoveryWorker(
+            db=mock_db, source_type=SourceType.GITHUB, base_dir=tmp_path
+        )
         worker.process(task)
 
         mock_db.batch_upsert_doc_registry.assert_called_once()
@@ -182,7 +193,9 @@ class TestLocalDiscoveryWorker:
             "base_path": "/nonexistent/path",
         }
 
-        worker = LocalDiscoveryWorker(mock_db)
+        worker = GenericDiscoveryWorker(
+            db=mock_db, source_type=SourceType.LOCAL, base_dir=Path("/nonexistent")
+        )
         worker.process(task)
 
     def test_process_scans_local_directory(self, mock_db: MagicMock, tmp_path: Path) -> None:
@@ -198,7 +211,7 @@ class TestLocalDiscoveryWorker:
             "base_path": str(local_dir),
         }
 
-        worker = LocalDiscoveryWorker(mock_db)
+        worker = GenericDiscoveryWorker(db=mock_db, source_type=SourceType.LOCAL, base_dir=tmp_path)
         worker.process(task)
 
         mock_db.batch_upsert_doc_registry.assert_called_once()
@@ -212,7 +225,9 @@ class TestLocalDiscoveryWorker:
             "collection_name": "local",
         }
 
-        worker = LocalDiscoveryWorker(mock_db)
+        worker = GenericDiscoveryWorker(
+            db=mock_db, source_type=SourceType.LOCAL, base_dir=Path("/tmp")
+        )
         worker.process(task)
 
     def test_process_reports_source_type(self, mock_db: MagicMock, tmp_path: Path) -> None:
@@ -227,7 +242,7 @@ class TestLocalDiscoveryWorker:
             "base_path": str(local_dir),
         }
 
-        worker = LocalDiscoveryWorker(mock_db)
+        worker = GenericDiscoveryWorker(db=mock_db, source_type=SourceType.LOCAL, base_dir=tmp_path)
         worker.process(task)
 
         mock_db.batch_upsert_doc_registry.assert_called_once()

@@ -11,7 +11,7 @@ import urllib.parse
 from collections.abc import Callable
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import httpx
 import yaml
@@ -240,11 +240,11 @@ def _get_retry_after(response: httpx.Response) -> int | None:
 
 
 def _load_registry(path: Path, db: DatabaseService) -> dict[str, Any]:
-    """Load the registry from DuckDB.
+    """Load the registry from doc_registry for sigmaref org.
 
     Returns an empty dict if DB not available.
     """
-    entries = db.get_doc_sigma_ref(limit=0)
+    entries = db.get_entries_by_org("sigmaref", limit=0)
     registry = {}
     for entry in entries:
         url_hash = entry["url_hash"]
@@ -264,7 +264,7 @@ def _load_registry(path: Path, db: DatabaseService) -> dict[str, Any]:
 
 
 def _save_registry(registry: dict[str, Any], path: Path, db: DatabaseService) -> None:
-    """Save the registry to DuckDB atomically in a single batch."""
+    """Save the registry to doc_registry atomically in a single batch."""
     rows = []
     now = iso_now()
     for url_hash, entry in registry.items():
@@ -287,13 +287,13 @@ def _save_registry(registry: dict[str, Any], path: Path, db: DatabaseService) ->
                     "last_seen": entry.get("last_seen", now),
                 }
             )
-    db.batch_upsert_doc_sigma_ref(rows)
+    db.batch_upsert_doc_registry(rows)
 
 
 def _load_error_registry(db: DatabaseService) -> set[str]:
     """Load the set of url_hash values that have previously failed (30x/40x)."""
     try:
-        entries = db.get_doc_sigma_ref_error()
+        entries = db.get_doc_errors()
         return {e["url_hash"] for e in entries}
     except Exception:
         logger.warning("Failed to load error registry from DuckDB — proceeding without it")
@@ -309,12 +309,12 @@ def _maybe_record_error(
     rule_id: str,
     rule_title: str,
 ) -> None:
-    """Record a 30x/40x download error in doc_sigma_ref_error so it is skipped on retry."""
+    """Record a 30x/40x download error in doc_error so it is skipped on retry."""
     if status_code is None:
         return
     if 300 <= status_code < 500 or (status_code >= 500 and status_code not in RETRY_STATUSES):
         try:
-            db.upsert_doc_sigma_ref_error(
+            db.upsert_doc_error(
                 {
                     "url_hash": url_hash,
                     "original_url": original_url,
@@ -367,6 +367,7 @@ def download_references(
     request_delay: float = DEFAULT_REQUEST_DELAY,
     progress_callback: Callable[[int, int, str], None] | None = None,
     max_workers: int = DEFAULT_MAX_WORKERS,
+    selected_dirs: list[str] | None = None,
 ) -> dict[str, Any]:
     """Download all Sigma rule references matching supported document types.
 
@@ -383,6 +384,9 @@ def download_references(
             phase only; parallel phase uses max_workers instead).
         progress_callback: Optional callback(current, total) called after each file.
         max_workers: Max concurrent HTTP download threads.
+        selected_dirs: Optional list of relative directory paths to scan.
+            If provided, only files within these directories are processed.
+            Directories not in this list are excluded from scanning.
 
     Returns:
         Dict with summary stats: total_rules, total_refs, downloaded, skipped, failed.
@@ -408,8 +412,42 @@ def download_references(
     skipped = 0
     failed = 0
 
-    yml_files: list[Path] = list(rules_path.rglob("*.yaml"))
-    yml_files.extend(rules_path.rglob("*.yml"))
+    _EXCLUDE_DIRS = {".github", ".git", "__pycache__", ".vscode", ".idea", ".pytest_cache"}
+
+    def _is_sigma_rule(data: dict[str, Any]) -> bool:
+        """Check if the YAML data looks like a valid Sigma rule (has logsource)."""
+        return "logsource" in data
+
+    def _is_selected_dir(yml_file: Path) -> bool:
+        """Check if the file is within any of the selected directories."""
+        if not selected_dirs:
+            return True
+        try:
+            rel_path = yml_file.relative_to(rules_path).with_suffix("")
+            rel_str = rel_path.as_posix()
+            for sd in selected_dirs:
+                clean_sd = sd.lstrip("./").rstrip("/")
+                if not clean_sd:
+                    return True
+                if rel_str == clean_sd or rel_str.startswith(clean_sd + "/"):
+                    return True
+        except (ValueError, TypeError):
+            pass
+        return False
+
+    def _collect_yaml_files() -> list[Path]:
+        yml_files: list[Path] = []
+        for pattern in ("*.yaml", "*.yml"):
+            for yml_file in rules_path.rglob(pattern):
+                parts = yml_file.parts
+                if any(part in _EXCLUDE_DIRS for part in parts):
+                    continue
+                if not _is_selected_dir(yml_file):
+                    continue
+                yml_files.append(yml_file)
+        return yml_files
+
+    yml_files = _collect_yaml_files()
 
     # Phase 1: scan YAML files, classify refs
     download_queue: list[dict[str, Any]] = []
@@ -427,7 +465,8 @@ def download_references(
             logger.warning("Failed to parse YAML %s: %s", yml_file, exc)
             continue
         if not isinstance(data, dict):
-            logger.warning("YAML %s is not a dict, skipping", yml_file)
+            continue
+        if not _is_sigma_rule(data):
             continue
 
         total_rules += 1
@@ -626,7 +665,9 @@ def download_references(
             future_map = {}
             for item in download_queue:
                 future = executor.submit(
-                    _download_file, item["normalized_url"], item["output_file"]
+                    _download_file,
+                    item["normalized_url"],
+                    item["output_file"],  # type: ignore[arg-type]
                 )
                 future_map[future] = item
 
@@ -634,7 +675,7 @@ def download_references(
                 if progress_callback:
                     progress_callback(idx + 1, queue_size, "downloading")
                 item = future_map[future]
-                success, status_code = future.result()
+                success, status_code = cast(tuple[bool, int | None], future.result())
                 if success:
                     output_file = item["output_file"]
                     content_hash = _sha256_file(output_file) if output_file.exists() else ""

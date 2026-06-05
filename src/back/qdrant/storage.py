@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import logging
+import uuid
 from typing import Any
 
 import qdrant_client
+from qdrant_client.models import FieldCondition, Filter, MatchValue
 
 from src.back.qdrant.client import get_qdrant_client
 
@@ -14,19 +16,54 @@ logger = logging.getLogger(__name__)
 DEFAULT_VECTOR_SIZE = 384
 
 
+def _make_point_id(collection: str, meta: dict[str, Any]) -> str:
+    """Generate a deterministic UUID from collection + source_file + chunk_type.
+
+    Falls back to uuid4 when required metadata fields are missing.
+    """
+    source_file = meta.get("source_file", "")
+    chunk_type = meta.get("chunk_type", "")
+    if source_file and chunk_type:
+        key = f"{collection}:{source_file}:{chunk_type}"
+        return str(uuid.uuid5(uuid.NAMESPACE_URL, key))
+    return str(uuid.uuid4())
+
+
+def _delete_by_source(client: Any, collection_name: str, source_file: str) -> None:
+    """Delete all points matching metadata.source_file in a collection."""
+    try:
+        client.delete(
+            collection_name=collection_name,
+            points_selector=Filter(
+                must=[
+                    FieldCondition(
+                        key="source_file",
+                        match=MatchValue(value=source_file),
+                    )
+                ]
+            ),
+        )
+    except Exception as e:
+        logger.warning("Failed to delete old points for %s: %s", source_file, e)
+
+
 async def store_embeddings(
     embeddings: list[list[float]],
     documents: list[str],
     metadata: list[dict[str, Any]] | None = None,
-    collection_name: str = "sigmaref",
+    collection_name: str = "sigma_docs",
     vector_size: int = DEFAULT_VECTOR_SIZE,
 ) -> bool:
-    """Store embeddings in Qdrant.
+    """Store embeddings in Qdrant with delete-before-upsert.
+
+    For each unique source_file, deletes old points before inserting new ones.
+    Point IDs are deterministic (uuid5) when source_file + chunk_type are present,
+    so the same document always maps to the same point.
 
     Args:
         embeddings: Embedding vectors
         documents: Original documents
-        metadata: Optional metadata for each document
+        metadata: Metadata for each document (must contain source_file, chunk_type)
         collection_name: Qdrant collection name
         vector_size: Vector dimension
 
@@ -37,29 +74,65 @@ async def store_embeddings(
         logger.error("Document count must match embedding count")
         return False
 
-    try:
-        from src.back.qdrant import QdrantService
+    meta_list = metadata if metadata is not None else [{} for _ in documents]
 
-        service = QdrantService(
-            collection_name=collection_name,
-            vector_size=vector_size,
+    # Group by source_file for batch delete
+    sources_seen: set[str] = set()
+    for meta in meta_list:
+        src = meta.get("source_file", "")
+        if src:
+            sources_seen.add(src)
+
+    points = []
+    for emb, doc, meta in zip(embeddings, documents, meta_list, strict=True):
+        point_id = _make_point_id(collection_name, meta)
+        points.append(
+            qdrant_client.models.PointStruct(
+                id=point_id,
+                vector=emb,
+                payload={
+                    "text": doc,
+                    **meta,
+                },
+            )
         )
-        await service.initialize()
 
-        await service.add_vectors(
-            embeddings=embeddings,
-            documents=documents,
-            metadata=metadata,
+    try:
+        client = get_qdrant_client()
+
+        # Auto-create collection if missing
+        existing_collections = [c.name for c in client.get_collections().collections]
+        if collection_name not in existing_collections:
+            from qdrant_client.models import Distance, VectorParams
+
+            client.recreate_collection(
+                collection_name=collection_name,
+                vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE),
+            )
+
+        # Delete old points for each source before upserting
+        for src in sources_seen:
+            _delete_by_source(client, collection_name, src)
+
+        client.upsert(
+            collection_name=collection_name,
+            points=points,
+        )
+        logger.info(
+            "Stored %d vectors in %s (cleaned %d sources)",
+            len(points),
+            collection_name,
+            len(sources_seen),
         )
         return True
     except Exception as e:
-        logger.error(f"Failed to store embeddings: {e}")
+        logger.error("Failed to store embeddings: %s", e)
         return False
 
 
 async def search(
     query_embedding: list[float],
-    collection_name: str = "sigmaref",
+    collection_name: str = "sigma_docs",
     top_k: int = 5,
 ) -> list[dict[str, Any]]:
     """Search for similar vectors in Qdrant.

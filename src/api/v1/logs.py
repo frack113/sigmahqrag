@@ -6,6 +6,7 @@ import asyncio
 import json
 import logging
 from pathlib import Path
+from typing import Any
 
 from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -57,7 +58,7 @@ async def _tail_log_file(
 
 
 def _sse(event: str, data, **extra) -> str:
-    payload = {"type": event}
+    payload: dict[str, Any] = {"type": event}
     if isinstance(data, list):
         payload["lines"] = data
     else:

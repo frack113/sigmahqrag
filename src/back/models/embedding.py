@@ -59,7 +59,7 @@ class EmbeddingManager:
         self, texts: list[str], model_name: str | None = None
     ) -> list[list[float]]:
         """Generate embeddings for text."""
-        from src.back.rag.embeddings import embed_documents
+        from src.rag.embeddings import embed_documents
         from llama_index.core.schema import Document
 
         if model_name:
@@ -83,17 +83,17 @@ class EmbeddingManager:
         """Search for embedding models."""
         return await self.download_service.list_models(query)
 
-    async def _create_index(self, model_path: Path, dimension: int = 384) -> Path:
-        """Create FAISS index for embeddings."""
+    async def _create_index(self, model_dir: Path, dimension: int = 384) -> Path:
+        """Create FAISS index for embeddings within the model directory."""
         try:
             import faiss
 
             index = faiss.IndexFlatL2(dimension)
-            index_path = model_path.parent / "index.faiss"
+            index_path = model_dir / "index.faiss"
             faiss.write_index(index, str(index_path))
             return index_path
         except ImportError:
-            return model_path.parent / "index.npy"
+            return model_dir / "index.npy"
 
     async def download_model(
         self,
@@ -128,7 +128,7 @@ class EmbeddingManager:
             shutil.move(str(temp_path), str(final_dir))
             dest = final_dir
 
-        dimension = 384
+        dimension = await self._detect_model_dimension(dest)
         index_path = None
 
         if create_index:
@@ -211,6 +211,18 @@ class EmbeddingManager:
         if api.siblings:
             return [f.rfilename for f in api.siblings]
         return []
+
+    @staticmethod
+    async def _detect_model_dimension(model_dir: Path) -> int:
+        """Detect embedding dimension by loading the model and encoding a probe."""
+        try:
+            from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+
+            model = HuggingFaceEmbedding(model_name=str(model_dir), device="cpu")
+            vec = model.get_text_embedding("probe")
+            return len(vec)
+        except Exception:
+            return 384
 
     async def delete_model(self, repo_id: str) -> None:
         """Delete an embedding model."""

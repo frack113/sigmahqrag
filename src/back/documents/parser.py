@@ -5,15 +5,16 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
+from datetime import date, datetime
 from typing import Any
 
 import yaml
 
-from src.back.documents.models import SigmaRule
+from src.shared.schemas.sigma_rule import SigmaRule
 
 logger = logging.getLogger(__name__)
 
-REQUIRED_FIELDS = {"title", "detection", "condition"}
+REQUIRED_FIELDS = {"title", "detection"}
 MAX_FILE_SIZE = 1024 * 1024
 
 
@@ -78,15 +79,22 @@ def parse_sigma_rule(file_path: str) -> SigmaRule | None:
         rule_id = os.path.splitext(os.path.basename(file_path))[0]
 
     try:
+        condition = data.get("condition") or (data.get("detection") or {}).get("condition", "")
+        date_val = data.get("date")
+        if isinstance(date_val, (date, datetime)):
+            date_val = date_val.isoformat()
+        modified_val = data.get("modified")
+        if isinstance(modified_val, (date, datetime)):
+            modified_val = modified_val.isoformat()
         return SigmaRule(
             id=rule_id,
             title=data.get("title", ""),
             detection=data.get("detection", {}),
-            condition=data.get("condition", ""),
+            condition=condition,
             description=data.get("description"),
             author=data.get("author"),
-            date=data.get("date"),
-            modified=data.get("modified"),
+            date=date_val,
+            modified=modified_val,
             references=data.get("references", []),
             tags=data.get("tags", []),
             level=data.get("level"),
@@ -101,21 +109,25 @@ def parse_sigma_rule(file_path: str) -> SigmaRule | None:
 
 
 def scan_directory(directory: str, recursive: bool = True) -> list[str]:
-    """Scan directory for Sigma rule files.
+    """Scan directory for all files.
+
+    The caller is responsible for filtering by registered transforms
+    (e.g. via TransformRegistry.find_for_file). This function returns
+    every file so that future transforms are automatically picked up.
 
     Args:
         directory: Directory to scan
         recursive: Whether to scan subdirectories
 
     Returns:
-        List of YAML file paths
+        List of file paths
     """
     dir_path = Path(directory)
 
     if not dir_path.exists() or not dir_path.is_dir():
         return []
 
-    pattern = "**/*.y*ml" if recursive else "*.y*ml"
+    pattern = "**/*" if recursive else "*"
     files = sorted(dir_path.glob(pattern))
 
     return [str(f) for f in files if f.is_file()]

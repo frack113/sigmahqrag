@@ -1,0 +1,185 @@
+{% extends "data/base.html" %}
+
+{% block title %}Sigma Spec - Data Sources{% endblock %}
+
+{% block page_content %}
+<h1>Sigma Specification</h1>
+<p>Manage the Sigma specification repository for indexing.</p>
+
+<div class="card">
+    <div class="github-actions">
+        <button id="scan-btn" class="btn btn-primary" onclick="scanSpec()">Scan for new files</button>
+        <button id="refresh-btn" class="btn btn-primary" onclick="loadSpecFiles()">Refresh</button>
+    </div>
+
+    <div class="repo-info card" style="margin-top: 1rem;">
+        <h3>Repository</h3>
+        <p><strong>Source:</strong> <a href="https://github.com/SigmaHQ/sigma-specification" target="_blank">SigmaHQ/sigma-specification</a></p>
+        <p><strong>Local path:</strong> <code>data/sigma-specification</code></p>
+        <p><strong>Qdrant collection:</strong> <code>sigma_spec</code></p>
+    </div>
+
+    <div class="card" style="margin-top: 1rem;">
+        <h3>Select folders to include</h3>
+        <p class="hint">Only files from selected folders will be scanned and embedded.</p>
+        <div id="dirs-container">
+            <p>Loading directories...</p>
+        </div>
+    </div>
+
+    <div id="spec-files-list" style="margin-top: 1rem;">
+        <p>Loading files...</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function escHtml(s) {
+    if (s == null) return '';
+    return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+async function loadDirs() {
+    const container = document.getElementById('dirs-container');
+    try {
+        const [dirsResp, selResp] = await Promise.all([
+            fetch('/api/v1/spec/dirs'),
+            fetch('/api/v1/spec/selected-dirs'),
+        ]);
+        const dirsData = await dirsResp.json();
+        const selData = await selResp.json();
+        if (!dirsData.success) {
+            container.innerHTML = '<p class="error-message">' + escHtml(dirsData.error) + '</p>';
+            return;
+        }
+        const dirs = dirsData.data?.dirs || [];
+        const selected = selData.data?.selected || [];
+        if (dirs.length === 0) {
+            container.innerHTML = '<p>No subdirectories found.</p>';
+            return;
+        }
+        container.innerHTML = dirs.map(d => `
+            <label class="dir-checkbox">
+                <input type="checkbox" value="${escHtml(d)}" ${selected.includes(d) ? 'checked' : ''}
+                    onchange="onDirToggle()">
+                ${escHtml(d)}
+            </label>
+        `).join('');
+    } catch (error) {
+        console.error('Failed to load dirs:', error);
+        container.innerHTML = '<p>Error loading directories.</p>';
+    }
+}
+
+async function onDirToggle() {
+    const checkboxes = document.querySelectorAll('#dirs-container input[type="checkbox"]');
+    const selected = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value);
+    try {
+        const resp = await fetch('/api/v1/spec/selected-dirs', {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({selected}),
+        });
+        const data = await resp.json();
+        if (!data.success) {
+            console.error('Failed to save selection:', data.error);
+        }
+    } catch (error) {
+        console.error('Failed to save selection:', error);
+    }
+    loadSpecFiles();
+}
+
+async function loadSpecFiles() {
+    const container = document.getElementById('spec-files-list');
+    container.innerHTML = '<p>Loading...</p>';
+    try {
+        const response = await fetch('/api/v1/spec/files');
+        const result = await response.json();
+        if (!result.success) {
+            container.innerHTML = '<p class="info-message">' + escHtml(result.error || 'Failed to list files') + '</p>';
+            return;
+        }
+        const files = result.data?.files || [];
+        if (files.length === 0) {
+            container.innerHTML = '<p>No specification files found for the selected folders.</p>';
+            return;
+        }
+        container.innerHTML = `
+            <p><strong>${files.length}</strong> specification files found</p>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>File</th>
+                        <th>Type</th>
+                        <th>Size</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${files.map(f => `
+                        <tr>
+                            <td>${escHtml(f.name)}</td>
+                            <td>${escHtml(f.type || 'unknown')}</td>
+                            <td>${f.size ? (f.size / 1024).toFixed(1) + ' KB' : '-'}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+    } catch (error) {
+        console.error('Failed to load spec files:', error);
+        container.innerHTML = '<p>Error loading files.</p>';
+    }
+}
+
+async function scanSpec() {
+    const btn = document.getElementById('scan-btn');
+    btn.disabled = true;
+    btn.textContent = 'Scanning...';
+    try {
+        const response = await fetch('/api/v1/spec/scan', { method: 'POST' });
+        const result = await response.json();
+        if (result.success) {
+            alert('Scan completed: ' + (result.data?.count || 0) + ' files found.');
+            loadSpecFiles();
+        } else {
+            alert(result.error || 'Scan failed');
+        }
+    } catch (error) {
+        alert('Scan failed');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Scan for new files';
+    }
+}
+
+loadDirs();
+loadSpecFiles();
+</script>
+{% endblock %}
+
+{% block styles %}
+{{ super() }}
+<style>
+.repo-info { padding: 1rem; }
+.repo-info h3 { margin-top: 0; }
+.table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; }
+.table th, .table td { padding: 0.5rem; text-align: left; border-bottom: 1px solid var(--border-color); }
+.table th { font-weight: 600; }
+.dir-checkbox {
+    display: inline-block;
+    margin: 0.25rem 0.5rem;
+    padding: 0.25rem 0.5rem;
+    border: 1px solid var(--border-color, #ccc);
+    border-radius: 4px;
+    cursor: pointer;
+}
+.dir-checkbox input { margin-right: 0.25rem; }
+.hint { font-size: 0.9rem; opacity: 0.8; margin: 0.25rem 0 0.5rem; }
+</style>
+{% endblock %}

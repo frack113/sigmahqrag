@@ -4,9 +4,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.back.rag.search import (
+from src.rag.search import (
     SearchEngine,
     _get_search_embed_model,
+    format_result_by_collection,
     format_search_result,
     get_citation,
     search,
@@ -16,13 +17,13 @@ from src.back.rag.search import (
 class TestSearchEngine:
     def test_init_defaults(self) -> None:
         engine = SearchEngine()
-        assert engine.collection_name == "sigmaref"
+        assert engine.collection_names == ["sigma_rules", "sigma_docs", "sigma_spec"]
         assert engine.top_k == 15
         assert engine.similarity_threshold == 0.0
 
     def test_init_custom(self) -> None:
-        engine = SearchEngine(collection_name="custom", top_k=5, similarity_threshold=0.5)
-        assert engine.collection_name == "custom"
+        engine = SearchEngine(collection_names=["custom"], top_k=5, similarity_threshold=0.5)
+        assert engine.collection_names == ["custom"]
         assert engine.top_k == 5
         assert engine.similarity_threshold == 0.5
 
@@ -43,11 +44,11 @@ class TestGetSearchEmbedModel:
         mock_db = MagicMock()
         mock_db.get_embedding_config.return_value = {}
         with (
-            patch("src.back.rag.search._async_embed_model", None),
-            patch("src.back.rag.search.DatabaseService.get_instance", return_value=mock_db),
-            patch("src.back.rag.search.build_embed_model") as mock_build,
+            patch("src.rag.search._async_embed_model", None),
+            patch("src.rag.search.DatabaseService.get_instance", return_value=mock_db),
+            patch("src.rag.search.build_embed_model") as mock_build,
         ):
-            from src.back.rag.ingestion import DEFAULT_MODEL
+            from src.rag.ingestion import DEFAULT_MODEL
 
             _get_search_embed_model()
         mock_build.assert_called_once_with(DEFAULT_MODEL)
@@ -56,9 +57,9 @@ class TestGetSearchEmbedModel:
         mock_db = MagicMock()
         mock_db.get_embedding_config.return_value = {}
         with (
-            patch("src.back.rag.search._async_embed_model", None),
-            patch("src.back.rag.search.DatabaseService.get_instance", return_value=mock_db),
-            patch("src.back.rag.search.build_embed_model") as mock_build,
+            patch("src.rag.search._async_embed_model", None),
+            patch("src.rag.search.DatabaseService.get_instance", return_value=mock_db),
+            patch("src.rag.search.build_embed_model") as mock_build,
         ):
             mock_build.return_value = "fake_model"
             first = _get_search_embed_model()
@@ -80,8 +81,8 @@ class TestSearch:
         mock_embed = AsyncMock()
         mock_embed.aget_query_embedding = AsyncMock(return_value=[0.1])
         with (
-            patch("src.back.rag.search.get_qdrant_client", return_value=mock_client),
-            patch("src.back.rag.search._get_search_embed_model", return_value=mock_embed),
+            patch("src.rag.search.get_qdrant_client", return_value=mock_client),
+            patch("src.rag.search._get_search_embed_model", return_value=mock_embed),
         ):
             results = await search("query")
         assert results == []
@@ -96,8 +97,8 @@ class TestSearch:
         mock_embed = AsyncMock()
         mock_embed.aget_query_embedding = AsyncMock(return_value=[0.1])
         with (
-            patch("src.back.rag.search.get_qdrant_client", return_value=mock_client),
-            patch("src.back.rag.search._get_search_embed_model", return_value=mock_embed),
+            patch("src.rag.search.get_qdrant_client", return_value=mock_client),
+            patch("src.rag.search._get_search_embed_model", return_value=mock_embed),
         ):
             results = await search("query")
         assert len(results) == 1
@@ -114,8 +115,8 @@ class TestSearch:
         mock_embed = AsyncMock()
         mock_embed.aget_query_embedding = AsyncMock(return_value=[0.1])
         with (
-            patch("src.back.rag.search.get_qdrant_client", return_value=mock_client),
-            patch("src.back.rag.search._get_search_embed_model", return_value=mock_embed),
+            patch("src.rag.search.get_qdrant_client", return_value=mock_client),
+            patch("src.rag.search._get_search_embed_model", return_value=mock_embed),
         ):
             results = await search("query")
         assert len(results) == 1
@@ -132,8 +133,8 @@ class TestSearch:
         mock_embed = AsyncMock()
         mock_embed.aget_query_embedding = AsyncMock(return_value=[0.1])
         with (
-            patch("src.back.rag.search.get_qdrant_client", return_value=mock_client),
-            patch("src.back.rag.search._get_search_embed_model", return_value=mock_embed),
+            patch("src.rag.search.get_qdrant_client", return_value=mock_client),
+            patch("src.rag.search._get_search_embed_model", return_value=mock_embed),
         ):
             results = await search("query")
         assert len(results) == 1
@@ -150,8 +151,8 @@ class TestSearch:
         mock_embed = AsyncMock()
         mock_embed.aget_query_embedding = AsyncMock(return_value=[0.1])
         with (
-            patch("src.back.rag.search.get_qdrant_client", return_value=mock_client),
-            patch("src.back.rag.search._get_search_embed_model", return_value=mock_embed),
+            patch("src.rag.search.get_qdrant_client", return_value=mock_client),
+            patch("src.rag.search._get_search_embed_model", return_value=mock_embed),
         ):
             results = await search("query")
         assert len(results) == 1
@@ -168,8 +169,8 @@ class TestSearch:
         mock_embed = AsyncMock()
         mock_embed.aget_query_embedding = AsyncMock(return_value=[0.1])
         with (
-            patch("src.back.rag.search.get_qdrant_client", return_value=mock_client),
-            patch("src.back.rag.search._get_search_embed_model", return_value=mock_embed),
+            patch("src.rag.search.get_qdrant_client", return_value=mock_client),
+            patch("src.rag.search._get_search_embed_model", return_value=mock_embed),
         ):
             results = await search("query")
         assert len(results) == 1
@@ -186,15 +187,15 @@ class TestSearch:
         mock_embed = AsyncMock()
         mock_embed.aget_query_embedding = AsyncMock(return_value=[0.1])
         with (
-            patch("src.back.rag.search.get_qdrant_client", return_value=mock_client),
-            patch("src.back.rag.search._get_search_embed_model", return_value=mock_embed),
+            patch("src.rag.search.get_qdrant_client", return_value=mock_client),
+            patch("src.rag.search._get_search_embed_model", return_value=mock_embed),
         ):
             results = await search("query", similarity_threshold=0.5)
         assert results == []
 
     @pytest.mark.asyncio
     async def test_exception_returns_empty(self) -> None:
-        with patch("src.back.rag.search.get_qdrant_client", side_effect=ValueError("fail")):
+        with patch("src.rag.search.get_qdrant_client", side_effect=ValueError("fail")):
             results = await search("query")
         assert results == []
 
@@ -203,21 +204,23 @@ class TestSearchEngineSearch:
     @pytest.mark.asyncio
     async def test_default_top_k(self) -> None:
         engine = SearchEngine()
-        with patch("src.back.rag.search.search", AsyncMock(return_value=[{"text": "a"}])):
+        with patch("src.rag.search.search", AsyncMock(return_value=[{"text": "a"}])):
             results = await engine.search("q")
-        assert results == [{"text": "a"}]
+        assert len(results) == 1
+        assert results[0]["text"] == "a"
+        assert "rrf_score" in results[0]
 
     @pytest.mark.asyncio
     async def test_custom_top_k(self) -> None:
         engine = SearchEngine()
-        with patch("src.back.rag.search.search", AsyncMock()) as mock_search:
+        with patch("src.rag.search.search", AsyncMock()) as mock_search:
             await engine.search("q", top_k=3)
-        mock_search.assert_called_once_with(
-            query="q",
-            collection_name="sigmaref",
-            top_k=3,
-            similarity_threshold=0.0,
-        )
+        # per_collection_k = max(3 * 2, 10) = 10
+        assert mock_search.call_count == len(engine.collection_names)
+        for call in mock_search.call_args_list:
+            assert call.kwargs["query"] == "q"
+            assert call.kwargs["top_k"] == 10
+            assert call.kwargs["similarity_threshold"] == 0.0
 
 
 class TestFormatSearchResult:
@@ -264,3 +267,138 @@ class TestGetCitation:
     def test_no_metadata(self) -> None:
         result = get_citation({})
         assert result == ""
+
+
+class TestFormatResultByCollection:
+    def test_sigma_rules_format(self) -> None:
+        result = {
+            "text": "detection text",
+            "score": 0.9,
+            "metadata": {
+                "collection": "sigma_rules",
+                "source_file": "/rules/test.yml",
+                "rule_id": "abc-123",
+                "title": "Test Rule",
+                "level": "high",
+                "status": "stable",
+                "chunk_type": "executive_summary",
+                "product": "windows",
+                "category": "process_creation",
+            },
+        }
+        formatted = format_result_by_collection(result)
+        assert formatted["collection"] == "sigma_rules"
+        assert formatted["rule_id"] == "abc-123"
+        assert formatted["title"] == "Test Rule"
+        assert formatted["level"] == "high"
+        assert formatted["chunk_type"] == "executive_summary"
+        assert formatted["text"] == "detection text"
+        assert formatted["score"] == 0.9
+
+    def test_sigma_docs_format(self) -> None:
+        result = {
+            "text": "CVE description",
+            "score": 0.85,
+            "metadata": {
+                "collection": "sigma_docs",
+                "source_file": "/docs/cve.md",
+                "doc_type": "markdown",
+                "heading_text": "CVE-2024-1234",
+                "heading_level": 2,
+            },
+        }
+        formatted = format_result_by_collection(result)
+        assert formatted["collection"] == "sigma_docs"
+        assert formatted["doc_type"] == "markdown"
+        assert formatted["heading_text"] == "CVE-2024-1234"
+        assert formatted["heading_level"] == 2
+        assert "rule_id" not in formatted
+
+    def test_sigma_spec_format(self) -> None:
+        result = {
+            "text": "spec content",
+            "score": 0.7,
+            "metadata": {
+                "collection": "sigma_spec",
+                "source_file": "/spec/format.md",
+            },
+        }
+        formatted = format_result_by_collection(result)
+        assert formatted["collection"] == "sigma_spec"
+        assert formatted["source_file"] == "/spec/format.md"
+        assert "rule_id" not in formatted
+        assert "heading_text" not in formatted
+
+    def test_unknown_collection_format(self) -> None:
+        result = {
+            "text": "some text",
+            "score": 0.5,
+            "metadata": {},
+        }
+        formatted = format_result_by_collection(result)
+        assert formatted["collection"] == ""
+        assert formatted["text"] == "some text"
+
+    def test_base_fields_always_present(self) -> None:
+        result = {
+            "text": "text",
+            "score": 0.9,
+            "metadata": {"collection": "sigma_rules"},
+        }
+        formatted = format_result_by_collection(result)
+        assert "text" in formatted
+        assert "score" in formatted
+        assert "collection" in formatted
+        assert "source_file" in formatted
+
+
+class TestSearchEngineWithRouter:
+    def test_init_use_router_default_false(self) -> None:
+        engine = SearchEngine()
+        assert engine.use_router is False
+
+    def test_init_use_router_true(self) -> None:
+        engine = SearchEngine(use_router=True)
+        assert engine.use_router is True
+
+    @pytest.mark.asyncio
+    async def test_router_disabled_searches_all_collections(self) -> None:
+        engine = SearchEngine(use_router=False)
+        with patch("src.rag.search.search", AsyncMock(return_value=[{"text": "a"}])) as mock_search:
+            await engine.search("q")
+        assert mock_search.call_count == 3
+
+    @pytest.mark.asyncio
+    async def test_router_enabled_filters_collections(self) -> None:
+        engine = SearchEngine(use_router=True)
+        with (
+            patch("src.rag.search.route_query", AsyncMock(return_value=["sigma_rules"])),
+            patch("src.rag.search.search", AsyncMock(return_value=[{"text": "a"}])) as mock_search,
+        ):
+            await engine.search("q")
+        assert mock_search.call_count == 1
+        assert mock_search.call_args_list[0].kwargs["collection_name"] == "sigma_rules"
+
+    @pytest.mark.asyncio
+    async def test_router_returns_unknown_collection_falls_back(self) -> None:
+        engine = SearchEngine(use_router=True)
+        with (
+            patch(
+                "src.rag.search.route_query",
+                AsyncMock(return_value=["unknown_collection"]),
+            ),
+            patch("src.rag.search.search", AsyncMock(return_value=[{"text": "a"}])) as mock_search,
+        ):
+            await engine.search("q")
+        # Falls back to all collections when routed results don't match
+        assert mock_search.call_count == 3
+
+    @pytest.mark.asyncio
+    async def test_router_failure_falls_back(self) -> None:
+        engine = SearchEngine(use_router=True)
+        with (
+            patch("src.rag.search.route_query", AsyncMock(side_effect=Exception("timeout"))),
+            patch("src.rag.search.search", AsyncMock(return_value=[{"text": "a"}])) as mock_search,
+        ):
+            await engine.search("q")
+        assert mock_search.call_count == 3

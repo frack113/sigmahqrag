@@ -8,7 +8,7 @@ from enum import Enum
 from pathlib import Path
 
 import puremagic
-import yaml  # type: ignore[import-untyped]
+import yaml
 
 UTF8_BOM = b"\xef\xbb\xbf"
 MAX_FILE_SIZE = 100 * 1024 * 1024
@@ -32,6 +32,8 @@ class FileType(Enum):
     PLAIN_TEXT = "plain_text"
     UNKNOWN = "unknown"
 
+
+SIGMA_RULE_EXTENSIONS: frozenset[str] = frozenset({".yml", ".yaml"})
 
 SUPPORTED_DOC_EXTENSION_MAP: dict[str, FileType] = {
     ".md": FileType.MARKDOWN,
@@ -138,7 +140,10 @@ def _is_sigma_rule(file_path: str, content: str) -> bool:
         data = yaml.safe_load(content)
         if not isinstance(data, dict):
             return False
-        return all(k in data for k in ("title", "detection", "condition"))
+        if "title" not in data or "detection" not in data:
+            return False
+        detection = data.get("detection")
+        return "condition" in data or (isinstance(detection, dict) and "condition" in detection)
     except Exception:
         return False
 

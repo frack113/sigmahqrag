@@ -108,135 +108,103 @@ async function askWorker(workerType, taskParams) {
     return await resp.json();
 }
 
-async function startSigmaRefEmbedding() {
-    if (window.isProcessing) return;
+async function startUnifiedIndex() {
+    var btn = document.getElementById('btn-index-docs');
+    if (btn && btn.disabled) return;  // already running
+    if (btn) btn.disabled = true;
 
-    var githubProgressSection = document.getElementById('github-progress-section');
-    var githubProgressFill = document.getElementById('github-progress-fill');
-    var githubProgressText = document.getElementById('github-progress-text');
-    var githubMessageEl = document.getElementById('github-message');
+    var specSection = document.getElementById('indexer-progress-spec');
+    var docsSection = document.getElementById('indexer-progress-docs');
+    var specFill = document.getElementById('indexer-progress-spec-fill');
+    var docsFill = document.getElementById('indexer-progress-docs-fill');
+    var specText = document.getElementById('indexer-progress-spec-text');
+    var docsText = document.getElementById('indexer-progress-docs-text');
+    var resultEl = document.getElementById('indexer-result');
+    var errorEl = document.getElementById('indexer-error');
 
-    var progressSection = document.getElementById('sigmaref-progress-section');
-    var progressFill = document.getElementById('sigmaref-progress-fill');
-    var progressText = document.getElementById('sigmaref-progress-text');
-    var messageEl = document.getElementById('sigmaref-message');
-    var btnIndexDocs = document.getElementById('btn-index-docs');
+    if (resultEl) resultEl.style.display = 'none';
+    if (errorEl) errorEl.style.display = 'none';
 
-    if (btnIndexDocs) btnIndexDocs.disabled = true;
-    if (githubMessageEl) githubMessageEl.style.display = 'none';
-    if (messageEl) messageEl.style.display = 'none';
+    function setSpecProgress(pct, label) {
+        if (!specSection) return;
+        specSection.style.display = 'block';
+        if (specFill) { specFill.style.width = pct + '%'; specFill.style.background = pct === 100 ? '#4caf50' : 'linear-gradient(to right, rgb(0, 0, 1), rgb(0, 0, 255))'; }
+        if (specText) specText.textContent = label;
+    }
 
-    [githubProgressFill, progressFill].forEach(function(fill) {
-        if (fill) {
-            fill.style.width = '0%';
-            fill.style.background = 'linear-gradient(to right, rgb(0, 0, 1), rgb(0, 0, 255))';
+    function setDocsProgress(pct, label) {
+        if (!docsSection) return;
+        docsSection.style.display = 'block';
+        if (docsFill) { docsFill.style.width = pct + '%'; docsFill.style.background = pct === 100 ? '#4caf50' : 'linear-gradient(to right, rgb(0, 0, 1), rgb(0, 0, 255))'; }
+        if (docsText) docsText.textContent = label;
+    }
+
+    async function callGroup(group) {
+        var resp = await fetch('/api/v1/qdrant', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'index_all', payload: { action: 'index_all', group: group } }),
+        });
+        if (!resp.ok) {
+            var body = await resp.text();
+            throw new Error('HTTP ' + resp.status + ': ' + body.slice(0, 200));
         }
-    });
-    [githubProgressText, progressText].forEach(function(text) {
-        if (text) text.textContent = '0%';
-    });
+        return await resp.json();
+    }
+
+    console.log('Indexer: starting spec phase...');
 
     try {
-        var tasks = [];
-
-        var gResult = await askWorker('github_embeddings', { collection_name: 'all' });
-        if (gResult.task_id) {
-            tasks.push('github_embeddings');
-        }
-
-        var sResult = await askWorker('sigmaref_embeddings', { collection_name: 'sigmaref' });
-        if (sResult.task_id) {
-            tasks.push('sigmaref_embeddings');
-        }
-
-        if (tasks.indexOf('github_embeddings') !== -1) {
-            pollEmbedProgress('github_embeddings', githubProgressFill, githubProgressText, githubMessageEl, btnIndexDocs);
-        }
-
-        if (tasks.indexOf('sigmaref_embeddings') !== -1) {
-            pollEmbedProgress('sigmaref_embeddings', progressFill, progressText, messageEl, btnIndexDocs);
-        }
-
-        if (tasks.length === 0) {
-            if (gResult.error && sResult.error) {
-                throw new Error('All workers busy');
-            }
-        }
-    } catch (error) {
-        console.error('Failed to start embedding:', error);
-        if (githubMessageEl) {
-            githubMessageEl.textContent = 'Error: ' + error.message;
-            githubMessageEl.style.display = 'block';
-        }
-        if (messageEl) {
-            messageEl.textContent = 'Error: ' + error.message;
-            messageEl.style.display = 'block';
-        }
-        [githubProgressFill, progressFill].forEach(function(fill) {
-            if (fill) fill.style.width = '0%';
-        });
-        if (btnIndexDocs) btnIndexDocs.disabled = false;
-    }
-}
-
-async function pollEmbedProgress(source, progressFill, progressText, messageEl, btnIndexDocs) {
-    var pollCount = 0;
-    var maxPolls = 300;
-    var pollInterval = setInterval(async function() {
-        pollCount++;
-        if (pollCount > maxPolls) {
-            clearInterval(pollInterval);
-            checkAllComplete(btnIndexDocs);
+        // Phase 1: Specification
+        setSpecProgress(0, 'Indexation...');
+        setDocsProgress(0, 'En attente');
+        var specResult = await callGroup('spec');
+        if (specResult.status === 'success') {
+            var specCount = (specResult.data && specResult.data.results) ? specResult.data.results.reduce(function(s, r) { return s + r.processed; }, 0) : 0;
+            setSpecProgress(100, specCount + ' documents');
+            console.log('Indexer: spec done, ' + specCount + ' documents');
+        } else {
+            setSpecProgress(0, 'Erreur');
+            if (errorEl) { errorEl.textContent = 'Erreur spécification: ' + (specResult.message || 'Échec'); errorEl.style.display = 'block'; }
+            console.error('Indexer: spec failed', specResult);
             return;
         }
-        try {
-            var response = await fetch(DISPATCHER_API + '/status/' + encodeURIComponent(source));
-            if (response.status === 404) {
-                if (pollCount > 5) {
-                    clearInterval(pollInterval);
-                    checkAllComplete(btnIndexDocs);
-                }
-                return;
-            }
-            var statusData = await response.json();
 
-            if (statusData.status === 'running' || statusData.status === 'waiting') {
-                var pct = Math.round(statusData.progress_percent || 0);
-                if (progressFill) progressFill.style.width = pct + '%';
-                if (progressText) progressText.textContent = pct + '%';
-            } else if (statusData.status === 'idle') {
-                if (progressFill) {
-                    progressFill.style.width = '100%';
-                    progressFill.style.background = '#4caf50';
-                }
-                if (progressText) progressText.textContent = '100%';
-                if (messageEl) {
-                    messageEl.textContent = 'Completed';
-                    messageEl.style.display = 'block';
-                }
-                clearInterval(pollInterval);
-                checkAllComplete(btnIndexDocs);
-            } else if (statusData.status === 'error') {
-                if (progressFill) {
-                    progressFill.style.background = '#f44336';
-                }
-                if (messageEl) {
-                    messageEl.textContent = 'Error: ' + (statusData.error || 'Task failed');
-                    messageEl.style.display = 'block';
-                }
-                clearInterval(pollInterval);
-                checkAllComplete(btnIndexDocs);
-            }
-        } catch (e) {
-            console.error('Poll error:', e);
-            clearInterval(pollInterval);
-            checkAllComplete(btnIndexDocs);
+        // Phase 2: Documents
+        console.log('Indexer: starting docs phase...');
+        setDocsProgress(0, 'Indexation...');
+        var docsResult = await callGroup('docs');
+        if (docsResult.status === 'success') {
+            var docsCount = (docsResult.data && docsResult.data.results) ? docsResult.data.results.reduce(function(s, r) { return s + r.processed; }, 0) : 0;
+            setDocsProgress(100, docsCount + ' documents');
+            console.log('Indexer: docs done, ' + docsCount + ' documents');
+        } else {
+            setDocsProgress(0, 'Erreur');
+            if (errorEl) { errorEl.textContent = 'Erreur documents: ' + (docsResult.message || 'Échec'); errorEl.style.display = 'block'; }
+            console.error('Indexer: docs failed', docsResult);
+            return;
         }
-    }, 2000);
-}
 
-function checkAllComplete(btnIndexDocs) {
-    if (btnIndexDocs) btnIndexDocs.disabled = false;
+        // Show combined result
+        if (resultEl) {
+            var specResults = (specResult.data && specResult.data.results) || [];
+            var docsResults = (docsResult.data && docsResult.data.results) || [];
+            var allResults = specResults.concat(docsResults);
+            var lines = allResults.map(function(r) {
+                return r.route + ': ' + r.processed + ' documents' + (r.errors && r.errors.length ? ' (' + r.errors.length + ' erreurs)' : '');
+            });
+            resultEl.innerHTML = '<strong>Terminé</strong><br>' + lines.join('<br>');
+            resultEl.style.display = 'block';
+        }
+    } catch (error) {
+        console.error('Indexer error:', error);
+        if (errorEl) {
+            errorEl.textContent = 'Erreur: ' + error.message;
+            errorEl.style.display = 'block';
+        }
+    } finally {
+        if (btn) btn.disabled = false;
+    }
 }
 
 document.addEventListener('DOMContentLoaded', loadVectorDB);

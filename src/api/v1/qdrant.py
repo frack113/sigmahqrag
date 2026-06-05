@@ -18,11 +18,13 @@ from src.back.qdrant.health import check_health
 from src.back.qdrant.service import get_qdrant_service
 from src.back.qdrant.storage import store_embeddings, delete_point, search as qdrant_search
 from src.shared.download_manager import create_download_manager
+from src.rag.indexer import UnifiedIndexer
 from src.shared.schemas.qdrant import (
     CancelPayload,
     CollectionManagementPayload,
     DataManagementPayload,
     DownloadUpdatePayload,
+    IndexAllPayload,
     ProgressPayload,
     QdrantActionRequest,
     QdrantActionResponse,
@@ -141,6 +143,7 @@ async def qdrant_action(
 
         elif isinstance(payload, ProgressPayload):
             return JSONResponse(
+                content=None,
                 status_code=307,
                 headers={"Location": f"/api/v1/qdrant/progress/{payload.download_id}"},
             )
@@ -217,6 +220,26 @@ async def qdrant_action(
                 )
             else:
                 raise ValueError(f"Unknown operation: {dm_op}")
+
+        elif isinstance(payload, IndexAllPayload):
+            indexer = UnifiedIndexer()
+            results = await indexer.index_all(group=payload.group)
+            total = sum(r.processed for r in results)
+            return QdrantActionResponse(
+                status="success",
+                action=action,
+                data={
+                    "results": [
+                        {
+                            "route": r.route.qdrant_collection,
+                            "processed": r.processed,
+                            "errors": r.errors,
+                        }
+                        for r in results
+                    ]
+                },
+                message=f"Indexed {total} documents",
+            )
 
         elif isinstance(payload, VectorSearchPayload):
             results = await qdrant_search(

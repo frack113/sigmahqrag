@@ -92,8 +92,8 @@ class LlamaClient:
                 ) as response:
                     logger.info("Llama.cpp stream response status: %d", response.status_code)
                     response.raise_for_status()
-                    raw_lines = []
-                    data_lines = []
+                    raw_lines: list[str] = []
+                    data_lines: list[str] = []
                     line_count = 0
                     async for line in response.aiter_lines():
                         line_count += 1

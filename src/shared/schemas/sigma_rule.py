@@ -1,4 +1,4 @@
-"""Sigma rule schema."""
+"""Sigma rule schema — canonical model."""
 
 from pathlib import Path
 from typing import Any
@@ -7,19 +7,30 @@ from pydantic import BaseModel, Field
 
 
 class SigmaRule(BaseModel):
-    """Sigma rule model."""
+    """Sigma rule model — canonical source of truth.
+
+    Used by both the legacy chunker (src/back/rag/chunker.py) and the
+    document-level operations (src/back/documents/).
+    """
 
     id: str
     title: str
-    detection: dict = Field(default_factory=dict)
+    detection: dict[str, Any] = Field(default_factory=dict)
+    condition: str = ""
     status: str | None = None
     level: str | None = None
     tags: list[str] = Field(default_factory=list)
     falsepositives: list[str] = Field(default_factory=list)
-    file_path: str | None = None
-    line_number: int | None = None
     description: str | None = None
     fields: list[str] = Field(default_factory=list)
+    file_path: str | None = None
+    line_number: int | None = None
+    author: str | None = None
+    date: str | None = None
+    modified: str | None = None
+    references: list[str] = Field(default_factory=list)
+    logsource: dict[str, Any] = Field(default_factory=dict)
+    license: str | None = None
 
     @classmethod
     def from_dict(
@@ -38,7 +49,7 @@ class SigmaRule(BaseModel):
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
-        return self.model_dump(exclude_none=True)  # type: ignore[no-any-return]
+        return self.model_dump(exclude_none=True)
 
     @property
     def path(self) -> Path | None:

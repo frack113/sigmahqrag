@@ -4,8 +4,6 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-from src.shared.config import get_config
-
 
 class DownloadUpdatePayload(BaseModel):
     action: Literal["download_update"] = "download_update"
@@ -51,10 +49,9 @@ class VectorSearchPayload(BaseModel):
     collection_name: str
 
 
-class EmbedSigmaRefPayload(BaseModel):
-    action: Literal["embed_sigmaref"] = "embed_sigmaref"
-    registry_path: str = Field(default_factory=lambda: get_config().sigmaref_documents_path)
-    collection_name: str = "sigmaref"
+class IndexAllPayload(BaseModel):
+    action: Literal["index_all"] = "index_all"
+    group: str | None = None  # "spec", "docs", or None for all
 
 
 class QdrantActionRequest(BaseModel):
@@ -66,7 +63,7 @@ class QdrantActionRequest(BaseModel):
         "vector_search",
         "progress",
         "cancel",
-        "embed_sigmaref",
+        "index_all",
     ]
     payload: (
         DownloadUpdatePayload
@@ -76,7 +73,7 @@ class QdrantActionRequest(BaseModel):
         | CollectionManagementPayload
         | DataManagementPayload
         | VectorSearchPayload
-        | EmbedSigmaRefPayload
+        | IndexAllPayload
     ) = Field(..., discriminator="action")
 
 

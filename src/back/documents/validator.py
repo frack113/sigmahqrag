@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import logging
-from src.back.documents.models import SigmaRule, ValidationError, ValidationResult
+from src.shared.schemas.sigma_rule import SigmaRule
+from src.back.documents.models import ValidationError, ValidationResult
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +63,7 @@ def validate_sigma_rule(rule: SigmaRule) -> ValidationResult:
             )
 
     if rule.status is not None:
-        valid_statuses = ["experimental", "stable", "testing", "deprecated"]
+        valid_statuses = ["experimental", "stable", "testing", "deprecated", "test", "unsupported"]
         if rule.status.lower() not in valid_statuses:
             errors.append(
                 ValidationError(
