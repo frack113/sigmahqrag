@@ -26,6 +26,9 @@ from src.shared.constants import (
     DEFAULT_QDRANT_COLLECTION,
     DEFAULT_QDRANT_VECTOR_SIZE,
 )
+from src.shared import LLM_DIR, EMBEDDINGS_DIR
+from src.worker.processor import TaskDispatcher
+from src.worker.enums import WorkerName, WorkerStatus
 
 # Configure structured logging
 logger = logging.getLogger("init_projet")
@@ -105,9 +108,6 @@ def _generate_default_toml() -> str:
         'log_max_size = "10M"',
         "log_max_file = 5",
         "clean_at_startup = false",
-        "",
-        "[rag]",
-        "enable_rich_chunks = true",
         "",
     ]
     return "\n".join(lines)
@@ -234,6 +234,106 @@ def initialize_database(db_service: Optional[DatabaseServiceProtocol] = None) ->
     db.close()
 
 
+def run_initial_workers() -> None:
+    """Run ModelSyncWorker and LocalRepoSyncWorker during initialization."""
+    log_step("Starting initial workers (ModelSync, LocalRepoSync)...")
+
+    dispatcher: TaskDispatcher | None = None
+    try:
+        dispatcher = TaskDispatcher(poll_interval=1, max_workers=4)
+        dispatcher.start()
+
+        # Queue ModelSyncWorker
+        log_info("Queuing ModelSyncWorker...")
+        if not dispatcher.ask_for_worker(
+            WorkerName.MODEL_SYNC,
+            llm_dir=str(LLM_DIR),
+            embeddings_dir=str(EMBEDDINGS_DIR),
+        ):
+            log_warn("ModelSyncWorker not queued — worker is busy")
+        else:
+            log_info("ModelSyncWorker queued.")
+
+        # Queue LocalRepoSyncWorker
+        log_info("Queuing LocalRepoSyncWorker...")
+        if not dispatcher.ask_for_worker(WorkerName.LOCAL_REPO_SYNC):
+            log_warn("LocalRepoSyncWorker not queued — worker is busy")
+        else:
+            log_info("LocalRepoSyncWorker queued.")
+
+        _wait_for_initial_workers(dispatcher)
+
+    except KeyboardInterrupt:
+        log_error("Initialization interrupted by user.")
+        sys.exit(130)
+    finally:
+        if dispatcher is not None:
+            dispatcher.stop()
+            log_info("Dispatcher stopped.")
+
+    # Sync model registry from JSON to DuckDB so models are visible in API
+    log_step("Syncing model registry to DuckDB...")
+    _sync_model_registry_to_db()
+
+
+def _wait_for_initial_workers(dispatcher: TaskDispatcher) -> None:
+    """Poll workers until they reach a terminal state (IDLE, ERROR) or timeout.
+
+    Raises:
+        RuntimeError: If workers do not complete within max_wait seconds.
+    """
+    max_wait = 300  # 5 minutes max
+    poll_interval = 2
+    start_time = time.time()
+
+    while time.time() - start_time < max_wait:
+        model_progress = dispatcher.get_worker_progress(WorkerName.MODEL_SYNC.value)
+        repo_progress = dispatcher.get_worker_progress(WorkerName.LOCAL_REPO_SYNC.value)
+
+        model_status = model_progress.get("status") if model_progress else None
+        repo_status = repo_progress.get("status") if repo_progress else None
+
+        errors: list[str] = []
+        if model_status == WorkerStatus.ERROR.value:
+            errors.append("ModelSyncWorker ended with ERROR")
+        if repo_status == WorkerStatus.ERROR.value:
+            errors.append("LocalRepoSyncWorker ended with ERROR")
+        if errors:
+            for msg in errors:
+                log_error(msg)
+            sys.exit(1)
+
+        if model_status == WorkerStatus.IDLE.value and repo_status == WorkerStatus.IDLE.value:
+            log_info("Both initial workers completed.")
+            return
+
+        time.sleep(poll_interval)
+
+    log_error(f"Timeout ({max_wait}s) waiting for initial workers to complete")
+    sys.exit(1)
+
+
+def _sync_model_registry_to_db() -> None:
+    """Sync model registry (JSON) to DuckDB models table."""
+    from src.back.database import DatabaseService
+    from src.back.models.registry import UnifiedRegistry
+
+    db = None
+    try:
+        db = DatabaseService()
+        db.initialize()
+        reg = UnifiedRegistry.get_instance()
+        reg.sync_llm_folder(LLM_DIR, db)
+        reg.sync_embeddings_folder(EMBEDDINGS_DIR, db)
+        log_info("Model registry synced to DuckDB.")
+    except Exception as e:
+        logger.exception("Failed to sync model registry to DuckDB")
+        log_warn(f"Failed to sync model registry to DuckDB: {e}")
+    finally:
+        if db is not None:
+            db.close()
+
+
 def main() -> None:
     logger.info("=" * 50)
     logger.info("SigmaHQ RAG - Project Initialization")
@@ -243,6 +343,7 @@ def main() -> None:
     create_config_file()
     clone_or_update_sigma_spec()
     initialize_database()
+    run_initial_workers()
 
     logger.info("=" * 50)
     log_info("Initialization complete!")
