@@ -60,4 +60,5 @@ $null
 .dcignore
 # AI agent guidance (local only, not tracked)
 AGENTS.md
-data/sigmahqrag.toml
+sigmarag.toml
+init.txt
