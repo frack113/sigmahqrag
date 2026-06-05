@@ -43,7 +43,6 @@ class TestTransformConfig:
         assert config.batch_size == 8
         assert config.max_length == 512
         assert config.enable_sbert is True
-        assert config.enable_rich_chunks is False
         assert config.enable_eval_questions is False
 
     def test_custom_config(self):
@@ -51,12 +50,10 @@ class TestTransformConfig:
             collection_name="test_collection",
             model_name="test-model",
             chunk_size=512,
-            enable_rich_chunks=True,
         )
         assert config.collection_name == "test_collection"
         assert config.model_name == "test-model"
         assert config.chunk_size == 512
-        assert config.enable_rich_chunks is True
 
 
 class TestDocumentTransform:
@@ -142,19 +139,18 @@ class TestTransformRegistry:
 
 
 class TestSigmaParser:
-    """Tests for SigmaParser transform."""
+    """Tests for SigmaParser transform (rich mode only)."""
 
-    def test_parse_flat_mode(self, sample_sigma_file):
-        config = TransformConfig(enable_rich_chunks=False)
+    def test_parse_emits_empty_text(self, sample_sigma_file):
+        """Rich mode: parse() emits Documents with empty text, chunking happens later."""
+        config = TransformConfig()
         parser = SigmaParser(config)
 
         documents = parser.parse(sample_sigma_file)
 
         assert len(documents) == 1
         doc = documents[0]
-        assert doc.text is not None
-        assert "Test Sigma Rule" in doc.text
-        assert "process_creation" in doc.text
+        assert doc.text == ""
         assert doc.metadata["rule_id"] == "12345678-1234-1234-1234-123456789012"
 
     def test_parse_multiple_rules(self, tmp_path):
@@ -177,7 +173,7 @@ detection:
             rule_file = rules_dir / f"rule_{i}.yml"
             rule_file.write_text(content)
 
-        config = TransformConfig(enable_rich_chunks=False)
+        config = TransformConfig()
         parser = SigmaParser(config)
 
         all_docs = []
@@ -192,28 +188,32 @@ detection:
         empty_file = tmp_path / "empty.yml"
         empty_file.write_text("")
 
-        config = TransformConfig(enable_rich_chunks=False)
+        config = TransformConfig()
         parser = SigmaParser(config)
 
         documents = parser.parse(empty_file)
         assert len(documents) == 0
 
-    def test_chunk_flat_mode(self, sample_sigma_file):
-        """Test that chunk() returns documents unchanged in flat mode."""
-        config = TransformConfig(enable_rich_chunks=False)
+    def test_chunk_delegates_to_chunker(self, sample_sigma_file):
+        """Test that chunk() delegates to SigmaChunker and passes through documents
+        that lack rule_meta (since SigmaParser.parse() doesn't enrich with rule_meta)."""
+        config = TransformConfig()
         parser = SigmaParser(config)
 
         documents = parser.parse(sample_sigma_file)
         chunks = parser.chunk(documents)
 
+        # SigmaParser.parse() emits Documents without rule_meta,
+        # so SigmaChunker.chunk() passes them through unchanged.
         assert len(chunks) == len(documents)
+        assert chunks[0].text == ""
 
 
 class TestSigmaChunker:
     """Tests for SigmaChunker transform."""
 
-    def test_parse_rich_mode(self, sample_sigma_file):
-        config = TransformConfig(enable_rich_chunks=True)
+    def test_parse_emits_empty_text(self, sample_sigma_file):
+        config = TransformConfig()
         chunker = SigmaChunker(config)
 
         documents = chunker.parse(sample_sigma_file)
@@ -223,9 +223,9 @@ class TestSigmaChunker:
         assert doc.text == ""  # Rich mode: text is empty, chunks created later
         assert doc.metadata["rule_id"] == "12345678-1234-1234-1234-123456789012"
 
-    def test_chunk_rich_mode(self, sample_sigma_file):
-        """Test that rich chunking produces multiple chunks."""
-        config = TransformConfig(enable_rich_chunks=True)
+    def test_chunk_produces_multiple_chunks(self, sample_sigma_file):
+        """Test that chunking produces multiple chunks per rule."""
+        config = TransformConfig()
         chunker = SigmaChunker(config)
 
         documents = chunker.parse(sample_sigma_file)
@@ -240,12 +240,9 @@ class TestSigmaChunker:
         assert "logsource_context" in chunk_types
         assert "detection_condition" in chunk_types
 
-    def test_run_rich_mode(self, sample_sigma_file):
-        """Test full run (parse + chunk + post_process) in rich mode."""
-        config = TransformConfig(
-            enable_rich_chunks=True,
-            enable_eval_questions=True,
-        )
+    def test_run_full_pipeline(self, sample_sigma_file):
+        """Test full run (parse + chunk + post_process)."""
+        config = TransformConfig(enable_eval_questions=True)
         chunker = SigmaChunker(config)
 
         result = chunker.run(sample_sigma_file)
@@ -255,7 +252,7 @@ class TestSigmaChunker:
 
     def test_chunk_metadata_preserved(self, sample_sigma_file):
         """Test that metadata is preserved through chunking."""
-        config = TransformConfig(enable_rich_chunks=True)
+        config = TransformConfig()
         chunker = SigmaChunker(config)
 
         documents = chunker.parse(sample_sigma_file)
@@ -268,11 +265,8 @@ class TestSigmaChunker:
 class TestCollectionInjection:
     """Tests that DocumentTransform.run() injects collection into metadata."""
 
-    def test_run_injects_collection(self, sample_sigma_file):
-        config = TransformConfig(
-            enable_rich_chunks=False,
-            collection="sigma_rules",
-        )
+    def test_run_injects_collection_with_sigma_parser(self, sample_sigma_file):
+        config = TransformConfig(collection="sigma_rules")
         parser = SigmaParser(config)
         result = parser.run(sample_sigma_file)
 
@@ -280,11 +274,8 @@ class TestCollectionInjection:
         for doc in result:
             assert doc.metadata.get("collection") == "sigma_rules"
 
-    def test_run_injects_collection_rich_mode(self, sample_sigma_file):
-        config = TransformConfig(
-            enable_rich_chunks=True,
-            collection="sigma_rules",
-        )
+    def test_run_injects_collection_with_sigma_chunker(self, sample_sigma_file):
+        config = TransformConfig(collection="sigma_rules")
         chunker = SigmaChunker(config)
         result = chunker.run(sample_sigma_file)
 
@@ -293,7 +284,7 @@ class TestCollectionInjection:
             assert doc.metadata.get("collection") == "sigma_rules"
 
     def test_default_collection_when_not_set(self, sample_sigma_file):
-        config = TransformConfig(enable_rich_chunks=False)
+        config = TransformConfig()
         parser = SigmaParser(config)
         result = parser.run(sample_sigma_file)
 

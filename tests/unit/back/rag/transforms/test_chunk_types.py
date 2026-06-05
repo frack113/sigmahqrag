@@ -27,7 +27,7 @@ ALL_CHUNK_TYPES = frozenset(
 
 @pytest.fixture
 def config():
-    return TransformConfig(enable_rich_chunks=True)
+    return TransformConfig()
 
 
 @pytest.fixture

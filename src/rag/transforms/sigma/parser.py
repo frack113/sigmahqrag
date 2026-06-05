@@ -1,4 +1,4 @@
-"""Sigma rule parser using the legacy loader + detector."""
+"""Sigma rule parser — emits empty-text Documents for downstream rich chunking."""
 
 from __future__ import annotations
 
@@ -24,8 +24,8 @@ class SigmaParser(DocumentTransform):
     def parse(self, file_path: Path) -> list[Document]:
         """Load Sigma rules from a YAML file and return one Document per rule.
 
-        In flat mode, each rule is wrapped in a Document with its text representation.
-        In rich mode, text is empty and chunking happens during chunk().
+        Each Document has empty text — rich chunking happens during chunk()
+        via SigmaChunker.
 
         Args:
             file_path: Path to the YAML file containing one or more Sigma rules.
@@ -44,13 +44,8 @@ class SigmaParser(DocumentTransform):
             rule_id = rule.get("id", "unknown")
             title = rule.get("title", "Untitled Sigma rule")
 
-            if self.config.enable_rich_chunks:
-                text = ""
-            else:
-                text = _rule_dict_to_text(rule)
-
             doc = Document(
-                text=text,
+                text="",
                 metadata={
                     "source_file": str(file_path),
                     "doc_type": "sigma_rule",
@@ -64,10 +59,10 @@ class SigmaParser(DocumentTransform):
         return documents
 
     def chunk(self, documents: list[Document]) -> list[Document]:
-        """Transform parsed documents into indexed chunks.
+        """Transform parsed documents into indexed chunks using SigmaChunker.
 
-        In flat mode, returns documents unchanged (one doc = one chunk).
-        In rich mode, delegates to SigmaChunker to produce multiple chunks per rule.
+        Local import avoids circular dependency: chunker.py imports
+        SigmaParser at module level.
 
         Args:
             documents: List of Document objects from parse().
@@ -75,56 +70,10 @@ class SigmaParser(DocumentTransform):
         Returns:
             List of Document objects ready for embedding/indexing.
         """
-        if self.config.enable_rich_chunks:
-            from .chunker import SigmaChunker
+        from .chunker import SigmaChunker  # noqa: PLC0415 — circular import
 
-            chunker = SigmaChunker(config=self.config)
-            return chunker.chunk(documents)
-        return documents
-
-
-# ------------------------------------------------------------------
-# Flat-mode text builder (mirrors indexing._sigma_rule_to_text)
-# ------------------------------------------------------------------
-
-
-def _rule_dict_to_text(rule: dict) -> str:
-    """Convert a Sigma rule dict to a flat text representation.
-
-    This is the legacy behavior: one rule = one text block for embedding.
-
-    Args:
-        rule: Sigma rule dict with keys like title, description, detection, etc.
-
-    Returns:
-        A flat text string suitable for embedding.
-    """
-    parts = [f"Title: {rule.get('title', 'Untitled Sigma rule')}"]
-
-    description = rule.get("description")
-    if description:
-        parts.append(f"Description: {description}")
-
-    logsource = rule.get("logsource", {})
-    if logsource:
-        product = logsource.get("product", "unknown")
-        category = logsource.get("category", "unknown")
-        service = logsource.get("service", "unknown")
-        parts.append(f"Logsource: product={product}, category={category}, service={service}")
-
-    condition = rule.get("detection", {}).get("condition", "")
-    if condition:
-        parts.append(f"Condition: {condition}")
-
-    tags = rule.get("tags", [])
-    if tags:
-        parts.append(f"Tags: {', '.join(str(t) for t in tags)}")
-
-    level = rule.get("level")
-    if level:
-        parts.append(f"Level: {level}")
-
-    return "\n".join(parts)
+        chunker = SigmaChunker(config=self.config)
+        return chunker.chunk(documents)
 
 
 # Register the SigmaParser transform.

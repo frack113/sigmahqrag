@@ -64,8 +64,6 @@ class Config:
     logging_log_max_file: int = 5
     logging_clean_at_startup: bool = False
 
-    rag_enable_rich_chunks: bool = True
-
     def __post_init__(self) -> None:
         self._load_from_toml()
 
