@@ -204,7 +204,12 @@ EXPECTED_TABLES = frozenset(
 
 
 def initialize_database(db_service: Optional[DatabaseServiceProtocol] = None) -> None:
-    """Initialize DuckDB schema and verify tables."""
+    """Initialize DuckDB schema and verify tables.
+
+    Keeps the DB instance open (returns it via the singleton) so subsequent
+    steps (run_initial_workers, _sync_model_registry_to_db) can use it.
+    Callers are responsible for closing it.
+    """
     # Import here to avoid circular imports
     from src.back.database import DatabaseService
 
@@ -215,7 +220,6 @@ def initialize_database(db_service: Optional[DatabaseServiceProtocol] = None) ->
     missing = EXPECTED_TABLES - tables
     if missing:
         log_error(f"Missing tables after init: {sorted(missing)}")
-        db.close()
         sys.exit(1)
 
     # Set schema version in config table
@@ -224,14 +228,12 @@ def initialize_database(db_service: Optional[DatabaseServiceProtocol] = None) ->
         log_info(f"Schema version set to {SCHEMA_VERSION}")
     except Exception as e:
         log_error(f"Failed to set schema version: {e}")
-        db.close()
         sys.exit(1)
 
     log_info(f"DuckDB initialized: {len(tables)} tables verified")
     log_info(f"  embedding_config: {db.get_table_count('embedding_config')} rows")
     log_info(f"  system_prompts:   {db.get_table_count('system_prompts')} rows")
     log_info(f"  config:           {db.get_table_count('config')} rows")
-    db.close()
 
 
 def run_initial_workers() -> None:
@@ -314,14 +316,16 @@ def _wait_for_initial_workers(dispatcher: TaskDispatcher) -> None:
 
 
 def _sync_model_registry_to_db() -> None:
-    """Sync model registry (JSON) to DuckDB models table."""
+    """Sync model registry (JSON) to DuckDB models table.
+
+    Uses the DatabaseService singleton (already initialized by
+    initialize_database). Does not close it — the caller manages lifecycle.
+    """
     from src.back.database import DatabaseService
     from src.back.models.registry import UnifiedRegistry
 
-    db = None
     try:
-        db = DatabaseService()
-        db.initialize()
+        db = DatabaseService.get_instance()
         reg = UnifiedRegistry.get_instance()
         reg.sync_llm_folder(LLM_DIR, db)
         reg.sync_embeddings_folder(EMBEDDINGS_DIR, db)
@@ -329,9 +333,6 @@ def _sync_model_registry_to_db() -> None:
     except Exception as e:
         logger.exception("Failed to sync model registry to DuckDB")
         log_warn(f"Failed to sync model registry to DuckDB: {e}")
-    finally:
-        if db is not None:
-            db.close()
 
 
 def main() -> None:
@@ -339,15 +340,26 @@ def main() -> None:
     logger.info("SigmaHQ RAG - Project Initialization")
     logger.info("=" * 50)
 
+    from src.back.database import DatabaseService
+
     create_data_structure()
     create_config_file()
     clone_or_update_sigma_spec()
     initialize_database()
     run_initial_workers()
 
+    # Persist and close DB to save final state to disk
+    try:
+        db = DatabaseService.get_instance()
+        db.persist()
+        db.close()
+    except RuntimeError:
+        pass
+
     logger.info("=" * 50)
     log_info("Initialization complete!")
-    logger.info("  Run 'uv run main.py' to start the server")
+    logger.info("  Review/edit sigmarag.toml as needed")
+    logger.info("  Then run 'uv run main.py' to start the server")
     logger.info("=" * 50)
 
 
