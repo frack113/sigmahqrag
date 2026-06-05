@@ -405,9 +405,7 @@ class SigmaChunker(DocumentTransform):
         return Document(
             text=chunk_data.get("text", ""),
             metadata=metadata,
-            excluded_embed_metadata_keys=[]
-            if not self.config.enable_rich_chunks
-            else ["chunk_type", "source_file"],
+            excluded_embed_metadata_keys=["chunk_type", "source_file"],
         )
 
     # ------------------------------------------------------------------

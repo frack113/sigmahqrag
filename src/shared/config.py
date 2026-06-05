@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 BASE_DIR = Path("data").resolve()
-CONFIG_FILE = BASE_DIR / "sigmahqrag.toml"
+CONFIG_FILE = Path("sigmarag.toml").resolve()
 BIN_DIR = BASE_DIR / "bin"
 MODELS_DIR = BASE_DIR / "models"
 LLM_DIR = MODELS_DIR / "llm"
@@ -63,8 +63,6 @@ class Config:
     logging_log_max_size: str = "10M"
     logging_log_max_file: int = 5
     logging_clean_at_startup: bool = False
-
-    rag_enable_rich_chunks: bool = True
 
     def __post_init__(self) -> None:
         self._load_from_toml()
@@ -121,13 +119,6 @@ class Config:
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "backend": {
-                "os": self.os,
-                "gpu_type": self.gpu_type,
-                "llamacpp_version": self.llamacpp_version,
-                "qdrant_version": self.qdrant_version,
-                "qdrant_webui_version": self.qdrant_webui_version,
-            },
             "services": {
                 "llama": {
                     "base_url": self.llama_base_url,

@@ -22,7 +22,6 @@ class TransformConfig:
         batch_size: Number of documents per embedding batch.
         max_length: Max token length for the embedding model.
         enable_sbert: Use sentence-transformers for embedding.
-        enable_rich_chunks: Skip LlamaIndex SentenceSplitter for pre-chunked output.
         enable_eval_questions: Generate eval questions for RAGAS evaluation.
         enable_llm_enrichment: Enable LLM-based keyword extraction per chunk.
         llm_client: Optional LLM client for keyword generation.
@@ -36,7 +35,6 @@ class TransformConfig:
     batch_size: int = 8
     max_length: int = 512
     enable_sbert: bool = True
-    enable_rich_chunks: bool = False
     enable_eval_questions: bool = False
     enable_llm_enrichment: bool = True
     llm_client: Any = None
@@ -137,7 +135,6 @@ class DocumentTransform(ABC):
             chunk_size=getattr(cfg, "chunk_size", 1024),
             chunk_overlap=getattr(cfg, "chunk_overlap", 100),
             enable_sbert=getattr(cfg, "enable_sbert", True),
-            enable_rich_chunks=getattr(cfg, "enable_rich_chunks", False),
             enable_eval_questions=getattr(cfg, "enable_eval_questions", False),
         )
 

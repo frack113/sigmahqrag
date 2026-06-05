@@ -10,10 +10,10 @@ class TestConfigToDict:
     def test_returns_all_sections(self) -> None:
         cfg = Config()
         d = cfg.to_dict()
-        assert "backend" in d
+        assert "backend" not in d  # backend section removed - stored in DuckDB
         assert "services" in d
         assert "logging" in d
-        assert d["backend"]["os"] == "windows"
+        assert d["services"]["llama"]["base_url"] == "http://127.0.0.1:8080"
 
 
 class TestConfigSave:

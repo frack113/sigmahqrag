@@ -60,4 +60,7 @@ $null
 .dcignore
 # AI agent guidance (local only, not tracked)
 AGENTS.md
-data/sigmahqrag.toml
+sigmarag.toml
+
+# Internal architecture documentation (local only, not tracked)
+DOCUMENTATION_ARCHITECTURE.md

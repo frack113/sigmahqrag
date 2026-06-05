@@ -126,4 +126,5 @@ INSERT OR IGNORE INTO embedding_config (key, model) VALUES
 -- Default app config
 INSERT OR IGNORE INTO config (key, value) VALUES
     ('app_version', '"0.1.0"'),
-    ('theme', '"dark"');
+    ('theme', '"dark"'),
+    ('schema_version', '1');

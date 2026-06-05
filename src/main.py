@@ -41,7 +41,6 @@ from src.back.llamacpp.auto_start import start_llamacpp, stop_llamacpp
 from src.back.qdrant.auto_start import start_qdrant, stop_qdrant
 from src.back.service_manager import shutdown_all_services
 from src.worker.processor import TaskDispatcher
-from src.worker.enums import WorkerName
 from src.front import STATIC_DIR
 from src.shared.exceptions import SigmaError
 from src.shared import TEMP_DIR
@@ -179,25 +178,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         app.state.dispatcher = dispatcher
         dispatcher.start()
         logger.info("Dispatcher started in background thread.")
-
-        # Queue model sync and repo sync as background worker tasks
-        from src.shared import LLM_DIR, EMBEDDINGS_DIR
-
-        logger.info("Queuing model sync as background worker...")
-        if not dispatcher.ask_for_worker(
-            WorkerName.MODEL_SYNC,
-            llm_dir=str(LLM_DIR),
-            embeddings_dir=str(EMBEDDINGS_DIR),
-        ):
-            logger.warning("Model sync not queued — worker is busy")
-        else:
-            logger.info("Model sync queued.")
-
-        logger.info("Queuing repo sync as background worker...")
-        if not dispatcher.ask_for_worker(WorkerName.LOCAL_REPO_SYNC):
-            logger.warning("Repo sync not queued — worker is busy")
-        else:
-            logger.info("Repo sync queued.")
 
         _validate_services()
         logger.info("Services validated.")

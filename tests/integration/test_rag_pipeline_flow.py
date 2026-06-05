@@ -11,7 +11,6 @@ import yaml
 from src.rag.search import format_search_result, get_citation
 from src.rag.transforms.base import TransformConfig
 from src.rag.transforms.sigma.chunker import SigmaChunker
-from src.rag.transforms.sigma.parser import SigmaParser
 
 
 @pytest.fixture
@@ -55,7 +54,7 @@ class TestFullPipelineContract:
         This validates that documents produced by the transform system have
         the metadata shape expected by RAGPipeline._format_search_results().
         """
-        config = TransformConfig(enable_rich_chunks=True)
+        config = TransformConfig()
         chunker = SigmaChunker(config=config)
 
         documents = chunker.parse(sample_sigma_yaml)
@@ -82,7 +81,7 @@ class TestFullPipelineContract:
 
     def test_chunk_metadata_in_search_result_format(self, sample_sigma_yaml: Path):
         """Verify chunk metadata survives being wrapped in a search result dict."""
-        config = TransformConfig(enable_rich_chunks=True)
+        config = TransformConfig()
         chunker = SigmaChunker(config=config)
         documents = chunker.parse(sample_sigma_yaml)
         chunks = chunker.chunk(documents)
@@ -100,7 +99,7 @@ class TestFullPipelineContract:
 
     def test_citation_format_consistency(self, sample_sigma_yaml: Path):
         """Verify citations work across the chunk types."""
-        config = TransformConfig(enable_rich_chunks=True)
+        config = TransformConfig()
         chunker = SigmaChunker(config=config)
         documents = chunker.parse(sample_sigma_yaml)
         chunks = chunker.chunk(documents)
@@ -113,27 +112,6 @@ class TestFullPipelineContract:
             }
             citation = get_citation(result)
             assert isinstance(citation, str)
-
-    def test_flat_mode_compatible_with_search(self, sample_sigma_yaml: Path):
-        """Verify flat-mode documents also produce searchable results."""
-        config = TransformConfig(enable_rich_chunks=False)
-        parser = SigmaParser(config=config)
-
-        documents = parser.parse(sample_sigma_yaml)
-        assert len(documents) == 1
-
-        doc = documents[0]
-        assert "powershell" in doc.text.lower()
-        assert doc.metadata["rule_id"] == "test-integration-001"
-
-        search_result = {
-            "text": doc.text,
-            "score": 0.85,
-            "metadata": doc.metadata,
-        }
-        formatted = format_search_result(search_result)
-        assert formatted["text"] == doc.text
-        assert formatted["metadata"]["rule_id"] == "test-integration-001"
 
     def test_multiple_rules_in_directory(self, tmp_path: Path):
         """Verify batch processing across multiple files."""
@@ -150,7 +128,7 @@ class TestFullPipelineContract:
                 yaml.dump(rule, default_flow_style=False), encoding="utf-8"
             )
 
-        config = TransformConfig(enable_rich_chunks=True)
+        config = TransformConfig()
         chunker = SigmaChunker(config=config)
 
         all_chunks: list[dict[str, Any]] = []
@@ -174,7 +152,7 @@ class TestFullPipelineContract:
 
     def test_rich_chunks_preserve_attack_tags(self, sample_sigma_yaml: Path):
         """Verify ATT&CK tags survive into the chunk metadata."""
-        config = TransformConfig(enable_rich_chunks=True)
+        config = TransformConfig()
         chunker = SigmaChunker(config=config)
         documents = chunker.parse(sample_sigma_yaml)
         chunks = chunker.chunk(documents)

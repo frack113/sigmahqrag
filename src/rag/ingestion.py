@@ -203,9 +203,6 @@ class IngestionPipelineBuilder:
         from .transforms.base import TransformConfig
         from src.rag.transforms.markdown.chunker import _get_llm_client
 
-        from src.shared.config import get_config as _get_config
-
-        cfg = _get_config()
         llm_client = _get_llm_client()
         config = TransformConfig(
             collection_name=self._collection_name,
@@ -213,7 +210,6 @@ class IngestionPipelineBuilder:
             model_name=self._model_name,
             chunk_size=SOURCE_CHUNK_CONFIG.get(source, {}).get("chunk_size", 512),
             chunk_overlap=SOURCE_CHUNK_CONFIG.get(source, {}).get("chunk_overlap", 50),
-            enable_rich_chunks=cfg.rag_enable_rich_chunks,
             llm_client=llm_client,
             enable_llm_enrichment=True,
         )
@@ -384,14 +380,11 @@ class IngestionPipelineBuilder:
         """Build a TransformConfig suited for a specific file."""
         from .transforms.base import TransformConfig
 
-        from src.shared.config import get_config as _get_config
-
         source = ""
         if self._collection_name:
             parts = self._collection_name.lower().split("/")
             source = parts[0] if parts else self._collection_name
 
-        cfg = _get_config()
         chunk_cfg = SOURCE_CHUNK_CONFIG.get(source, {})
 
         return TransformConfig(
@@ -400,7 +393,6 @@ class IngestionPipelineBuilder:
             model_name=self._model_name,
             chunk_size=chunk_cfg.get("chunk_size", 512),
             chunk_overlap=chunk_cfg.get("chunk_overlap", 50),
-            enable_rich_chunks=cfg.rag_enable_rich_chunks,
         )
 
     async def arun(

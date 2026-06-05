@@ -1,4 +1,4 @@
-"""Benchmark: flat vs rich Sigma rule chunking performance."""
+"""Benchmark: rich Sigma rule chunking performance."""
 
 import time
 from pathlib import Path
@@ -8,7 +8,6 @@ import pytest
 
 from src.rag.transforms.base import TransformConfig
 from src.rag.transforms.sigma.chunker import SigmaChunker
-from src.rag.transforms.sigma.parser import SigmaParser
 
 
 def _make_rule(title: str, i: int) -> str:
@@ -16,7 +15,7 @@ def _make_rule(title: str, i: int) -> str:
 title: {title}
 id: bench-{i:04d}
 status: test
-description: Benchmark rule {i} for flat vs rich chunking comparison
+description: Benchmark rule {i} for rich chunking
 author: Benchmark
 date: 2024/01/01
 logsource:
@@ -52,20 +51,9 @@ def rules_dir(tmp_path: Path) -> Path:
     return d
 
 
-class TestFlatVsRichBenchmark:
-    def test_flat_produces_one_chunk_per_rule(self, rules_dir: Path) -> None:
-        config = TransformConfig(enable_rich_chunks=False)
-        parser = SigmaParser(config)
-        all_docs: list[Any] = []
-
-        for f in sorted(rules_dir.iterdir()):
-            docs = parser.parse(f)
-            all_docs.extend(parser.chunk(docs))
-
-        assert len(all_docs) == 10
-
+class TestRichChunkingBenchmark:
     def test_rich_produces_multiple_chunks_per_rule(self, rules_dir: Path) -> None:
-        config = TransformConfig(enable_rich_chunks=True)
+        config = TransformConfig()
         chunker = SigmaChunker(config)
         all_docs: list[Any] = []
 
@@ -75,7 +63,7 @@ class TestFlatVsRichBenchmark:
 
         assert len(all_docs) > 50
 
-    def test_benchmark_flat_vs_rich(self, rules_dir: Path) -> None:
+    def test_benchmark_rich(self, rules_dir: Path) -> None:
         sizes = [10, 50]
 
         for n_rules in sizes:
@@ -88,20 +76,8 @@ class TestFlatVsRichBenchmark:
                     if not f.exists():
                         f.write_text(_make_rule(f"Benchmark Rule {i}", i))
 
-            # Flat
-            config_flat = TransformConfig(enable_rich_chunks=False)
-            parser = SigmaParser(config_flat)
-            start = time.perf_counter()
-            flat_docs: list[Any] = []
-            for f in sorted(test_dir.iterdir()):
-                docs = parser.parse(f)
-                flat_docs.extend(parser.chunk(docs))
-            flat_time = time.perf_counter() - start
-            flat_chars = sum(len(d.text) for d in flat_docs)
-
-            # Rich
-            config_rich = TransformConfig(enable_rich_chunks=True)
-            chunker = SigmaChunker(config_rich)
+            config = TransformConfig()
+            chunker = SigmaChunker(config)
             start = time.perf_counter()
             rich_docs: list[Any] = []
             for f in sorted(test_dir.iterdir()):
@@ -110,14 +86,7 @@ class TestFlatVsRichBenchmark:
             rich_time = time.perf_counter() - start
             rich_chars = sum(len(d.text) for d in rich_docs)
 
-            speed_ratio = rich_time / flat_time if flat_time > 0 else 0
-            size_ratio = rich_chars / flat_chars if flat_chars > 0 else 0
-
             print(f"\n--- {n_rules} rules ---")
-            print(f"  Flat:  {len(flat_docs):>4} docs, {flat_time:.3f}s, {flat_chars:>6} chars")
             print(f"  Rich:  {len(rich_docs):>4} docs, {rich_time:.3f}s, {rich_chars:>6} chars")
-            print(f"  Speed: {speed_ratio:.1f}x slower (rich vs flat)")
-            print(f"  Size:  {size_ratio:.1f}x more text (rich vs flat)")
 
-            assert len(flat_docs) == n_rules
             assert len(rich_docs) > n_rules
