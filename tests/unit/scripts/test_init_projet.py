@@ -1,4 +1,4 @@
-"""Tests for init-projet.py script."""
+"""Tests for init_projet.py script."""
 
 import tempfile
 from pathlib import Path
@@ -65,43 +65,67 @@ def test_config_file_not_overwritten(temp_project_dir):
     assert content == custom_content, "Existing config should not be overwritten"
 
 
-def test_init_file_format(temp_project_dir):
-    """Test that init.txt contains correct format with ISO 8601 timestamp."""
+def test_schema_version_set_in_database(temp_project_dir):
+    """Test that schema_version is set in DuckDB config table after init."""
     sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
-    from init_projet import create_init_file, INIT_FILE
+    from init_projet import (
+        create_data_structure,
+        create_config_file,
+        initialize_database,
+        SCHEMA_VERSION,
+    )
+    from src.back.database import DatabaseService
 
-    create_init_file()
+    # Run init steps
+    create_data_structure()
+    create_config_file()
+    # initialize_database creates and closes its own DB instance
+    initialize_database()
 
-    assert INIT_FILE.exists(), "init.txt was not created"
-    content = INIT_FILE.read_text(encoding="utf-8").strip()
-    assert content.startswith("Init data structure the "), "Invalid prefix"
+    # Create a new DB instance to verify (since initialize_database closed it)
+    db = DatabaseService()
+    db.initialize()
+    schema_version = db.get_config("schema_version")
+    db.close()
 
-    # Extract timestamp and verify ISO 8601 format
-    timestamp_str = content.replace("Init data structure the ", "")
-    # Should parse as valid ISO 8601
-    from datetime import datetime
-
-    parsed = datetime.fromisoformat(timestamp_str)
-    assert parsed is not None
+    assert schema_version == SCHEMA_VERSION, (
+        f"Expected schema_version {SCHEMA_VERSION}, got {schema_version}"
+    )
 
 
-def test_init_file_unique_timestamp(temp_project_dir):
-    """Test that each run creates a unique timestamp."""
+def test_initialize_database_injectable(temp_project_dir):
+    """Test that initialize_database accepts injected DatabaseService for testing."""
     sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
-    from init_projet import create_init_file, INIT_FILE
-    import time
+    from init_projet import initialize_database, DatabaseServiceProtocol
+    from unittest.mock import MagicMock
 
-    create_init_file()
-    content1 = INIT_FILE.read_text(encoding="utf-8").strip()
+    # Create mock database service with all required methods
+    mock_db = MagicMock(spec=DatabaseServiceProtocol)
+    mock_db.get_tables.return_value = [
+        "config",
+        "embedding_config",
+        "system_prompts",
+        "models",
+        "doc_registry",
+        "worker_state",
+        "git_metadata",
+        "git_selected_dirs",
+        "sigma_spec",
+        "doc_error",
+    ]
+    mock_db.get_table_count.return_value = 1
+    mock_db.set_config.return_value = None
 
-    time.sleep(0.01)  # Ensure different timestamp
+    # Should not raise with injected mock
+    initialize_database(db_service=mock_db)
 
-    create_init_file()
-    content2 = INIT_FILE.read_text(encoding="utf-8").strip()
-
-    assert content1 != content2, "Timestamps should be different"
+    # Verify mock was called
+    mock_db.initialize.assert_called_once()
+    mock_db.get_tables.assert_called_once()
+    mock_db.set_config.assert_called_once_with("schema_version", 1)
+    mock_db.close.assert_called_once()
 
 
 if __name__ == "__main__":

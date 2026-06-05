@@ -1,7 +1,6 @@
 import logging
 import re
 import sys
-from pathlib import Path
 
 
 class _Filter2xx(logging.Filter):
@@ -13,24 +12,48 @@ class _Filter2xx(logging.Filter):
         return not bool(re.search(r'"\s+2\d{2}\s+\d{3}', msg))
 
 
+EXPECTED_SCHEMA_VERSION = 1
+
+
+def _validate_schema_version() -> None:
+    """Validate project is initialized by checking schema_version in DuckDB."""
+    try:
+        from src.back.database import DatabaseService
+
+        db = DatabaseService()
+        db.initialize()
+        schema_version = db.get_config("schema_version")
+        db.close()
+
+        if schema_version is None:
+            print(
+                "✗ Project not initialized (schema_version not found). Run 'uv run python init_projet.py' first.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+        if schema_version != EXPECTED_SCHEMA_VERSION:
+            print(
+                f"✗ Schema version mismatch: expected {EXPECTED_SCHEMA_VERSION}, got {schema_version}. "
+                "Run 'uv run python init_projet.py' to reinitialize.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+        print(f"✓ Schema version {schema_version} validated")
+    except Exception as e:
+        print(f"✗ Failed to validate schema version: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
 if __name__ == "__main__":
     import asyncio
     import copy
     import uvicorn
     from uvicorn.config import LOGGING_CONFIG
 
-    # Check init.txt exists and has valid format
-    init_file = Path("init.txt")
-    if not init_file.exists():
-        print(
-            "✗ Project not initialized. Run 'uv run python init-projet.py' first.", file=sys.stderr
-        )
-        sys.exit(1)
-
-    content = init_file.read_text(encoding="utf-8").strip()
-    if not content.startswith("Init data structure the "):
-        print("✗ Invalid init.txt format. Re-run initialization.", file=sys.stderr)
-        sys.exit(1)
+    # Check schema version in DuckDB
+    _validate_schema_version()
 
     if sys.platform == "win32":
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
