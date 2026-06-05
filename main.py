@@ -2,6 +2,8 @@ import logging
 import re
 import sys
 
+from src.shared.constants import SCHEMA_VERSION
+
 
 class _Filter2xx(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
@@ -10,9 +12,6 @@ class _Filter2xx(logging.Filter):
         msg = record.getMessage()
         # Uvicorn access log format: '127.0.0.1 - "GET /path HTTP/1.1" 200 OK'
         return not bool(re.search(r'"\s+2\d{2}\s+\d{3}', msg))
-
-
-EXPECTED_SCHEMA_VERSION = 1
 
 
 def _validate_schema_version() -> None:
@@ -32,9 +31,9 @@ def _validate_schema_version() -> None:
             )
             sys.exit(1)
 
-        if schema_version != EXPECTED_SCHEMA_VERSION:
+        if schema_version != SCHEMA_VERSION:
             print(
-                f"✗ Schema version mismatch: expected {EXPECTED_SCHEMA_VERSION}, got {schema_version}. "
+                f"✗ Schema version mismatch: expected {SCHEMA_VERSION}, got {schema_version}. "
                 "Run 'uv run python init_projet.py' to reinitialize.",
                 file=sys.stderr,
             )
