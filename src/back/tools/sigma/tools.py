@@ -89,41 +89,11 @@ async def filter_metadata(
         return "Error: tool context not available."
 
     try:
-        from src.rag.search import build_qdrant_filter, _get_search_embed_model
-        from src.back.qdrant.client import get_qdrant_client
-
-        qdrant_field = (
-            ctx.search_engine.collection_names[0]
-            if ctx.search_engine.collection_names
-            else "sigma_rules"
+        results = await ctx.search_engine.search(
+            query=value,
+            metadata_filter={field: value},
+            top_k=10,
         )
-
-        qdrant_filter = build_qdrant_filter({field: value})
-
-        client = get_qdrant_client()
-        embed_model = _get_search_embed_model()
-        query_embedding = await embed_model.aget_query_embedding(value)
-
-        points = client.query_points(
-            collection_name=qdrant_field,
-            query=query_embedding,
-            limit=10,
-            query_filter=qdrant_filter,
-        )
-
-        results = []
-        for point in points.points:
-            score = point.score if point.score else 0.0
-            payload = point.payload or {}
-            results.append(
-                {
-                    "score": score,
-                    "metadata": {
-                        k: v for k, v in payload.items() if k not in ("text", "_node_content")
-                    },
-                    "text": payload.get("text", "")[:300],
-                }
-            )
 
         if not results:
             return f"No rules found with {field}='{value}'."
@@ -132,7 +102,8 @@ async def filter_metadata(
         for i, r in enumerate(results, 1):
             meta = r.get("metadata", {})
             title = meta.get("title", "Untitled")
-            lines.append(f"{i}. {title} (relevance: {r['score']:.2f})")
+            score = r.get("rrf_score", r.get("score", 0))
+            lines.append(f"{i}. {title} (relevance: {score:.2f})")
         return "\n\n".join(lines)
     except ValueError:
         raise  # Re-raise validation errors

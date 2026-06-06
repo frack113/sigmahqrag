@@ -98,6 +98,7 @@ async def search(
     collection_name: str = "sigma_docs",
     top_k: int = DEFAULT_TOP_K,
     similarity_threshold: float = SIMILARITY_THRESHOLD,
+    qdrant_filter: Filter | None = None,
 ) -> list[dict[str, Any]]:
     """Search for relevant documents.
 
@@ -106,6 +107,7 @@ async def search(
         collection_name: Qdrant collection name
         top_k: Number of results to return
         similarity_threshold: Minimum similarity score
+        qdrant_filter: Optional pre-built Qdrant Filter to apply
 
     Returns:
         List of search results with metadata
@@ -114,20 +116,25 @@ async def search(
         logger.warning("Empty query provided")
         return []
 
-    filters, clean_query = parse_query_filters(query)
-    qdrant_filter = build_qdrant_filter(filters)
+    # Use external filter if provided, otherwise parse embedded key:value filters
+    _parsed_qdrant_filter: Filter | None = None
+    if qdrant_filter is None:
+        filters, clean_query = parse_query_filters(query)
+        _parsed_qdrant_filter = build_qdrant_filter(filters)
+        embedding_query = clean_query if clean_query else query
+    else:
+        embedding_query = query
 
     try:
         client = get_qdrant_client()
         embed_model = _get_search_embed_model()
-        embedding_query = clean_query if clean_query else " ".join(filters.values())
-        query_embedding = await embed_model.aget_query_embedding(embedding_query or query)
+        query_embedding = await embed_model.aget_query_embedding(embedding_query)
 
         points = client.query_points(
             collection_name,
             query=query_embedding,
             limit=top_k,
-            query_filter=qdrant_filter,
+            query_filter=_parsed_qdrant_filter or qdrant_filter,
         )
         scored_points = points.points
 
@@ -289,12 +296,20 @@ class SearchEngine:
         self.similarity_threshold = similarity_threshold
         self.use_router = use_router
 
-    async def search(self, query: str, top_k: int | None = None) -> list[dict[str, Any]]:
+    async def search(
+        self,
+        query: str,
+        top_k: int | None = None,
+        metadata_filter: dict[str, str] | None = None,
+    ) -> list[dict[str, Any]]:
         """Search across configured collections and fuse results with RRF.
 
         When ``use_router`` is enabled, classifies the query first and
         searches only the relevant collections.  Falls back to all
         collections if routing fails.
+
+        When ``metadata_filter`` is provided, applies a Qdrant metadata
+        filter to each collection search before RRF fusion.
         """
         limit = top_k if top_k is not None else self.top_k
         per_collection_k = max(limit * 2, 10)
@@ -311,12 +326,15 @@ class SearchEngine:
         else:
             cols = self.collection_names
 
+        qdrant_filter = build_qdrant_filter(metadata_filter) if metadata_filter else None
+
         tasks = [
             search(
                 query=query,
                 collection_name=col,
                 top_k=per_collection_k,
                 similarity_threshold=self.similarity_threshold,
+                qdrant_filter=qdrant_filter,
             )
             for col in cols
         ]
