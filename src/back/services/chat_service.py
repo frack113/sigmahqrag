@@ -10,17 +10,20 @@ from typing import Any
 
 from src.back.services.rag_pipeline import RAGPipeline
 from src.back.services.sigma_validator import SigmaValidator
+
 from src.back.services.translate_service import (
     detect_sigma_yaml,
     extract_yaml_block,
     translate_detection,
 )
+from src.back.tools import ToolContext, ToolDispatcher, get_tools
 from src.rag.search import SearchEngine
 from src.shared.schemas.chat_mode import ChatMode
 
 logger = logging.getLogger(__name__)
 
 MAX_HISTORY = 50
+MAX_TOOL_CALLS = 5
 
 
 class ChatService:
@@ -34,6 +37,17 @@ class ChatService:
         self._uploaded_rule: dict[str, Any] | None = None
         self._last_citations: list[str] = []
         self._current_prompt_id: str = ""
+
+        # Tool-calling setup
+        self._tool_executor = ToolDispatcher(get_tools())
+        self._tool_context = ToolContext(
+            search_engine=self.search_engine,
+            rag_pipeline=self.rag_pipeline,
+        )
+
+    def _get_tool_schemas(self) -> list[dict[str, Any]]:
+        """Return OpenAI-compatible tool schemas for the LLM."""
+        return self._tool_executor.list_tools()
 
     async def process_message(
         self,
@@ -113,62 +127,130 @@ class ChatService:
 
         self._add_to_history("assistant", "".join(accumulated))
 
-    async def _handle_search(self, message: str) -> str:
-        """Handle search mode: semantic search over indexed Sigma rules.
+    async def _execute_tool_calls(self, messages: list[dict[str, Any]]) -> str:
+        """Execute tool calls returned by the LLM in a multi-turn loop.
 
-        If the message contains a Sigma detection YAML block, it is
-        automatically translated into plain English and included as
-        additional context in the LLM prompt.
+        1. Send messages + tool schemas to LLM
+        2. If LLM returns tool_calls → execute them → append results → repeat
+        3. If LLM returns text → return it
+        4. Bail out after MAX_TOOL_CALLS iterations
+
+        Returns the final assistant text response.
         """
-        # Auto-detect and translate Sigma YAML
-        translation = ""
-        if detect_sigma_yaml(message):
-            yaml_block = extract_yaml_block(message)
-            if yaml_block:
-                logger.info("Detected Sigma YAML in chat message — auto-translating")
-                translation = await translate_detection(yaml_block, self.rag_pipeline)
+        schemas = self._get_tool_schemas()
+        turns = 0
+
+        while turns < MAX_TOOL_CALLS:
+            turns += 1
+
+            # Send chat request with tools and get raw response
+            tool_response = await self._send_chat_with_tools(messages, schemas)
+            choices = tool_response.get("choices") or []
+            if not choices:
+                return "No response from model."
+
+            message = choices[0].get("message") or {}
+            tool_calls = message.get("tool_calls") or []
+
+            if not tool_calls:
+                # LLM returned text, done
+                return message.get("content", "")
+
+            # Execute each tool call
+            tool_messages = [message] if "content" in message else []
+            for tc in tool_calls:
+                tc_id = tc.get("id", "")
+                func = tc.get("function", {})
+                fn_name = func.get("name", "")
+                fn_args_str = func.get("arguments", "{}")
+
                 try:
-                    await self.rag_pipeline.llm_client.erase_slot_cache()
-                except Exception:
-                    logger.warning("Failed to clear KV cache after translate")
+                    fn_args = json.loads(fn_args_str) if fn_args_str else {}
+                except (json.JSONDecodeError, TypeError):
+                    fn_args = {}
 
-        results = await self.search_engine.search(message)
+                try:
+                    result = await self._tool_executor.execute(fn_name, fn_args, tc_id)
+                    tool_result = {
+                        "role": "tool",
+                        "tool_call_id": tc_id,
+                        "content": result.content,
+                    }
+                except Exception as e:
+                    logger.warning("Tool '%s' failed: %s", fn_name, e)
+                    tool_result = {
+                        "role": "tool",
+                        "tool_call_id": tc_id,
+                        "content": f"Error: {e}",
+                    }
 
-        if not results and not translation:
-            return "No matching Sigma rules found. Try a different query."
+                tool_messages.append(tool_result)
 
-        self._last_citations = [
-            self.search_engine.get_citation(r)
-            for r in results[:5]
-            if self.search_engine.get_citation(r)
-        ]
+            messages.extend(tool_messages)
 
-        try:
-            # If we have a translation, prepend it as context
-            augmented_message = message
-            if translation:
-                augmented_message = (
-                    f"[Auto-translated detection]\n{translation}\n\n[Original YAML]\n{message}"
+        logger.warning("Max tool call iterations (%d) reached", MAX_TOOL_CALLS)
+        return "Too many tool calls. Please simplify your request."
+
+    async def _send_chat_with_tools(
+        self,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        """Send a chat request with tools and return the raw JSON response."""
+        import httpx
+
+        payload: dict[str, Any] = {
+            "messages": messages,
+            "temperature": 0.3,
+            "max_tokens": 1024,
+            "stream": False,
+            "tools": tools,
+        }
+
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.post(
+                    f"{self.rag_pipeline.llm_client.base_url}/v1/chat/completions",
+                    json=payload,
+                    timeout=120.0,
                 )
+                response.raise_for_status()
+                return response.json()
+            except Exception as e:
+                logger.error("Tool-calling chat failed: %s", e)
+                raise
 
-            return await self.rag_pipeline.answer_search_query(
-                augmented_message, results, system_prompt_id=self._current_prompt_id
-            )
-        except Exception as e:
-            logger.error(f"RAG pipeline failed: {e}")
-            return self._fallback_search_results(results)
+    async def _handle_search(self, message: str) -> str:
+        """Handle search mode: multi-turn tool-calling loop.
+
+        Uses search_sigma, filter_metadata, explain_detection, explain_rule,
+        and summarize tools to answer questions about Sigma detection rules.
+        """
+        assistant_message = {
+            "role": "assistant",
+            "content": message,
+        }
+        system_msg = {
+            "role": "system",
+            "content": (
+                "You are a Sigma rule assistant. Use the provided tools to answer "
+                "questions about Sigma detection rules. If the user asks about Sigma "
+                "rules, use search_sigma. If they want to filter, use filter_metadata. "
+                "If they ask to explain a Sigma detection, use explain_detection. "
+                "If they ask to explain a full Sigma rule, use explain_rule. "
+                "If they want a summary of text, use summarize. Always use tools when appropriate."
+            ),
+        }
+        messages = [system_msg, assistant_message]
+        return await self._execute_tool_calls(messages)
 
     async def _handle_explain(self, message: str) -> str:
         """Handle explain mode: analyze uploaded Sigma rule."""
         if not self._uploaded_rule:
             return "No Sigma rule uploaded. Please upload a .yaml file first."
 
-        try:
-            related = await self.search_engine.search(self._uploaded_rule.get("name", ""))
-            return await self.rag_pipeline.explain_rule(self._uploaded_rule, related)
-        except Exception as e:
-            logger.error(f"RAG pipeline failed: {e}")
-            return self._fallback_explanation(self._uploaded_rule)
+        related = await self.search_engine.search(self._uploaded_rule.get("name", ""))
+        return await self.rag_pipeline.explain_rule(self._uploaded_rule, related)
 
     async def _handle_explain_stream(
         self,
@@ -179,15 +261,9 @@ class ChatService:
             yield "No Sigma rule uploaded. Please upload a .yaml file first."
             return
 
-        try:
-            related = await self.search_engine.search(self._uploaded_rule.get("name", ""))
-            async for token in self.rag_pipeline.explain_rule_stream(self._uploaded_rule, related):
-                yield token
-        except Exception as e:
-            logger.error(f"RAG pipeline failed: {e}")
-            fallback = self._fallback_explanation(self._uploaded_rule)
-            for token in fallback:
-                yield token
+        related = await self.search_engine.search(self._uploaded_rule.get("name", ""))
+        async for token in self.rag_pipeline.explain_rule_stream(self._uploaded_rule, related):
+            yield token
 
     async def _handle_coverage(self, message: str) -> str:
         """Handle coverage mode."""
@@ -255,15 +331,9 @@ class ChatService:
                 yield token
                 found = True
             if not found:
-                logger.warning("RAG stream returned no tokens — falling back to search results")
-                fallback = self._fallback_search_results(results)
-                for t in fallback:
-                    yield t
+                logger.warning("RAG stream returned no tokens")
         except Exception as e:
             logger.error(f"RAG pipeline failed: {e}")
-            fallback = self._fallback_search_results(results)
-            for token in fallback:
-                yield token
 
     async def _handle_coverage_stream(
         self,
@@ -286,9 +356,6 @@ class ChatService:
                 yield token
         except Exception as e:
             logger.error(f"RAG pipeline failed: {e}")
-            fallback = f"Found {len(results)} related rules for coverage comparison."
-            for token in fallback:
-                yield token
 
     async def validate_and_store_yaml(self, content: bytes) -> dict[str, Any]:
         """Validate YAML content and store rule data in session.
@@ -307,25 +374,6 @@ class ChatService:
     def get_last_citations(self) -> list[str]:
         """Get citations from the last search response."""
         return self._last_citations.copy()
-
-    def _fallback_search_results(self, results: list[dict[str, Any]]) -> str:
-        """Fallback when RAG pipeline fails."""
-        lines = []
-        for i, result in enumerate(results[:5], 1):
-            text = result.get("text", "")[:300]
-            score = result.get("score", 0)
-            lines.append(f"{i}. {text} (relevance: {score:.2f})")
-        return "\n\n".join(lines)
-
-    def _fallback_explanation(self, rule: dict[str, Any]) -> str:
-        """Fallback explanation without LLM."""
-        parts = [
-            f"**Rule:** {rule.get('name', 'Unknown')}",
-            f"**ID:** {rule.get('id', 'N/A')}",
-        ]
-        if desc := rule.get("description"):
-            parts.append(f"**Description:** {desc}")
-        return "\n".join(parts)
 
     def _add_to_history(self, role: str, content: str) -> None:
         """Add a message to chat history (max 50 messages)."""

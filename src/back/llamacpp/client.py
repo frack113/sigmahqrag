@@ -74,6 +74,8 @@ class LlamaClient:
         temperature: float = 0.3,
         max_tokens: int = 512,
         stop: list[str] | None = None,
+        tools: list[dict[str, Any]] | None = None,
+        tool_choice: str | dict[str, Any] | None = None,
     ) -> str:
         """Generate text via /v1/chat/completions (OpenAI-compatible chat format).
 
@@ -87,10 +89,16 @@ class LlamaClient:
             temperature: Sampling temperature.
             max_tokens: Hard cap on generated tokens.
             stop: Optional list of stop strings (e.g. ["\\nfields:"]).
+            tools: Optional list of tool definitions for function calling.
+                Each tool is a dict with "type": "function" and "function" key.
+            tool_choice: Force or disable tool usage. Use "auto", "none",
+                "required", or a specific tool dict.
 
         Returns:
             Assistant message content, or empty string if the response has
-            no choices / content.
+            no choices / content.  When the server supports tools, the
+            caller should check for ``tool_calls`` in the response and
+            dispatch them manually.
         """
         payload: dict[str, Any] = {
             "messages": messages,
@@ -100,6 +108,10 @@ class LlamaClient:
         }
         if stop:
             payload["stop"] = stop
+        if tools:
+            payload["tools"] = tools
+        if tool_choice:
+            payload["tool_choice"] = tool_choice
         async with httpx.AsyncClient() as client:
             try:
                 response = await client.post(
@@ -118,6 +130,22 @@ class LlamaClient:
                 return content if content is not None else ""
             except Exception as e:
                 raise RuntimeError(f"Llama.cpp chat failed: {e}") from e
+
+    @staticmethod
+    def parse_tool_calls(response: dict[str, Any]) -> list[dict[str, Any]]:
+        """Extract tool_calls from an OpenAI-compatible chat completion response.
+
+        Returns an empty list when:
+        - The response has no choices
+        - The message has no tool_calls field
+        - The model does not support tools (no tool_calls key)
+        """
+        choices = response.get("choices") or []
+        if not choices:
+            return []
+        message = choices[0].get("message") or {}
+        tool_calls = message.get("tool_calls") or []
+        return list(tool_calls)
 
     async def generate_stream(
         self,
