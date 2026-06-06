@@ -15,36 +15,12 @@ import httpx
 from llama_index.core.schema import Document
 
 from ..base import DocumentTransform
+from ..generique.llm import enrich_by_llm
 from ..registry import TransformRegistry
 
 logger = logging.getLogger(__name__)
 
 ATX_HEADING_RE = re.compile(r"^(#{1,6})\s+(.+)$", re.MULTILINE)
-
-# LLM prompt for summary + keyword extraction
-_LLM_ENRICH_PROMPT = """Given the following document section, provide:
-1. A concise summary in 2-3 sentences (max 150 words)
-2. A comma-separated list of 8-15 key search keywords/phrases
-
-Rules:
-- Summary should capture the main topic and key points
-- Keywords should include both technical terms and natural-language synonyms
-- Focus on domain-specific concepts, not generic words
-- Use English even if the source text is in another language
-- Output format (EXACTLY):
-
-Summary:
-[your 2-3 sentence summary here]
-
-Keywords:
-[comma-separated keywords here]
-
-Document section:
----
-{text}
----
-
-Summary:"""
 
 
 class _StaticLlamaClient:
@@ -72,6 +48,25 @@ class _StaticLlamaClient:
             logger.debug("LLM enrichment failed: %s", e)
             return ""
 
+    def erase_slot_cache(self, slot_id: int = 0) -> None:
+        """Erase the KV cache for a given slot to prevent llama.cpp context explosion."""
+        try:
+            with httpx.Client(timeout=10.0) as client:
+                resp = client.post(
+                    f"{self.base_url}/slots/{slot_id}?action=erase",
+                    content=b"",
+                )
+                if resp.status_code == 200:
+                    logger.debug("KV cache erased for slot %d", slot_id)
+                else:
+                    logger.warning(
+                        "erase_slot_cache returned %d for slot %d",
+                        resp.status_code,
+                        slot_id,
+                    )
+        except Exception:
+            logger.debug("Failed to erase llama.cpp slot cache (likely not available)")
+
 
 # Global LLM client singleton (lazy-initialized)
 _llm_client: _StaticLlamaClient | None = None
@@ -98,22 +93,8 @@ def _extract_keywords(text: str, llm_client: _StaticLlamaClient | None = None) -
         Tuple of (summary, keywords) strings.
     """
     client = llm_client or _get_llm_client()
-    prompt = _LLM_ENRICH_PROMPT.format(text=text[:2000])
-    result = client.generate(prompt, max_tokens=512, temperature=0.3)
-
-    summary = ""
-    keywords = ""
-    if result:
-        # Parse Summary: and Keywords: sections
-        parts = result.split("\n\n")
-        for part in parts:
-            part = part.strip()
-            if part.startswith("Summary:") or part.startswith("Summary :"):
-                summary = part.replace("Summary:", "").replace("Summary :", "").strip()
-            elif part.startswith("Keywords:") or part.startswith("Keywords :"):
-                keywords = part.replace("Keywords:", "").replace("Keywords :", "").strip()
-
-    return summary, keywords
+    result = enrich_by_llm(text, client)
+    return (result.get("summary") or ""), (result.get("keywords") or "")
 
 
 class MarkdownChunker(DocumentTransform):
@@ -190,6 +171,14 @@ class MarkdownChunker(DocumentTransform):
                 )
             )
 
+            # Try to erase KV cache after LLM enrichment (non-destructive)
+            if llm_client and hasattr(llm_client, "erase_slot_cache"):
+                try:
+                    llm_client.erase_slot_cache()
+                    logger.debug("KV cache erased after markdown enrichment")
+                except Exception:
+                    logger.debug("KV cache erase failed, llama.cpp may not support slot management")
+
             headings = list(ATX_HEADING_RE.finditer(text))
             if not headings:
                 continue
@@ -236,6 +225,12 @@ class MarkdownChunker(DocumentTransform):
                             )
                         except Exception as e:
                             logger.warning("LLM enrichment for heading %s failed: %s", heading, e)
+
+                    if llm_client and hasattr(llm_client, "erase_slot_cache"):
+                        try:
+                            llm_client.erase_slot_cache()
+                        except Exception:
+                            logger.debug("KV cache erase failed for heading %s", heading)
 
                     enriched = chunk_text
                     if chunk_summary or chunk_keywords:

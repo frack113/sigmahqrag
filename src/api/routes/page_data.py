@@ -5,7 +5,6 @@ from __future__ import annotations
 from fastapi import APIRouter, Request
 from fastapi.templating import Jinja2Templates
 
-from src.back.database import DatabaseService
 from src.front import TEMPLATES_DIR
 
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
@@ -29,19 +28,6 @@ async def data_github_page(request: Request):
 async def data_sigma_spec_page(request: Request):
     """Serve the Sigma Specification management page."""
     return templates.TemplateResponse(request=request, name="data/sigma_spec.html")
-
-
-@router.get("/data/embedding")
-async def data_embedding_page(request: Request):
-    """Serve the embedding configuration page."""
-    config = DatabaseService.get_instance().get_embedding_config()
-    current_model = config.get("model", "")
-
-    return templates.TemplateResponse(
-        request=request,
-        name="data/embedding.html",
-        context={"current_model": current_model},
-    )
 
 
 @router.get("/data/vectordb")

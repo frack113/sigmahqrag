@@ -45,6 +45,38 @@ def _create_collection_sync(
     client.create_collection(**kwargs)
 
 
+PAYLOAD_INDEXES: list[tuple[str, str]] = [
+    ("rule_id", "keyword"),
+    ("title", "text"),
+    ("author", "keyword"),
+    ("level", "keyword"),
+    ("status", "keyword"),
+    ("product", "keyword"),
+    ("category", "keyword"),
+    ("service", "keyword"),
+    ("date", "keyword"),
+    ("modified", "keyword"),
+    ("chunk_type", "keyword"),
+    ("collection", "keyword"),
+    ("tags", "keyword"),
+]
+
+
+def _create_payload_indexes_sync(client, collection_name: str) -> None:
+    """Create payload indexes for filterable fields."""
+    for field_name, field_type in PAYLOAD_INDEXES:
+        try:
+            client.create_payload_index(
+                collection_name=collection_name,
+                field_name=field_name,
+                field_schema=field_type,
+            )
+        except Exception:
+            logger.debug(
+                "Payload index '%s' already exists or failed for '%s'", field_name, collection_name
+            )
+
+
 def _delete_collection_sync(client, collection_name: str):
     """Synchronous wrapper for client.delete_collection()."""
     client.delete_collection(collection_name=collection_name)
@@ -90,6 +122,7 @@ async def create_collection(
         await asyncio.to_thread(
             _create_collection_sync, client, collection_name, vectors_config, sparse_vectors_config
         )
+        await asyncio.to_thread(_create_payload_indexes_sync, client, collection_name)
         logger.info(
             "Collection '%s' created successfully (hybrid=%s).", collection_name, enable_hybrid
         )

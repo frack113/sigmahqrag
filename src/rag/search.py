@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 import threading
 from typing import Any
+
+from qdrant_client.models import FieldCondition, Filter, MatchValue, MatchText
 
 from src.back.database import DatabaseService
 from src.back.qdrant.client import get_qdrant_client
@@ -16,6 +19,51 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_TOP_K = 15
 SIMILARITY_THRESHOLD = 0.0
+
+FILTER_KEYS = frozenset(
+    {
+        "rule_id",
+        "title",
+        "author",
+        "level",
+        "status",
+        "product",
+        "category",
+        "service",
+        "date",
+        "modified",
+        "chunk_type",
+        "collection",
+        "tags",
+    }
+)
+
+_FILTER_PATTERN = re.compile(r"(\w+):(\S+)")
+_VALUE_CLEAN_RE = re.compile(r"[\s,;:]+")
+
+
+def parse_query_filters(query: str) -> tuple[dict[str, str], str]:
+    """Extract key:value filters from query, return (filters, cleaned_query)."""
+    filters: dict[str, str] = {}
+    for match in _FILTER_PATTERN.finditer(query):
+        key, raw_value = match.group(1).lower(), match.group(2)
+        if key in FILTER_KEYS:
+            filters[key] = _VALUE_CLEAN_RE.sub(" ", raw_value.strip()).strip()
+    cleaned = _FILTER_PATTERN.sub("", query).strip()
+    return filters, cleaned
+
+
+def build_qdrant_filter(filters: dict[str, str]) -> Filter | None:
+    """Build a Qdrant Filter from parsed filter dict."""
+    if not filters:
+        return None
+    conditions: list[Any] = []
+    for key, value in filters.items():
+        if key == "tags":
+            conditions.append(FieldCondition(key=key, match=MatchText(text=value)))
+        else:
+            conditions.append(FieldCondition(key=key, match=MatchValue(value=value)))
+    return Filter(must=list(conditions))
 
 
 _async_embed_model: Any | None = None
@@ -54,7 +102,7 @@ async def search(
     """Search for relevant documents.
 
     Args:
-        query: Natural language query
+        query: Natural language query (supports key:value filters)
         collection_name: Qdrant collection name
         top_k: Number of results to return
         similarity_threshold: Minimum similarity score
@@ -66,12 +114,21 @@ async def search(
         logger.warning("Empty query provided")
         return []
 
+    filters, clean_query = parse_query_filters(query)
+    qdrant_filter = build_qdrant_filter(filters)
+
     try:
         client = get_qdrant_client()
         embed_model = _get_search_embed_model()
-        query_embedding = await embed_model.aget_query_embedding(query)
+        embedding_query = clean_query if clean_query else " ".join(filters.values())
+        query_embedding = await embed_model.aget_query_embedding(embedding_query or query)
 
-        points = client.query_points(collection_name, query=query_embedding, limit=top_k)
+        points = client.query_points(
+            collection_name,
+            query=query_embedding,
+            limit=top_k,
+            query_filter=qdrant_filter,
+        )
         scored_points = points.points
 
         if not scored_points:

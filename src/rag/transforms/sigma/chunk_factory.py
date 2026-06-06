@@ -29,6 +29,14 @@ def make_chunk(
         "category": logsource.get("category", "unknown"),
         "service": logsource.get("service", "unknown"),
         "chunk_type": chunk_type,
+        "author": rule.get("author", ""),
+        "description": rule.get("description", ""),
+        "date": rule.get("date", ""),
+        "modified": rule.get("modified", ""),
+        "falsepositives": rule.get("falsepositives", []),
+        "related": rule.get("related", []),
+        "name": rule.get("name", ""),
+        "references": rule.get("references", []),
         **(extra_meta or {}),
     }
 

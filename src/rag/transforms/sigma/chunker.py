@@ -9,7 +9,7 @@ from llama_index.core.schema import Document
 
 from ..base import DocumentTransform
 from ..registry import TransformRegistry
-from ..markdown.chunker import _extract_keywords, _get_llm_client
+from ..markdown.chunker import _get_llm_client, enrich_by_llm
 from .chunk_factory import make_chunk
 from .parser import SigmaParser
 from .flattening import flatten_detection_values, split_field_operator
@@ -81,6 +81,14 @@ class SigmaChunker(DocumentTransform):
                 result.append(self._dict_to_document(chunk_data, doc.metadata.get("source_file")))
 
         logger.info("Expanded %d rules into %d rich chunks", len(documents), len(result))
+
+        if llm_client is not None:
+            try:
+                llm_client.erase_slot_cache()
+                logger.info("KV cache erased after Sigma rule enrichment")
+            except Exception:
+                logger.debug("KV cache erase failed, llama.cpp may not support slot management")
+
         return result
 
     def post_process(self, documents: list[Document]) -> list[Document]:
@@ -384,6 +392,15 @@ class SigmaChunker(DocumentTransform):
         )
 
         # Backend mapping hints
+        detection_summary_lines: list[str] = []
+        for det_name, det_val in detection.items():
+            if det_name == "condition":
+                continue
+            is_filt = det_name.startswith("filter")
+            role = "exclusion" if is_filt else "selection"
+            detection_summary_lines.append(f"  - {det_name} ({role}): {format_value(det_val)}")
+        detection_summary = "\n".join(detection_summary_lines) if detection_summary_lines else "N/A"
+
         chunks.append(
             make_chunk(
                 rule,
@@ -394,7 +411,8 @@ class SigmaChunker(DocumentTransform):
                     f"SIEM, EDR, or log backend schema.\n"
                     f"Operators from Sigma such as contains, startswith, endswith, "
                     f"all, and equals should be preserved during translation.\n"
-                    f"Condition: {condition}"
+                    f"Condition: {condition}\n\n"
+                    f"Detection blocks:\n{detection_summary}"
                 ),
                 eval_questions=[
                     f"What fields should be mapped for {title}?",
@@ -406,29 +424,22 @@ class SigmaChunker(DocumentTransform):
 
         # Enrich all chunks with LLM-generated summaries and keywords
         if llm_client is not None:
+            enriched_chunks: list[dict] = []
             for chunk in chunks:
-                chunk["text"] = self._enrich_chunk_text(chunk["text"], llm_client)
+                result = enrich_by_llm(chunk["text"], llm_client)
+                summary = result.get("summary") or ""
+                keywords = result.get("keywords") or ""
+                if summary or keywords:
+                    enrichment = "\n\n---\n"
+                    if summary:
+                        enrichment += f"Summary: {summary}\n\n"
+                    if keywords:
+                        enrichment += f"Keywords: {keywords}\n"
+                    chunk["text"] = chunk["text"] + enrichment
+                enriched_chunks.append(chunk)
+            chunks = enriched_chunks
 
         return chunks
-
-    @staticmethod
-    def _enrich_chunk_text(text: str, llm_client: object) -> str:
-        """Append LLM-generated summary and keywords to a chunk's text."""
-        try:
-            summary, keywords = _extract_keywords(text, llm_client)
-        except Exception as e:
-            logger.debug("LLM enrichment failed for chunk: %s", e)
-            return text
-
-        if not summary and not keywords:
-            return text
-
-        enrichment = "\n\n---\n"
-        if summary:
-            enrichment += f"Summary: {summary}\n\n"
-        if keywords:
-            enrichment += f"Keywords: {keywords}\n"
-        return text + enrichment
 
     def _dict_to_document(self, chunk_data: dict, source_file: str | None = None) -> Document:
         """Convert a chunk dict to a LlamaIndex Document."""

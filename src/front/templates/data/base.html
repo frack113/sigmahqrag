@@ -16,7 +16,6 @@
 <a href="/data" {% if request.url.path == '/data' %}class="active"{% endif %}>Overview</a>
 <a href="/data/github" {% if '/data/github' in request.url.path %}class="active"{% endif %}>GitHub</a>
 <a href="/data/sigma-spec" {% if '/data/sigma-spec' in request.url.path %}class="active"{% endif %}>Sigma Spec</a>
-<a href="/data/embedding" {% if '/data/embedding' in request.url.path %}class="active"{% endif %}>Embedding</a>
 <a href="/data/local" {% if '/data/local' in request.url.path %}class="active"{% endif %}>Local Files</a>
 <a href="/data/vectordb" {% if '/data/vectordb' in request.url.path %}class="active"{% endif %}>Vector DB</a>
 {% endblock %}
