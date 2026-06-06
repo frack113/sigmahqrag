@@ -9,6 +9,7 @@ from llama_index.core.schema import Document
 
 from ..base import DocumentTransform
 from ..registry import TransformRegistry
+from ..markdown.chunker import _extract_keywords, _get_llm_client
 from .chunk_factory import make_chunk
 from .parser import SigmaParser
 from .flattening import flatten_detection_values, split_field_operator
@@ -62,6 +63,21 @@ class SigmaChunker(DocumentTransform):
         Returns:
             List of Document objects, one per rich chunk produced.
         """
+        # Determine LLM client for enrichment
+        llm_client = None
+        enable_llm = False
+        client = self.config.llm_client if hasattr(self.config, "llm_client") else None
+        if client is not None:
+            llm_client = client
+            enable_llm = True
+        elif hasattr(self.config, "enable_llm_enrichment"):
+            enable_llm = self.config.enable_llm_enrichment and True
+        else:
+            enable_llm = True
+
+        if enable_llm and llm_client is None:
+            llm_client = _get_llm_client()
+
         result: list[Document] = []
         for doc in documents:
             rule_meta = doc.metadata.get("rule_meta")
@@ -70,7 +86,7 @@ class SigmaChunker(DocumentTransform):
                 result.append(doc)
                 continue
 
-            chunks = self._chunk_rule(rule_meta)
+            chunks = self._chunk_rule(rule_meta, llm_client=llm_client)
             for chunk_data in chunks:
                 result.append(self._dict_to_document(chunk_data, doc.metadata.get("source_file")))
 
@@ -84,10 +100,14 @@ class SigmaChunker(DocumentTransform):
 
         return documents
 
-    def _chunk_rule(self, rule: dict) -> list[dict]:
+    def _chunk_rule(self, rule: dict, llm_client: object | None = None) -> list[dict]:
         """Chunk a single Sigma rule dict into enriched chunk dicts.
 
         This is the refactored version of the legacy chunk_sigma_rules_rich function.
+
+        Args:
+            rule: Raw Sigma rule dict.
+            llm_client: Optional LLM client for keyword extraction.
         """
         title = rule.get("title", "Untitled Sigma rule")
         rule_id = rule.get("id")
@@ -394,7 +414,31 @@ class SigmaChunker(DocumentTransform):
             )
         )
 
+        # Enrich all chunks with LLM-generated summaries and keywords
+        if llm_client is not None:
+            for chunk in chunks:
+                chunk["text"] = self._enrich_chunk_text(chunk["text"], llm_client)
+
         return chunks
+
+    @staticmethod
+    def _enrich_chunk_text(text: str, llm_client: object) -> str:
+        """Append LLM-generated summary and keywords to a chunk's text."""
+        try:
+            summary, keywords = _extract_keywords(text, llm_client)
+        except Exception as e:
+            logger.debug("LLM enrichment failed for chunk: %s", e)
+            return text
+
+        if not summary and not keywords:
+            return text
+
+        enrichment = "\n\n---\n"
+        if summary:
+            enrichment += f"Summary: {summary}\n\n"
+        if keywords:
+            enrichment += f"Keywords: {keywords}\n"
+        return text + enrichment
 
     def _dict_to_document(self, chunk_data: dict, source_file: str | None = None) -> Document:
         """Convert a chunk dict to a LlamaIndex Document."""
