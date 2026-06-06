@@ -11,18 +11,18 @@
         <div class="form-group">
             <label for="os-select">OS:</label>
             <select id="os-select" name="os">
-                    <option value="windows" {% if config.backend.os == 'windows' %}selected{% endif %}>Windows</option>
-                    <option value="linux" {% if config.backend.os == 'linux' %}selected{% endif %}>Linux</option>
-                    <option value="macos" {% if config.backend.os == 'macos' %}selected{% endif %}>macOS</option>
+                    <option value="windows" {% if config.Hardware.os == 'windows' %}selected{% endif %}>Windows</option>
+                    <option value="linux" {% if config.Hardware.os == 'linux' %}selected{% endif %}>Linux</option>
+                    <option value="macos" {% if config.Hardware.os == 'macos' %}selected{% endif %}>macOS</option>
             </select>
         </div>
         <div class="form-group">
             <label for="gpu-select">GPU Backend:</label>
             <select id="gpu-select" name="gpu">
-                    <option value="cpu" {% if config.backend.gpu_type == 'cpu' %}selected{% endif %}>CPU</option>
-                    <option value="cuda" {% if config.backend.gpu_type == 'cuda' %}selected{% endif %}>CUDA</option>
-                    <option value="hip" {% if config.backend.gpu_type == 'hip' %}selected{% endif %}>HIP (AMD)</option>
-                    <option value="vulkan" {% if config.backend.gpu_type == 'vulkan' %}selected{% endif %}>Vulkan</option>
+                    <option value="cpu" {% if config.Hardware.gpu == 'cpu' %}selected{% endif %}>CPU</option>
+                    <option value="cuda" {% if config.Hardware.gpu == 'cuda' %}selected{% endif %}>CUDA</option>
+                    <option value="hip" {% if config.Hardware.gpu == 'hip' %}selected{% endif %}>HIP (AMD)</option>
+                    <option value="vulkan" {% if config.Hardware.gpu == 'vulkan' %}selected{% endif %}>Vulkan</option>
             </select>
         </div>
         <button type="submit" class="btn btn-primary">Save Configuration</button>
@@ -57,9 +57,9 @@ var _CONFIG = {};
 try { _CONFIG = JSON.parse(document.getElementById('config-data').textContent); } catch(e) {}
 
 function applyConfig(cfg) {
-    const backend = (cfg && cfg.backend) || {};
-    document.getElementById('os-select').value = backend.os || 'windows';
-    document.getElementById('gpu-select').value = backend.gpu_type || 'cpu';
+    const hw = (cfg && cfg.Hardware) || {};
+    document.getElementById('os-select').value = hw.os || 'windows';
+    document.getElementById('gpu-select').value = hw.gpu || 'cpu';
 }
 
 function loadLlamaInfo() {
@@ -93,7 +93,7 @@ function saveConfig() {
     fetch('/api/v1/config', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({backend: {os: os, gpu_type: gpu}})
+        body: JSON.stringify({Hardware: {os: os, gpu: gpu}})
     })
     .then(r => r.json())
     .then(data => {
