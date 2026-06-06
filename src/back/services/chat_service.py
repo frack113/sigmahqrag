@@ -10,6 +10,11 @@ from typing import Any
 
 from src.back.services.rag_pipeline import RAGPipeline
 from src.back.services.sigma_validator import SigmaValidator
+from src.back.services.translate_service import (
+    detect_sigma_yaml,
+    extract_yaml_block,
+    translate_detection,
+)
 from src.rag.search import SearchEngine
 from src.shared.schemas.chat_mode import ChatMode
 
@@ -109,10 +114,23 @@ class ChatService:
         self._add_to_history("assistant", "".join(accumulated))
 
     async def _handle_search(self, message: str) -> str:
-        """Handle search mode: semantic search over indexed Sigma rules."""
+        """Handle search mode: semantic search over indexed Sigma rules.
+
+        If the message contains a Sigma detection YAML block, it is
+        automatically translated into plain English and included as
+        additional context in the LLM prompt.
+        """
+        # Auto-detect and translate Sigma YAML
+        translation = ""
+        if detect_sigma_yaml(message):
+            yaml_block = extract_yaml_block(message)
+            if yaml_block:
+                logger.info("Detected Sigma YAML in chat message — auto-translating")
+                translation = await translate_detection(yaml_block, self.rag_pipeline)
+
         results = await self.search_engine.search(message)
 
-        if not results:
+        if not results and not translation:
             return "No matching Sigma rules found. Try a different query."
 
         self._last_citations = [
@@ -122,8 +140,15 @@ class ChatService:
         ]
 
         try:
+            # If we have a translation, prepend it as context
+            augmented_message = message
+            if translation:
+                augmented_message = (
+                    f"[Auto-translated detection]\n{translation}\n\n[Original YAML]\n{message}"
+                )
+
             return await self.rag_pipeline.answer_search_query(
-                message, results, system_prompt_id=self._current_prompt_id
+                augmented_message, results, system_prompt_id=self._current_prompt_id
             )
         except Exception as e:
             logger.error(f"RAG pipeline failed: {e}")
@@ -179,10 +204,22 @@ class ChatService:
         self,
         message: str,
     ) -> AsyncGenerator[str, None]:
-        """Handle search mode with streaming: semantic search + LLM token stream."""
+        """Handle search mode with streaming: semantic search + LLM token stream.
+
+        If the message contains Sigma YAML, auto-translates and includes
+        the translation as context.
+        """
+        # Auto-detect and translate Sigma YAML
+        translation = ""
+        if detect_sigma_yaml(message):
+            yaml_block = extract_yaml_block(message)
+            if yaml_block:
+                logger.info("Detected Sigma YAML in chat message — auto-translating")
+                translation = await translate_detection(yaml_block, self.rag_pipeline)
+
         results = await self.search_engine.search(message)
 
-        if not results:
+        if not results and not translation:
             yield "No matching Sigma rules found. Try a different query."
             return
 
@@ -195,10 +232,17 @@ class ChatService:
         if self._last_citations:
             yield f"__CITATIONS__:{json.dumps(self._last_citations)}"
 
+        # If we have a translation, prepend it as context
+        augmented_message = message
+        if translation:
+            augmented_message = (
+                f"[Auto-translated detection]\n{translation}\n\n[Original YAML]\n{message}"
+            )
+
         try:
             found = False
             async for token in self.rag_pipeline.answer_search_query_stream(
-                message, results, system_prompt_id=self._current_prompt_id
+                augmented_message, results, system_prompt_id=self._current_prompt_id
             ):
                 yield token
                 found = True

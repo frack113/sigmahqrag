@@ -1,10 +1,11 @@
 """Tests for translate.py endpoint."""
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import patch
 from fastapi.testclient import TestClient
 from fastapi import FastAPI
 
-from src.api.v1.translate import router, _render_safe, SIGMA_YAML_STOP_SEQUENCES
+from src.api.v1.translate import router
+from src.back.services.translate_service import _render_safe, SIGMA_YAML_STOP_SEQUENCES
 
 app = FastAPI()
 app.include_router(router)
@@ -24,12 +25,8 @@ class TestSchemaValidation:
         assert response.status_code == 422
 
     def test_valid_yaml_accepted(self):
-        with patch("src.api.v1.translate.RAGPipeline") as mock_rag:
-            mock_instance = MagicMock()
-            mock_instance.search_engine.search = AsyncMock(return_value=[])
-            mock_instance.answer_search_query = AsyncMock(return_value="translated text")
-            mock_instance.search_engine.get_citation.return_value = None
-            mock_rag.return_value = mock_instance
+        with patch("src.api.v1.translate.translate_detection") as mock_translate:
+            mock_translate.return_value = "translated text"
 
             response = client.post(
                 "/api/v1/translate/detection",
@@ -39,22 +36,15 @@ class TestSchemaValidation:
             assert response.json()["translation"] == "translated text"
 
     def test_default_values(self):
-        with patch("src.api.v1.translate.RAGPipeline") as mock_rag:
-            mock_instance = MagicMock()
-            mock_instance.search_engine.search = AsyncMock(return_value=[])
-            mock_instance.answer_search_query = AsyncMock(return_value="ok")
-            mock_instance.search_engine.get_citation.return_value = None
-            mock_rag.return_value = mock_instance
+        with patch("src.api.v1.translate.translate_detection") as mock_translate:
+            mock_translate.return_value = "ok"
 
             response = client.post(
                 "/api/v1/translate/detection",
                 json={"yaml": "test"},
             )
             assert response.status_code == 200
-            mock_instance.answer_search_query.assert_called_once()
-            call_kwargs = mock_instance.answer_search_query.call_args
-            assert call_kwargs.kwargs["use_chat"] is True
-            assert call_kwargs.kwargs["temperature"] == 0.1
+            mock_translate.assert_called_once()
 
 
 class TestRenderSafe:
