@@ -13,6 +13,7 @@ from src.back.database import DatabaseService
 from src.back.qdrant.storage import store_embeddings
 from src.rag.embeddings import embed_documents
 from src.rag.transforms import TransformRegistry
+from src.rag.transforms.base import TransformConfig
 from src.rag.transforms.generique.parser import GenericTransform
 from src.shared.config import get_config
 
@@ -86,17 +87,41 @@ class UnifiedIndexer:
                 if transform_cls is None:
                     transform_cls = GenericTransform
 
-                transform = transform_cls()
+                base_config = transform_cls._build_default_config()
+                route_config = TransformConfig(
+                    collection_name=route.qdrant_collection,
+                    collection=route.qdrant_collection,
+                    model_name=base_config.model_name,
+                    chunk_size=base_config.chunk_size,
+                    chunk_overlap=base_config.chunk_overlap,
+                    batch_size=base_config.batch_size,
+                    max_length=base_config.max_length,
+                    enable_sbert=base_config.enable_sbert,
+                    enable_eval_questions=base_config.enable_eval_questions,
+                    enable_llm_enrichment=base_config.enable_llm_enrichment,
+                    llm_client=base_config.llm_client,
+                    max_heading_level=base_config.max_heading_level,
+                )
+                transform = transform_cls(config=route_config)
                 docs = transform.run(file_path)
                 if not docs:
                     continue
 
-                embeddings = await embed_documents(docs)
+                # Some transforms (notably SigmaParser → SigmaChunker) may emit
+                # chunks with empty text (missing fields). ``embed_documents``
+                # filters those out, which would cause store_embeddings to fail
+                # on the "Document count must match embedding count" check.
+                # Align the three lists to only chunks that have non-empty text.
+                non_empty = [d for d in docs if d.text]
+                if not non_empty:
+                    continue
+
+                embeddings = await embed_documents(non_empty)
 
                 await store_embeddings(
                     embeddings=embeddings,
-                    documents=[d.text for d in docs],
-                    metadata=[d.metadata for d in docs],
+                    documents=[d.text for d in non_empty],
+                    metadata=[d.metadata for d in non_empty],
                     collection_name=route.qdrant_collection,
                 )
 

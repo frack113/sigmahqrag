@@ -177,13 +177,10 @@ class RAGPipeline:
 
         try:
             prompt_content = self._resolve_prompt(system_prompt_id, mode="search")
-            prompt = Template(prompt_content).render(
-                search_results=results_text,
-                question=query,
-            )
+            prompt = Template(prompt_content).render(search_results=results_text)
 
             stream = self.llm_client.generate_stream(
-                prompt=prompt,
+                prompt=f"{prompt}\n\nQuery:\n{query}",
                 temperature=0.3,
             )
             async for token in _stream_cache_wrapper(self, cache_key, stream):
@@ -199,28 +196,59 @@ class RAGPipeline:
         query: str,
         search_results: list[dict[str, Any]],
         system_prompt_id: str = "",
+        temperature: float = 0.3,
+        bypass_cache: bool = False,
+        use_chat: bool = False,
+        stop: list[str] | None = None,
     ) -> str:
-        """Generate answer for a search query using LLM."""
+        """Generate answer for a search query using LLM.
+
+        When ``use_chat`` is True, the rendered prompt (with search results
+        as reference context) goes into the system message, and the query
+        (the Sigma detection YAML) goes into the user message. This structure
+        ensures instruction-following models treat the YAML as data to
+        translate rather than as content to continue.
+
+        ``stop`` strings are forwarded to llama.cpp to halt generation
+        early when the model starts emitting typical Sigma rule sections
+        (fields, level, logsource, etc.) instead of the translation.
+        """
         results_text = self._format_search_results(search_results)
         cache_key = self.cache.generate_key(query=query, context=results_text)
 
-        cached = self.cache.get(cache_key)
-        if cached:
-            logger.info(f"Cache hit for search query: {query[:50]}")
-            return cached
+        if not bypass_cache:
+            cached = self.cache.get(cache_key)
+            if cached:
+                logger.info(f"Cache hit for search query: {query[:50]}")
+                return cached
 
         try:
             prompt_content = self._resolve_prompt(system_prompt_id, mode="search")
-            prompt = Template(prompt_content).render(
-                search_results=results_text,
-                question=query,
-            )
+            # Render the prompt template with search results so the LLM gets
+            # Sigma syntax reference as context when available.
+            prompt = Template(prompt_content).render(search_results=results_text)
 
-            response = await self.llm_client.generate(
-                prompt=prompt,
-                temperature=0.3,
-            )
-            self.cache.set(cache_key, response)
+            if use_chat:
+                messages = [
+                    {"role": "system", "content": prompt},
+                    {
+                        "role": "user",
+                        "content": query,
+                    },
+                ]
+                response = await self.llm_client.chat(
+                    messages=messages,
+                    temperature=temperature,
+                    stop=stop,
+                )
+            else:
+                full_prompt = f"{prompt}\n\nInput:\n{query}"
+                response = await self.llm_client.generate(
+                    prompt=full_prompt,
+                    temperature=temperature,
+                )
+            if not bypass_cache:
+                self.cache.set(cache_key, response)
             return response
         except Exception as e:
             logger.error(f"LLM generation failed: {e}")

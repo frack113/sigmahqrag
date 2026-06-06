@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from pathlib import Path
+from typing import Any
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -28,6 +30,7 @@ from src.shared.schemas.qdrant import (
     ProgressPayload,
     QdrantActionRequest,
     QdrantActionResponse,
+    ReindexPayload,
     ServiceControlPayload,
     VectorSearchPayload,
 )
@@ -37,6 +40,28 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/qdrant", tags=["v1-qdrant"])
 
 SERVICE_NAME = "qdrant"
+
+
+def _recreate_collection(client: Any, collection_name: str, vector_size: int | None = None) -> None:
+    """Recreate an empty Qdrant collection with the configured vector size.
+
+    The collection was just deleted by the caller; we recreate it with the
+    same shape so the indexer can store_embeddings() into it again.
+    """
+    from qdrant_client.http import models
+
+    if vector_size is None:
+        try:
+            from src.shared import get_config
+
+            vector_size = get_config().qdrant_vector_size
+        except Exception:
+            vector_size = 384
+
+    client.create_collection(
+        collection_name=collection_name,
+        vectors_config=models.VectorParams(size=vector_size, distance=models.Distance.COSINE),
+    )
 
 
 @router.get("/status")
@@ -241,13 +266,68 @@ async def qdrant_action(
                 message=f"Indexed {total} documents",
             )
 
+        elif isinstance(payload, ReindexPayload):
+            from src.back.qdrant.client import get_qdrant_client
+            from src.rag.indexer import ROUTES as INDEX_ROUTES
+
+            target = payload.collection_name
+            route = next((r for r in INDEX_ROUTES if r.qdrant_collection == target), None)
+            if route is None:
+                return QdrantActionResponse(
+                    status="error",
+                    action=action,
+                    error_code="UNKNOWN_COLLECTION",
+                    message=f"No index route targets Qdrant collection '{target}'",
+                )
+
+            logger.warning("Reindex requested for %s — wiping points + resetting status", target)
+            client = get_qdrant_client()
+            from src.shared import get_config
+
+            vector_size = get_config().qdrant_vector_size
+            try:
+                await asyncio.to_thread(client.delete_collection, collection_name=target)
+                await asyncio.to_thread(_recreate_collection, client, target, vector_size)
+            except Exception:
+                logger.exception("Failed to recycle Qdrant collection %s", target)
+                raise
+
+            db = DatabaseService.get_instance()
+            with db._lock:
+                if target == "sigma_spec":
+                    db._writer_conn.execute("UPDATE sigma_spec SET embed_status = 'discovery'")
+                elif target == "sigma_rules":
+                    db._writer_conn.execute(
+                        "UPDATE doc_registry SET embed_status = 'discovery' "
+                        "WHERE content_type = 'sigma_rule'"
+                    )
+                elif target == "sigma_docs":
+                    db._writer_conn.execute(
+                        "UPDATE doc_registry SET embed_status = 'discovery' "
+                        "WHERE (content_type IS NULL OR content_type != 'sigma_rule')"
+                    )
+                db._writer_conn.commit()
+
+            indexer = UnifiedIndexer()
+            index_result = await indexer.index(route)
+            return QdrantActionResponse(
+                status="success",
+                action=action,
+                data={
+                    "route": index_result.route.qdrant_collection,
+                    "processed": index_result.processed,
+                    "errors": index_result.errors,
+                },
+                message=f"Re-indexed {index_result.processed} points into {target}",
+            )
+
         elif isinstance(payload, VectorSearchPayload):
-            results = await qdrant_search(
+            search_results = await qdrant_search(
                 query_embedding=payload.query_vector,
                 collection_name=payload.collection_name,
                 top_k=payload.top_k,
             )
-            return QdrantActionResponse(status="success", action=action, data=results)
+            return QdrantActionResponse(status="success", action=action, data=search_results)
 
         else:
             return QdrantActionResponse(

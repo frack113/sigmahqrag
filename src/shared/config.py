@@ -129,6 +129,10 @@ class Config:
                     "manage_internally": self.qdrant_manage_internally,
                 },
             },
+            "backend": {
+                "os": self.os,
+                "gpu_type": self.gpu_type,
+            },
             "logging": {
                 "level": self.logging_level,
                 "log_max_size": self.logging_log_max_size,

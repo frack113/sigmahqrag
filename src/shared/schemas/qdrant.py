@@ -54,6 +54,15 @@ class IndexAllPayload(BaseModel):
     group: str | None = None  # "spec", "docs", or None for all
 
 
+class ReindexPayload(BaseModel):
+    action: Literal["reindex"] = "reindex"
+    collection_name: str = Field(..., description="Qdrant collection to wipe and rebuild")
+    group: str | None = Field(
+        default=None,
+        description='Index group filter ("spec", "docs", or None for the matching route)',
+    )
+
+
 class QdrantActionRequest(BaseModel):
     action: Literal[
         "download_update",
@@ -64,6 +73,7 @@ class QdrantActionRequest(BaseModel):
         "progress",
         "cancel",
         "index_all",
+        "reindex",
     ]
     payload: (
         DownloadUpdatePayload
@@ -74,6 +84,7 @@ class QdrantActionRequest(BaseModel):
         | DataManagementPayload
         | VectorSearchPayload
         | IndexAllPayload
+        | ReindexPayload
     ) = Field(..., discriminator="action")
 
 
