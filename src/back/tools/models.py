@@ -57,7 +57,8 @@ class ToolContext:
     """Shared backend dependencies injected into tool calls."""
 
     search_engine: Any
-    rag_pipeline: Any
+    llm_client: Any
+    rag_pipeline: Any | None = None
 
 
 @dataclass

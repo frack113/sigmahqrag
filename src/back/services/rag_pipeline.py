@@ -36,10 +36,15 @@ async def _stream_cache_wrapper(
 class RAGPipeline:
     """Pipeline for RAG-based chat responses."""
 
-    def __init__(self) -> None:
-        self.search_engine = SearchEngine()
-        self.llm_client = LlamaClient()
-        self.cache = ResponseCache()
+    def __init__(
+        self,
+        search_engine: SearchEngine | None = None,
+        llm_client: LlamaClient | None = None,
+        cache: ResponseCache | None = None,
+    ) -> None:
+        self.search_engine = search_engine or SearchEngine()
+        self.llm_client = llm_client or LlamaClient()
+        self.cache = cache or ResponseCache()
 
     def _resolve_prompt(self, prompt_id: str = "", mode: str = "search") -> str:
         """Resolve prompt content from DuckDB by ID or mode.
@@ -55,33 +60,38 @@ class RAGPipeline:
                 get_prompt_by_id,
                 get_prompt_by_name,
             )
+        except Exception:
+            logger.exception("Failed to import system_prompt for mode=%s id=%s", mode, prompt_id)
+            return self._fallback_prompt()
 
-            if prompt_id:
-                p = get_prompt_by_id(prompt_id)
-                if p:
-                    return p.content
-                logger.warning("prompt_id '%s' not found — falling back", prompt_id)
-
-            if mode == "search":
-                active = get_active_prompt()
-                if active:
-                    return active.content
-
-            mode_map = {
-                "search": "search-answer",
-                "explain": "explain-rule",
-                "coverage": "coverage-analysis",
-            }
-            name = mode_map.get(mode, "search-answer")
-            p = get_prompt_by_name(name)
+        if prompt_id:
+            p = get_prompt_by_id(prompt_id)
             if p:
                 return p.content
-        except Exception:
-            logger.exception("Failed to resolve prompt for mode=%s id=%s", mode, prompt_id)
+            logger.warning("prompt_id '%s' not found — falling back", prompt_id)
+
+        if mode == "search":
+            active = get_active_prompt()
+            if active:
+                return active.content
+
+        mode_map = {
+            "search": "search-answer",
+            "explain": "explain-rule",
+            "coverage": "coverage-analysis",
+        }
+        name = mode_map.get(mode, "search-answer")
+        p = get_prompt_by_name(name)
+        if p:
+            return p.content
 
         logger.warning(
             "No prompt found for mode=%s id=%s — using minimal fallback", mode, prompt_id
         )
+        return self._fallback_prompt()
+
+    def _fallback_prompt(self) -> str:
+        """Return a minimal fallback prompt."""
         return "Answer the user's question based on the provided context."
 
     async def explain_rule(

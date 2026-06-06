@@ -157,7 +157,7 @@ async def explain_detection(
                 f"Reference context:\n{search_context}\n\nDetection YAML:\n{rule_yaml}"
             )
 
-        translation = await ctx.rag_pipeline.llm_client.chat(
+        translation = await ctx.llm_client.chat(
             messages=[
                 {"role": "system", "content": prompt},
                 {
@@ -191,7 +191,7 @@ async def explain_detection(
         # Reformulate into natural language
         if translation:
             try:
-                reformulated = await ctx.rag_pipeline.llm_client.chat(
+                reformulated = await ctx.llm_client.chat(
                     messages=[
                         {
                             "role": "system",
@@ -238,6 +238,9 @@ async def explain_rule(
     if not ctx:
         return "Error: tool context not available."
 
+    if not ctx.rag_pipeline:
+        return "explain_rule requires a RAG pipeline (not available in this context)."
+
     try:
         import yaml
 
@@ -281,7 +284,7 @@ async def summarize(*, text: str, ctx: ToolContext | None = None) -> str:
             f"Text to summarize:\n{text}"
         )
 
-        response = await ctx.rag_pipeline.llm_client.chat(
+        response = await ctx.llm_client.chat(
             messages=[
                 {"role": "system", "content": prompt},
                 {"role": "user", "content": "Please provide a concise summary."},

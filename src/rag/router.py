@@ -10,7 +10,6 @@ from __future__ import annotations
 import json
 import logging
 import re
-import threading
 
 import httpx
 
@@ -44,29 +43,6 @@ VALID_COLLECTIONS = {"sigma_rules", "sigma_docs", "sigma_spec"}
 # Default fallback: search all collections
 DEFAULT_COLLECTIONS = ["sigma_rules", "sigma_docs", "sigma_spec"]
 
-# Thread-safe singleton for the LLM client
-_llm_client: LlamaClient | None = None
-_llm_lock = threading.Lock()
-
-
-def _get_llm_client() -> LlamaClient:
-    """Get or create the LLM client singleton."""
-    global _llm_client
-    if _llm_client is not None:
-        return _llm_client
-    with _llm_lock:
-        if _llm_client is not None:
-            return _llm_client
-        _llm_client = LlamaClient()
-    return _llm_client
-
-
-def reset_llm_client() -> None:
-    """Reset the cached LLM client singleton (for testing)."""
-    global _llm_client
-    with _llm_lock:
-        _llm_client = None
-
 
 def _parse_llm_response(raw: str) -> list[str]:
     """Parse the LLM's JSON response into a list of collection names.
@@ -98,11 +74,17 @@ def _parse_llm_response(raw: str) -> list[str]:
     return [c for c in collections if c in VALID_COLLECTIONS]
 
 
-async def route_query(query: str, timeout: float = 5.0) -> list[str]:
+async def route_query(
+    query: str,
+    llm_client: LlamaClient | None = None,
+    timeout: float = 5.0,
+) -> list[str]:
     """Classify a query into relevant collection(s) using the LLM.
 
     Args:
         query: The user's search query
+        llm_client: Optional LlamaClient instance. When not provided,
+            creates a new LlamaClient (fallback for standalone use).
         timeout: LLM call timeout in seconds
 
     Returns:
@@ -113,7 +95,7 @@ async def route_query(query: str, timeout: float = 5.0) -> list[str]:
         return list(DEFAULT_COLLECTIONS)
 
     try:
-        client = _get_llm_client()
+        client = llm_client or LlamaClient()
         prompt = ROUTER_PROMPT.format(query=query)
 
         async with httpx.AsyncClient() as http_client:

@@ -11,6 +11,7 @@ from typing import Any
 from qdrant_client.models import FieldCondition, Filter, MatchValue, MatchText
 
 from src.back.database import DatabaseService
+from src.back.llamacpp.client import LlamaClient
 from src.back.qdrant.client import get_qdrant_client
 from src.rag.ingestion import DEFAULT_MODEL, build_embed_model
 from src.rag.router import route_query
@@ -280,6 +281,7 @@ class SearchEngine:
         top_k: int = DEFAULT_TOP_K,
         similarity_threshold: float = SIMILARITY_THRESHOLD,
         use_router: bool = False,
+        llm_client: LlamaClient | None = None,
     ) -> None:
         """Initialize search engine.
 
@@ -290,11 +292,14 @@ class SearchEngine:
             similarity_threshold: Minimum similarity score.
             use_router: Enable LLM-based query routing to search only
                 relevant collections instead of all three.
+            llm_client: Optional LlamaClient for the router.
+                When not provided, creates a new LlamaClient.
         """
         self.collection_names = collection_names or list(DEFAULT_COLLECTIONS)
         self.top_k = top_k
         self.similarity_threshold = similarity_threshold
         self.use_router = use_router
+        self._llm_client = llm_client
 
     async def search(
         self,
@@ -317,7 +322,7 @@ class SearchEngine:
         # Determine which collections to search
         if self.use_router:
             try:
-                routed = await route_query(query)
+                routed = await route_query(query, llm_client=self._llm_client)
                 cols = [c for c in routed if c in self.collection_names]
                 if not cols:
                     cols = self.collection_names

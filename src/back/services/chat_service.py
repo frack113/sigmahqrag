@@ -42,6 +42,7 @@ class ChatService:
         self._tool_executor = ToolDispatcher(get_tools())
         self._tool_context = ToolContext(
             search_engine=self.search_engine,
+            llm_client=self.rag_pipeline.llm_client,
             rag_pipeline=self.rag_pipeline,
         )
 
