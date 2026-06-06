@@ -127,6 +127,10 @@ class ChatService:
             if yaml_block:
                 logger.info("Detected Sigma YAML in chat message — auto-translating")
                 translation = await translate_detection(yaml_block, self.rag_pipeline)
+                try:
+                    await self.rag_pipeline.llm_client.erase_slot_cache()
+                except Exception:
+                    logger.warning("Failed to clear KV cache after translate")
 
         results = await self.search_engine.search(message)
 
@@ -216,6 +220,10 @@ class ChatService:
             if yaml_block:
                 logger.info("Detected Sigma YAML in chat message — auto-translating")
                 translation = await translate_detection(yaml_block, self.rag_pipeline)
+                try:
+                    await self.rag_pipeline.llm_client.erase_slot_cache()
+                except Exception:
+                    logger.warning("Failed to clear KV cache after translate")
 
         results = await self.search_engine.search(message)
 

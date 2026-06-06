@@ -67,6 +67,12 @@ async def translate_detection_endpoint(req: TranslateDetectionRequest) -> JSONRe
             use_chat=req.use_chat,
         )
 
+        # Clear KV cache to avoid polluting the shared llama-server slot
+        try:
+            await rag.llm_client.erase_slot_cache()
+        except Exception:
+            logger.warning("Failed to clear KV cache after translate")
+
         if not translation:
             return JSONResponse(
                 status_code=500,
