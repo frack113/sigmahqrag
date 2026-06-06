@@ -6,20 +6,16 @@ import yaml
 from pathlib import Path
 from typing import Optional
 
+from src.shared.schemas.sigma_rule import is_sigma_rule as is_sigma_rule_fn
+
 
 def is_sigma_rule(file_path: Path) -> bool:
     """Check if a YAML file is a Sigma rule.
 
-    A file is considered a Sigma rule if it is YAML and contains
-    at least the keys ``logsource``, ``detection``, and ``condition``.
+    Re-export of the canonical ``is_sigma_rule`` from
+    ``src.shared.schemas.sigma_rule`` for the ``Path``-only call-signature.
     """
-    try:
-        data = yaml.safe_load(file_path.read_text(encoding="utf-8"))
-        if not isinstance(data, dict):
-            return False
-        return all(key in data for key in ("logsource", "detection", "condition"))
-    except Exception:
-        return False
+    return is_sigma_rule_fn(file_path)
 
 
 def extract_sigma_references(file_path: Path) -> list[str]:

@@ -21,6 +21,7 @@ from src.back.utils.identify_file_type import (
     SUPPORTED_DOC_EXTENSION_MAP,
     SUPPORTED_REFERENCE_DOC_TYPES,
 )
+from src.shared.schemas.sigma_rule import is_sigma_rule_dict
 from src.shared.utils import iso_now
 
 logger = logging.getLogger(__name__)
@@ -414,10 +415,6 @@ def download_references(
 
     _EXCLUDE_DIRS = {".github", ".git", "__pycache__", ".vscode", ".idea", ".pytest_cache"}
 
-    def _is_sigma_rule(data: dict[str, Any]) -> bool:
-        """Check if the YAML data looks like a valid Sigma rule (has logsource)."""
-        return "logsource" in data
-
     def _is_selected_dir(yml_file: Path) -> bool:
         """Check if the file is within any of the selected directories."""
         if not selected_dirs:
@@ -466,7 +463,7 @@ def download_references(
             continue
         if not isinstance(data, dict):
             continue
-        if not _is_sigma_rule(data):
+        if not is_sigma_rule_dict(data):
             continue
 
         total_rules += 1

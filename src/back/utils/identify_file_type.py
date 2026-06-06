@@ -10,6 +10,8 @@ from pathlib import Path
 import puremagic
 import yaml
 
+from src.shared.schemas.sigma_rule import is_sigma_rule_candidate
+
 UTF8_BOM = b"\xef\xbb\xbf"
 MAX_FILE_SIZE = 100 * 1024 * 1024
 MAGIC_HEADER_SIZE = 4096
@@ -133,19 +135,10 @@ def _detect_via_puremagic(header: bytes, file_path: str = "") -> FileType | None
 
 
 def _is_sigma_rule(file_path: str, content: str) -> bool:
-    try:
-        ext = Path(file_path).suffix.lower()
-        if ext not in (".yml", ".yaml"):
-            return False
-        data = yaml.safe_load(content)
-        if not isinstance(data, dict):
-            return False
-        if "title" not in data or "detection" not in data:
-            return False
-        detection = data.get("detection")
-        return "condition" in data or (isinstance(detection, dict) and "condition" in detection)
-    except Exception:
+    ext = Path(file_path).suffix.lower()
+    if ext not in (".yml", ".yaml"):
         return False
+    return is_sigma_rule_candidate(yaml.safe_load(content))
 
 
 def _is_yaml(file_path: str, content: str) -> bool:
