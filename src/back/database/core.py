@@ -151,12 +151,13 @@ class DatabaseServiceCore:
         limit = max(1, min(limit, 1000))
         offset = max(0, offset)
         with self._lock:
-            results = self._writer_conn.execute(
+            result = self._writer_conn.execute(
                 f"SELECT * FROM {table_name} LIMIT ? OFFSET ?",
                 [limit, offset],
-            ).fetchall()
-            col_names = [desc[0] for desc in self._writer_conn.description]
-        return [dict(zip(col_names, row)) for row in results]
+            )
+            col_names = [desc[0] for desc in result.description]
+            rows = result.fetchall()
+        return [dict(zip(col_names, row)) for row in rows]
 
     def get_table_count(self, table_name: str) -> int:
         if table_name not in _VALID_TABLES:
