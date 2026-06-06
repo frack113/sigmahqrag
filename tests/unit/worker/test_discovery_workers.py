@@ -132,6 +132,38 @@ class TestGithubDiscoveryWorker:
         entries = mock_db.batch_upsert_doc_registry.call_args[0][0]
         assert len(entries) == 1
 
+    def test_process_selected_dirs_not_prefix_match(
+        self, mock_db: MagicMock, tmp_path: Path
+    ) -> None:
+        """Selected dir 'rules' must not match 'rulesets' (prefix bug)."""
+        repo_dir = tmp_path / "test-org" / "test-repo"
+        rules_dir = repo_dir / "rules"
+        rules_dir.mkdir(parents=True)
+        (rules_dir / "rule1.md").write_text("# Rule 1")
+        rulesets_dir = repo_dir / "rulesets"
+        rulesets_dir.mkdir(parents=True)
+        (rulesets_dir / "ruleset1.md").write_text("# Ruleset 1")
+
+        mock_db.get_repos_with_selected_dirs.return_value = ["test-org/test-repo"]
+        mock_db.get_selected_dirs.return_value = ["rules"]
+
+        task = {
+            "task_id": "gh-disc-prefix",
+            "task_type": "github_discovery",
+            "collection_name": "all",
+            "github_base_dir": str(tmp_path),
+        }
+
+        worker = GenericDiscoveryWorker(
+            db=mock_db, source_type=SourceType.GITHUB, base_dir=tmp_path
+        )
+        worker.process(task)
+
+        mock_db.batch_upsert_doc_registry.assert_called_once()
+        entries = mock_db.batch_upsert_doc_registry.call_args[0][0]
+        assert len(entries) == 1
+        assert entries[0]["file_name"] == "rules/rule1.md"
+
     def test_process_skips_missing_repos(self, mock_db: MagicMock, tmp_path: Path) -> None:
         repo_dir = tmp_path / "test-org" / "test-repo"
         repo_dir.mkdir(parents=True)

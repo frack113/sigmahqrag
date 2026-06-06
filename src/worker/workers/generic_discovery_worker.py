@@ -147,7 +147,12 @@ class GenericDiscoveryWorker(DiscoveryWorker):
 
                 if selected:
                     rel_to_repo = found_file.relative_to(repo_path).as_posix()
-                    if not any(rel_to_repo.startswith(sd.lstrip("./")) for sd in selected):
+                    if not any(
+                        rel_to_repo == sd.lstrip("./")
+                        or rel_to_repo.startswith(sd.lstrip("./") + "/")
+                        for sd in selected
+                        if sd
+                    ):
                         continue
 
                 all_files.append((found_file, repo_path, org, repo))
