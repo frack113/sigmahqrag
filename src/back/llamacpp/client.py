@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 from collections.abc import AsyncGenerator
+from typing import Any
 
 import httpx
 
@@ -57,6 +58,7 @@ class LlamaClient:
                     timeout=120.0,
                 )
                 response.raise_for_status()
+                response.encoding = "utf-8"
                 payload = response.json()
                 choices = payload.get("choices") or []
                 if not choices:
@@ -65,6 +67,57 @@ class LlamaClient:
                 return text if text is not None else ""
             except Exception as e:
                 raise RuntimeError(f"Llama.cpp generate failed: {e}") from e
+
+    async def chat(
+        self,
+        messages: list[dict[str, str]],
+        temperature: float = 0.3,
+        max_tokens: int = 512,
+        stop: list[str] | None = None,
+    ) -> str:
+        """Generate text via /v1/chat/completions (OpenAI-compatible chat format).
+
+        Reasoning-tuned instruction models follow chat-format prompts more
+        reliably than raw text completion, especially for tasks where the
+        prompt contains code or YAML the model might otherwise try to
+        continue instead of translating.
+
+        Args:
+            messages: List of {"role": "system"|"user"|"assistant", "content": str}.
+            temperature: Sampling temperature.
+            max_tokens: Hard cap on generated tokens.
+            stop: Optional list of stop strings (e.g. ["\\nfields:"]).
+
+        Returns:
+            Assistant message content, or empty string if the response has
+            no choices / content.
+        """
+        payload: dict[str, Any] = {
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "stream": False,
+        }
+        if stop:
+            payload["stop"] = stop
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.post(
+                    f"{self.base_url}/v1/chat/completions",
+                    json=payload,
+                    timeout=120.0,
+                )
+                response.raise_for_status()
+                response.encoding = "utf-8"
+                data = response.json()
+                choices = data.get("choices") or []
+                if not choices:
+                    return ""
+                message = choices[0].get("message") or {}
+                content = message.get("content")
+                return content if content is not None else ""
+            except Exception as e:
+                raise RuntimeError(f"Llama.cpp chat failed: {e}") from e
 
     async def generate_stream(
         self,
@@ -92,6 +145,7 @@ class LlamaClient:
                 ) as response:
                     logger.info("Llama.cpp stream response status: %d", response.status_code)
                     response.raise_for_status()
+                    response.encoding = "utf-8"
                     raw_lines: list[str] = []
                     data_lines: list[str] = []
                     line_count = 0

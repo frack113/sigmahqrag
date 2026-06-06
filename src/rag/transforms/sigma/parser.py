@@ -24,8 +24,15 @@ class SigmaParser(DocumentTransform):
     def parse(self, file_path: Path) -> list[Document]:
         """Load Sigma rules from a YAML file and return one Document per rule.
 
-        Each Document has empty text — rich chunking happens during chunk()
-        via SigmaChunker.
+        Each Document has empty text and the full rule dict in
+        ``metadata["rule_meta"]`` — rich chunking happens during chunk()
+        via SigmaChunker, which needs ``rule_meta`` to expand each rule
+        into its semantic chunks (executive_summary, logsource_context,
+        detection_condition, ...).
+
+        Setting ``rule_meta`` here is critical: without it, the chunker
+        falls back to passing each rule through unchanged (one empty-text
+        Document per rule) and the indexer ends up storing nothing.
 
         Args:
             file_path: Path to the YAML file containing one or more Sigma rules.
@@ -50,6 +57,7 @@ class SigmaParser(DocumentTransform):
                     "source_file": str(file_path),
                     "doc_type": "sigma_rule",
                     "rule_id": rule_id,
+                    "rule_meta": rule,
                 },
             )
             documents.append(doc)

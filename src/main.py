@@ -36,6 +36,7 @@ from src.api.v1.models_embedding import router as models_embedding_router
 from src.api.v1.qdrant import router as qdrant_router
 from src.api.v1.search import router as search_v1_router
 from src.api.v1.system_prompt import router as prompts_v1_router
+from src.api.v1.translate import router as translate_v1_router
 from src.back.database import DatabaseService
 from src.back.llamacpp.auto_start import start_llamacpp, stop_llamacpp
 from src.back.qdrant.auto_start import start_qdrant, stop_qdrant
@@ -272,6 +273,7 @@ def create_app() -> FastAPI:
     app.include_router(search_v1_router)
     app.include_router(spec_v1_router)
     app.include_router(prompts_v1_router)
+    app.include_router(translate_v1_router)
     app.include_router(chat_v1_router)
     app.include_router(chat_page_router)
     app.include_router(data_page_router)
