@@ -23,7 +23,6 @@ class TransformConfig:
         max_length: Max token length for the embedding model.
         enable_sbert: Use sentence-transformers for embedding.
         enable_eval_questions: Generate eval questions for RAGAS evaluation.
-        enable_llm_enrichment: Enable LLM-based keyword extraction per chunk.
         llm_client: Optional LLM client for keyword generation.
     """
 
@@ -36,7 +35,6 @@ class TransformConfig:
     max_length: int = 512
     enable_sbert: bool = True
     enable_eval_questions: bool = False
-    enable_llm_enrichment: bool = True
     llm_client: Any = None
     max_heading_level: int = 3
     """Max heading depth for markdown chunking (1=H1 only, 2=H1+H2, 3=H1+H2+H3)."""

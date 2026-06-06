@@ -157,18 +157,8 @@ class MarkdownChunker(DocumentTransform):
             source = doc.metadata.get("source_file", "")
 
             # Determine LLM client
-            llm_client = None
-            enable_llm = False
-            client = self.config.llm_client if hasattr(self.config, "llm_client") else None
-            if client is not None:
-                llm_client = client
-                enable_llm = True
-            elif hasattr(self.config, "enable_llm_enrichment"):
-                enable_llm = self.config.enable_llm_enrichment and True
-            else:
-                enable_llm = True
-
-            if enable_llm and llm_client is None:
+            llm_client = self.config.llm_client if hasattr(self.config, "llm_client") else None
+            if llm_client is None:
                 llm_client = _get_llm_client()
 
             # Global chunk (full document)

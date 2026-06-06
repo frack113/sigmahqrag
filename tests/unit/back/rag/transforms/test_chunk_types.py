@@ -383,7 +383,7 @@ class TestLLMEnrichment:
                 return_value=mock_client,
             ),
         ):
-            config = TransformConfig(enable_llm_enrichment=True)
+            config = TransformConfig()
             chunker = SigmaChunker(config=config)
             chunks = chunker._chunk_rule(full_rule_dict, llm_client=mock_client)
 
@@ -418,7 +418,7 @@ class TestLLMEnrichment:
             "src.rag.transforms.sigma.chunker._extract_keywords",
             side_effect=RuntimeError("LLM unavailable"),
         ):
-            config = TransformConfig(enable_llm_enrichment=True)
+            config = TransformConfig()
             chunker = SigmaChunker(config=config)
             chunks = chunker._chunk_rule(full_rule_dict, llm_client=mock_client)
 
@@ -436,7 +436,7 @@ class TestLLMEnrichment:
             "src.rag.transforms.sigma.chunker._extract_keywords",
             return_value=("", ""),
         ):
-            config = TransformConfig(enable_llm_enrichment=True)
+            config = TransformConfig()
             chunker = SigmaChunker(config=config)
             chunks = chunker._chunk_rule(full_rule_dict, llm_client=mock_client)
 
@@ -455,7 +455,7 @@ class TestLLMEnrichment:
             "src.rag.transforms.sigma.chunker._extract_keywords",
             return_value=("summary", "keywords"),
         ) as mock_extract:
-            config = TransformConfig(enable_llm_enrichment=True)
+            config = TransformConfig()
             chunker = SigmaChunker(config=config)
             chunks = chunker._chunk_rule(full_rule_dict, llm_client=mock_client)
 

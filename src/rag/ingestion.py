@@ -211,7 +211,6 @@ class IngestionPipelineBuilder:
             chunk_size=SOURCE_CHUNK_CONFIG.get(source, {}).get("chunk_size", 512),
             chunk_overlap=SOURCE_CHUNK_CONFIG.get(source, {}).get("chunk_overlap", 50),
             llm_client=llm_client,
-            enable_llm_enrichment=True,
         )
         return transform_cls(config=config)
 

@@ -98,7 +98,6 @@ class UnifiedIndexer:
                     max_length=base_config.max_length,
                     enable_sbert=base_config.enable_sbert,
                     enable_eval_questions=base_config.enable_eval_questions,
-                    enable_llm_enrichment=base_config.enable_llm_enrichment,
                     llm_client=base_config.llm_client,
                     max_heading_level=base_config.max_heading_level,
                 )
