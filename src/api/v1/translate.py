@@ -63,6 +63,14 @@ def _render_safe(template_text: str, **kwargs: Any) -> str:
     return template.render(defaults)
 
 
+REFORMULATE_SYSTEM = (
+    "You are a plain-English rewriter. Take the following technical description "
+    "of a security detection rule and rewrite it as a single, clear, natural paragraph. "
+    "Do not repeat sentence structures. Do not start multiple sentences with the same words. "
+    "Keep it concise (2-4 sentences max)."
+)
+
+
 class TranslateDetectionRequest(BaseModel):
     """Request body for translating a Sigma detection block."""
 
@@ -163,6 +171,21 @@ async def translate_detection(req: TranslateDetectionRequest) -> JSONResponse:
                     temperature=DEFAULT_TEMPERATURE,
                 )
             citations = []
+
+        # Second pass: reformulate into natural language
+        if req.use_chat:
+            try:
+                reformulated = await rag.llm_client.chat(
+                    messages=[
+                        {"role": "system", "content": REFORMULATE_SYSTEM},
+                        {"role": "user", "content": translation},
+                    ],
+                    temperature=DEFAULT_TEMPERATURE,
+                )
+                if reformulated and len(reformulated) > 20:
+                    translation = reformulated
+            except Exception:
+                logger.warning("Reformulation pass failed, keeping raw translation")
 
         return JSONResponse(
             content={
