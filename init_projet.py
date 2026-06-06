@@ -109,6 +109,10 @@ def _generate_default_toml() -> str:
         "log_max_file = 5",
         "clean_at_startup = false",
         "",
+        "[Hardware]",
+        'os = "windows"',
+        'gpu = "vulkan"',
+        "",
     ]
     return "\n".join(lines)
 
@@ -128,7 +132,7 @@ def create_data_structure() -> None:
 
 
 def create_config_file() -> None:
-    """Create sigmarag.toml at project root (no [backend] section)."""
+    """Create sigmarag.toml at project root with default configuration."""
     if not CONFIG_FILE.exists():
         CONFIG_FILE.write_text(DEFAULT_TOML, encoding="utf-8")
         log_info(f"Created {CONFIG_FILE}")

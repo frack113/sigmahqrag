@@ -83,6 +83,13 @@ class Config:
 
     def _apply_nested_config(self, nested: dict[str, Any]) -> None:
         """Apply nested config dict to dataclass fields."""
+        if "Hardware" in nested:
+            hw = nested["Hardware"]
+            if "os" in hw:
+                self.os = hw["os"]
+            if "gpu" in hw:
+                self.gpu_type = hw["gpu"]
+
         if "services" in nested:
             services = nested["services"]
             if "llama" in services:
@@ -129,9 +136,9 @@ class Config:
                     "manage_internally": self.qdrant_manage_internally,
                 },
             },
-            "backend": {
+            "Hardware": {
                 "os": self.os,
-                "gpu_type": self.gpu_type,
+                "gpu": self.gpu_type,
             },
             "logging": {
                 "level": self.logging_level,

@@ -45,7 +45,7 @@ def test_config_file_created_no_backend_section(temp_project_dir):
     assert "[services.llama]" in content
     assert "[services.qdrant]" in content
     assert "[logging]" in content
-    assert "[rag]" in content
+    assert "[Hardware]" in content
 
 
 def test_config_file_not_overwritten(temp_project_dir):
