@@ -29,7 +29,7 @@ async def chat_page(request: Request):
 def _get_prompts() -> list[dict]:
     """Fetch system prompts from the database."""
     try:
-        from src.application.system_prompt import list_prompts
+        from src.application.system.prompts import list_prompts
 
         return list_prompts()
     except Exception:

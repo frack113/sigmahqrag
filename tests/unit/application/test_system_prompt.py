@@ -18,7 +18,7 @@ MOCK_PROMPTS = {
 @pytest.fixture
 def mock_db():
     """Mock DatabaseService."""
-    from src.application.system_prompt import Prompt
+    from src.application.system.prompts import Prompt
 
     db = MagicMock()
     db.get_prompts.return_value = [
@@ -40,9 +40,9 @@ def mock_db():
     db.upsert_prompt.return_value = None
     db.persist.return_value = None
     db.delete_prompt.return_value = None
-    with patch("src.application.system_prompt.DatabaseService.get_instance", return_value=db):
-        with patch("src.application.system_prompt._ensure_loaded"):
-            import src.application.system_prompt as sp
+    with patch("src.application.system.prompts.DatabaseService.get_instance", return_value=db):
+        with patch("src.application.system.prompts._ensure_loaded"):
+            import src.application.system.prompts as sp
 
             sp._prompts = {
                 "prompt-1": Prompt(

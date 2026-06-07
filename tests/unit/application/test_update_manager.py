@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from src.application.update_manager import UpdateService, create_update_service
+from src.application.system.update import UpdateService, create_update_service
 
 
 class FakeHealthChecker:

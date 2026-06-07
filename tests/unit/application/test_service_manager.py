@@ -4,8 +4,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-import src.application.service_manager
-from src.application.service_manager import get_subprocess_manager, shutdown_all_services
+import src.shared.service_manager
+from src.shared.service_manager import (
+    get_subprocess_manager,
+    shutdown_all_services,
+)
 
 
 class TestGetSubprocessManager:
@@ -13,7 +16,7 @@ class TestGetSubprocessManager:
         mock_config = MagicMock()
         mock_config.paths_logs_dir = "data/logs"
         with (
-            patch.object(src.application.service_manager, "_subprocess_manager", None),
+            patch.object(src.shared.service_manager, "_subprocess_manager", None),
             patch("src.config.settings.get_config", return_value=mock_config),
             patch("src.shared.subprocess_manager.SubprocessManager") as MockSPM,
         ):
@@ -28,7 +31,7 @@ class TestShutdownAllServices:
     async def test_shuts_down(self) -> None:
         mock_mgr = AsyncMock()
         mock_mgr.stop_all = AsyncMock(return_value={})
-        with patch("src.application.service_manager.get_subprocess_manager", return_value=mock_mgr):
+        with patch("src.shared.service_manager.get_subprocess_manager", return_value=mock_mgr):
             await shutdown_all_services()
             mock_mgr.stop_all.assert_awaited_once()
 
@@ -36,6 +39,6 @@ class TestShutdownAllServices:
     async def test_handles_exception_gracefully(self) -> None:
         mock_mgr = AsyncMock()
         mock_mgr.stop_all = AsyncMock(side_effect=RuntimeError("fail"))
-        with patch("src.application.service_manager.get_subprocess_manager", return_value=mock_mgr):
+        with patch("src.shared.service_manager.get_subprocess_manager", return_value=mock_mgr):
             await shutdown_all_services()
             mock_mgr.stop_all.assert_awaited_once()

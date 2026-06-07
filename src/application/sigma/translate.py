@@ -125,7 +125,7 @@ async def translate_detection(
     Returns:
         Plain English translation, or empty string on failure.
     """
-    from src.application.system_prompt import get_prompt_by_id
+    from src.application.system.prompts import get_prompt_by_id
 
     if not yaml_text or not yaml_text.strip():
         return ""

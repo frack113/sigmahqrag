@@ -28,7 +28,7 @@ class QdrantBinaryService:
         self.pid_dir = Path(self._config.paths_logs_dir.replace("logs", "pids")).resolve()
 
         if subprocess_manager is None:
-            from src.application.service_manager import get_subprocess_manager
+            from src.shared.service_manager import get_subprocess_manager
 
             subprocess_manager = get_subprocess_manager()
 

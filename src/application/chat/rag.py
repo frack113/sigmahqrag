@@ -55,7 +55,7 @@ class RAGPipeline:
         3. Mode-specific default (search-answer, explain-rule, coverage-analysis)
         """
         try:
-            from src.application.system_prompt import (
+            from src.application.system.prompts import (
                 get_active_prompt,
                 get_prompt_by_id,
                 get_prompt_by_name,

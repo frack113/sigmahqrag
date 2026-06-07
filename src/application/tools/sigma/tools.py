@@ -141,7 +141,7 @@ async def explain_detection(
         search_context = _format_search_context(search_results)
 
         # Build prompt
-        from src.application.system_prompt import get_prompt_by_id
+        from src.application.system.prompts import get_prompt_by_id
 
         prompt_obj = get_prompt_by_id("vulgarisation-english")
         if prompt_obj:
