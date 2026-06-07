@@ -372,16 +372,13 @@ class TestLLMEnrichment:
         from unittest.mock import MagicMock
 
         mock_client = MagicMock()
-        # Mock _extract_keywords to return predictable results
-        with (
-            patch(
-                "src.rag.transforms.sigma.chunker._extract_keywords",
-                return_value=("Test summary", "keyword1, keyword2, keyword3"),
-            ),
-            patch(
-                "src.rag.transforms.sigma.chunker._get_llm_client",
-                return_value=mock_client,
-            ),
+        with patch(
+            "src.rag.transforms.sigma.chunker.enrich_by_llm",
+            return_value={
+                "summary": "Test summary",
+                "keywords": "keyword1, keyword2, keyword3",
+                "error": None,
+            },
         ):
             config = TransformConfig()
             chunker = SigmaChunker(config=config)
@@ -415,7 +412,7 @@ class TestLLMEnrichment:
 
         mock_client = MagicMock()
         with patch(
-            "src.rag.transforms.sigma.chunker._extract_keywords",
+            "src.rag.transforms.sigma.chunker.enrich_by_llm",
             side_effect=RuntimeError("LLM unavailable"),
         ):
             config = TransformConfig()
@@ -423,7 +420,6 @@ class TestLLMEnrichment:
             chunks = chunker._chunk_rule(full_rule_dict, llm_client=mock_client)
 
         assert len(chunks) > 0
-        # Chunks should still have their original text (no enrichment appended)
         for chunk in chunks:
             assert "Summary:" not in chunk["text"]
 
@@ -433,8 +429,8 @@ class TestLLMEnrichment:
 
         mock_client = MagicMock()
         with patch(
-            "src.rag.transforms.sigma.chunker._extract_keywords",
-            return_value=("", ""),
+            "src.rag.transforms.sigma.chunker.enrich_by_llm",
+            return_value={"summary": "", "keywords": "", "error": None},
         ):
             config = TransformConfig()
             chunker = SigmaChunker(config=config)
@@ -447,16 +443,16 @@ class TestLLMEnrichment:
             )
 
     def test_enrichment_called_for_all_chunks(self, full_rule_dict):
-        """_extract_keywords should be called once per chunk."""
+        """enrich_by_llm should be called once per chunk."""
         from unittest.mock import MagicMock
 
         mock_client = MagicMock()
         with patch(
-            "src.rag.transforms.sigma.chunker._extract_keywords",
-            return_value=("summary", "keywords"),
-        ) as mock_extract:
+            "src.rag.transforms.sigma.chunker.enrich_by_llm",
+            return_value={"summary": "summary", "keywords": "keywords", "error": None},
+        ) as mock_enrich:
             config = TransformConfig()
             chunker = SigmaChunker(config=config)
             chunks = chunker._chunk_rule(full_rule_dict, llm_client=mock_client)
 
-        assert mock_extract.call_count == len(chunks)
+        assert mock_enrich.call_count == len(chunks)

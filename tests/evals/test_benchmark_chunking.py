@@ -59,7 +59,7 @@ class TestRichChunkingBenchmark:
 
         for f in sorted(rules_dir.iterdir()):
             docs = chunker.parse(f)
-            all_docs.extend(chunker.chunk(docs))
+            all_docs.extend(chunker.process(docs))
 
         assert len(all_docs) > 50
 
@@ -82,7 +82,7 @@ class TestRichChunkingBenchmark:
             rich_docs: list[Any] = []
             for f in sorted(test_dir.iterdir()):
                 docs = chunker.parse(f)
-                rich_docs.extend(chunker.chunk(docs))
+                rich_docs.extend(chunker.process(docs))
             rich_time = time.perf_counter() - start
             rich_chars = sum(len(d.text) for d in rich_docs)
 

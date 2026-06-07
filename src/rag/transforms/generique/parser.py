@@ -28,9 +28,18 @@ class GenericTransform(DocumentTransform):
 
     def parse(self, file_path: Path) -> list[Document]:
         text = file_path.read_text(encoding="utf-8", errors="replace")
-        return [Document(text=text, metadata={"source_file": str(file_path)})]
+        return [
+            Document(
+                text=text,
+                metadata={
+                    "source_file": str(file_path),
+                    "doc_type": "generic",
+                    "file_name": file_path.name,
+                },
+            )
+        ]
 
-    def chunk(self, documents: list[Document]) -> list[Document]:
+    def _chunk(self, documents: list[Document]) -> list[Document]:
         splitter = SentenceSplitter(
             chunk_size=self.config.chunk_size,
             chunk_overlap=self.config.chunk_overlap,

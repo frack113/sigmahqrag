@@ -8,10 +8,8 @@ from __future__ import annotations
 
 import logging
 import re
-import threading
 from pathlib import Path
 
-import httpx
 from llama_index.core.schema import Document
 
 from ..base import DocumentTransform
@@ -23,86 +21,24 @@ logger = logging.getLogger(__name__)
 ATX_HEADING_RE = re.compile(r"^(#{1,6})\s+(.+)$", re.MULTILINE)
 
 
-class _StaticLlamaClient:
-    """Minimal sync wrapper around httpx for LLM enrichment (summary + keywords)."""
-
-    def __init__(self, base_url: str = "http://127.0.0.1:8080") -> None:
-        self.base_url = base_url.rstrip("/")
-
-    def generate(self, prompt: str, max_tokens: int = 512, temperature: float = 0.3) -> str:
-        try:
-            with httpx.Client(timeout=15.0) as client:
-                resp = client.post(
-                    f"{self.base_url}/v1/completions",
-                    json={
-                        "prompt": prompt,
-                        "max_tokens": max_tokens,
-                        "temperature": temperature,
-                        "stream": False,
-                    },
-                )
-                resp.raise_for_status()
-                choices = resp.json().get("choices") or []
-                return (choices[0].get("text") or "").strip() if choices else ""
-        except Exception as e:
-            logger.debug("LLM enrichment failed: %s", e)
-            return ""
-
-    def erase_slot_cache(self, slot_id: int = 0) -> None:
-        """Erase the KV cache for a given slot to prevent llama.cpp context explosion."""
-        try:
-            with httpx.Client(timeout=10.0) as client:
-                resp = client.post(
-                    f"{self.base_url}/slots/{slot_id}?action=erase",
-                    content=b"",
-                )
-                if resp.status_code == 200:
-                    logger.debug("KV cache erased for slot %d", slot_id)
-                else:
-                    logger.warning(
-                        "erase_slot_cache returned %d for slot %d",
-                        resp.status_code,
-                        slot_id,
-                    )
-        except Exception:
-            logger.debug("Failed to erase llama.cpp slot cache (likely not available)")
-
-
-# Global LLM client singleton (lazy-initialized)
-_llm_client: _StaticLlamaClient | None = None
-_llm_lock = threading.Lock()
-
-
-def _get_llm_client() -> _StaticLlamaClient:
-    global _llm_client
-    if _llm_client is None:
-        with _llm_lock:
-            if _llm_client is None:
-                _llm_client = _StaticLlamaClient()
-    return _llm_client
-
-
-def _extract_keywords(text: str, llm_client: _StaticLlamaClient | None = None) -> tuple[str, str]:
+def _extract_keywords(text: str, llm_client: object | None) -> tuple[str, str]:
     """Extract summary and keywords from text via LLM.
 
     Args:
         text: The chunk text to enrich.
-        llm_client: Optional LLM client (uses default if not provided).
+        llm_client: LLM client instance or None (skips enrichment).
 
     Returns:
         Tuple of (summary, keywords) strings.
     """
-    client = llm_client or _get_llm_client()
-    result = enrich_by_llm(text, client)
+    if not llm_client:
+        return "", ""
+    result = enrich_by_llm(text, llm_client)
     return (result.get("summary") or ""), (result.get("keywords") or "")
 
 
 class MarkdownChunker(DocumentTransform):
     """Chunk markdown files into heading-based Document objects.
-
-    Uses LLM-based keyword extraction for each chunk when an LLM client is
-    configured via ``TransformConfig.llm_client`` or when running in an
-    environment where keyword generation is enabled.
 
     Chunk hierarchy (always includes global chunk):
     - ``max_heading_level=1`` → H1 chunks only
@@ -130,17 +66,19 @@ class MarkdownChunker(DocumentTransform):
             )
         ]
 
-    def chunk(self, documents: list[Document]) -> list[Document]:
+    def process(self, documents: list[Document]) -> list[Document]:
+        """Chunk markdown into heading-based chunks with inline LLM enrichment.
+
+        Chunking and enrichment are performed in a single pass since each
+        heading chunk is enriched independently as it is created.
+        """
         result: list[Document] = []
 
         for doc in documents:
             text = doc.text or ""
             source = doc.metadata.get("source_file", "")
 
-            # Determine LLM client
-            llm_client = self.config.llm_client if hasattr(self.config, "llm_client") else None
-            if llm_client is None:
-                llm_client = _get_llm_client()
+            llm_client = getattr(self.config, "llm_client", None)
 
             # Global chunk (full document)
             global_text = text
@@ -283,11 +221,6 @@ class MarkdownChunker(DocumentTransform):
         if keywords:
             enrichment += f"Keywords: {keywords}\n"
         return text + enrichment
-
-    @staticmethod
-    def _enrich_text(text: str) -> str:
-        """Fallback enrichment (no longer used when LLM is available)."""
-        return text
 
 
 TransformRegistry.register(MarkdownChunker)

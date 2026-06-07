@@ -22,9 +22,13 @@ class PDFTransform(DocumentTransform):
         from llama_index.readers.file import PyMuPDFReader
 
         reader = PyMuPDFReader()
-        return reader.load_data(file_path)
+        documents = reader.load_data(file_path)
+        for doc in documents:
+            doc.metadata["doc_type"] = "pdf"
+            doc.metadata["file_name"] = file_path.name
+        return documents
 
-    def chunk(self, documents: list[Document]) -> list[Document]:
+    def _chunk(self, documents: list[Document]) -> list[Document]:
         splitter = SentenceSplitter(
             chunk_size=self.config.chunk_size,
             chunk_overlap=self.config.chunk_overlap,

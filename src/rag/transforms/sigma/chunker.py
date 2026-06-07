@@ -8,8 +8,8 @@ from pathlib import Path
 from llama_index.core.schema import Document
 
 from ..base import DocumentTransform
+from ..generique.llm import enrich_by_llm
 from ..registry import TransformRegistry
-from ..markdown.chunker import _get_llm_client, enrich_by_llm
 from .chunk_factory import make_chunk
 from .parser import SigmaParser
 from .flattening import flatten_detection_values, split_field_operator
@@ -27,35 +27,25 @@ class SigmaChunker(DocumentTransform):
       detection_filter_block, field_operator_group, atomic_indicator,
       indicator_inventory, investigation_guidance, false_positive_context,
       natural_language_queries, backend_mapping_hints
+
+    ``parse()`` delegates to ``SigmaParser`` which sets ``rule_meta``.
+    ``process()`` reads ``rule_meta`` and produces all 12+ chunk types
+    with LLM enrichment inline.
     """
 
-    FORMAT_NAME = "sigma_chunker"
+    FORMAT_NAME = "sigma"
     SUPPORTED_EXTENSIONS = (".yml", ".yaml")
 
     def parse(self, file_path: Path) -> list[Document]:
-        """Load Sigma rules from YAML and enrich with rule metadata for chunking."""
-        from .loader import load_sigma_rules
-        from .detectors import is_sigma_rule
-
-        raw_rules = load_sigma_rules(str(file_path))
-        rule_by_id: dict[str, dict] = {}
-        for rule in raw_rules:
-            if is_sigma_rule(rule):
-                rule_by_id[rule.get("id", "unknown")] = rule
-
+        """Delegate to ``SigmaParser`` to load rules with ``rule_meta``."""
         parser = SigmaParser(config=self.config)
-        documents = parser.parse(file_path)
+        return parser.parse(file_path)
 
-        for doc in documents:
-            rule_id = doc.metadata.get("rule_id", "")
-            if rule_id in rule_by_id:
-                doc.metadata["rule_meta"] = rule_by_id[rule_id]
-
-        logger.info("Rich-parsed %d rule(s) from %s", len(documents), file_path)
-        return documents
-
-    def chunk(self, documents: list[Document]) -> list[Document]:
+    def process(self, documents: list[Document]) -> list[Document]:
         """Produce multiple enriched chunks per Sigma rule document.
+
+        Reads ``rule_meta`` from each document's metadata and expands it
+        into 12+ semantic chunks with inline LLM enrichment.
 
         Args:
             documents: List of Document objects with rule_meta in metadata.
@@ -63,18 +53,16 @@ class SigmaChunker(DocumentTransform):
         Returns:
             List of Document objects, one per rich chunk produced.
         """
-        # Determine LLM client for enrichment
-        llm_client = self.config.llm_client if hasattr(self.config, "llm_client") else None
-        if llm_client is None:
-            llm_client = _get_llm_client()
+        llm_client = getattr(self.config, "llm_client", None)
 
         result: list[Document] = []
         for doc in documents:
             rule_meta = doc.metadata.get("rule_meta")
             if not rule_meta:
-                # No rule data — pass through unchanged.
-                result.append(doc)
-                continue
+                raise ValueError(
+                    "SigmaChunker.process() requires rule_meta in metadata. "
+                    "Use SigmaParser.parse() or SigmaChunker.parse() first."
+                )
 
             chunks = self._chunk_rule(rule_meta, llm_client=llm_client)
             for chunk_data in chunks:
@@ -426,7 +414,11 @@ class SigmaChunker(DocumentTransform):
         if llm_client is not None:
             enriched_chunks: list[dict] = []
             for chunk in chunks:
-                result = enrich_by_llm(chunk["text"], llm_client)
+                try:
+                    result = enrich_by_llm(chunk["text"], llm_client)
+                except Exception:
+                    logger.debug("LLM enrichment failed for chunk %s", chunk.get("chunk_type", "?"))
+                    result = {"summary": None, "keywords": None, "error": "enrichment_failed"}
                 summary = result.get("summary") or ""
                 keywords = result.get("keywords") or ""
                 if summary or keywords:
@@ -535,7 +527,7 @@ TransformRegistry.register(SigmaChunker)
 def chunk_sigma_rules_rich(rule: dict) -> list[dict]:
     """Legacy entry-point: chunk a single Sigma rule dict into enriched chunks.
 
-    Kept for backwards compatibility. New code should use SigmaChunker.chunk()
+    Kept for backwards compatibility. New code should use ``SigmaChunker.process()``
     via the DocumentTransform contract.
     """
     chunker = SigmaChunker()

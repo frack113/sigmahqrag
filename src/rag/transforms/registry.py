@@ -91,8 +91,21 @@ class TransformRegistry:
 
     @classmethod
     def _iter(cls) -> Iterator[tuple[str, Type[DocumentTransform]]]:
-        """Iterate over all registered (format_name, transform_class) pairs."""
-        yield from _register.items()
+        """Iterate over all registered (format_name, transform_class) pairs.
+
+        Yields extension-specific transforms (non-empty ``SUPPORTED_EXTENSIONS``)
+        before generic catch-all transforms so that ``find_for_file`` matches
+        the most specific transform first.
+        """
+        specific: list[tuple[str, Type[DocumentTransform]]] = []
+        generic: list[tuple[str, Type[DocumentTransform]]] = []
+        for item in _register.items():
+            if item[1].SUPPORTED_EXTENSIONS:
+                specific.append(item)
+            else:
+                generic.append(item)
+        yield from specific
+        yield from generic
 
     @classmethod
     def list_formats(cls) -> list[str]:

@@ -23,15 +23,20 @@ class OfficeTransform(DocumentTransform):
         if ext in (".docx", ".doc"):
             from llama_index.readers.file import DocxReader
 
-            return DocxReader().load_data(file_path)
-        if ext in (".pptx", ".ppt", ".pptm"):
+            docs = DocxReader().load_data(file_path)
+        elif ext in (".pptx", ".ppt", ".pptm"):
             from llama_index.readers.file import PptxReader
 
-            return PptxReader().load_data(file_path)
-        logger.warning("Unsupported office format: %s", ext)
-        return []
+            docs = PptxReader().load_data(file_path)
+        else:
+            logger.warning("Unsupported office format: %s", ext)
+            return []
+        for doc in docs:
+            doc.metadata["doc_type"] = "office"
+            doc.metadata["file_name"] = file_path.name
+        return docs
 
-    def chunk(self, documents: list[Document]) -> list[Document]:
+    def _chunk(self, documents: list[Document]) -> list[Document]:
         splitter = SentenceSplitter(
             chunk_size=self.config.chunk_size,
             chunk_overlap=self.config.chunk_overlap,

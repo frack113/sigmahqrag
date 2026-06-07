@@ -61,7 +61,7 @@ class TestFullPipelineContract:
         assert len(documents) == 1
         assert documents[0].metadata["rule_id"] == "test-integration-001"
 
-        chunks = chunker.chunk(documents)
+        chunks = chunker.process(documents)
         assert len(chunks) > 1
 
         rich_chunk = None
@@ -84,7 +84,7 @@ class TestFullPipelineContract:
         config = TransformConfig()
         chunker = SigmaChunker(config=config)
         documents = chunker.parse(sample_sigma_yaml)
-        chunks = chunker.chunk(documents)
+        chunks = chunker.process(documents)
 
         for chunk in chunks:
             search_result = {
@@ -102,7 +102,7 @@ class TestFullPipelineContract:
         config = TransformConfig()
         chunker = SigmaChunker(config=config)
         documents = chunker.parse(sample_sigma_yaml)
-        chunks = chunker.chunk(documents)
+        chunks = chunker.process(documents)
 
         for chunk in chunks:
             result = {
@@ -134,7 +134,7 @@ class TestFullPipelineContract:
         all_chunks: list[dict[str, Any]] = []
         for rule_file in rules_dir.iterdir():
             docs = chunker.parse(rule_file)
-            chunks = chunker.chunk(docs)
+            chunks = chunker.process(docs)
             for c in chunks:
                 all_chunks.append(
                     {
@@ -155,7 +155,7 @@ class TestFullPipelineContract:
         config = TransformConfig()
         chunker = SigmaChunker(config=config)
         documents = chunker.parse(sample_sigma_yaml)
-        chunks = chunker.chunk(documents)
+        chunks = chunker.process(documents)
 
         attack_chunks = [
             c for c in chunks if c.metadata.get("chunk_type") == "mitre_attack_mapping"

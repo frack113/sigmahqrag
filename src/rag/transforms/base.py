@@ -40,38 +40,33 @@ class TransformConfig:
     """Max heading depth for markdown chunking (1=H1 only, 2=H1+H2, 3=H1+H2+H3)."""
 
 
-@dataclass
-class ChunkMetadata:
-    """Metadata attached to a Document before chunking.
-
-    Attributes:
-        source_file: Path to the original source file.
-        doc_type: Type of document being processed (e.g. 'sigma_rule').
-        rule_id: Sigma rule ID if applicable.
-        rule_meta: Sigma rule metadata dict if applicable.
-    """
-
-    source_file: Path
-    doc_type: str
-    rule_id: str | None = None
-    rule_meta: dict | None = None
-
-
 class DocumentTransform(ABC):
     """Base class all format-specific transforms must implement.
 
-    A transform has three stages:
-    1. **parse** -- load raw file content into LlamaIndex Document objects.
-       One file may contain multiple documents (e.g. a YAML with several Sigma rules).
-    2. **chunk** -- split Document objects into appropriately-sized chunks.
-       Formats with rich chunking (e.g. Sigma) produce more chunks per document.
-       Formats without rich chunking return the documents as-is.
-    3. **post_process** -- optional final step (e.g. adding eval questions).
-       Default is identity.
+    Pipeline::
+
+        parse(file) → process(documents) → output(documents) → post_process(documents)
+
+    * ``parse`` — abstract, loads raw file content.
+    * ``process`` — abstract, chunking + enrichment in a single pass.
+    * ``output`` — optional formatting/filtering (identity by default).
+    * ``post_process`` — optional cross-cutting (identity by default).
+
+    The base provides an implementation of ``process()`` that decomposes
+    into two protected hooks::
+
+        def process(self, documents):
+            chunks = self._chunk(documents)
+            return self._enrich(chunks)
+
+    Simple transforms (PDF, Office, Generic) override ``_chunk()``.
+    Complex transforms (Sigma, Markdown) override ``process()`` directly.
+    ``_enrich()`` is overridden only when enrichment must differ from
+    ``enrich_by_llm``.
     """
 
     FORMAT_NAME: str = ""
-    """Human-readable format name (e.g. 'sigma_rules', 'pdf', 'docx')."""
+    """Human-readable format name (e.g. 'sigma', 'pdf', 'markdown')."""
 
     SUPPORTED_EXTENSIONS: tuple[str, ...] = ()
     """File extensions this transform handles (e.g. ('.yml', '.yaml'))."""
@@ -79,9 +74,15 @@ class DocumentTransform(ABC):
     def __init__(self, config: TransformConfig | None = None) -> None:
         self.config = config or self._build_default_config()
 
+    # ------------------------------------------------------------------
+    # Pipeline stages
+    # ------------------------------------------------------------------
+
     @abstractmethod
     def parse(self, file_path: Path) -> list[Document]:
         """Convert raw file content to LlamaIndex Document objects.
+
+        Must set ``source_file``, ``doc_type``, and ``file_name`` in metadata.
 
         Args:
             file_path: Path to the source file.
@@ -90,34 +91,153 @@ class DocumentTransform(ABC):
             List of Document objects (one or more per file).
         """
 
-    @abstractmethod
-    def chunk(self, documents: list[Document]) -> list[Document]:
-        """Transform Document objects into chunks suitable for embedding.
+    def process(self, documents: list[Document]) -> list[Document]:
+        """Chunk and enrich documents in a single pass.
 
-        Can return the same documents unchanged (for formats that rely on the
-        LlamaIndex SentenceSplitter) or produce multiple chunks per document
-        (for rich chunking formats like Sigma).
+        The default implementation calls ``_chunk()`` then ``_enrich()``.
+        Override directly when chunking and enrichment are intertwined
+        (e.g. Sigma, Markdown).
 
         Args:
-            documents: List of Document objects from parse().
+            documents: List of Document objects from ``parse()``.
 
         Returns:
-            List of Document objects ready for embedding/indexing.
+            List of chunked and enriched Document objects.
         """
+        chunks = self._chunk(documents)
+        return self._enrich(chunks)
 
-    def post_process(self, documents: list[Document]) -> list[Document]:
-        """Optional post-processing step after chunking.
-
-        Default implementation returns documents unchanged. Subclasses can
-        override to add eval questions, additional metadata, etc.
+    def output(self, documents: list[Document]) -> list[Document]:
+        """Optional formatting/filtering before storage.
 
         Args:
-            documents: List of Document objects from chunk().
+            documents: List of Document objects from ``process()``.
 
         Returns:
             Processed Document objects.
         """
         return documents
+
+    def post_process(self, documents: list[Document]) -> list[Document]:
+        """Optional cross-cutting meta-operations (eval questions, tags, etc.).
+
+        Args:
+            documents: List of Document objects from ``output()``.
+
+        Returns:
+            Processed Document objects.
+        """
+        return documents
+
+    # ------------------------------------------------------------------
+    # Protected hooks (used by the default ``process()``)
+    # ------------------------------------------------------------------
+
+    def _chunk(self, documents: list[Document]) -> list[Document]:
+        """Split documents into chunks (SentenceSplitter by default).
+
+        Override for formats with custom chunking logic.  Must NOT
+        perform enrichment.
+
+        Args:
+            documents: List of Document objects from ``parse()``.
+
+        Returns:
+            List of chunked Document objects.
+        """
+        from llama_index.core.node_parser import SentenceSplitter
+
+        splitter = SentenceSplitter(
+            chunk_size=self.config.chunk_size,
+            chunk_overlap=self.config.chunk_overlap,
+        )
+        return splitter(documents)  # type: ignore[return-value]
+
+    def _enrich(self, documents: list[Document]) -> list[Document]:
+        """Enrich each chunk with LLM-generated summary and keywords.
+
+        Calls ``generique.llm.enrich_by_llm`` for every non-empty chunk.
+        Override only when enrichment logic must differ.
+
+        Args:
+            documents: List of Document objects from ``_chunk()``.
+
+        Returns:
+            Enriched Document objects.
+        """
+        from .generique.llm import enrich_by_llm
+
+        llm_client = getattr(self.config, "llm_client", None)
+        updated: list[Document] = []
+        for doc in documents:
+            text = doc.text or ""
+            if not text.strip():
+                updated.append(doc)
+                continue
+            result = (
+                enrich_by_llm(text, llm_client)
+                if llm_client
+                else {"summary": None, "keywords": None}
+            )
+            summary = result.get("summary") or ""
+            keywords = result.get("keywords") or ""
+            if summary or keywords:
+                enrichment = "\n\n---\n"
+                if summary:
+                    enrichment += f"Summary: {summary}\n\n"
+                if keywords:
+                    enrichment += f"Keywords: {keywords}\n"
+                doc = Document(
+                    text=text + enrichment,
+                    metadata={**doc.metadata, "has_llm_enrichment": True},
+                    excluded_embed_metadata_keys=doc.excluded_embed_metadata_keys,
+                )
+            else:
+                doc = Document(
+                    text=text,
+                    metadata={**doc.metadata, "has_llm_enrichment": False},
+                    excluded_embed_metadata_keys=doc.excluded_embed_metadata_keys,
+                )
+            updated.append(doc)
+        return updated
+
+    # ------------------------------------------------------------------
+    # Pipeline execution
+    # ------------------------------------------------------------------
+
+    def run(self, file_path: Path) -> list[Document]:
+        """Execute the full pipeline: parse → process → output → post_process.
+
+        **Do not override** — place custom logic in the individual stages.
+
+        Injects ``collection`` into each document's metadata.
+
+        Args:
+            file_path: Path to the source file.
+
+        Returns:
+            List of Document objects ready for embedding/indexing.
+        """
+        documents = self.parse(file_path)
+        assert documents, f"{type(self).__name__}.parse() returned empty list"
+        assert "source_file" in documents[0].metadata, "parse() must set source_file in metadata"
+        assert "doc_type" in documents[0].metadata, "parse() must set doc_type in metadata"
+        assert "file_name" in documents[0].metadata, "parse() must set file_name in metadata"
+
+        documents = self.process(documents)
+        assert documents, f"{type(self).__name__}.process() returned empty list"
+        assert "chunk_type" in documents[0].metadata, "process() must set chunk_type in metadata"
+
+        documents = self.output(documents)
+        documents = self.post_process(documents)
+
+        for doc in documents:
+            doc.metadata["collection"] = self.config.collection
+        return documents
+
+    # ------------------------------------------------------------------
+    # Resolution helpers
+    # ------------------------------------------------------------------
 
     @classmethod
     def _build_default_config(cls) -> TransformConfig:
@@ -140,7 +260,7 @@ class DocumentTransform(ABC):
     def can_handle(cls, file_path: Path | str) -> bool:
         """Check if this transform can handle the given file.
 
-        Uses SUPPORTED_EXTENSIONS for format detection.
+        Uses ``SUPPORTED_EXTENSIONS`` for format detection.
 
         Args:
             file_path: Path to the file to check.
@@ -150,21 +270,3 @@ class DocumentTransform(ABC):
         """
         path = Path(file_path)
         return path.suffix.lower() in cls.SUPPORTED_EXTENSIONS
-
-    def run(self, file_path: Path) -> list[Document]:
-        """Execute the full transform pipeline: parse -> chunk -> post_process.
-
-        Injects ``collection`` into each document's metadata for unified storage routing.
-
-        Args:
-            file_path: Path to the source file.
-
-        Returns:
-            List of Document objects ready for embedding/indexing.
-        """
-        documents = self.parse(file_path)
-        chunks = self.chunk(documents)
-        result = self.post_process(chunks)
-        for doc in result:
-            doc.metadata["collection"] = self.config.collection
-        return result
