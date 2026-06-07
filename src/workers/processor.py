@@ -5,12 +5,12 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from typing import Dict, Type
 
 from src.infrastructure.database.service import DatabaseService
-from src.worker.base import BaseWorker
-from src.worker.enums import WorkerName, WorkerStatus
-from src.worker.workers.generic_discovery_worker import GenericDiscoveryWorker, SourceType
-from src.worker.workers.local_repo_sync_worker import LocalRepoSyncWorker
-from src.worker.workers.model_sync_worker import ModelSyncWorker
-from src.worker.workers.sigmaref_worker import SigmaRefProcessor
+from src.workers.base import BaseWorker
+from src.workers.enums import WorkerName, WorkerStatus
+from src.workers.sigma.discovery_worker import GenericDiscoveryWorker, SourceType
+from src.workers.sigma.sync_worker import LocalRepoSyncWorker
+from src.workers.model.sync_worker import ModelSyncWorker
+from src.workers.sigma.sigmaref_worker import SigmaRefProcessor
 
 logger = logging.getLogger(__name__)
 

@@ -12,8 +12,8 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
 from src.api.dependencies import get_dispatcher
-from src.worker.enums import WorkerName, WorkerStatus
-from src.worker.processor import TaskDispatcher
+from src.workers.enums import WorkerName, WorkerStatus
+from src.workers.processor import TaskDispatcher
 
 logger = logging.getLogger(__name__)
 

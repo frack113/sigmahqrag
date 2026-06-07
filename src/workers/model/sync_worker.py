@@ -4,8 +4,8 @@ from pathlib import Path
 from typing import Any
 
 from src.config.settings import get_config
-from src.worker.base import BaseWorker
-from src.worker.enums import WorkerName, WorkerStatus
+from src.workers.base import BaseWorker
+from src.workers.enums import WorkerName, WorkerStatus
 
 logger = logging.getLogger(__name__)
 

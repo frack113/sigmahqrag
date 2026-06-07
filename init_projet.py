@@ -27,8 +27,8 @@ from src.config.constants import (
 )
 from src.config.settings import EMBEDDINGS_DIR, LLM_DIR
 from src.infrastructure.database import DatabaseServiceProtocol
-from src.worker.enums import WorkerName, WorkerStatus
-from src.worker.processor import TaskDispatcher
+from src.workers.enums import WorkerName, WorkerStatus
+from src.workers.processor import TaskDispatcher
 
 # Configure structured logging
 logger = logging.getLogger("init_projet")

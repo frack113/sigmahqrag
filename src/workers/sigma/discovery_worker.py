@@ -9,11 +9,11 @@ from typing import TYPE_CHECKING, Optional
 
 from src.shared.utils.identify_file_type import SIGMA_RULE_EXTENSIONS, SUPPORTED_DOC_EXTENSION_MAP
 from src.infrastructure.database.service import DatabaseService
-from src.worker.enums import WorkerName
-from src.worker.workers.discovery_base import DiscoveryWorker
+from src.workers.enums import WorkerName
+from src.workers.sigma.discovery_base import DiscoveryWorker
 
 if TYPE_CHECKING:
-    from src.worker.processor import TaskDispatcher
+    from src.workers.processor import TaskDispatcher
 
 logger = logging.getLogger(__name__)
 

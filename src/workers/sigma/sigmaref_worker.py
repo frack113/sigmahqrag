@@ -7,8 +7,8 @@ import logging
 from src.application.documents.sigma_ref_processor import process_sigma_refs
 from src.shared.utils.identify_file_type import SUPPORTED_REFERENCE_DOC_TYPES
 from src.config.settings import get_config
-from src.worker.base import BaseWorker
-from src.worker.enums import WorkerName, WorkerStatus
+from src.workers.base import BaseWorker
+from src.workers.enums import WorkerName, WorkerStatus
 
 logger = logging.getLogger(__name__)
 

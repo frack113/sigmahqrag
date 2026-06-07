@@ -4,7 +4,7 @@ from pathlib import Path
 
 from src.shared.utils.identify_file_type import identify
 from src.shared.utils import iso_now
-from src.worker.base import BaseWorker
+from src.workers.base import BaseWorker
 
 logger = logging.getLogger(__name__)
 

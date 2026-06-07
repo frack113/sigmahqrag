@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from src.application.models import EmbeddingManager
 from src.application.models.registry import UnifiedRegistry
 from src.infrastructure.database.service import DatabaseService
-from src.worker.processor import TaskDispatcher
+from src.workers.processor import TaskDispatcher
 
 
 def safe_error_response(

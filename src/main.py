@@ -44,7 +44,7 @@ from src.infrastructure.database import DatabaseService
 from src.infrastructure.llm.llamacpp.auto_start import start_llamacpp, stop_llamacpp
 from src.infrastructure.vectorstore.auto_start import start_qdrant, stop_qdrant
 from src.shared.exceptions import SigmaError
-from src.worker.processor import TaskDispatcher
+from src.workers.processor import TaskDispatcher
 
 logger = logging.getLogger(__name__)
 

@@ -1,8 +1,8 @@
 import logging
 
 from src.infrastructure.github.git import get_metadata, list_repos, save_metadata
-from src.worker.base import BaseWorker
-from src.worker.enums import WorkerName, WorkerStatus
+from src.workers.base import BaseWorker
+from src.workers.enums import WorkerName, WorkerStatus
 
 logger = logging.getLogger(__name__)
 

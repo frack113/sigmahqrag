@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from src.infrastructure.database.service import DatabaseService
-    from src.worker.processor import TaskDispatcher
+    from src.workers.processor import TaskDispatcher
 
 
 class BaseWorker(ABC):

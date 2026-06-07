@@ -17,7 +17,7 @@ from src.shared.utils.identify_file_type import SUPPORTED_DOC_EXTENSION_MAP, ide
 from src.config.settings import get_config
 from src.infrastructure.database.service import DatabaseService
 from src.shared.utils import iso_now
-from src.worker.enums import WorkerName
+from src.workers.enums import WorkerName
 
 logger = logging.getLogger(__name__)
 
