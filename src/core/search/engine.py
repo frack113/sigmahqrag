@@ -8,10 +8,12 @@ import re
 import threading
 from typing import Any
 
+from llama_index.core.retrievers import QueryFusionRetriever
 from qdrant_client.models import FieldCondition, Filter, MatchText, MatchValue
 
 from src.core.pipeline.ingestion import DEFAULT_MODEL, build_embed_model
 from src.core.search.router import route_query
+from src.core.search.retrievers import get_collection_retriever
 from src.infrastructure.database import DatabaseService
 from src.infrastructure.llm.llamacpp.client import LlamaClient
 from src.infrastructure.vectorstore.client import get_qdrant_client
@@ -94,6 +96,22 @@ def _get_search_embed_model() -> Any:
 DEFAULT_COLLECTIONS = ["sigma_rules", "sigma_docs", "sigma_spec"]
 
 
+def _node_to_result(node: Any) -> dict[str, Any]:
+    """Convert a LlamaIndex NodeWithScore to the legacy dict format.
+
+    Handles both flat payload and _node_content formats used by Qdrant.
+    """
+    text = node.text if hasattr(node, "text") else ""
+    metadata = node.metadata if hasattr(node, "metadata") else {}
+    score = float(getattr(node, "score", 0.0) or 0.0)
+
+    return {
+        "text": text,
+        "score": score,
+        "metadata": metadata,
+    }
+
+
 async def search(
     query: str,
     collection_name: str = "sigma_docs",
@@ -101,23 +119,25 @@ async def search(
     similarity_threshold: float = SIMILARITY_THRESHOLD,
     qdrant_filter: Filter | None = None,
 ) -> list[dict[str, Any]]:
-    """Search for relevant documents.
+    """Search a single collection using direct Qdrant client.
+
+    This function is kept for backward compatibility and for use cases
+    where searching a single collection is preferred over multi-collection fusion.
 
     Args:
-        query: Natural language query (supports key:value filters)
-        collection_name: Qdrant collection name
-        top_k: Number of results to return
-        similarity_threshold: Minimum similarity score
-        qdrant_filter: Optional pre-built Qdrant Filter to apply
+        query: Natural language query (supports key:value filters).
+        collection_name: Qdrant collection name.
+        top_k: Number of results to return.
+        similarity_threshold: Minimum similarity score.
+        qdrant_filter: Optional pre-built Qdrant Filter to apply.
 
     Returns:
-        List of search results with metadata
+        List of search results with metadata.
     """
     if not query:
         logger.warning("Empty query provided")
         return []
 
-    # Use external filter if provided, otherwise parse embedded key:value filters
     _parsed_qdrant_filter: Filter | None = None
     if qdrant_filter is None:
         filters, clean_query = parse_query_filters(query)
@@ -144,22 +164,18 @@ async def search(
 
         results = []
         for point in scored_points:
-            score = point.score if point.score else 0.0
-            if score >= similarity_threshold:
+            score_val = point.score if point.score else 0.0
+            if score_val >= similarity_threshold:
                 payload = point.payload or {}
 
-                # Support both flat payload format (from JSONL injection)
-                # and LlamaIndex _node_content format
                 text = payload.get("text", "")
-                metadata = {}
+                metadata: dict[str, Any] = {}
 
                 if text:
-                    # Flat payload — collect remaining fields as metadata
                     metadata = {
                         k: v for k, v in payload.items() if k not in ("text", "_node_content")
                     }
                 else:
-                    # Fallback: try _node_content format
                     node_content = payload.get("_node_content", "{}")
                     if isinstance(node_content, str):
                         import json
@@ -178,7 +194,7 @@ async def search(
                 results.append(
                     {
                         "text": text,
-                        "score": score,
+                        "score": score_val,
                         "metadata": metadata,
                     }
                 )
@@ -194,10 +210,10 @@ def format_search_result(result: dict[str, Any]) -> dict[str, Any]:
     """Format a search result for display.
 
     Args:
-        result: Raw search result from Qdrant
+        result: Raw search result from Qdrant.
 
     Returns:
-        Formatted result with title, description, metadata
+        Formatted result with title, description, metadata.
     """
     return {
         "text": result.get("text", ""),
@@ -215,10 +231,10 @@ def format_result_by_collection(result: dict[str, Any]) -> dict[str, Any]:
     and returns a display-oriented dict with collection-specific fields.
 
     Args:
-        result: Raw search result from Qdrant
+        result: Raw search result from Qdrant.
 
     Returns:
-        Formatted result with collection-appropriate fields
+        Formatted result with collection-appropriate fields.
     """
     meta = result.get("metadata", {})
     collection = meta.get("collection", "")
@@ -258,10 +274,10 @@ def get_citation(result: dict[str, Any]) -> str:
     """Get citation string for a result.
 
     Args:
-        result: Search result
+        result: Search result.
 
     Returns:
-        Citation in format "path/to/file.yaml:line"
+        Citation in format "path/to/file.yaml:line".
     """
     file_path = result.get("metadata", {}).get("file_path", "")
     line_start = result.get("metadata", {}).get("line_start", "")
@@ -307,31 +323,84 @@ class SearchEngine:
         top_k: int | None = None,
         metadata_filter: dict[str, str] | None = None,
     ) -> list[dict[str, Any]]:
-        """Search across configured collections and fuse results with RRF.
+        """Search across configured collections and fuse results with QueryFusionRetriever.
 
-        When ``use_router`` is enabled, classifies the query first and
-        searches only the relevant collections.  Falls back to all
-        collections if routing fails.
+        Uses LlamaIndex's built-in RRF fusion instead of manual implementation.
+        When ``use_router`` is enabled, classifies the query first and searches only
+        the relevant collections.  Falls back to all collections if routing fails.
 
-        When ``metadata_filter`` is provided, applies a Qdrant metadata
-        filter to each collection search before RRF fusion.
+        When ``metadata_filter`` is provided, applies a Qdrant metadata filter to
+        each collection search before RRF fusion.
         """
         limit = top_k if top_k is not None else self.top_k
         per_collection_k = max(limit * 2, 10)
 
         # Determine which collections to search
+        cols_to_search: list[str] = []
         if self.use_router:
             try:
                 routed = await route_query(query, llm_client=self._llm_client)
-                cols = [c for c in routed if c in self.collection_names]
-                if not cols:
-                    cols = self.collection_names
-            except Exception:
-                cols = self.collection_names
+                cols_to_search = [c for c in routed if c in self.collection_names]
+                if not cols_to_search:
+                    cols_to_search = self.collection_names
+            except Exception as e:
+                logger.warning("Router failed, falling back to all collections: %s", e)
+                cols_to_search = self.collection_names
         else:
-            cols = self.collection_names
+            cols_to_search = self.collection_names
 
+        # Build Qdrant filter for metadata filtering
         qdrant_filter = build_qdrant_filter(metadata_filter) if metadata_filter else None
+
+        # Create retrievers for each collection
+        retrievers = []
+        for col in cols_to_search:
+            try:
+                retriever = get_collection_retriever(
+                    collection_name=col,
+                    top_k=per_collection_k,
+                    metadata_filter=qdrant_filter,
+                )
+                retrievers.append(retriever)
+            except Exception as e:
+                logger.warning("Failed to create retriever for '%s', skipping: %s", col, e)
+
+        if not retrievers:
+            logger.error("No retrievers available for collections: %s", cols_to_search)
+            return []
+
+        # Use LlamaIndex QueryFusionRetriever for built-in RRF fusion
+        try:
+            fusion_retriever = QueryFusionRetriever(
+                retrievers,  # type: ignore[arg-type]
+                similarity_top_k=limit,
+                num_queries=1,  # disable query generation to match current behavior
+                use_async=True,
+            )
+
+            nodes_with_scores = await fusion_retriever.aretrieve(query)
+
+            results = [_node_to_result(node) for node in nodes_with_scores]
+
+            # Apply similarity threshold filter
+            if self.similarity_threshold > 0:
+                results = [r for r in results if r.get("score", 0.0) >= self.similarity_threshold]
+
+            return results[:limit]
+
+        except Exception as e:
+            logger.error("QueryFusionRetriever failed, falling back to manual RRF: %s", e)
+            return await self._search_manual_rrf(query, cols_to_search, limit, qdrant_filter)
+
+    async def _search_manual_rrf(
+        self,
+        query: str,
+        collections: list[str],
+        limit: int,
+        qdrant_filter: Filter | None,
+    ) -> list[dict[str, Any]]:
+        """Fallback manual RRF search when QueryFusionRetriever fails."""
+        per_collection_k = max(limit * 2, 10)
 
         tasks = [
             search(
@@ -341,7 +410,7 @@ class SearchEngine:
                 similarity_threshold=self.similarity_threshold,
                 qdrant_filter=qdrant_filter,
             )
-            for col in cols
+            for col in collections
         ]
         all_results = await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -352,8 +421,8 @@ class SearchEngine:
                     "Collection search failed during RRF fusion, skipping: %s", col_results
                 )
                 continue
-            # mypy narrowing: after isinstance(Exception) check, col_results is list[dict[str, Any]]
-            for rank, result in enumerate(col_results, start=1):  # type: ignore[arg-type]
+            results_list: list[dict[str, Any]] = col_results  # type: ignore[assignment]
+            for rank, result in enumerate(results_list, start=1):
                 rrf_score = 1.0 / (60 + rank)
                 text = result.get("text", "")
                 meta = result.get("metadata", {})
@@ -365,13 +434,13 @@ class SearchEngine:
                 else:
                     rrf_scores[dedup_key]["rrf_score"] += rrf_score
 
-        fused = sorted(rrf_scores.values(), key=lambda r: r["rrf_score"], reverse=True)
+        fused = sorted(rrf_scores.values(), key=lambda r: r.get("rrf_score", 0), reverse=True)
         return fused[:limit]
 
     async def search_collection(
         self, query: str, collection_name: str, top_k: int | None = None
     ) -> list[dict[str, Any]]:
-        """Search a single specific collection."""
+        """Search a single specific collection using direct Qdrant client."""
         limit = top_k if top_k is not None else self.top_k
         return await search(
             query=query,
