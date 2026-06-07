@@ -14,7 +14,7 @@ class TestGetSubprocessManager:
         mock_config.paths_logs_dir = "data/logs"
         with (
             patch.object(src.back.service_manager, "_subprocess_manager", None),
-            patch("src.shared.get_config", return_value=mock_config),
+            patch("src.config.settings.get_config", return_value=mock_config),
             patch("src.shared.subprocess_manager.SubprocessManager") as MockSPM,
         ):
             mgr1 = get_subprocess_manager()

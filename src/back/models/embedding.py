@@ -59,7 +59,7 @@ class EmbeddingManager:
         self, texts: list[str], model_name: str | None = None
     ) -> list[list[float]]:
         """Generate embeddings for text."""
-        from src.rag.embeddings import embed_documents
+        from src.core.embedding.factory import embed_documents
         from llama_index.core.schema import Document
 
         if model_name:

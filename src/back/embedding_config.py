@@ -12,9 +12,9 @@ def get_embedding_config() -> dict:
 
 def set_embedding_config(model: str) -> None:
     """Set the global embedding model in DuckDB and reset cached singletons."""
-    from src.rag.embeddings import reset_embedding_model
-    from src.rag.search import reset_search_embed_model
-    from src.rag.ingestion import reset_pipeline_registry
+    from src.core.embedding.factory import reset_embedding_model
+    from src.core.search.engine import reset_search_embed_model
+    from src.core.pipeline.ingestion import reset_pipeline_registry
 
     db = DatabaseService.get_instance()
     model = model.strip()

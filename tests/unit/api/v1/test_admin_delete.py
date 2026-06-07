@@ -50,7 +50,7 @@ class TestModelsDelete:
         reg.get_llm.return_value = record
         mock_get_reg.return_value = reg
 
-        with patch("src.shared.LLM_DIR", new="/data/models/llm"):
+        with patch("src.config.settings.LLM_DIR", new="/data/models/llm"):
             response = client.post(
                 "/api/v1/admin/models/delete",
                 json={"repo_id": "org/m", "filename": "model.gguf"},
@@ -82,7 +82,7 @@ class TestModelsDelete:
         reg.get_llm.return_value = record
         mock_get_reg.return_value = reg
 
-        with patch("src.shared.LLM_DIR", new="/data/models/llm"):
+        with patch("src.config.settings.LLM_DIR", new="/data/models/llm"):
             response = client.post(
                 "/api/v1/admin/models/delete",
                 json={"repo_id": "org/m", "filename": "model1.gguf"},
@@ -138,7 +138,7 @@ class TestModelsDeleteEmbedding:
         }
         mock_get_reg.return_value = reg
 
-        with patch("src.shared.EMBEDDINGS_DIR", new="/data/models/embeddings"):
+        with patch("src.config.settings.EMBEDDINGS_DIR", new="/data/models/embeddings"):
             response = client.post(
                 "/api/v1/admin/models/delete-embedding",
                 json={"repo_id": "org/emb"},

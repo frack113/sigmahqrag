@@ -20,7 +20,7 @@ from src.back.qdrant.health import check_health
 from src.back.qdrant.service import get_qdrant_service
 from src.back.qdrant.storage import store_embeddings, delete_point, search as qdrant_search
 from src.shared.download_manager import create_download_manager
-from src.rag.indexer import UnifiedIndexer
+from src.core.pipeline.indexer import UnifiedIndexer
 from src.shared.schemas.qdrant import (
     CancelPayload,
     CollectionManagementPayload,
@@ -268,7 +268,7 @@ async def qdrant_action(
 
         elif isinstance(payload, ReindexPayload):
             from src.back.qdrant.client import get_qdrant_client
-            from src.rag.indexer import ROUTES as INDEX_ROUTES
+            from src.core.pipeline.indexer import ROUTES as INDEX_ROUTES
 
             target = payload.collection_name
             route = next((r for r in INDEX_ROUTES if r.qdrant_collection == target), None)

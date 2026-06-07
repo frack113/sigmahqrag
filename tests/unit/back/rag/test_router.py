@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.rag.router import (
+from src.core.search.router import (
     VALID_COLLECTIONS,
     _parse_llm_response,
     route_query,
@@ -76,7 +76,7 @@ class TestRouteQuery:
     @pytest.mark.asyncio
     async def test_llm_failure_falls_back_to_all(self) -> None:
         with (
-            patch("src.rag.router.LlamaClient") as mock_llm_class,
+            patch("src.core.search.router.LlamaClient") as mock_llm_class,
             patch("httpx.AsyncClient") as mock_client_class,
         ):
             mock_llm_class.return_value.base_url = "http://test:8080"
@@ -97,7 +97,7 @@ class TestRouteQuery:
 
         with (
             patch("httpx.AsyncClient") as mock_client_class,
-            patch("src.rag.router.LlamaClient") as mock_llm_class,
+            patch("src.core.search.router.LlamaClient") as mock_llm_class,
         ):
             mock_client_class.return_value.__aenter__.return_value = mock_http
             mock_client_class.return_value.__aexit__.return_value = None
@@ -118,7 +118,7 @@ class TestRouteQuery:
 
         with (
             patch("httpx.AsyncClient") as mock_client_class,
-            patch("src.rag.router.LlamaClient") as mock_llm_class,
+            patch("src.core.search.router.LlamaClient") as mock_llm_class,
         ):
             mock_client_class.return_value.__aenter__.return_value = mock_http
             mock_client_class.return_value.__aexit__.return_value = None

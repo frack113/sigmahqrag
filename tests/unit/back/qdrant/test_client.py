@@ -37,7 +37,7 @@ class TestGetQdrantClient:
     def test_singleton_first_call(self) -> None:
         with (
             patch.object(qdrant_module, "qdrant_client") as mock_qdrant,
-            patch("src.shared.get_config") as mock_cfg,
+            patch("src.config.settings.get_config") as mock_cfg,
             patch.object(qdrant_module, "_client_instance", None),
         ):
             mock_cfg.return_value.qdrant_host = "default"

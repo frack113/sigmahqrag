@@ -6,7 +6,7 @@ import logging
 
 from fastapi import APIRouter, HTTPException, Query, status
 
-from src.rag.search import SearchEngine
+from src.core.search.engine import SearchEngine
 
 logger = logging.getLogger(__name__)
 

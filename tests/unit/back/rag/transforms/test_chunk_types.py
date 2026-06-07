@@ -4,8 +4,8 @@ from unittest.mock import patch
 
 import pytest
 
-from src.rag.transforms.sigma.chunker import SigmaChunker
-from src.rag.transforms.base import TransformConfig
+from src.core.sigma.chunker import SigmaChunker
+from src.core.base import TransformConfig
 
 ALL_CHUNK_TYPES = frozenset(
     {
@@ -373,7 +373,7 @@ class TestLLMEnrichment:
 
         mock_client = MagicMock()
         with patch(
-            "src.rag.transforms.sigma.chunker.enrich_by_llm",
+            "src.core.sigma.chunker.enrich_by_llm",
             return_value={
                 "summary": "Test summary",
                 "keywords": "keyword1, keyword2, keyword3",
@@ -412,7 +412,7 @@ class TestLLMEnrichment:
 
         mock_client = MagicMock()
         with patch(
-            "src.rag.transforms.sigma.chunker.enrich_by_llm",
+            "src.core.sigma.chunker.enrich_by_llm",
             side_effect=RuntimeError("LLM unavailable"),
         ):
             config = TransformConfig()
@@ -429,7 +429,7 @@ class TestLLMEnrichment:
 
         mock_client = MagicMock()
         with patch(
-            "src.rag.transforms.sigma.chunker.enrich_by_llm",
+            "src.core.sigma.chunker.enrich_by_llm",
             return_value={"summary": "", "keywords": "", "error": None},
         ):
             config = TransformConfig()
@@ -448,7 +448,7 @@ class TestLLMEnrichment:
 
         mock_client = MagicMock()
         with patch(
-            "src.rag.transforms.sigma.chunker.enrich_by_llm",
+            "src.core.sigma.chunker.enrich_by_llm",
             return_value={"summary": "summary", "keywords": "keywords", "error": None},
         ) as mock_enrich:
             config = TransformConfig()

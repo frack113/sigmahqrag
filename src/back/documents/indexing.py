@@ -9,7 +9,7 @@ from llama_index.core.schema import TextNode
 
 from src.shared.schemas.sigma_rule import SigmaRule
 from src.back.qdrant import QdrantService
-from src.rag.ingestion import get_embedding_dimension
+from src.core.pipeline.ingestion import get_embedding_dimension
 from src.config.settings import get_config
 
 logger = logging.getLogger(__name__)
@@ -127,7 +127,7 @@ def _sigma_rule_to_metadata(rule: SigmaRule) -> dict[str, Any]:
 
 def _sigma_rule_to_rich_chunks(rule: SigmaRule) -> list[TextNode]:
     """Convert SigmaRule to multiple enriched chunks for rich mode."""
-    from src.rag.transforms.sigma.chunker import chunk_sigma_rules_rich
+    from src.core.sigma.chunker import chunk_sigma_rules_rich
 
     # Reconstruct a dict from SigmaRule for the chunker
     rule_dict = {
@@ -167,7 +167,7 @@ def _sigma_rule_to_rich_chunks(rule: SigmaRule) -> list[TextNode]:
 
 async def _generate_embeddings(nodes: list[TextNode]) -> list[list[float]]:
     """Generate embeddings for nodes using batched inference."""
-    from src.rag.embeddings import embed_documents
+    from src.core.embedding.factory import embed_documents
     from llama_index.core.schema import Document
 
     docs = [Document(text=node.text) for node in nodes]

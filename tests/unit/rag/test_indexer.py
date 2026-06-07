@@ -3,7 +3,7 @@
 from unittest.mock import MagicMock, patch
 import pytest
 
-from src.rag.indexer import UnifiedIndexer, IndexRoute, ROUTES
+from src.core.pipeline.indexer import UnifiedIndexer, IndexRoute, ROUTES
 
 
 @pytest.fixture
@@ -37,7 +37,7 @@ class TestRoutes:
 
 class TestResolvePath:
     def test_sigma_spec_path(self, indexer):
-        with patch("src.rag.indexer.get_config") as mock_cfg:
+        with patch("src.core.pipeline.indexer.get_config") as mock_cfg:
             mock_cfg.return_value.paths_sigma_spec_dir = "data/sigma-specification"
             row = {"file_name": "specification/test.md"}
             result = indexer._resolve_path("sigma_spec", row)
@@ -47,7 +47,7 @@ class TestResolvePath:
             assert "specification" in str(result).replace("\\", "/")
 
     def test_local_org_path(self, indexer):
-        with patch("src.rag.indexer.get_config") as mock_cfg:
+        with patch("src.core.pipeline.indexer.get_config") as mock_cfg:
             mock_cfg.return_value.local_documents_path = "data/local"
             row = {"org": "local", "repo": "local", "file_name": "test.md"}
             result = indexer._resolve_path("doc_registry", row)
@@ -55,7 +55,7 @@ class TestResolvePath:
             assert "test.md" in str(result)
 
     def test_sigmaref_org_path(self, indexer):
-        with patch("src.rag.indexer.get_config") as mock_cfg:
+        with patch("src.core.pipeline.indexer.get_config") as mock_cfg:
             mock_cfg.return_value.sigmaref_documents_path = "data/sigmaref"
             row = {"org": "sigmaref", "repo": "sigmaref", "file_name": "test.md"}
             result = indexer._resolve_path("doc_registry", row)
@@ -63,7 +63,7 @@ class TestResolvePath:
             assert "test.md" in str(result)
 
     def test_github_org_path(self, indexer):
-        with patch("src.rag.indexer.get_config") as mock_cfg:
+        with patch("src.core.pipeline.indexer.get_config") as mock_cfg:
             mock_cfg.return_value.paths_github_dir = "data/github"
             row = {"org": "SigmaHQ", "repo": "sigma", "file_name": "rules/test.yml"}
             result = indexer._resolve_path("doc_registry", row)

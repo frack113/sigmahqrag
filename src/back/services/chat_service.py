@@ -17,7 +17,7 @@ from src.back.services.translate_service import (
     translate_detection,
 )
 from src.back.tools import ToolContext, ToolDispatcher, get_tools
-from src.rag.search import SearchEngine
+from src.core.search.engine import SearchEngine
 from src.shared.schemas.chat_mode import ChatMode
 
 logger = logging.getLogger(__name__)

@@ -24,7 +24,7 @@ def client(app: FastAPI) -> TestClient:
 class TestSearchAPI:
     """Test search API endpoint."""
 
-    @patch("src.rag.search.SearchEngine.search", new_callable=AsyncMock)
+    @patch("src.core.search.engine.SearchEngine.search", new_callable=AsyncMock)
     def test_search_returns_empty_data(self, mock_search: AsyncMock, client: TestClient) -> None:
         """Test search returns empty data when no results."""
         mock_search.return_value = []
@@ -35,7 +35,7 @@ class TestSearchAPI:
         data = response.json()
         assert data == {"data": [], "meta": {"total": 0, "query": "test", "routed": False}}
 
-    @patch("src.rag.search.SearchEngine.search", new_callable=AsyncMock)
+    @patch("src.core.search.engine.SearchEngine.search", new_callable=AsyncMock)
     def test_search_returns_results(self, mock_search: AsyncMock, client: TestClient) -> None:
         """Test search returns results."""
         mock_search.return_value = [{"id": "rule-001"}, {"id": "rule-002"}]
@@ -53,7 +53,7 @@ class TestSearchAPI:
 
         assert response.status_code == 400
 
-    @patch("src.rag.search.SearchEngine.search", new_callable=AsyncMock)
+    @patch("src.core.search.engine.SearchEngine.search", new_callable=AsyncMock)
     def test_search_failure_returns_500(self, mock_search: AsyncMock, client: TestClient) -> None:
         """Test search failure returns 500."""
         mock_search.side_effect = Exception("Search failed")

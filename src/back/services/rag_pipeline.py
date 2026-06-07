@@ -11,7 +11,7 @@ import yaml
 from jinja2 import Template
 
 from src.back.llamacpp import LlamaClient
-from src.rag.search import SearchEngine
+from src.core.search.engine import SearchEngine
 
 from .cache import ResponseCache
 

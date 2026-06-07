@@ -2,10 +2,10 @@
 
 import pytest
 
-from src.rag.transforms.base import DocumentTransform, TransformConfig
-from src.rag.transforms.registry import TransformRegistry
-from src.rag.transforms.sigma.parser import SigmaParser
-from src.rag.transforms.sigma.chunker import SigmaChunker
+from src.core.base import DocumentTransform, TransformConfig
+from src.core.registry import TransformRegistry
+from src.core.sigma.parser import SigmaParser
+from src.core.sigma.chunker import SigmaChunker
 
 
 @pytest.fixture

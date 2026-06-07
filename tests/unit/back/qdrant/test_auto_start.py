@@ -60,7 +60,7 @@ class FakeConfig:
 @pytest.fixture(autouse=True)
 def mock_config():
     fake = FakeConfig()
-    with patch("src.shared.get_config", return_value=fake):
+    with patch("src.config.settings.get_config", return_value=fake):
         yield fake
 
 

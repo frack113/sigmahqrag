@@ -8,9 +8,9 @@ from typing import Any
 import pytest
 import yaml
 
-from src.rag.search import format_search_result, get_citation
-from src.rag.transforms.base import TransformConfig
-from src.rag.transforms.sigma.chunker import SigmaChunker
+from src.core.search.engine import format_search_result, get_citation
+from src.core.base import TransformConfig
+from src.core.sigma.chunker import SigmaChunker
 
 
 @pytest.fixture
