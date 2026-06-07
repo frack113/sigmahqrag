@@ -162,7 +162,7 @@ class TestTranslateDetection:
         Image|endswith: '\\\\winver.exe'
     condition: selection"""
 
-        with patch("src.application.system_prompt.get_prompt_by_id") as mock_prompt:
+        with patch("src.application.system.prompts.get_prompt_by_id") as mock_prompt:
             mock_prompt.return_value = MagicMock(content="Translate: {{ search_results }}")
             result = await translate_detection(yaml, rag, use_chat=True)
             assert len(result) > 0
@@ -184,7 +184,7 @@ class TestTranslateDetection:
         Image|endswith: '\\\\winver.exe'
     condition: selection"""
 
-        with patch("src.application.system_prompt.get_prompt_by_id") as mock_prompt:
+        with patch("src.application.system.prompts.get_prompt_by_id") as mock_prompt:
             mock_prompt.return_value = MagicMock(content="Translate: {{ search_results }}")
             result = await translate_detection(yaml, rag, use_chat=True)
             assert "winver.exe" in result
