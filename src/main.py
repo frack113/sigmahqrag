@@ -39,7 +39,7 @@ from src.api.v1.system.system_prompt import router as prompts_v1_router
 from src.api.v1.sigma.translate import router as translate_v1_router
 from src.application.service_manager import shutdown_all_services
 from src.config.settings import TEMP_DIR
-from src.front import STATIC_DIR
+from src.presentation import STATIC_DIR
 from src.infrastructure.database import DatabaseService
 from src.infrastructure.llm.llamacpp.auto_start import start_llamacpp, stop_llamacpp
 from src.infrastructure.vectorstore.auto_start import start_qdrant, stop_qdrant

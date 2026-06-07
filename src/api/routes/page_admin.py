@@ -10,7 +10,7 @@ from fastapi.templating import Jinja2Templates
 
 from src.application.services.health_check import HealthCheckService
 from src.config.settings import get_config
-from src.front import TEMPLATES_DIR
+from src.presentation import TEMPLATES_DIR
 
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
