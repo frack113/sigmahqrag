@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 from fastapi import FastAPI
 import pytest
 
-from src.api.v1.qdrant import router
+from src.api.v1.infrastructure.qdrant import router
 
 app = FastAPI()
 app.include_router(router)
@@ -16,7 +16,7 @@ client = TestClient(app)
 def mock_db():
     db = MagicMock()
     db.reset_embed_status_for_collection.return_value = None
-    with patch("src.api.v1.qdrant.DatabaseService.get_instance", return_value=db):
+    with patch("src.api.v1.infrastructure.qdrant.DatabaseService.get_instance", return_value=db):
         yield db
 
 
@@ -40,8 +40,8 @@ async def test_reindex_sigma_spec(mock_db):
 
     with (
         patch("src.infrastructure.vectorstore.client.get_qdrant_client") as mock_qc,
-        patch("src.api.v1.qdrant._recreate_collection"),
-        patch("src.api.v1.qdrant.UnifiedIndexer") as mock_indexer_cls,
+        patch("src.api.v1.infrastructure.qdrant._recreate_collection"),
+        patch("src.api.v1.infrastructure.qdrant.UnifiedIndexer") as mock_indexer_cls,
     ):
         mock_client = MagicMock()
         mock_qc.return_value = mock_client
@@ -73,8 +73,8 @@ async def test_reindex_deletes_and_recreates_collection(mock_db):
 
     with (
         patch("src.infrastructure.vectorstore.client.get_qdrant_client") as mock_qc,
-        patch("src.api.v1.qdrant._recreate_collection") as mock_recreate,
-        patch("src.api.v1.qdrant.UnifiedIndexer") as mock_indexer_cls,
+        patch("src.api.v1.infrastructure.qdrant._recreate_collection") as mock_recreate,
+        patch("src.api.v1.infrastructure.qdrant.UnifiedIndexer") as mock_indexer_cls,
     ):
         mock_client = MagicMock()
         mock_qc.return_value = mock_client

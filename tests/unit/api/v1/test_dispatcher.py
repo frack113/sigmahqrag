@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-router = importlib.import_module("src.api.v1.dispatcher").router
+router = importlib.import_module("src.api.v1.system.dispatcher").router
 
 app = FastAPI()
 app.include_router(router)

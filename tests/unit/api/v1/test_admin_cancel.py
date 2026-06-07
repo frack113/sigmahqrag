@@ -6,7 +6,8 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from src.api.v1 import admin, qdrant
+from src.api.v1 import admin
+from src.api.v1.infrastructure import qdrant
 
 
 @pytest.fixture
@@ -27,7 +28,7 @@ def client(app: FastAPI) -> TestClient:
 class TestQdrantCancel:
     """Test POST /api/v1/qdrant endpoint with cancel action."""
 
-    @patch("src.api.v1.qdrant.create_download_manager")
+    @patch("src.api.v1.infrastructure.qdrant.create_download_manager")
     def test_qdrant_cancel_returns_200(self, mock_dm: AsyncMock, client: TestClient) -> None:
         """Given cancel action called, when POST /api/v1/post/qdrant called, then returns 200 (FR16)."""
         mock_manager = AsyncMock()
@@ -47,7 +48,7 @@ class TestQdrantCancel:
         assert "job-123 cancelled" in data["message"]
         mock_manager.cancel_download.assert_called_once_with("job-123")
 
-    @patch("src.api.v1.qdrant.create_download_manager")
+    @patch("src.api.v1.infrastructure.qdrant.create_download_manager")
     def test_qdrant_cancel_with_idempotency_key(
         self, mock_dm: AsyncMock, client: TestClient
     ) -> None:

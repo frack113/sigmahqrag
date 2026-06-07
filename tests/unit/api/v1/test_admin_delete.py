@@ -8,7 +8,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from src.api.v1.admin_models import router as admin_router
+from src.api.v1.models.admin_models import router as admin_router
 
 
 @pytest.fixture

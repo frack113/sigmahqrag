@@ -6,7 +6,8 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from src.api.v1 import admin, qdrant
+from src.api.v1 import admin
+from src.api.v1.infrastructure import qdrant
 
 
 @pytest.fixture
@@ -27,7 +28,7 @@ def client(app: FastAPI) -> TestClient:
 class TestQdrantStatus:
     """Tests for GET /api/v1/qdrant/status endpoint."""
 
-    @patch("src.api.v1.qdrant.check_health", new_callable=AsyncMock)
+    @patch("src.api.v1.infrastructure.qdrant.check_health", new_callable=AsyncMock)
     def test_qdrant_status_returns_200_with_component_status(
         self, mock_health: AsyncMock, client: TestClient
     ) -> None:
@@ -42,7 +43,7 @@ class TestQdrantStatus:
         assert "healthy" in data
         assert "downloads" in data
 
-    @patch("src.api.v1.qdrant.check_health", new_callable=AsyncMock)
+    @patch("src.api.v1.infrastructure.qdrant.check_health", new_callable=AsyncMock)
     def test_qdrant_status_responds_under_500ms(
         self, mock_health: AsyncMock, client: TestClient
     ) -> None:
@@ -58,7 +59,7 @@ class TestQdrantStatus:
         assert response.status_code == 200
         assert elapsed < 0.5  # 500ms
 
-    @patch("src.api.v1.qdrant.check_health", new_callable=AsyncMock)
+    @patch("src.api.v1.infrastructure.qdrant.check_health", new_callable=AsyncMock)
     def test_qdrant_status_returns_structured_error_when_health_check_fails(
         self, mock_health: AsyncMock, client: TestClient
     ) -> None:

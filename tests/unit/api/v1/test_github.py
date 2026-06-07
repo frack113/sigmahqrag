@@ -9,7 +9,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from src.api.v1.github import router
+from src.api.v1.infrastructure.github import router
 
 
 @pytest.fixture
@@ -25,7 +25,7 @@ class TestGitHubApiV1Get:
 
     def test_list_repos_empty(self, client):
         """Test listing repos when none exist."""
-        with patch("src.api.v1.github.list_repos", return_value=[]):
+        with patch("src.api.v1.infrastructure.github.list_repos", return_value=[]):
             response = client.get("/api/v1/github/repos")
 
         assert response.status_code == 200
@@ -44,9 +44,9 @@ class TestGitHubApiV1Get:
             }
         ]
         with (
-            patch("src.api.v1.github.list_repos", return_value=mock_repos),
+            patch("src.api.v1.infrastructure.github.list_repos", return_value=mock_repos),
             patch(
-                "src.api.v1.github.get_metadata",
+                "src.api.v1.infrastructure.github.get_metadata",
                 return_value={
                     "status": "synced",
                     "last_synced": datetime.now(timezone.utc).isoformat(),
@@ -54,9 +54,9 @@ class TestGitHubApiV1Get:
                     "url": "https://github.com/test-org/test-repo.git",
                 },
             ),
-            patch("src.api.v1.github.is_repo_outdated", return_value=False),
+            patch("src.api.v1.infrastructure.github.is_repo_outdated", return_value=False),
             patch(
-                "src.api.v1.github.get_last_commit_date",
+                "src.api.v1.infrastructure.github.get_last_commit_date",
                 return_value=datetime.now(timezone.utc).isoformat(),
             ),
         ):
@@ -82,18 +82,18 @@ class TestGitHubApiV1Get:
             }
         ]
         with (
-            patch("src.api.v1.github.list_repos", return_value=mock_repos),
+            patch("src.api.v1.infrastructure.github.list_repos", return_value=mock_repos),
             patch(
-                "src.api.v1.github.get_metadata",
+                "src.api.v1.infrastructure.github.get_metadata",
                 return_value={
                     "status": "synced",
                     "last_synced": datetime.now(timezone.utc).isoformat(),
                     "branch": "main",
                 },
             ),
-            patch("src.api.v1.github.is_repo_outdated", return_value=True),
+            patch("src.api.v1.infrastructure.github.is_repo_outdated", return_value=True),
             patch(
-                "src.api.v1.github.get_last_commit_date",
+                "src.api.v1.infrastructure.github.get_last_commit_date",
                 return_value=datetime.now(timezone.utc).isoformat(),
             ),
         ):
@@ -115,16 +115,16 @@ class TestGitHubApiV1Get:
             }
         ]
         with (
-            patch("src.api.v1.github.list_repos", return_value=mock_repos),
+            patch("src.api.v1.infrastructure.github.list_repos", return_value=mock_repos),
             patch(
-                "src.api.v1.github.get_metadata",
+                "src.api.v1.infrastructure.github.get_metadata",
                 return_value={
                     "status": "cloning",
                     "last_synced": datetime.now(timezone.utc).isoformat(),
                 },
             ),
             patch(
-                "src.api.v1.github.get_last_commit_date",
+                "src.api.v1.infrastructure.github.get_last_commit_date",
                 return_value=datetime.now(timezone.utc).isoformat(),
             ),
         ):
@@ -146,13 +146,13 @@ class TestGitHubApiV1Get:
             }
         ]
         with (
-            patch("src.api.v1.github.list_repos", return_value=mock_repos),
+            patch("src.api.v1.infrastructure.github.list_repos", return_value=mock_repos),
             patch(
-                "src.api.v1.github.get_metadata",
+                "src.api.v1.infrastructure.github.get_metadata",
                 return_value={"status": "error", "error": "clone failed"},
             ),
             patch(
-                "src.api.v1.github.get_last_commit_date",
+                "src.api.v1.infrastructure.github.get_last_commit_date",
                 return_value=None,
             ),
         ):
@@ -165,7 +165,7 @@ class TestGitHubApiV1Get:
 
     def test_get_repo_not_found(self, client):
         """Test getting info for non-existent repo."""
-        with patch("src.api.v1.github.list_repos", return_value=[]):
+        with patch("src.api.v1.infrastructure.github.list_repos", return_value=[]):
             response = client.get("/api/v1/github/repos/test-org/nonexistent")
 
         assert response.status_code == 404
@@ -176,9 +176,9 @@ class TestGitHubApiV1Get:
         mock_repos = [{"org": "test-org", "name": "test-repo"}]
         now_iso = datetime.now(timezone.utc).isoformat()
         with (
-            patch("src.api.v1.github.list_repos", return_value=mock_repos),
+            patch("src.api.v1.infrastructure.github.list_repos", return_value=mock_repos),
             patch(
-                "src.api.v1.github.get_metadata",
+                "src.api.v1.infrastructure.github.get_metadata",
                 return_value={
                     "status": "synced",
                     "last_synced": now_iso,
@@ -187,7 +187,7 @@ class TestGitHubApiV1Get:
                 },
             ),
             patch(
-                "src.api.v1.github.get_last_commit_date",
+                "src.api.v1.infrastructure.github.get_last_commit_date",
                 return_value=now_iso,
             ),
         ):
@@ -204,12 +204,12 @@ class TestGitHubApiV1Get:
         """Test get repo returns error status correctly."""
         mock_repos = [{"org": "test-org", "name": "error-repo"}]
         with (
-            patch("src.api.v1.github.list_repos", return_value=mock_repos),
+            patch("src.api.v1.infrastructure.github.list_repos", return_value=mock_repos),
             patch(
-                "src.api.v1.github.get_metadata",
+                "src.api.v1.infrastructure.github.get_metadata",
                 return_value={"status": "error", "error": "clone failed"},
             ),
-            patch("src.api.v1.github.get_last_commit_date", return_value=None),
+            patch("src.api.v1.infrastructure.github.get_last_commit_date", return_value=None),
         ):
             response = client.get("/api/v1/github/repos/test-org/error-repo")
 
@@ -221,7 +221,7 @@ class TestGitHubApiV1Get:
 class TestGitHubApiV1Post:
     """Tests for POST /api/v1/github endpoints."""
 
-    @patch("src.api.v1.github.clone_repo")
+    @patch("src.api.v1.infrastructure.github.clone_repo")
     def test_add_repo_success(self, mock_clone, client):
         """Test successful repo addition (background task)."""
         mock_clone.return_value = {
@@ -240,11 +240,11 @@ class TestGitHubApiV1Post:
         assert data["success"] is True
         assert "cloning" in data["message"].lower()
 
-    @patch("src.api.v1.github.clone_repo")
+    @patch("src.api.v1.infrastructure.github.clone_repo")
     def test_add_repo_duplicate(self, mock_clone, client):
         """Test adding a repo that already exists."""
         with patch(
-            "src.api.v1.github.list_repos",
+            "src.api.v1.infrastructure.github.list_repos",
             return_value=[{"org": "test-org", "name": "existing-repo"}],
         ):
             payload = {"url": "https://github.com/test-org/existing-repo.git", "branch": "main"}
@@ -255,7 +255,7 @@ class TestGitHubApiV1Post:
         assert data["success"] is False
         assert "already exists" in data["error"].lower()
 
-    @patch("src.api.v1.github.clone_repo")
+    @patch("src.api.v1.infrastructure.github.clone_repo")
     def test_add_repo_invalid_url(self, mock_clone, client):
         """Test adding a repo with invalid URL format."""
         payload = {"url": "invalid-url", "branch": "main"}
@@ -265,7 +265,7 @@ class TestGitHubApiV1Post:
         data = response.json()
         assert data["success"] is False
 
-    @patch("src.api.v1.github.delete_repo")
+    @patch("src.api.v1.infrastructure.github.delete_repo")
     def test_delete_repo_success(self, mock_delete, client):
         """Test successful repo deletion."""
         mock_delete.return_value = {"success": True}
@@ -276,7 +276,7 @@ class TestGitHubApiV1Post:
         data = response.json()
         assert data["success"] is True
 
-    @patch("src.api.v1.github.delete_repo")
+    @patch("src.api.v1.infrastructure.github.delete_repo")
     def test_delete_repo_failure(self, mock_delete, client):
         """Test failed repo deletion."""
         mock_delete.return_value = {"success": False, "error": "not found"}
@@ -293,15 +293,15 @@ class TestGitHubApiV1Post:
         mock_path.exists.return_value = True
 
         with (
-            patch("src.api.v1.github._get_repo_path", return_value=mock_path),
-            patch("src.api.v1.github._is_valid_repo", return_value=True),
+            patch("src.api.v1.infrastructure.github._get_repo_path", return_value=mock_path),
+            patch("src.api.v1.infrastructure.github._is_valid_repo", return_value=True),
             patch(
-                "src.api.v1.github.get_metadata",
+                "src.api.v1.infrastructure.github.get_metadata",
                 return_value={"status": "synced"},
             ),
-            patch("src.api.v1.github.get_selected_dirs", return_value=[]),
+            patch("src.api.v1.infrastructure.github.get_selected_dirs", return_value=[]),
             patch(
-                "src.api.v1.github.list_directory_tree",
+                "src.api.v1.infrastructure.github.list_directory_tree",
                 return_value=[{"name": "folder", "path": "folder", "children": []}],
             ),
         ):
@@ -318,7 +318,7 @@ class TestGitHubApiV1Post:
         mock_path = MagicMock()
         mock_path.exists.return_value = False
 
-        with patch("src.api.v1.github._get_repo_path", return_value=mock_path):
+        with patch("src.api.v1.infrastructure.github._get_repo_path", return_value=mock_path):
             response = client.get("/api/v1/github/repos/test-org/nonexistent/tree")
 
         assert response.status_code == 200
@@ -339,9 +339,12 @@ class TestGitHubApiV1Post:
 
         payload = {"selected": ["folder1", "folder2"]}
         with (
-            patch("src.api.v1.github._get_repo_path", return_value=mock_path),
-            patch("src.api.v1.github._is_valid_repo", return_value=True),
-            patch("src.api.v1.github.save_selected_dirs", return_value={"success": True}),
+            patch("src.api.v1.infrastructure.github._get_repo_path", return_value=mock_path),
+            patch("src.api.v1.infrastructure.github._is_valid_repo", return_value=True),
+            patch(
+                "src.api.v1.infrastructure.github.save_selected_dirs",
+                return_value={"success": True},
+            ),
         ):
             response = client.post(
                 "/api/v1/github/repos/test-org/test-repo/select-dirs", json=payload
@@ -357,7 +360,7 @@ class TestGitHubApiV1Post:
         mock_path.exists.return_value = False
 
         payload = {"selected": ["folder1"]}
-        with patch("src.api.v1.github._get_repo_path", return_value=mock_path):
+        with patch("src.api.v1.infrastructure.github._get_repo_path", return_value=mock_path):
             response = client.post(
                 "/api/v1/github/repos/test-org/nonexistent/select-dirs", json=payload
             )
@@ -374,15 +377,15 @@ class TestGitHubApiV1Sync:
         """Test successful repo sync."""
         with (
             patch(
-                "src.api.v1.github.get_metadata",
+                "src.api.v1.infrastructure.github.get_metadata",
                 return_value={"status": "synced", "branch": "main"},
             ),
             patch(
-                "src.api.v1.github.list_repos",
+                "src.api.v1.infrastructure.github.list_repos",
                 return_value=[{"org": "test-org", "name": "test-repo"}],
             ),
             patch(
-                "src.api.v1.github.update_repo",
+                "src.api.v1.infrastructure.github.update_repo",
                 return_value={"success": True, "remote_head": "def456"},
             ),
         ):
@@ -396,12 +399,12 @@ class TestGitHubApiV1Sync:
     def test_sync_repo_branch_override(self, client):
         """Test sync with explicit branch override."""
         with (
-            patch("src.api.v1.github.get_metadata", return_value={"branch": "main"}),
+            patch("src.api.v1.infrastructure.github.get_metadata", return_value={"branch": "main"}),
             patch(
-                "src.api.v1.github.list_repos",
+                "src.api.v1.infrastructure.github.list_repos",
                 return_value=[{"org": "test-org", "name": "test-repo"}],
             ),
-            patch("src.api.v1.github.update_repo", return_value={"success": True}),
+            patch("src.api.v1.infrastructure.github.update_repo", return_value={"success": True}),
         ):
             response = client.post("/api/v1/github/repos/test-org/test-repo/sync?branch=develop")
 
@@ -412,9 +415,9 @@ class TestGitHubApiV1Sync:
     def test_sync_repo_not_found(self, client):
         """Test sync for non-existent repo."""
         with (
-            patch("src.api.v1.github.get_metadata", return_value=None),
+            patch("src.api.v1.infrastructure.github.get_metadata", return_value=None),
             patch(
-                "src.api.v1.github.list_repos",
+                "src.api.v1.infrastructure.github.list_repos",
                 return_value=[{"org": "other-org", "name": "other-repo"}],
             ),
         ):
@@ -428,14 +431,14 @@ class TestGitHubApiV1Sync:
         """Test syncing all repos."""
         with (
             patch(
-                "src.api.v1.github.list_repos",
+                "src.api.v1.infrastructure.github.list_repos",
                 return_value=[
                     {"org": "test-org", "name": "repo-a"},
                     {"org": "test-org", "name": "repo-b"},
                 ],
             ),
-            patch("src.api.v1.github.get_metadata", return_value={"branch": "main"}),
-            patch("src.api.v1.github.update_repo", return_value={"success": True}),
+            patch("src.api.v1.infrastructure.github.get_metadata", return_value={"branch": "main"}),
+            patch("src.api.v1.infrastructure.github.update_repo", return_value={"success": True}),
         ):
             response = client.post("/api/v1/github/repos/sync-all")
 
@@ -446,7 +449,7 @@ class TestGitHubApiV1Sync:
 
     def test_sync_all_repos_empty(self, client):
         """Test syncing all repos when none exist."""
-        with patch("src.api.v1.github.list_repos", return_value=[]):
+        with patch("src.api.v1.infrastructure.github.list_repos", return_value=[]):
             response = client.post("/api/v1/github/repos/sync-all")
 
         assert response.status_code == 200
@@ -462,11 +465,11 @@ class TestGitHubApiV1Status:
         """Test getting status for an existing repo."""
         with (
             patch(
-                "src.api.v1.github.list_repos",
+                "src.api.v1.infrastructure.github.list_repos",
                 return_value=[{"org": "test-org", "name": "test-repo"}],
             ),
             patch(
-                "src.api.v1.github.get_metadata",
+                "src.api.v1.infrastructure.github.get_metadata",
                 return_value={
                     "status": "synced",
                     "last_synced": datetime.now(timezone.utc).isoformat(),
@@ -483,7 +486,7 @@ class TestGitHubApiV1Status:
     def test_get_repo_status_not_cloned(self, client):
         """Test getting status for a repo in metadata but not cloned."""
         with patch(
-            "src.api.v1.github.list_repos",
+            "src.api.v1.infrastructure.github.list_repos",
             return_value=[{"org": "test-org", "name": "cloned-repo"}],
         ):
             response = client.get("/api/v1/github/repos/test-org/not-cloned/status")
@@ -506,9 +509,9 @@ class TestGitHubApiV1Validation:
     def test_sync_repo_invalid_branch(self, client):
         """Test sync with branch containing path traversal."""
         with (
-            patch("src.api.v1.github.get_metadata", return_value={"branch": "main"}),
+            patch("src.api.v1.infrastructure.github.get_metadata", return_value={"branch": "main"}),
             patch(
-                "src.api.v1.github.list_repos",
+                "src.api.v1.infrastructure.github.list_repos",
                 return_value=[{"org": "test-org", "name": "test-repo"}],
             ),
         ):
@@ -526,9 +529,9 @@ class TestGitHubApiV1Validation:
         long_branch = "a" * 256
 
         with (
-            patch("src.api.v1.github.get_metadata", return_value={"branch": "main"}),
+            patch("src.api.v1.infrastructure.github.get_metadata", return_value={"branch": "main"}),
             patch(
-                "src.api.v1.github.list_repos",
+                "src.api.v1.infrastructure.github.list_repos",
                 return_value=[{"org": "test-org", "name": "test-repo"}],
             ),
         ):
@@ -556,10 +559,10 @@ class TestGitHubApiV1ModelValidation:
         """Test that branch defaults to main."""
         with (
             patch(
-                "src.api.v1.github.clone_repo",
+                "src.api.v1.infrastructure.github.clone_repo",
                 return_value={"success": True, "org": "x", "name": "y", "remote_head": ""},
             ),
-            patch("src.api.v1.github.list_repos", return_value=[]),
+            patch("src.api.v1.infrastructure.github.list_repos", return_value=[]),
         ):
             payload = {"url": "https://github.com/x/y.git"}
             response = client.post("/api/v1/github/repos", json=payload)
@@ -574,7 +577,7 @@ class TestMarkSelected:
 
     def test_mark_selected_matches(self):
         """Test that matching nodes are marked as selected."""
-        from src.api.v1.github import _mark_selected
+        from src.api.v1.infrastructure.github import _mark_selected
 
         node = {
             "name": "folder",
@@ -588,7 +591,7 @@ class TestMarkSelected:
 
     def test_mark_selected_nested_match(self):
         """Test matching on nested children."""
-        from src.api.v1.github import _mark_selected
+        from src.api.v1.infrastructure.github import _mark_selected
 
         node = {
             "name": "root",
@@ -603,7 +606,7 @@ class TestMarkSelected:
 
     def test_mark_selected_no_match(self):
         """Test no marking when nothing matches."""
-        from src.api.v1.github import _mark_selected
+        from src.api.v1.infrastructure.github import _mark_selected
 
         node = {"name": "folder", "path": "src/models"}
         _mark_selected(node, ["other/path"])

@@ -10,11 +10,11 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 
 from src.api.dependencies import get_database_service, get_embedding_manager, get_unified_registry
-from src.api.v1._models_shared import (
+from src.api.v1.models._models_shared import (
     _delete_all_models_of_type,
     _download_progress,
 )
-from src.api.v1._models_shared import (
+from src.api.v1.models._models_shared import (
     _delete_embedding_model as _shared_delete_embedding,
 )
 from src.application.models import EmbeddingManager

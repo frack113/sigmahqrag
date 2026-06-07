@@ -6,7 +6,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from src.api.v1.search import router
+from src.api.v1.chat.search import router
 
 
 @pytest.fixture

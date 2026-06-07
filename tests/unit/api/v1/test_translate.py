@@ -4,7 +4,7 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 from fastapi import FastAPI
 
-from src.api.v1.translate import router
+from src.api.v1.sigma.translate import router
 from src.application.services.translate_service import _render_safe, SIGMA_YAML_STOP_SEQUENCES
 
 app = FastAPI()
@@ -25,7 +25,7 @@ class TestSchemaValidation:
         assert response.status_code == 422
 
     def test_valid_yaml_accepted(self):
-        with patch("src.api.v1.translate.translate_detection") as mock_translate:
+        with patch("src.api.v1.sigma.translate.translate_detection") as mock_translate:
             mock_translate.return_value = "translated text"
 
             response = client.post(
@@ -36,7 +36,7 @@ class TestSchemaValidation:
             assert response.json()["translation"] == "translated text"
 
     def test_default_values(self):
-        with patch("src.api.v1.translate.translate_detection") as mock_translate:
+        with patch("src.api.v1.sigma.translate.translate_detection") as mock_translate:
             mock_translate.return_value = "ok"
 
             response = client.post(

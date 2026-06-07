@@ -94,9 +94,9 @@ class TestTranslateEndpointCacheCleanup:
     async def test_erase_slot_cache_called_in_endpoint(self):
         with (
             patch(
-                "src.api.v1.translate.translate_detection", new_callable=AsyncMock
+                "src.api.v1.sigma.translate.translate_detection", new_callable=AsyncMock
             ) as mock_translate,
-            patch("src.api.v1.translate.RAGPipeline") as mock_rag_cls,
+            patch("src.api.v1.sigma.translate.RAGPipeline") as mock_rag_cls,
         ):
             mock_rag = MagicMock()
             mock_rag.llm_client.erase_slot_cache = AsyncMock()
@@ -105,7 +105,7 @@ class TestTranslateEndpointCacheCleanup:
 
             from fastapi.testclient import TestClient
             from fastapi import FastAPI
-            from src.api.v1.translate import router
+            from src.api.v1.sigma.translate import router
 
             app = FastAPI()
             app.include_router(router)

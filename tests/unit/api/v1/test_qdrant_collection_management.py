@@ -1,6 +1,6 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 from fastapi.testclient import TestClient
-from src.api.v1.qdrant import router
+from src.api.v1.infrastructure.qdrant import router
 from fastapi import FastAPI
 import pytest
 
@@ -14,13 +14,15 @@ def mock_db():
     """Mock DatabaseService.get_instance for all tests."""
     db = MagicMock()
     db.reset_embed_status_for_collection.return_value = None
-    with patch("src.api.v1.qdrant.DatabaseService.get_instance", return_value=db):
+    with patch("src.api.v1.infrastructure.qdrant.DatabaseService.get_instance", return_value=db):
         yield
 
 
 @pytest.mark.asyncio
 async def test_list_collections(mock_db):
-    with patch("src.api.v1.qdrant.list_collections", new_callable=AsyncMock) as mock_list:
+    with patch(
+        "src.api.v1.infrastructure.qdrant.list_collections", new_callable=AsyncMock
+    ) as mock_list:
         mock_list.return_value = [{"name": "test_collection"}]
         response = client.post(
             "/api/v1/qdrant",
@@ -36,7 +38,9 @@ async def test_list_collections(mock_db):
 
 @pytest.mark.asyncio
 async def test_create_collection():
-    with patch("src.api.v1.qdrant.create_collection", new_callable=AsyncMock) as mock_create:
+    with patch(
+        "src.api.v1.infrastructure.qdrant.create_collection", new_callable=AsyncMock
+    ) as mock_create:
         response = client.post(
             "/api/v1/qdrant",
             json={
@@ -57,7 +61,9 @@ async def test_create_collection():
 
 @pytest.mark.asyncio
 async def test_delete_collection():
-    with patch("src.api.v1.qdrant.delete_collection", new_callable=AsyncMock) as mock_delete:
+    with patch(
+        "src.api.v1.infrastructure.qdrant.delete_collection", new_callable=AsyncMock
+    ) as mock_delete:
         response = client.post(
             "/api/v1/qdrant",
             json={
@@ -77,7 +83,9 @@ async def test_delete_collection():
 
 @pytest.mark.asyncio
 async def test_get_collection():
-    with patch("src.api.v1.qdrant.get_collection", new_callable=AsyncMock) as mock_get:
+    with patch(
+        "src.api.v1.infrastructure.qdrant.get_collection", new_callable=AsyncMock
+    ) as mock_get:
         mock_get.return_value = {"name": "test_col", "status": "active"}
         response = client.post(
             "/api/v1/qdrant",
@@ -97,7 +105,9 @@ async def test_get_collection():
 
 @pytest.mark.asyncio
 async def test_create_collection_exists():
-    with patch("src.api.v1.qdrant.get_collection", new_callable=AsyncMock) as mock_get:
+    with patch(
+        "src.api.v1.infrastructure.qdrant.get_collection", new_callable=AsyncMock
+    ) as mock_get:
         mock_get.return_value = {"name": "test_col", "status": "active"}
         response = client.post(
             "/api/v1/qdrant",
