@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-from src.back.llamacpp.vram import VRAMEstimator, create_vram_estimator
+from src.infrastructure.llm.llamacpp.vram import VRAMEstimator, create_vram_estimator
 
 
 class TestVRAMEstimator:

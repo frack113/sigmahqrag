@@ -8,8 +8,8 @@ from pathlib import Path
 from llama_index.core.schema import Document
 
 from ..base import DocumentTransform
-from .loader import load_sigma_rules
 from .detectors import is_sigma_rule
+from .loader import load_sigma_rules
 
 logger = logging.getLogger(__name__)
 

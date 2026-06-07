@@ -9,18 +9,19 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from src.api.sse import download_progress_generator
-from src.back.database.service import DatabaseService
-from src.back.qdrant.collections import (
-    list_collections,
+from src.core.pipeline.indexer import UnifiedIndexer
+from src.infrastructure.database.service import DatabaseService
+from src.infrastructure.vectorstore.collections import (
     create_collection,
     delete_collection,
     get_collection,
+    list_collections,
 )
-from src.back.qdrant.health import check_health
-from src.back.qdrant.service import get_qdrant_service
-from src.back.qdrant.storage import store_embeddings, delete_point, search as qdrant_search
+from src.infrastructure.vectorstore.health import check_health
+from src.infrastructure.vectorstore.service import get_qdrant_service
+from src.infrastructure.vectorstore.storage import delete_point, store_embeddings
+from src.infrastructure.vectorstore.storage import search as qdrant_search
 from src.shared.download_manager import create_download_manager
-from src.core.pipeline.indexer import UnifiedIndexer
 from src.shared.schemas.qdrant import (
     CancelPayload,
     CollectionManagementPayload,
@@ -267,8 +268,8 @@ async def qdrant_action(
             )
 
         elif isinstance(payload, ReindexPayload):
-            from src.back.qdrant.client import get_qdrant_client
             from src.core.pipeline.indexer import ROUTES as INDEX_ROUTES
+            from src.infrastructure.vectorstore.client import get_qdrant_client
 
             target = payload.collection_name
             route = next((r for r in INDEX_ROUTES if r.qdrant_collection == target), None)

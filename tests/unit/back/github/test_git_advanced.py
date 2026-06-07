@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.back.github.git import (
+from src.infrastructure.github.git import (
     _get_repo_key,
     _get_repo_path,
     _is_valid_repo,
@@ -30,14 +30,14 @@ class TestGetRepoPath:
 
 class TestIsValidRepo:
     def test_valid_repo(self) -> None:
-        with patch("src.back.github.git.Repo") as MockRepo:
+        with patch("src.infrastructure.github.git.Repo") as MockRepo:
             assert _is_valid_repo(Path("/repo")) is True
             MockRepo.assert_called_once_with(Path("/repo"))
 
     def test_invalid_repo(self) -> None:
         from git.exc import InvalidGitRepositoryError
 
-        with patch("src.back.github.git.Repo", side_effect=InvalidGitRepositoryError):
+        with patch("src.infrastructure.github.git.Repo", side_effect=InvalidGitRepositoryError):
             assert _is_valid_repo(Path("/invalid")) is False
 
 
@@ -55,7 +55,7 @@ class TestListDirectoryTree:
         (repo_path / "docs").mkdir()
         (repo_path / "docs" / "readme.md").write_text("")
 
-        with patch("src.back.github.git._is_valid_repo", return_value=True):
+        with patch("src.infrastructure.github.git._is_valid_repo", return_value=True):
             result = list_directory_tree("org", "repo", repos_dir=tmp_path, max_depth=3)
             names = [n["name"] for n in result]
             assert "src" in names
@@ -68,7 +68,7 @@ class TestListDirectoryTree:
         (repo_path / ".hidden").mkdir()
         (repo_path / "visible").mkdir()
 
-        with patch("src.back.github.git._is_valid_repo", return_value=True):
+        with patch("src.infrastructure.github.git._is_valid_repo", return_value=True):
             result = list_directory_tree("org", "repo", repos_dir=tmp_path)
             names = [n["name"] for n in result]
             assert "visible" in names
@@ -83,7 +83,7 @@ class TestListDirectoryTree:
         deep.mkdir(parents=True)
         (deep / "d").mkdir()
 
-        with patch("src.back.github.git._is_valid_repo", return_value=True):
+        with patch("src.infrastructure.github.git._is_valid_repo", return_value=True):
             result = list_directory_tree("org", "repo", repos_dir=tmp_path, max_depth=1)
             names = [n["name"] for n in result]
             assert "a" in names
@@ -101,7 +101,9 @@ class TestGetRepoKey:
 class TestSaveMetadata:
     def test_calls_db(self) -> None:
         mock_db = MagicMock()
-        with patch("src.back.github.git.DatabaseService.get_instance", return_value=mock_db):
+        with patch(
+            "src.infrastructure.github.git.DatabaseService.get_instance", return_value=mock_db
+        ):
             save_metadata("org", "repo", {"key": "val"})
             mock_db.set_git_metadata.assert_called_once_with("org/repo", {"key": "val"})
 
@@ -109,7 +111,9 @@ class TestSaveMetadata:
 class TestSaveSelectedDirs:
     def test_saves_successfully(self) -> None:
         mock_db = MagicMock()
-        with patch("src.back.github.git.DatabaseService.get_instance", return_value=mock_db):
+        with patch(
+            "src.infrastructure.github.git.DatabaseService.get_instance", return_value=mock_db
+        ):
             result = save_selected_dirs("org", "repo", ["src/", "docs/"])
             assert result["success"] is True
             mock_db.set_selected_dirs.assert_called_once_with("org/repo", ["src/", "docs/"])
@@ -117,7 +121,9 @@ class TestSaveSelectedDirs:
     def test_handles_exception(self) -> None:
         mock_db = MagicMock()
         mock_db.set_selected_dirs.side_effect = RuntimeError("db fail")
-        with patch("src.back.github.git.DatabaseService.get_instance", return_value=mock_db):
+        with patch(
+            "src.infrastructure.github.git.DatabaseService.get_instance", return_value=mock_db
+        ):
             result = save_selected_dirs("org", "repo", ["src/"])
             assert result["success"] is False
 
@@ -126,14 +132,18 @@ class TestGetSelectedDirs:
     def test_returns_dirs(self) -> None:
         mock_db = MagicMock()
         mock_db.get_selected_dirs.return_value = ["src/"]
-        with patch("src.back.github.git.DatabaseService.get_instance", return_value=mock_db):
+        with patch(
+            "src.infrastructure.github.git.DatabaseService.get_instance", return_value=mock_db
+        ):
             result = get_selected_dirs("org", "repo")
             assert result == ["src/"]
 
     def test_handles_exception(self) -> None:
         mock_db = MagicMock()
         mock_db.get_selected_dirs.side_effect = RuntimeError("fail")
-        with patch("src.back.github.git.DatabaseService.get_instance", return_value=mock_db):
+        with patch(
+            "src.infrastructure.github.git.DatabaseService.get_instance", return_value=mock_db
+        ):
             result = get_selected_dirs("org", "repo")
             assert result == []
 
@@ -142,7 +152,7 @@ class TestGetLastCommitDate:
     def test_returns_none_for_missing_repo(self) -> None:
         from git.exc import InvalidGitRepositoryError
 
-        with patch("src.back.github.git.Repo", side_effect=InvalidGitRepositoryError):
+        with patch("src.infrastructure.github.git.Repo", side_effect=InvalidGitRepositoryError):
             result = get_last_commit_date("org", "repo", repos_dir=Path("/tmp"))
             assert result is None
 
@@ -151,6 +161,6 @@ class TestIsRepoOutdated:
     def test_returns_false_for_missing_repo(self) -> None:
         from git.exc import InvalidGitRepositoryError
 
-        with patch("src.back.github.git.Repo", side_effect=InvalidGitRepositoryError):
+        with patch("src.infrastructure.github.git.Repo", side_effect=InvalidGitRepositoryError):
             result = is_repo_outdated("org", "repo", repos_dir=Path("/tmp"))
             assert result is False

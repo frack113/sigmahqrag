@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)

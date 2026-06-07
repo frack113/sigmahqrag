@@ -9,12 +9,13 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from src.back.database import DatabaseService
-from src.back.qdrant.storage import store_embeddings
+
+from src.config.settings import get_config
 from src.core import TransformRegistry
 from src.core.base import TransformConfig
 from src.core.document.generic_parser import GenericTransform
-from src.config.settings import get_config
+from src.infrastructure.database import DatabaseService
+from src.infrastructure.vectorstore.storage import store_embeddings
 
 logger = logging.getLogger(__name__)
 

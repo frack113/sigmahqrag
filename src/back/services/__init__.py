@@ -1,8 +1,8 @@
 """Services layer for external integrations."""
 
-from src.back.llamacpp import LlamaService
 from src.back.models import EmbeddingManager, ModelNotFoundError
-from src.back.qdrant import QdrantService
+from src.infrastructure.llm.llamacpp import LlamaService
+from src.infrastructure.vectorstore import QdrantService
 
 from .cache import ResponseCache
 from .chat_service import ChatService

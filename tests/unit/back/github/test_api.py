@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
-from src.back.github.api import (
+from src.infrastructure.github.api import (
     download_release_file,
     info_release,
     list_release_files,

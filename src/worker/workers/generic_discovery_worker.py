@@ -7,10 +7,10 @@ from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
-from src.back.database.service import DatabaseService
-from src.worker.workers.discovery_base import DiscoveryWorker
-from src.worker.enums import WorkerName
 from src.back.utils.identify_file_type import SIGMA_RULE_EXTENSIONS, SUPPORTED_DOC_EXTENSION_MAP
+from src.infrastructure.database.service import DatabaseService
+from src.worker.enums import WorkerName
+from src.worker.workers.discovery_base import DiscoveryWorker
 
 if TYPE_CHECKING:
     from src.worker.processor import TaskDispatcher

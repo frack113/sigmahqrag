@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, HTTPException, Query, Depends
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from src.api.dependencies import get_database_service
-from src.back.database import DatabaseService
+from src.infrastructure.database import DatabaseService
 
 logger = logging.getLogger(__name__)
 

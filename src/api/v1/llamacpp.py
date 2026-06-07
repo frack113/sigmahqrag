@@ -7,8 +7,8 @@ from fastapi.responses import JSONResponse, StreamingResponse
 
 from src.api.sse import download_progress_generator
 from src.back.services.health_check import HealthCheckService
-from src.back.llamacpp.service import get_llama_service
 from src.config.settings import get_config
+from src.infrastructure.llm.llamacpp.service import get_llama_service
 from src.shared.download_manager import create_download_manager
 
 logger = logging.getLogger(__name__)

@@ -9,9 +9,8 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from src.back.tools.registry import tool
 from src.back.tools.executor import ToolDispatcher
-
+from src.back.tools.registry import tool
 
 # ------------------------------------------------------------------
 # @tool decorator

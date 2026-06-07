@@ -8,9 +8,9 @@ from typing import Any
 
 from llama_index.core.schema import Document
 
-from src.back.database import DatabaseService
-from src.back.qdrant.storage import store_embeddings as _store_embeddings
 from src.core.pipeline.ingestion import DEFAULT_MODEL, get_embedding_dimension
+from src.infrastructure.database import DatabaseService
+from src.infrastructure.vectorstore.storage import store_embeddings as _store_embeddings
 
 logger = logging.getLogger(__name__)
 

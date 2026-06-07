@@ -7,10 +7,10 @@ import os
 from pathlib import Path
 from typing import Any
 
-from src.back.database.service import DatabaseService
 from src.back.models.exceptions import DownloadError
 from src.back.models.types import HFRepo
 from src.config.settings import TEMP_DIR
+from src.infrastructure.database.service import DatabaseService
 
 
 class HFDownloadService:

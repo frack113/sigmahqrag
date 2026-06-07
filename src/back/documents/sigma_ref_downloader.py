@@ -16,11 +16,11 @@ from typing import Any, cast
 import httpx
 import yaml
 
-from src.back.database import DatabaseService
 from src.back.utils.identify_file_type import (
     SUPPORTED_DOC_EXTENSION_MAP,
     SUPPORTED_REFERENCE_DOC_TYPES,
 )
+from src.infrastructure.database import DatabaseService
 from src.shared.schemas.sigma_rule import is_sigma_rule_dict
 from src.shared.utils import iso_now
 

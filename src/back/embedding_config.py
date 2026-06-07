@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from src.back.database import DatabaseService
+from src.infrastructure.database import DatabaseService
 
 
 def get_embedding_config() -> dict:
@@ -13,8 +13,8 @@ def get_embedding_config() -> dict:
 def set_embedding_config(model: str) -> None:
     """Set the global embedding model in DuckDB and reset cached singletons."""
     from src.core.embedding.factory import reset_embedding_model
-    from src.core.search.engine import reset_search_embed_model
     from src.core.pipeline.ingestion import reset_pipeline_registry
+    from src.core.search.engine import reset_search_embed_model
 
     db = DatabaseService.get_instance()
     model = model.strip()

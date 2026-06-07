@@ -16,19 +16,19 @@ except ImportError:
     print("✗ GitPython not installed. Run: uv add gitpython", file=sys.stderr)
     sys.exit(1)
 
-from src.back.database import DatabaseServiceProtocol
 from src.config.constants import (
-    SIGMA_SPEC_REPO,
-    SIGMA_SPEC_REF,
-    SCHEMA_VERSION,
     DEFAULT_LLAMA_BASE_URL,
     DEFAULT_QDRANT_BASE_URL,
     DEFAULT_QDRANT_COLLECTION,
     DEFAULT_QDRANT_VECTOR_SIZE,
+    SCHEMA_VERSION,
+    SIGMA_SPEC_REF,
+    SIGMA_SPEC_REPO,
 )
-from src.config.settings import LLM_DIR, EMBEDDINGS_DIR
-from src.worker.processor import TaskDispatcher
+from src.config.settings import EMBEDDINGS_DIR, LLM_DIR
+from src.infrastructure.database import DatabaseServiceProtocol
 from src.worker.enums import WorkerName, WorkerStatus
+from src.worker.processor import TaskDispatcher
 
 # Configure structured logging
 logger = logging.getLogger("init_projet")
@@ -215,7 +215,7 @@ def initialize_database(db_service: Optional[DatabaseServiceProtocol] = None) ->
     Callers are responsible for closing it.
     """
     # Import here to avoid circular imports
-    from src.back.database import DatabaseService
+    from src.infrastructure.database import DatabaseService
 
     db = db_service or DatabaseService()
     db.initialize()
@@ -325,8 +325,8 @@ def _sync_model_registry_to_db() -> None:
     Uses the DatabaseService singleton (already initialized by
     initialize_database). Does not close it — the caller manages lifecycle.
     """
-    from src.back.database import DatabaseService
     from src.back.models.registry import UnifiedRegistry
+    from src.infrastructure.database import DatabaseService
 
     try:
         db = DatabaseService.get_instance()
@@ -344,7 +344,7 @@ def main() -> None:
     logger.info("SigmaHQ RAG - Project Initialization")
     logger.info("=" * 50)
 
-    from src.back.database import DatabaseService
+    from src.infrastructure.database import DatabaseService
 
     create_data_structure()
     create_config_file()

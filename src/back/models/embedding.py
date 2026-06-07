@@ -6,11 +6,11 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-from src.back.database import DatabaseService
 from src.back.models.download import HFDownloadService
 from src.back.models.exceptions import DownloadError
 from src.back.models.types import HFRepo
 from src.config.settings import EMBEDDINGS_DIR
+from src.infrastructure.database import DatabaseService
 
 
 class EmbeddingManager:
@@ -59,8 +59,9 @@ class EmbeddingManager:
         self, texts: list[str], model_name: str | None = None
     ) -> list[list[float]]:
         """Generate embeddings for text."""
-        from src.core.embedding.factory import embed_documents
         from llama_index.core.schema import Document
+
+        from src.core.embedding.factory import embed_documents
 
         if model_name:
             logger = __import__("logging").getLogger(__name__)

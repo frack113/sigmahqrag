@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 
-from src.back.database import DatabaseService
+from src.infrastructure.database import DatabaseService
 
 
 class UnifiedRegistry:

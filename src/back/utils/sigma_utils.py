@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-import yaml
 from pathlib import Path
 from typing import Optional
+
+import yaml
 
 from src.shared.schemas.sigma_rule import is_sigma_rule as is_sigma_rule_fn
 

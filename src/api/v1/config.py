@@ -9,8 +9,8 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from src.back.database.service import DatabaseService
 from src.config.settings import get_config
+from src.infrastructure.database.service import DatabaseService
 
 logger = logging.getLogger(__name__)
 

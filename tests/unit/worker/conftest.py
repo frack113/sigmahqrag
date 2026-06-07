@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from src.back.database import DatabaseService
+from src.infrastructure.database import DatabaseService
 
 
 @pytest.fixture

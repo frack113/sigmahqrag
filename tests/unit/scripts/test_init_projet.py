@@ -75,7 +75,7 @@ def test_schema_version_set_in_database(temp_project_dir):
         initialize_database,
         SCHEMA_VERSION,
     )
-    from src.back.database import DatabaseService
+    from src.infrastructure.database import DatabaseService
 
     # Run init steps
     create_data_structure()

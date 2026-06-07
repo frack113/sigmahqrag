@@ -11,9 +11,9 @@ from ..base import DocumentTransform
 from ..document.llm import enrich_by_llm
 from ..registry import TransformRegistry
 from .chunk_factory import make_chunk
-from .parser import SigmaParser
 from .flattening import flatten_detection_values, split_field_operator
 from .formatting import format_value
+from .parser import SigmaParser
 
 logger = logging.getLogger(__name__)
 

@@ -216,14 +216,14 @@ async def test_cache_expiry(health_service):
 
 def test_get_current_version_llama(health_service):
     """Test get_current_version for llama."""
-    with patch("src.back.llamacpp.get_version", return_value="1.0.0"):
+    with patch("src.infrastructure.llm.llamacpp.get_version", return_value="1.0.0"):
         version = health_service.get_current_version("llama")
         assert version == "1.0.0"
 
 
 def test_get_current_version_qdrant(health_service):
     """Test get_current_version for qdrant."""
-    with patch("src.back.qdrant.get_version", return_value="2.0.0"):
+    with patch("src.infrastructure.vectorstore.get_version", return_value="2.0.0"):
         version = health_service.get_current_version("qdrant")
         assert version == "2.0.0"
 

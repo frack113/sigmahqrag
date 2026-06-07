@@ -1,17 +1,17 @@
 """GitHub Repository Management API v1."""
 
-from pathlib import Path
+import logging
 import re
 from datetime import datetime
+from pathlib import Path
+from threading import Lock
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
-from threading import Lock
 
-import logging
-
-from src.back.github.git import (
+from src.config.settings import get_config
+from src.infrastructure.github.git import (
     _get_repo_path,
     _is_valid_repo,
     clone_repo,
@@ -26,8 +26,6 @@ from src.back.github.git import (
     save_selected_dirs,
     update_repo,
 )
-
-from src.config.settings import get_config
 
 logger = logging.getLogger(__name__)
 

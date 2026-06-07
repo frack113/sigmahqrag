@@ -13,8 +13,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from ..registry import _VALID_FILTER_FIELDS, tool
 from ..models import ToolContext
+from ..registry import _VALID_FILTER_FIELDS, tool
 
 logger = logging.getLogger(__name__)
 # Additional services can be added here as needed

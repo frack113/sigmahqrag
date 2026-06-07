@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-import src.back.qdrant.client as qdrant_module
+import src.infrastructure.vectorstore.client as qdrant_module
 
 
 class TestGetQdrantClient:

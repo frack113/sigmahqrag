@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from src.back.qdrant import QdrantService
+from src.infrastructure.vectorstore import QdrantService
 
 
 class VectorStoreClient:

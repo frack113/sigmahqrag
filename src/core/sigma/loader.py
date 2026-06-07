@@ -1,4 +1,5 @@
 from pathlib import Path
+
 import yaml
 
 from .detectors import is_sigma_rule

@@ -9,7 +9,11 @@ from init_projet import EXPECTED_TABLES
 def test_schema_tables_match_sql():
     """Test that CREATE TABLE statements in initdb.sql match EXPECTED_TABLES."""
     sql_path = (
-        Path(__file__).parent.parent.parent.parent / "src" / "back" / "database" / "initdb.sql"
+        Path(__file__).parent.parent.parent.parent
+        / "src"
+        / "infrastructure"
+        / "database"
+        / "initdb.sql"
     )
 
     sql_content = sql_path.read_text(encoding="utf-8")
@@ -38,7 +42,11 @@ def test_schema_tables_match_sql():
 def test_schema_version_in_sql():
     """Test that schema_version seed data exists in initdb.sql."""
     sql_path = (
-        Path(__file__).parent.parent.parent.parent / "src" / "back" / "database" / "initdb.sql"
+        Path(__file__).parent.parent.parent.parent
+        / "src"
+        / "infrastructure"
+        / "database"
+        / "initdb.sql"
     )
 
     sql_content = sql_path.read_text(encoding="utf-8")

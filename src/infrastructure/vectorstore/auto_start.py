@@ -28,7 +28,7 @@ async def start_qdrant(
         return
 
     if health_check is None:
-        from src.back.qdrant.health import check_health as health_check
+        from src.infrastructure.vectorstore.health import check_health as health_check
 
     assert health_check is not None
     try:
@@ -45,7 +45,7 @@ async def start_qdrant(
     if not qdrant_exe.exists():
         logger.info("Qdrant binary not found, downloading...")
         if installer_service is None:
-            from src.back.qdrant.downloader import QdrantInstallerService
+            from src.infrastructure.vectorstore.downloader import QdrantInstallerService
 
             installer_service = QdrantInstallerService()
         try:
@@ -61,7 +61,7 @@ async def start_qdrant(
             return
 
     if binary_service is None:
-        from src.back.qdrant.service import QdrantBinaryService
+        from src.infrastructure.vectorstore.service import QdrantBinaryService
 
         binary_service = QdrantBinaryService()
 
@@ -102,7 +102,7 @@ async def stop_qdrant() -> None:
         if _started_binary_service is not None:
             result = await _started_binary_service.stop()
         else:
-            from src.back.qdrant.service import QdrantBinaryService
+            from src.infrastructure.vectorstore.service import QdrantBinaryService
 
             service = QdrantBinaryService()
             result = await service.stop()

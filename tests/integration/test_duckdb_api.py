@@ -6,7 +6,7 @@ import tempfile
 import pytest
 from fastapi.testclient import TestClient
 
-from src.back.database import DatabaseService
+from src.infrastructure.database import DatabaseService
 from src.main import create_app
 
 

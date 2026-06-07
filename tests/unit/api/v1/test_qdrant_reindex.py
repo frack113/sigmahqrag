@@ -39,7 +39,7 @@ async def test_reindex_sigma_spec(mock_db):
     mock_db._writer_conn = MagicMock()
 
     with (
-        patch("src.back.qdrant.client.get_qdrant_client") as mock_qc,
+        patch("src.infrastructure.vectorstore.client.get_qdrant_client") as mock_qc,
         patch("src.api.v1.qdrant._recreate_collection"),
         patch("src.api.v1.qdrant.UnifiedIndexer") as mock_indexer_cls,
     ):
@@ -72,7 +72,7 @@ async def test_reindex_deletes_and_recreates_collection(mock_db):
     mock_db._writer_conn = MagicMock()
 
     with (
-        patch("src.back.qdrant.client.get_qdrant_client") as mock_qc,
+        patch("src.infrastructure.vectorstore.client.get_qdrant_client") as mock_qc,
         patch("src.api.v1.qdrant._recreate_collection") as mock_recreate,
         patch("src.api.v1.qdrant.UnifiedIndexer") as mock_indexer_cls,
     ):

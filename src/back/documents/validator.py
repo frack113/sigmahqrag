@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import logging
-from src.shared.schemas.sigma_rule import SigmaRule
+
 from src.back.documents.models import ValidationError, ValidationResult
+from src.shared.schemas.sigma_rule import SigmaRule
 
 logger = logging.getLogger(__name__)
 

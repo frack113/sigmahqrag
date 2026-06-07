@@ -33,7 +33,7 @@ async def start_llamacpp() -> None:
         logger.info("llama.cpp manage_internally=false -- skipping auto-start")
         return
 
-    from src.back.llamacpp.health import check_health
+    from src.infrastructure.llm.llamacpp.health import check_health
 
     try:
         health = await check_health(timeout=2.0, port=8080)
@@ -71,7 +71,7 @@ async def start_llamacpp() -> None:
         logger.warning("No LLM model configured or found -- cannot start llama.cpp")
         return
 
-    from src.back.llamacpp.service import LlamaBinaryService
+    from src.infrastructure.llm.llamacpp.service import LlamaBinaryService
 
     global _started_binary_service
     service = LlamaBinaryService()
@@ -112,7 +112,7 @@ async def stop_llamacpp() -> None:
         if _started_binary_service is not None:
             result = await _started_binary_service.stop()
         else:
-            from src.back.llamacpp.service import LlamaBinaryService
+            from src.infrastructure.llm.llamacpp.service import LlamaBinaryService
 
             service = LlamaBinaryService()
             result = await service.stop()

@@ -8,15 +8,16 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Depends, UploadFile, File as FastAPIFile
+from fastapi import APIRouter, Depends, UploadFile
+from fastapi import File as FastAPIFile
 from pydantic import BaseModel
 
 from src.api.dependencies import get_dispatcher
-from src.back.database.service import DatabaseService
-from src.config.settings import get_config
 from src.back.utils.identify_file_type import SUPPORTED_DOC_EXTENSION_MAP, identify
-from src.worker.enums import WorkerName
+from src.config.settings import get_config
+from src.infrastructure.database.service import DatabaseService
 from src.shared.utils import iso_now
+from src.worker.enums import WorkerName
 
 logger = logging.getLogger(__name__)
 

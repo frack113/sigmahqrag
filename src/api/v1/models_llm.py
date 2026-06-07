@@ -8,12 +8,12 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
 from src.api.dependencies import get_database_service, get_embedding_manager, get_unified_registry
-from src.back.models import HFRepo
 from src.api.v1._models_shared import (
     _delete_all_models_of_type,
     _delete_llm_model_file,
     _download_progress,
 )
+from src.back.models import HFRepo
 
 logger = logging.getLogger(__name__)
 

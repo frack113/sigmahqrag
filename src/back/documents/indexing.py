@@ -7,10 +7,10 @@ from typing import Any
 
 from llama_index.core.schema import TextNode
 
-from src.shared.schemas.sigma_rule import SigmaRule
-from src.back.qdrant import QdrantService
-from src.core.pipeline.ingestion import get_embedding_dimension
 from src.config.settings import get_config
+from src.core.pipeline.ingestion import get_embedding_dimension
+from src.infrastructure.vectorstore import QdrantService
+from src.shared.schemas.sigma_rule import SigmaRule
 
 logger = logging.getLogger(__name__)
 
@@ -167,8 +167,9 @@ def _sigma_rule_to_rich_chunks(rule: SigmaRule) -> list[TextNode]:
 
 async def _generate_embeddings(nodes: list[TextNode]) -> list[list[float]]:
     """Generate embeddings for nodes using batched inference."""
-    from src.core.embedding.factory import embed_documents
     from llama_index.core.schema import Document
+
+    from src.core.embedding.factory import embed_documents
 
     docs = [Document(text=node.text) for node in nodes]
     return await embed_documents(docs)

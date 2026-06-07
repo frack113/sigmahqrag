@@ -13,7 +13,7 @@ import re
 
 import httpx
 
-from src.back.llamacpp.client import LlamaClient
+from src.infrastructure.llm.llamacpp.client import LlamaClient
 
 logger = logging.getLogger(__name__)
 

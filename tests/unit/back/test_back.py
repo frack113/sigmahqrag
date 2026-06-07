@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.back.llamacpp.vram import VRAMEstimator
+from src.infrastructure.llm.llamacpp.vram import VRAMEstimator
 from src.back.models import (
     HFDownloadService,
     UnifiedRegistry,

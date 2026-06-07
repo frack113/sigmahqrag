@@ -90,14 +90,14 @@ class HealthCheckService:
         port = config.qdrant_port
         collection = config.qdrant_collection_name
 
-        from src.back.qdrant.health import check_health
+        from src.infrastructure.vectorstore.health import check_health
 
         basic_check = await check_health(port=port)
         start = time.time()
 
         if basic_check["status"] == "active":
             try:
-                from src.back.qdrant.client import get_qdrant_client
+                from src.infrastructure.vectorstore.client import get_qdrant_client
 
                 client = get_qdrant_client(host=host, port=port, timeout=TIMEOUT)
                 collections = client.get_collections().collections
@@ -145,11 +145,11 @@ class HealthCheckService:
     def get_current_version(self, service: str) -> str | None:
         """Get current version of a service."""
         if service in ("llama", "llama.cpp", "llama_cpp"):
-            from src.back.llamacpp import get_version
+            from src.infrastructure.llm.llamacpp import get_version
 
             return get_version()
         elif service in ("qdrant", "qdrant_db"):
-            from src.back.qdrant import get_version
+            from src.infrastructure.vectorstore import get_version
 
             return get_version()
         return None

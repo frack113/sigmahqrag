@@ -3,14 +3,15 @@
 from __future__ import annotations
 
 import logging
+
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
-from src.back.database.service import DatabaseService
 from src.back.documents.models import IngestRequest
 from src.back.documents.sigma_ref_downloader import download_references
 from src.back.utils.identify_file_type import SUPPORTED_REFERENCE_DOC_TYPES
 from src.config.settings import get_config
+from src.infrastructure.database.service import DatabaseService
 
 logger = logging.getLogger(__name__)
 

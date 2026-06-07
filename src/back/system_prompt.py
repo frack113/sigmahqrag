@@ -7,7 +7,7 @@ import re
 import uuid
 from pathlib import Path
 
-from src.back.database import DatabaseService
+from src.infrastructure.database import DatabaseService
 
 logger = logging.getLogger(__name__)
 

@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-import src.back.qdrant.auto_start as _auto_start_mod
-from src.back.qdrant.auto_start import start_qdrant, stop_qdrant
+import src.infrastructure.vectorstore.auto_start as _auto_start_mod
+from src.infrastructure.vectorstore.auto_start import start_qdrant, stop_qdrant
 
 
 @pytest.fixture(autouse=True)
@@ -175,7 +175,7 @@ class TestStopQdrant:
 
     async def test_creates_service_if_no_stored_instance(self):
         _auto_start_mod._qdrant_started_by_us = True
-        with patch("src.back.qdrant.service.QdrantBinaryService") as mock_svc_cls:
+        with patch("src.infrastructure.vectorstore.service.QdrantBinaryService") as mock_svc_cls:
             mock_svc = AsyncMock()
             mock_svc.stop = AsyncMock(return_value={"success": True})
             mock_svc_cls.return_value = mock_svc

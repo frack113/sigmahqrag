@@ -10,8 +10,8 @@ from typing import Any
 import yaml
 from jinja2 import Template
 
-from src.back.llamacpp import LlamaClient
 from src.core.search.engine import SearchEngine
+from src.infrastructure.llm.llamacpp import LlamaClient
 
 from .cache import ResponseCache
 

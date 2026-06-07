@@ -2,8 +2,8 @@ import hashlib
 import logging
 from pathlib import Path
 
-from src.shared.utils import iso_now
 from src.back.utils.identify_file_type import identify
+from src.shared.utils import iso_now
 from src.worker.base import BaseWorker
 
 logger = logging.getLogger(__name__)

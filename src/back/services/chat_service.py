@@ -10,7 +10,6 @@ from typing import Any
 
 from src.back.services.rag_pipeline import RAGPipeline
 from src.back.services.sigma_validator import SigmaValidator
-
 from src.back.services.translate_service import (
     detect_sigma_yaml,
     extract_yaml_block,

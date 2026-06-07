@@ -10,13 +10,15 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 
 from src.api.dependencies import get_database_service, get_embedding_manager, get_unified_registry
-from src.back.database import DatabaseService
-from src.back.models import EmbeddingManager
 from src.api.v1._models_shared import (
     _delete_all_models_of_type,
-    _delete_embedding_model as _shared_delete_embedding,
     _download_progress,
 )
+from src.api.v1._models_shared import (
+    _delete_embedding_model as _shared_delete_embedding,
+)
+from src.back.models import EmbeddingManager
+from src.infrastructure.database import DatabaseService
 
 logger = logging.getLogger(__name__)
 

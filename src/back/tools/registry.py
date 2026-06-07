@@ -10,7 +10,7 @@ from __future__ import annotations
 import inspect
 import re
 import textwrap
-from typing import Any, get_origin, get_args
+from typing import Any, get_args, get_origin
 
 from .models import ToolDef
 

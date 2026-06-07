@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Any
 
-
 _download_progress: dict[str, dict] = {}
 
 
@@ -14,7 +13,8 @@ def _delete_all_models_of_type(model_type: str) -> None:
     from pathlib import Path
 
     from src.api.dependencies import get_database_service, get_unified_registry
-    from src.config.settings import LLM_DIR as llm_dir, EMBEDDINGS_DIR as emb_dir
+    from src.config.settings import EMBEDDINGS_DIR as emb_dir
+    from src.config.settings import LLM_DIR as llm_dir
 
     db = get_database_service()
     reg = get_unified_registry()

@@ -1,6 +1,6 @@
 """Tests for database dataclass models."""
 
-from src.back.database.models import (
+from src.infrastructure.database.models import (
     ConfigRow,
     DocRegistryRow,
     EmbeddingConfigRow,

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -17,8 +18,6 @@ from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.vector_stores.qdrant import QdrantVectorStore
 
 from src.config.settings import get_config
-
-import threading
 
 logger = logging.getLogger(__name__)
 
@@ -144,7 +143,7 @@ class IngestionPipelineBuilder:
         num_workers: int = DEFAULT_NUM_WORKERS,
     ) -> None:
         if model_name is None:
-            from src.back.database import DatabaseService
+            from src.infrastructure.database import DatabaseService
 
             config_data = DatabaseService.get_instance().get_embedding_config()
             self._model_name = (config_data.get("model") or "") or DEFAULT_MODEL
@@ -162,7 +161,7 @@ class IngestionPipelineBuilder:
 
     def _get_qdrant_store(self) -> QdrantVectorStore | None:
         try:
-            from src.back.qdrant.client import get_qdrant_client
+            from src.infrastructure.vectorstore.client import get_qdrant_client
 
             client = get_qdrant_client()
             return QdrantVectorStore(
@@ -175,7 +174,7 @@ class IngestionPipelineBuilder:
 
     def _check_qdrant_health(self) -> bool:
         try:
-            from src.back.qdrant.client import get_qdrant_client
+            from src.infrastructure.vectorstore.client import get_qdrant_client
 
             client = get_qdrant_client()
             client.get_collections()
@@ -200,8 +199,9 @@ class IngestionPipelineBuilder:
         if transform_cls is None:
             return None
 
-        from ..base import TransformConfig
         from src.core.document.clients import get_llm_client
+
+        from ..base import TransformConfig
 
         llm_client = get_llm_client()
         config = TransformConfig(
@@ -377,8 +377,9 @@ class IngestionPipelineBuilder:
 
     def _make_transform_config(self, file_path: str | Path) -> Any:
         """Build a TransformConfig suited for a specific file."""
-        from ..base import TransformConfig
         from src.core.document.clients import get_llm_client
+
+        from ..base import TransformConfig
 
         source = ""
         if self._collection_name:
@@ -462,7 +463,7 @@ def get_pipeline(
 ) -> IngestionPipeline:
     """Get or create a cached IngestionPipeline keyed by (model, collection)."""
     if model_name is None:
-        from src.back.database import DatabaseService
+        from src.infrastructure.database import DatabaseService
 
         config_data = DatabaseService.get_instance().get_embedding_config()
         model_name = config_data.get("model") or DEFAULT_MODEL

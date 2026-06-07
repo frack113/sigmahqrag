@@ -3,8 +3,8 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from llama_index.core.schema import Document
 from llama_index.core.node_parser import SentenceSplitter
+from llama_index.core.schema import Document
 
 from ..base import DocumentTransform
 from ..registry import TransformRegistry

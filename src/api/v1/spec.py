@@ -10,8 +10,8 @@ from typing import Any
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from src.back.database import DatabaseService
 from src.config.settings import get_config
+from src.infrastructure.database import DatabaseService
 
 logger = logging.getLogger(__name__)
 

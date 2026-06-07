@@ -8,13 +8,13 @@ import re
 import threading
 from typing import Any
 
-from qdrant_client.models import FieldCondition, Filter, MatchValue, MatchText
+from qdrant_client.models import FieldCondition, Filter, MatchText, MatchValue
 
-from src.back.database import DatabaseService
-from src.back.llamacpp.client import LlamaClient
-from src.back.qdrant.client import get_qdrant_client
 from src.core.pipeline.ingestion import DEFAULT_MODEL, build_embed_model
 from src.core.search.router import route_query
+from src.infrastructure.database import DatabaseService
+from src.infrastructure.llm.llamacpp.client import LlamaClient
+from src.infrastructure.vectorstore.client import get_qdrant_client
 
 logger = logging.getLogger(__name__)
 
