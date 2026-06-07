@@ -13,7 +13,7 @@ from src.api.v1._models_shared import (
     _delete_llm_model_file,
     _download_progress,
 )
-from src.back.models import HFRepo
+from src.application.models import HFRepo
 
 logger = logging.getLogger(__name__)
 

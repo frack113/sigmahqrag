@@ -37,7 +37,7 @@ from src.api.v1.search import router as search_v1_router
 from src.api.v1.spec import router as spec_v1_router
 from src.api.v1.system_prompt import router as prompts_v1_router
 from src.api.v1.translate import router as translate_v1_router
-from src.back.service_manager import shutdown_all_services
+from src.application.service_manager import shutdown_all_services
 from src.config.settings import TEMP_DIR
 from src.front import STATIC_DIR
 from src.infrastructure.database import DatabaseService
@@ -134,7 +134,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         db.initialize()
         app.state.db = db
 
-        from src.back.system_prompt import sync_prompts_from_files
+        from src.application.system_prompt import sync_prompts_from_files
 
         sync_prompts_from_files()
 

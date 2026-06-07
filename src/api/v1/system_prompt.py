@@ -8,7 +8,7 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from src.back.system_prompt import (
+from src.application.system_prompt import (
     add_prompt,
     delete_prompt,
     get_active_prompt,

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import logging
 
-from src.back.documents.sigma_ref_processor import process_sigma_refs
-from src.back.utils.identify_file_type import SUPPORTED_REFERENCE_DOC_TYPES
+from src.application.documents.sigma_ref_processor import process_sigma_refs
+from src.shared.utils.identify_file_type import SUPPORTED_REFERENCE_DOC_TYPES
 from src.config.settings import get_config
 from src.worker.base import BaseWorker
 from src.worker.enums import WorkerName, WorkerStatus

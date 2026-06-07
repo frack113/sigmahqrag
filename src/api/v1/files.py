@@ -13,7 +13,7 @@ from fastapi import File as FastAPIFile
 from pydantic import BaseModel
 
 from src.api.dependencies import get_dispatcher
-from src.back.utils.identify_file_type import SUPPORTED_DOC_EXTENSION_MAP, identify
+from src.shared.utils.identify_file_type import SUPPORTED_DOC_EXTENSION_MAP, identify
 from src.config.settings import get_config
 from src.infrastructure.database.service import DatabaseService
 from src.shared.utils import iso_now

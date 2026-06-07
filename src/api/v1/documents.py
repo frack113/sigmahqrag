@@ -7,9 +7,9 @@ import logging
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
-from src.back.documents.models import IngestRequest
-from src.back.documents.sigma_ref_downloader import download_references
-from src.back.utils.identify_file_type import SUPPORTED_REFERENCE_DOC_TYPES
+from src.application.documents.models import IngestRequest
+from src.application.documents.sigma_ref_downloader import download_references
+from src.shared.utils.identify_file_type import SUPPORTED_REFERENCE_DOC_TYPES
 from src.config.settings import get_config
 from src.infrastructure.database.service import DatabaseService
 

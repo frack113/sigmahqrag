@@ -5,8 +5,8 @@ import logging
 from fastapi import APIRouter, Depends, Header, Response
 from fastapi.responses import JSONResponse
 
-from src.back.feedback.models import FeedbackIn, FeedbackResponse
-from src.back.feedback.service import FeedbackService
+from src.application.feedback.models import FeedbackIn, FeedbackResponse
+from src.application.feedback.service import FeedbackService
 
 logger = logging.getLogger(__name__)
 

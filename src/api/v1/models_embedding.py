@@ -17,7 +17,7 @@ from src.api.v1._models_shared import (
 from src.api.v1._models_shared import (
     _delete_embedding_model as _shared_delete_embedding,
 )
-from src.back.models import EmbeddingManager
+from src.application.models import EmbeddingManager
 from src.infrastructure.database import DatabaseService
 
 logger = logging.getLogger(__name__)

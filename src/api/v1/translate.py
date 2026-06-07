@@ -8,8 +8,8 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from src.back.services.rag_pipeline import RAGPipeline
-from src.back.services.translate_service import translate_detection
+from src.application.services.rag_pipeline import RAGPipeline
+from src.application.services.translate_service import translate_detection
 
 logger = logging.getLogger(__name__)
 
