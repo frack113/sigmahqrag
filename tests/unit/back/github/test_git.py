@@ -2,7 +2,7 @@
 
 import pytest
 
-from src.back.github.git import _validate_git_url, _validate_org_name
+from src.infrastructure.github.git import _validate_git_url, _validate_org_name
 
 
 class TestValidateOrgName:

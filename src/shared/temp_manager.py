@@ -80,7 +80,7 @@ def get_temp_manager() -> TempManager:
     """Get or create the cached temp manager singleton."""
     global _temp_manager
     if _temp_manager is None:
-        from src.shared.config import TEMP_DIR
+        from src.config.settings import TEMP_DIR
 
         _temp_manager = TempManager(temp_dir=TEMP_DIR)
     return _temp_manager

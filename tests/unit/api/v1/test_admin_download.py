@@ -8,7 +8,8 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from src.api.v1 import admin, qdrant
+from src.api.v1 import admin
+from src.api.v1.infrastructure import qdrant
 
 
 @pytest.fixture
@@ -29,7 +30,7 @@ def client(app: FastAPI) -> TestClient:
 class TestPostAdminDownload:
     """Test POST /api/v1/admin/download endpoint."""
 
-    @patch("src.api.v1.qdrant.create_download_manager")
+    @patch("src.api.v1.infrastructure.qdrant.create_download_manager")
     def test_qdrant_download_returns_200_with_job_id(
         self, mock_dm: AsyncMock, client: TestClient
     ) -> None:

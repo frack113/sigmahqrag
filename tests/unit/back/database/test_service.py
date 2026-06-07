@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from src.back.database import DatabaseService
+from src.infrastructure.database import DatabaseService
 
 
 @pytest.fixture
@@ -812,7 +812,7 @@ class TestDefaultDbPath:
 
         mock_cfg = MagicMock()
         mock_cfg.paths_duckdb_path = "/tmp/test.duckdb"
-        with patch("src.back.database.core._default_db_path") as mock_fn:
+        with patch("src.infrastructure.database.core._default_db_path") as mock_fn:
             mock_fn.return_value = "/tmp/test.duckdb"
             svc = DatabaseService()
             assert "test.duckdb" in str(svc.db_path)
@@ -1128,14 +1128,14 @@ class TestReposWithSelectedDirs:
 
 class TestGetInstance:
     def test_get_instance_without_init_raises(self) -> None:
-        from src.back.database import DatabaseService as DS
+        from src.infrastructure.database import DatabaseService as DS
 
         DS._instance = None
         with pytest.raises(RuntimeError, match="not initialized"):
             DS.get_instance()
 
     def test_get_instance_returns_existing(self, db: DatabaseService) -> None:
-        from src.back.database import DatabaseService as DS
+        from src.infrastructure.database import DatabaseService as DS
 
         inst = DS.get_instance()
         assert inst is db
@@ -1160,11 +1160,11 @@ class TestDefaultDbPathFunction:
     def test_calls_get_config(self) -> None:
         from unittest.mock import MagicMock, patch
 
-        from src.back.database.service import _default_db_path
+        from src.infrastructure.database.service import _default_db_path
 
         mock_cfg = MagicMock()
         mock_cfg.paths_duckdb_path = "test/path.db"
-        with patch("src.shared.config.get_config", return_value=mock_cfg):
+        with patch("src.config.settings.get_config", return_value=mock_cfg):
             result = _default_db_path()
         assert result == "test/path.db"
 

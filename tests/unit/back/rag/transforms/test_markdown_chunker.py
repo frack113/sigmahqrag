@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from src.rag.transforms.base import TransformConfig
-from src.rag.transforms.markdown.chunker import MarkdownChunker
+from src.core.base import TransformConfig
+from src.core.document.chunker import MarkdownChunker
 
 
 SAMPLE_MD = """# Chapter 1
@@ -54,7 +54,7 @@ class TestMarkdownChunker:
         f.write_text("Just text.")
         chunker = MarkdownChunker(TransformConfig(max_heading_level=2))
         docs = chunker.parse(f)
-        chunks = chunker.chunk(docs)
+        chunks = chunker.process(docs)
         assert len(chunks) == 1
         assert chunks[0].metadata["chunk_type"] == "global"
 
@@ -62,7 +62,7 @@ class TestMarkdownChunker:
         config = TransformConfig(max_heading_level=2)
         chunker = MarkdownChunker(config)
         docs = chunker.parse(md_file)
-        chunks = chunker.chunk(docs)
+        chunks = chunker.process(docs)
         chunk_types = [c.metadata["chunk_type"] for c in chunks]
         assert "global" in chunk_types
         assert "heading_h1" in chunk_types
@@ -73,7 +73,7 @@ class TestMarkdownChunker:
         config = TransformConfig(max_heading_level=3)
         chunker = MarkdownChunker(config)
         docs = chunker.parse(md_file)
-        chunks = chunker.chunk(docs)
+        chunks = chunker.process(docs)
         chunk_types = [c.metadata["chunk_type"] for c in chunks]
         assert "heading_h3" in chunk_types
 
@@ -81,7 +81,7 @@ class TestMarkdownChunker:
         config = TransformConfig(max_heading_level=1)
         chunker = MarkdownChunker(config)
         docs = chunker.parse(md_file)
-        chunks = chunker.chunk(docs)
+        chunks = chunker.process(docs)
         chunk_types = [c.metadata["chunk_type"] for c in chunks]
         assert "heading_h1" in chunk_types
         assert "heading_h2" not in chunk_types
@@ -91,7 +91,7 @@ class TestMarkdownChunker:
         config = TransformConfig(max_heading_level=3)
         chunker = MarkdownChunker(config)
         docs = chunker.parse(md_file)
-        chunks = chunker.chunk(docs)
+        chunks = chunker.process(docs)
         h3_chunks = [c for c in chunks if c.metadata["chunk_type"] == "heading_h3"]
         assert len(h3_chunks) == 1
         assert (
@@ -102,7 +102,7 @@ class TestMarkdownChunker:
         config = TransformConfig(max_heading_level=2)
         chunker = MarkdownChunker(config)
         docs = chunker.parse(md_file)
-        chunks = chunker.chunk(docs)
+        chunks = chunker.process(docs)
         h1 = [
             c
             for c in chunks
@@ -120,7 +120,7 @@ class TestMarkdownChunker:
         config = TransformConfig(max_heading_level=2)
         chunker = MarkdownChunker(config)
         docs = chunker.parse(md_file)
-        chunks = chunker.chunk(docs)
+        chunks = chunker.process(docs)
         s11 = [
             c
             for c in chunks
@@ -136,7 +136,7 @@ class TestMarkdownChunker:
         config = TransformConfig(max_heading_level=2)
         chunker = MarkdownChunker(config)
         docs = chunker.parse(md_file)
-        chunks = chunker.chunk(docs)
+        chunks = chunker.process(docs)
         for c in chunks:
             assert c.metadata["source_file"] == str(md_file)
             assert c.metadata["doc_type"] == "markdown"
@@ -154,7 +154,7 @@ class TestMarkdownChunker:
         f.write_text("")
         chunker = MarkdownChunker(TransformConfig(max_heading_level=2))
         docs = chunker.parse(f)
-        chunks = chunker.chunk(docs)
+        chunks = chunker.process(docs)
         assert len(chunks) == 1
 
     def test_can_handle(self):
@@ -167,7 +167,7 @@ class TestMarkdownChunker:
         config = TransformConfig(max_heading_level=1)
         chunker = MarkdownChunker(config)
         docs = chunker.parse(md_file)
-        chunks = chunker.chunk(docs)
+        chunks = chunker.process(docs)
         # global + 2 H1 = 3
         assert len(chunks) == 3
 
@@ -175,7 +175,7 @@ class TestMarkdownChunker:
         config = TransformConfig(max_heading_level=2)
         chunker = MarkdownChunker(config)
         docs = chunker.parse(md_file)
-        chunks = chunker.chunk(docs)
+        chunks = chunker.process(docs)
         # global + 2 H1 + 3 H2 = 6
         assert len(chunks) == 6
 
@@ -183,6 +183,6 @@ class TestMarkdownChunker:
         config = TransformConfig(max_heading_level=3)
         chunker = MarkdownChunker(config)
         docs = chunker.parse(md_file)
-        chunks = chunker.chunk(docs)
+        chunks = chunker.process(docs)
         # global + 2 H1 + 3 H2 + 1 H3 = 7
         assert len(chunks) == 7

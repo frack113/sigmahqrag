@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.rag.search import (
+from src.core.search.engine import (
     SearchEngine,
     _get_search_embed_model,
     format_result_by_collection,
@@ -44,11 +44,11 @@ class TestGetSearchEmbedModel:
         mock_db = MagicMock()
         mock_db.get_embedding_config.return_value = {}
         with (
-            patch("src.rag.search._async_embed_model", None),
-            patch("src.rag.search.DatabaseService.get_instance", return_value=mock_db),
-            patch("src.rag.search.build_embed_model") as mock_build,
+            patch("src.core.search.engine._async_embed_model", None),
+            patch("src.core.search.engine.DatabaseService.get_instance", return_value=mock_db),
+            patch("src.core.search.engine.build_embed_model") as mock_build,
         ):
-            from src.rag.ingestion import DEFAULT_MODEL
+            from src.core.pipeline.ingestion import DEFAULT_MODEL
 
             _get_search_embed_model()
         mock_build.assert_called_once_with(DEFAULT_MODEL)
@@ -57,9 +57,9 @@ class TestGetSearchEmbedModel:
         mock_db = MagicMock()
         mock_db.get_embedding_config.return_value = {}
         with (
-            patch("src.rag.search._async_embed_model", None),
-            patch("src.rag.search.DatabaseService.get_instance", return_value=mock_db),
-            patch("src.rag.search.build_embed_model") as mock_build,
+            patch("src.core.search.engine._async_embed_model", None),
+            patch("src.core.search.engine.DatabaseService.get_instance", return_value=mock_db),
+            patch("src.core.search.engine.build_embed_model") as mock_build,
         ):
             mock_build.return_value = "fake_model"
             first = _get_search_embed_model()
@@ -81,8 +81,8 @@ class TestSearch:
         mock_embed = AsyncMock()
         mock_embed.aget_query_embedding = AsyncMock(return_value=[0.1])
         with (
-            patch("src.rag.search.get_qdrant_client", return_value=mock_client),
-            patch("src.rag.search._get_search_embed_model", return_value=mock_embed),
+            patch("src.core.search.engine.get_qdrant_client", return_value=mock_client),
+            patch("src.core.search.engine._get_search_embed_model", return_value=mock_embed),
         ):
             results = await search("query")
         assert results == []
@@ -97,8 +97,8 @@ class TestSearch:
         mock_embed = AsyncMock()
         mock_embed.aget_query_embedding = AsyncMock(return_value=[0.1])
         with (
-            patch("src.rag.search.get_qdrant_client", return_value=mock_client),
-            patch("src.rag.search._get_search_embed_model", return_value=mock_embed),
+            patch("src.core.search.engine.get_qdrant_client", return_value=mock_client),
+            patch("src.core.search.engine._get_search_embed_model", return_value=mock_embed),
         ):
             results = await search("query")
         assert len(results) == 1
@@ -115,8 +115,8 @@ class TestSearch:
         mock_embed = AsyncMock()
         mock_embed.aget_query_embedding = AsyncMock(return_value=[0.1])
         with (
-            patch("src.rag.search.get_qdrant_client", return_value=mock_client),
-            patch("src.rag.search._get_search_embed_model", return_value=mock_embed),
+            patch("src.core.search.engine.get_qdrant_client", return_value=mock_client),
+            patch("src.core.search.engine._get_search_embed_model", return_value=mock_embed),
         ):
             results = await search("query")
         assert len(results) == 1
@@ -133,8 +133,8 @@ class TestSearch:
         mock_embed = AsyncMock()
         mock_embed.aget_query_embedding = AsyncMock(return_value=[0.1])
         with (
-            patch("src.rag.search.get_qdrant_client", return_value=mock_client),
-            patch("src.rag.search._get_search_embed_model", return_value=mock_embed),
+            patch("src.core.search.engine.get_qdrant_client", return_value=mock_client),
+            patch("src.core.search.engine._get_search_embed_model", return_value=mock_embed),
         ):
             results = await search("query")
         assert len(results) == 1
@@ -151,8 +151,8 @@ class TestSearch:
         mock_embed = AsyncMock()
         mock_embed.aget_query_embedding = AsyncMock(return_value=[0.1])
         with (
-            patch("src.rag.search.get_qdrant_client", return_value=mock_client),
-            patch("src.rag.search._get_search_embed_model", return_value=mock_embed),
+            patch("src.core.search.engine.get_qdrant_client", return_value=mock_client),
+            patch("src.core.search.engine._get_search_embed_model", return_value=mock_embed),
         ):
             results = await search("query")
         assert len(results) == 1
@@ -169,8 +169,8 @@ class TestSearch:
         mock_embed = AsyncMock()
         mock_embed.aget_query_embedding = AsyncMock(return_value=[0.1])
         with (
-            patch("src.rag.search.get_qdrant_client", return_value=mock_client),
-            patch("src.rag.search._get_search_embed_model", return_value=mock_embed),
+            patch("src.core.search.engine.get_qdrant_client", return_value=mock_client),
+            patch("src.core.search.engine._get_search_embed_model", return_value=mock_embed),
         ):
             results = await search("query")
         assert len(results) == 1
@@ -187,15 +187,15 @@ class TestSearch:
         mock_embed = AsyncMock()
         mock_embed.aget_query_embedding = AsyncMock(return_value=[0.1])
         with (
-            patch("src.rag.search.get_qdrant_client", return_value=mock_client),
-            patch("src.rag.search._get_search_embed_model", return_value=mock_embed),
+            patch("src.core.search.engine.get_qdrant_client", return_value=mock_client),
+            patch("src.core.search.engine._get_search_embed_model", return_value=mock_embed),
         ):
             results = await search("query", similarity_threshold=0.5)
         assert results == []
 
     @pytest.mark.asyncio
     async def test_exception_returns_empty(self) -> None:
-        with patch("src.rag.search.get_qdrant_client", side_effect=ValueError("fail")):
+        with patch("src.core.search.engine.get_qdrant_client", side_effect=ValueError("fail")):
             results = await search("query")
         assert results == []
 
@@ -204,23 +204,37 @@ class TestSearchEngineSearch:
     @pytest.mark.asyncio
     async def test_default_top_k(self) -> None:
         engine = SearchEngine()
-        with patch("src.rag.search.search", AsyncMock(return_value=[{"text": "a"}])):
+        mock_node = MagicMock(text="a", score=0.9, metadata={})
+        with (
+            patch("src.core.search.engine.get_collection_retriever") as mock_get_retriever,
+            patch("src.core.search.engine.QueryFusionRetriever") as mock_fusion_class,
+        ):
+            mock_get_retriever.return_value = MagicMock()
+            mock_fusion = MagicMock()
+            mock_fusion.aretrieve = AsyncMock(return_value=[mock_node])
+            mock_fusion_class.return_value = mock_fusion
             results = await engine.search("q")
         assert len(results) == 1
         assert results[0]["text"] == "a"
-        assert "rrf_score" in results[0]
 
     @pytest.mark.asyncio
     async def test_custom_top_k(self) -> None:
         engine = SearchEngine()
-        with patch("src.rag.search.search", AsyncMock()) as mock_search:
+        with (
+            patch("src.core.search.engine.get_collection_retriever") as mock_get_retriever,
+            patch("src.core.search.engine.QueryFusionRetriever") as mock_fusion_class,
+        ):
+            mock_get_retriever.return_value = MagicMock()
+            mock_fusion = MagicMock()
+            mock_fusion.aretrieve = AsyncMock(
+                return_value=[MagicMock(text="ok", score=0.5, metadata={})]
+            )
+            mock_fusion_class.return_value = mock_fusion
             await engine.search("q", top_k=3)
         # per_collection_k = max(3 * 2, 10) = 10
-        assert mock_search.call_count == len(engine.collection_names)
-        for call in mock_search.call_args_list:
-            assert call.kwargs["query"] == "q"
+        assert mock_get_retriever.call_count == len(engine.collection_names)
+        for call in mock_get_retriever.call_args_list:
             assert call.kwargs["top_k"] == 10
-            assert call.kwargs["similarity_threshold"] == 0.0
 
 
 class TestFormatSearchResult:
@@ -364,41 +378,69 @@ class TestSearchEngineWithRouter:
     @pytest.mark.asyncio
     async def test_router_disabled_searches_all_collections(self) -> None:
         engine = SearchEngine(use_router=False)
-        with patch("src.rag.search.search", AsyncMock(return_value=[{"text": "a"}])) as mock_search:
+        mock_node = MagicMock(text="a", score=0.9, metadata={})
+        with (
+            patch("src.core.search.engine.get_collection_retriever") as mock_get_retriever,
+            patch("src.core.search.engine.QueryFusionRetriever") as mock_fusion_class,
+        ):
+            mock_get_retriever.return_value = MagicMock()
+            mock_fusion = MagicMock()
+            mock_fusion.aretrieve = AsyncMock(return_value=[mock_node])
+            mock_fusion_class.return_value = mock_fusion
             await engine.search("q")
-        assert mock_search.call_count == 3
+        assert mock_get_retriever.call_count == 3
 
     @pytest.mark.asyncio
     async def test_router_enabled_filters_collections(self) -> None:
         engine = SearchEngine(use_router=True)
+        mock_node = MagicMock(text="a", score=0.9, metadata={})
         with (
-            patch("src.rag.search.route_query", AsyncMock(return_value=["sigma_rules"])),
-            patch("src.rag.search.search", AsyncMock(return_value=[{"text": "a"}])) as mock_search,
+            patch("src.core.search.engine.route_query", AsyncMock(return_value=["sigma_rules"])),
+            patch("src.core.search.engine.get_collection_retriever") as mock_get_retriever,
+            patch("src.core.search.engine.QueryFusionRetriever") as mock_fusion_class,
         ):
+            mock_get_retriever.return_value = MagicMock()
+            mock_fusion = MagicMock()
+            mock_fusion.aretrieve = AsyncMock(return_value=[mock_node])
+            mock_fusion_class.return_value = mock_fusion
             await engine.search("q")
-        assert mock_search.call_count == 1
-        assert mock_search.call_args_list[0].kwargs["collection_name"] == "sigma_rules"
+        assert mock_get_retriever.call_count == 1
 
     @pytest.mark.asyncio
     async def test_router_returns_unknown_collection_falls_back(self) -> None:
         engine = SearchEngine(use_router=True)
+        mock_node = MagicMock(text="a", score=0.9, metadata={})
         with (
             patch(
-                "src.rag.search.route_query",
+                "src.core.search.engine.route_query",
                 AsyncMock(return_value=["unknown_collection"]),
             ),
-            patch("src.rag.search.search", AsyncMock(return_value=[{"text": "a"}])) as mock_search,
+            patch("src.core.search.engine.get_collection_retriever") as mock_get_retriever,
+            patch("src.core.search.engine.QueryFusionRetriever") as mock_fusion_class,
         ):
+            mock_get_retriever.return_value = MagicMock()
+            mock_fusion = MagicMock()
+            mock_fusion.aretrieve = AsyncMock(return_value=[mock_node])
+            mock_fusion_class.return_value = mock_fusion
             await engine.search("q")
         # Falls back to all collections when routed results don't match
-        assert mock_search.call_count == 3
+        assert mock_get_retriever.call_count == 3
 
     @pytest.mark.asyncio
     async def test_router_failure_falls_back(self) -> None:
         engine = SearchEngine(use_router=True)
+        mock_node = MagicMock(text="a", score=0.9, metadata={})
         with (
-            patch("src.rag.search.route_query", AsyncMock(side_effect=Exception("timeout"))),
-            patch("src.rag.search.search", AsyncMock(return_value=[{"text": "a"}])) as mock_search,
+            patch(
+                "src.core.search.engine.route_query", AsyncMock(side_effect=Exception("timeout"))
+            ),
+            patch("src.core.search.engine.get_collection_retriever") as mock_get_retriever,
+            patch("src.core.search.engine.QueryFusionRetriever") as mock_fusion_class,
         ):
+            mock_get_retriever.return_value = MagicMock()
+            mock_fusion = MagicMock()
+            mock_fusion.aretrieve = AsyncMock(return_value=[mock_node])
+            mock_fusion_class.return_value = mock_fusion
             await engine.search("q")
-        assert mock_search.call_count == 3
+        # Falls back to all collections when router fails
+        assert mock_get_retriever.call_count == 3

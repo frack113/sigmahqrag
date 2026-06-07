@@ -1,6 +1,6 @@
 """Tests for GitHub repository schemas."""
 
-from src.shared.schemas.github_repo import (
+from src.infrastructure.github.models import (
     GitHubRepoCreate,
     GitHubRepoInfo,
     GitHubRepoMetadata,

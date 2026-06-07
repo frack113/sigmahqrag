@@ -16,19 +16,19 @@ except ImportError:
     print("✗ GitPython not installed. Run: uv add gitpython", file=sys.stderr)
     sys.exit(1)
 
-from src.back.database import DatabaseServiceProtocol
-from src.shared.constants import (
-    SIGMA_SPEC_REPO,
-    SIGMA_SPEC_REF,
-    SCHEMA_VERSION,
+from src.config.constants import (
     DEFAULT_LLAMA_BASE_URL,
     DEFAULT_QDRANT_BASE_URL,
     DEFAULT_QDRANT_COLLECTION,
     DEFAULT_QDRANT_VECTOR_SIZE,
+    SCHEMA_VERSION,
+    SIGMA_SPEC_REF,
+    SIGMA_SPEC_REPO,
 )
-from src.shared import LLM_DIR, EMBEDDINGS_DIR
-from src.worker.processor import TaskDispatcher
-from src.worker.enums import WorkerName, WorkerStatus
+from src.config.settings import EMBEDDINGS_DIR, LLM_DIR
+from src.infrastructure.database import DatabaseServiceProtocol
+from src.workers.enums import WorkerName, WorkerStatus
+from src.workers.processor import TaskDispatcher
 
 # Configure structured logging
 logger = logging.getLogger("init_projet")
@@ -109,6 +109,10 @@ def _generate_default_toml() -> str:
         "log_max_file = 5",
         "clean_at_startup = false",
         "",
+        "[Hardware]",
+        'os = "windows"',
+        'gpu = "vulkan"',
+        "",
     ]
     return "\n".join(lines)
 
@@ -128,7 +132,7 @@ def create_data_structure() -> None:
 
 
 def create_config_file() -> None:
-    """Create sigmarag.toml at project root (no [backend] section)."""
+    """Create sigmarag.toml at project root with default configuration."""
     if not CONFIG_FILE.exists():
         CONFIG_FILE.write_text(DEFAULT_TOML, encoding="utf-8")
         log_info(f"Created {CONFIG_FILE}")
@@ -211,7 +215,7 @@ def initialize_database(db_service: Optional[DatabaseServiceProtocol] = None) ->
     Callers are responsible for closing it.
     """
     # Import here to avoid circular imports
-    from src.back.database import DatabaseService
+    from src.infrastructure.database import DatabaseService
 
     db = db_service or DatabaseService()
     db.initialize()
@@ -321,8 +325,8 @@ def _sync_model_registry_to_db() -> None:
     Uses the DatabaseService singleton (already initialized by
     initialize_database). Does not close it — the caller manages lifecycle.
     """
-    from src.back.database import DatabaseService
     from src.back.models.registry import UnifiedRegistry
+    from src.infrastructure.database import DatabaseService
 
     try:
         db = DatabaseService.get_instance()
@@ -340,7 +344,7 @@ def main() -> None:
     logger.info("SigmaHQ RAG - Project Initialization")
     logger.info("=" * 50)
 
-    from src.back.database import DatabaseService
+    from src.infrastructure.database import DatabaseService
 
     create_data_structure()
     create_config_file()

@@ -1,0 +1,70 @@
+"""Centralized configuration API v1 — backend config (DuckDB) + remaining TOML settings."""
+
+from __future__ import annotations
+
+import logging
+from typing import Any
+
+from fastapi import APIRouter
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel
+
+from src.config.settings import get_config
+from src.infrastructure.database.service import DatabaseService
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(prefix="/api/v1", tags=["config-v1"])
+
+
+class ConfigUpdateRequest(BaseModel):
+    """Request model for config updates."""
+
+    backend: dict[str, Any] | None = None
+
+
+@router.get("/config")
+async def get_full_config() -> JSONResponse:
+    """GET /api/v1/config — Return full application configuration."""
+    try:
+        config = get_config()
+        return JSONResponse(content={"status": "success", "data": config.to_dict()})
+    except Exception as e:
+        logger.error(f"Failed to load config: {e}")
+        return JSONResponse(
+            status_code=500, content={"status": "error", "error": "An internal error occurred"}
+        )
+
+
+@router.post("/config")
+async def update_config(request: ConfigUpdateRequest) -> JSONResponse:
+    """POST /api/v1/config — Update backend config (os, gpu_type) persisted to DuckDB."""
+    try:
+        config = get_config()
+        if request.backend:
+            os_val = request.backend.get("os")
+            gpu_val = request.backend.get("gpu_type")
+
+            if os_val:
+                config.os = os_val
+            if gpu_val:
+                config.gpu_type = gpu_val
+
+            db = DatabaseService.get_instance()
+            if os_val is not None:
+                db.set_config("backend.os", os_val)
+            if gpu_val is not None:
+                db.set_config("backend.gpu_type", gpu_val)
+
+        return JSONResponse(
+            content={
+                "status": "success",
+                "message": "Configuration updated and persisted",
+                "data": config.to_dict(),
+            }
+        )
+    except Exception as e:
+        logger.error(f"Failed to update config: {e}")
+        return JSONResponse(
+            status_code=500, content={"status": "error", "error": "An internal error occurred"}
+        )

@@ -1219,6 +1219,19 @@ wheels = [
 ]
 
 [[package]]
+name = "llama-index-llms-openai-like"
+version = "0.7.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "llama-index-core" },
+    { name = "llama-index-llms-openai" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/3b/a3/16410b28d131aa113ada79f856b78cb68a8e92a1e27255ea9c36c27a5dec/llama_index_llms_openai_like-0.7.2.tar.gz", hash = "sha256:ed9ff73f975dce470f98ac61c982151ba78eedfa3fb9b03894bc1d1312b213ff", size = 5389, upload-time = "2026-04-23T23:05:32.525Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f4/0c/fdddaee5391d915d3d568d2d8dbdb7c95647e65bb94d4ddb31d47cef5daf/llama_index_llms_openai_like-0.7.2-py3-none-any.whl", hash = "sha256:1f45a7b1cec8fb3f5997684327ffe6c19f93e789c2fff35dc5522465850faf0b", size = 6602, upload-time = "2026-04-23T23:05:31.708Z" },
+]
+
+[[package]]
 name = "llama-index-readers-file"
 version = "0.6.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2768,6 +2781,7 @@ dependencies = [
     { name = "jinja2" },
     { name = "llama-index" },
     { name = "llama-index-embeddings-huggingface" },
+    { name = "llama-index-llms-openai-like" },
     { name = "llama-index-readers-file" },
     { name = "llama-index-vector-stores-qdrant" },
     { name = "puremagic" },
@@ -2802,6 +2816,7 @@ requires-dist = [
     { name = "jinja2", specifier = ">=3.1.6" },
     { name = "llama-index", specifier = ">=0.14.22" },
     { name = "llama-index-embeddings-huggingface", specifier = ">=0.7.0" },
+    { name = "llama-index-llms-openai-like", specifier = ">=0.7.2" },
     { name = "llama-index-readers-file", specifier = ">=0.6.0" },
     { name = "llama-index-vector-stores-qdrant", specifier = ">=0.10.1" },
     { name = "puremagic", specifier = ">=2.2.0" },

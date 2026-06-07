@@ -4,8 +4,8 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-from src.front import TEMPLATES_DIR
-from src.shared import get_config
+from src.config.settings import get_config
+from src.presentation import TEMPLATES_DIR
 
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
 

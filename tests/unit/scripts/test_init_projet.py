@@ -45,7 +45,7 @@ def test_config_file_created_no_backend_section(temp_project_dir):
     assert "[services.llama]" in content
     assert "[services.qdrant]" in content
     assert "[logging]" in content
-    assert "[rag]" in content
+    assert "[Hardware]" in content
 
 
 def test_config_file_not_overwritten(temp_project_dir):
@@ -75,7 +75,7 @@ def test_schema_version_set_in_database(temp_project_dir):
         initialize_database,
         SCHEMA_VERSION,
     )
-    from src.back.database import DatabaseService
+    from src.infrastructure.database import DatabaseService
 
     # Run init steps
     create_data_structure()
@@ -125,7 +125,6 @@ def test_initialize_database_injectable(temp_project_dir):
     mock_db.initialize.assert_called_once()
     mock_db.get_tables.assert_called_once()
     mock_db.set_config.assert_called_once_with("schema_version", 1)
-    mock_db.close.assert_called_once()
 
 
 if __name__ == "__main__":

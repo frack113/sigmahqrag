@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-import src.back.qdrant.client as qdrant_module
+import src.infrastructure.vectorstore.client as qdrant_module
 
 
 class TestGetQdrantClient:
@@ -37,7 +37,7 @@ class TestGetQdrantClient:
     def test_singleton_first_call(self) -> None:
         with (
             patch.object(qdrant_module, "qdrant_client") as mock_qdrant,
-            patch("src.shared.get_config") as mock_cfg,
+            patch("src.config.settings.get_config") as mock_cfg,
             patch.object(qdrant_module, "_client_instance", None),
         ):
             mock_cfg.return_value.qdrant_host = "default"

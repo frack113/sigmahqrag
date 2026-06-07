@@ -1,0 +1,95 @@
+"""Shared fixtures for worker tests."""
+
+from __future__ import annotations
+
+import os
+import tempfile
+from unittest.mock import MagicMock
+
+import pytest
+
+from src.infrastructure.database import DatabaseService
+
+
+@pytest.fixture
+def db() -> DatabaseService:
+    tmp = tempfile.NamedTemporaryFile(suffix=".duckdb", delete=False)
+    tmp.close()
+    os.unlink(tmp.name)
+    d = DatabaseService(tmp.name)
+    d.initialize()
+    yield d
+    d.close()
+    if os.path.exists(tmp.name):
+        os.unlink(tmp.name)
+
+
+@pytest.fixture
+def mock_db() -> MagicMock:
+    """Mock DatabaseService for worker tests that don't need real DB."""
+    db = MagicMock()
+    db.upsert_worker_state = MagicMock()
+    db.update_worker_progress = MagicMock()
+    db.get_worker_progress = MagicMock(return_value=None)
+    db.claim_task = MagicMock(return_value=True)
+    db.is_worker_busy = MagicMock(return_value=False)
+    db.reset_stale_workers = MagicMock()
+    db.get_entries_by_org = MagicMock(return_value=[])
+    db.get_pending_entries = MagicMock(return_value=[])
+    db.get_pending_doc_registry = MagicMock(return_value=[])
+    db.get_doc_errors = MagicMock(return_value=[])
+    db.batch_upsert_doc_registry = MagicMock()
+    db.upsert_doc_error = MagicMock()
+    db.update_doc_registry_embed_status = MagicMock()
+    db.delete_doc_registry_by_url = MagicMock()
+    db.update_embed_status = MagicMock()
+    db.get_local_files = MagicMock(return_value=[])
+    db.get_local_file_count = MagicMock(return_value=0)
+    db.get_repos_with_selected_dirs = MagicMock(return_value=[])
+    db.get_selected_dirs = MagicMock(return_value=[])
+    return db
+
+
+@pytest.fixture
+def sample_task() -> dict:
+    return {
+        "task_id": "test-task-001",
+        "task_type": "test",
+        "collection_name": "test-org/test-repo",
+        "source_type": "github",
+    }
+
+
+@pytest.fixture
+def sample_sigmaref_task() -> dict:
+    return {
+        "task_id": "sigmaref-task-001",
+        "task_type": "sigmaref_discovery",
+        "collection_name": "sigmaref",
+        "source_type": "sigmaref",
+        "rules_dir": "data/github",
+        "output_dir": "data/documents/sigmaref",
+    }
+
+
+@pytest.fixture
+def sample_github_discovery_task() -> dict:
+    return {
+        "task_id": "github-disc-001",
+        "task_type": "github_discovery",
+        "collection_name": "test-org/test-repo",
+        "source_type": "github_discovery",
+        "org": "test-org",
+        "repo": "test-repo",
+    }
+
+
+@pytest.fixture
+def sample_local_discovery_task() -> dict:
+    return {
+        "task_id": "local-disc-001",
+        "task_type": "local_discovery",
+        "collection_name": "local",
+        "source_type": "local_discovery",
+        "base_path": "data/documents/local",
+    }

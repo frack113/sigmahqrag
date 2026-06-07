@@ -5,7 +5,7 @@ import tempfile
 
 import pytest
 
-from src.back.database.service import DatabaseService, _VALID_TABLES
+from src.infrastructure.database.service import DatabaseService, _VALID_TABLES
 
 
 @pytest.fixture

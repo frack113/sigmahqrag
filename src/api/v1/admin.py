@@ -11,7 +11,7 @@ from fastapi import APIRouter, Header
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from src.shared import get_config
+from src.config.settings import get_config
 
 logger = logging.getLogger(__name__)
 
@@ -64,9 +64,9 @@ async def check_service_health() -> dict[str, Any]:
 
     from httpx import AsyncClient
 
-    from src.back.llamacpp import get_version as get_llama_version
-    from src.back.qdrant import get_version as get_qdrant_version
-    from src.shared import get_config
+    from src.config.settings import get_config
+    from src.infrastructure.llm.llamacpp import get_version as get_llama_version
+    from src.infrastructure.vectorstore import get_version as get_qdrant_version
 
     config = get_config()
     llama_version = get_llama_version() or "Not installed"
@@ -150,8 +150,8 @@ async def post_backend(request: dict) -> JSONResponse:
         if action == "start" and service == "llama":
             from pathlib import Path
 
-            from src.back.llamacpp.service import get_llama_service
-            from src.shared import LLM_DIR
+            from src.config.settings import LLM_DIR
+            from src.infrastructure.llm.llamacpp.service import get_llama_service
 
             models = list(Path(LLM_DIR).rglob("*.gguf"))
             model_path = str(models[0]) if models else None
@@ -171,17 +171,17 @@ async def post_backend(request: dict) -> JSONResponse:
             )
 
         elif action == "stop" and service == "llama":
-            from src.back.llamacpp.service import get_llama_service
+            from src.infrastructure.llm.llamacpp.service import get_llama_service
 
             result = await get_llama_service().stop()
 
         elif action == "start" and service == "qdrant":
-            from src.back.qdrant.service import get_qdrant_service
+            from src.infrastructure.vectorstore.service import get_qdrant_service
 
             result = await get_qdrant_service().start()
 
         elif action == "stop" and service == "qdrant":
-            from src.back.qdrant.service import get_qdrant_service
+            from src.infrastructure.vectorstore.service import get_qdrant_service
 
             result = await get_qdrant_service().stop()
 
@@ -229,7 +229,7 @@ async def start_download(service: str | None = None, target: str | None = None) 
 
     if target_service == "llama":
         try:
-            from src.back.llamacpp.auto_start import stop_llamacpp
+            from src.infrastructure.llm.llamacpp.auto_start import stop_llamacpp
 
             await stop_llamacpp()
         except Exception:
@@ -257,7 +257,7 @@ async def start_download(service: str | None = None, target: str | None = None) 
             }
 
     if target_service == "qdrant":
-        from src.back.qdrant.downloader import (
+        from src.infrastructure.vectorstore.downloader import (
             QDRANT_BINARY_VERSION,
             QDRANT_UI_VERSION,
             create_qdrant_installer,
@@ -271,7 +271,7 @@ async def start_download(service: str | None = None, target: str | None = None) 
         if target_component in ("binary", "all"):
             binary_result = await installer.download_binary()
             if binary_result.get("success"):
-                from src.shared import get_config
+                from src.config.settings import get_config
 
                 config = get_config()
                 config.qdrant_version = QDRANT_BINARY_VERSION
@@ -280,7 +280,7 @@ async def start_download(service: str | None = None, target: str | None = None) 
         if target_component in ("web_ui", "all"):
             ui_result = await installer.download_web_ui()
             if ui_result.get("success"):
-                from src.shared import get_config
+                from src.config.settings import get_config
 
                 config = get_config()
                 config.qdrant_webui_version = QDRANT_UI_VERSION

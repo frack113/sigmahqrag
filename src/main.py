@@ -16,34 +16,35 @@ from src.api.routes.page_data import router as data_page_router
 from src.api.routes.page_duckdb import router as duckdb_page_router
 from src.api.routes.page_logs import router as logs_page_router
 from src.api.v1.admin import router as admin_v1_router
-from src.api.v1.admin_models import router as admin_models_router
-from src.api.v1.chat import router as chat_v1_router
-from src.api.v1.config import router as config_v1_router
-from src.api.v1.coverage import router as coverage_v1_router
-from src.api.v1.dispatcher import router as dispatcher_v1_router
-from src.api.v1.duckdb import router as duckdb_v1_router
-from src.api.v1.documents import router as documents_v1_router
-from src.api.v1.embeddings import router as embeddings_v1_router
-from src.api.v1.explain import router as explain_v1_router
-from src.api.v1.feedback import router as feedback_v1_router
-from src.api.v1.files import router as files_v1_router
-from src.api.v1.github import router as github_v1_router
-from src.api.v1.spec import router as spec_v1_router
-from src.api.v1.llamacpp import router as llama_router
-from src.api.v1.logs import router as logs_v1_router
-from src.api.v1.models_llm import router as models_llm_router
-from src.api.v1.models_embedding import router as models_embedding_router
-from src.api.v1.qdrant import router as qdrant_router
-from src.api.v1.search import router as search_v1_router
-from src.api.v1.system_prompt import router as prompts_v1_router
-from src.back.database import DatabaseService
-from src.back.llamacpp.auto_start import start_llamacpp, stop_llamacpp
-from src.back.qdrant.auto_start import start_qdrant, stop_qdrant
-from src.back.service_manager import shutdown_all_services
-from src.worker.processor import TaskDispatcher
-from src.front import STATIC_DIR
+from src.api.v1.models.admin_models import router as admin_models_router
+from src.api.v1.chat.chat import router as chat_v1_router
+from src.api.v1.system.config import router as config_v1_router
+from src.api.v1.sigma.coverage import router as coverage_v1_router
+from src.api.v1.system.dispatcher import router as dispatcher_v1_router
+from src.api.v1.documents.documents import router as documents_v1_router
+from src.api.v1.system.duckdb import router as duckdb_v1_router
+from src.api.v1.infrastructure.embeddings import router as embeddings_v1_router
+from src.api.v1.sigma.explain import router as explain_v1_router
+from src.api.v1.infrastructure.feedback import router as feedback_v1_router
+from src.api.v1.documents.files import router as files_v1_router
+from src.api.v1.infrastructure.github import router as github_v1_router
+from src.api.v1.infrastructure.llamacpp import router as llama_router
+from src.api.v1.system.logs import router as logs_v1_router
+from src.api.v1.models.models_embedding import router as models_embedding_router
+from src.api.v1.models.models_llm import router as models_llm_router
+from src.api.v1.infrastructure.qdrant import router as qdrant_router
+from src.api.v1.chat.search import router as search_v1_router
+from src.api.v1.documents.spec import router as spec_v1_router
+from src.api.v1.system.system_prompt import router as prompts_v1_router
+from src.api.v1.sigma.translate import router as translate_v1_router
+from src.shared.service_manager import shutdown_all_services
+from src.config.settings import TEMP_DIR
+from src.presentation import STATIC_DIR
+from src.infrastructure.database import DatabaseService
+from src.infrastructure.llm.llamacpp.auto_start import start_llamacpp, stop_llamacpp
+from src.infrastructure.vectorstore.auto_start import start_qdrant, stop_qdrant
 from src.shared.exceptions import SigmaError
-from src.shared import TEMP_DIR
+from src.workers.processor import TaskDispatcher
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +63,7 @@ def _parse_log_size(size_str: str) -> int:
 
 def _setup_logging(level: str = "INFO", max_size: str = "10M", max_files: int = 5) -> None:
     """Setup logging to file with rotation."""
-    from src.shared import LOGS_DIR
+    from src.config.settings import LOGS_DIR
 
     log_file = LOGS_DIR / "sigmahqrag.log"
     log_level = getattr(logging, level.upper(), logging.INFO)
@@ -85,7 +86,7 @@ def _setup_logging(level: str = "INFO", max_size: str = "10M", max_files: int = 
 
 async def _init_qdrant_collections() -> None:
     """Ensure all RAG collections exist with hybrid search enabled."""
-    from src.back.qdrant import QdrantVectorService
+    from src.infrastructure.vectorstore import QdrantVectorService
 
     for col in ("sigma_rules", "sigma_docs", "sigma_spec"):
         try:
@@ -98,7 +99,8 @@ async def _init_qdrant_collections() -> None:
 def _clean_at_startup() -> None:
     """Clean temp, pid, and log files at startup when clean_at_startup is enabled."""
     import shutil
-    from src.shared import PID_DIR, LOGS_DIR
+
+    from src.config.settings import LOGS_DIR, PID_DIR
 
     for d in (TEMP_DIR, PID_DIR):
         if d.exists():
@@ -132,11 +134,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         db.initialize()
         app.state.db = db
 
-        from src.back.system_prompt import sync_prompts_from_files
+        from src.application.system.prompts import sync_prompts_from_files
 
         sync_prompts_from_files()
 
-        from src.shared import Config, get_config
+        from src.config.settings import Config, get_config
 
         Config.init_app()
         config = get_config()
@@ -206,7 +208,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 def _validate_services() -> None:
     """Validate required services are configured."""
-    from src.shared import get_config
+    from src.config.settings import get_config
 
     config = get_config()
     if not config.llama_base_url:
@@ -272,6 +274,7 @@ def create_app() -> FastAPI:
     app.include_router(search_v1_router)
     app.include_router(spec_v1_router)
     app.include_router(prompts_v1_router)
+    app.include_router(translate_v1_router)
     app.include_router(chat_v1_router)
     app.include_router(chat_page_router)
     app.include_router(data_page_router)

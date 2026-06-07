@@ -3,7 +3,7 @@
 from unittest.mock import MagicMock
 
 
-from src.back.qdrant.collections import (
+from src.infrastructure.vectorstore.collections import (
     _count_sync,
     _create_collection_sync,
     _delete_collection_sync,

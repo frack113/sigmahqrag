@@ -1,0 +1,326 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Backend Management | Admin | SigmaHQ RAG{% endblock %}
+
+{% block header %}Backend Management{% endblock %}
+
+{% block content %}
+<div id="update-banner"></div>
+
+<div class="card">
+    <h2>Configuration</h2>
+    <form id="config-form">
+        <div class="config-row">
+            <div class="form-group inline">
+                <label for="os-select">OS:</label>
+                <select id="os-select" name="os">
+                    <option value="windows" {% if config.Hardware.os == 'windows' %}selected{% endif %}>Windows</option>
+                    <option value="linux" {% if config.Hardware.os == 'linux' %}selected{% endif %}>Linux</option>
+                    <option value="macos" {% if config.Hardware.os == 'macos' %}selected{% endif %}>macOS</option>
+                </select>
+            </div>
+            <div class="form-group inline">
+                <label for="gpu-select">GPU Backend:</label>
+                <select id="gpu-select" name="gpu">
+                    <option value="cpu" {% if config.Hardware.gpu == 'cpu' %}selected{% endif %}>CPU</option>
+                    <option value="cuda" {% if config.Hardware.gpu == 'cuda' %}selected{% endif %}>CUDA</option>
+                    <option value="hip" {% if config.Hardware.gpu == 'hip' %}selected{% endif %}>HIP (AMD)</option>
+                    <option value="vulkan" {% if config.Hardware.gpu == 'vulkan' %}selected{% endif %}>Vulkan</option>
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary">Save Configuration</button>
+        </div>
+    </form>
+    <div id="config-status" class="status-message"></div>
+</div>
+
+<div class="card">
+    <h2>llama.cpp Management <button class="btn btn-primary" onclick="loadStatus()" style="float:right;">Refresh</button></h2>
+    <div id="llama-status">
+        <p>Loading...</p>
+    </div>
+    <div style="margin-top: 15px;">
+        <button id="llama-start-btn" class="btn btn-success" onclick="startService('llama')">Start</button>
+        <button id="llama-stop-btn" class="btn btn-danger" onclick="stopService('llama')">Stop</button>
+        <button id="llama-download-btn" class="btn btn-primary" onclick="downloadLlama()">Download / Update</button>
+    </div>
+    <div id="llama-download-status" class="status-message"></div>
+    <div id="llama-progress-container" style="display:none;">
+        <div class="progress-bar"><div id="llama-progress-fill"></div></div>
+        <p id="llama-progress-text">Downloading...</p>
+    </div>
+</div>
+
+<div class="card">
+    <h2>Qdrant Management <button class="btn btn-primary" onclick="loadStatus()" style="float:right;">Refresh</button></h2>
+    <div id="qdrant-status">
+        <p>Loading...</p>
+    </div>
+    <div style="margin-top: 15px;">
+        <button id="qdrant-start-btn" class="btn btn-success" onclick="startService('qdrant')">Start</button>
+        <button id="qdrant-stop-btn" class="btn btn-danger" onclick="stopService('qdrant')">Stop</button>
+        <button id="qdrant-download-btn" class="btn btn-primary" onclick="downloadQdrant()">Download / Update</button>
+        <button class="btn btn-secondary" onclick="openQdrantUI()">Open Web UI</button>
+    </div>
+    <div id="qdrant-download-status" class="status-message"></div>
+    <div id="qdrant-progress-container" style="display:none;">
+        <div class="progress-bar"><div id="qdrant-progress-fill"></div></div>
+        <p id="qdrant-progress-text">Downloading...</p>
+    </div>
+</div>
+
+<script id="config-data" type="application/json">{{ config_json | safe }}</script>
+<script>
+let activeDownloadId = null;
+let progressPollInterval = null;
+
+function downloadLlama() {
+    document.getElementById('llama-download-status').textContent = 'Starting download...';
+    document.getElementById('llama-download-status').className = 'status-message';
+    document.getElementById('llama-progress-container').style.display = 'block';
+
+    fetch('/api/v1/admin/download', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({service: 'llama'})
+    })
+    .then(r => r.json())
+    .then(data => {
+        const info = data.data || {};
+        if (data.status === 'success' && info.status === 'started') {
+            document.getElementById('llama-download-status').textContent = info.message || 'Download started';
+            document.getElementById('llama-download-status').className = 'status-message success';
+            if (info.download_id) {
+                activeDownloadId = info.download_id;
+                startProgressPollingLlama(activeDownloadId);
+            }
+        } else if (info.error) {
+            document.getElementById('llama-download-status').textContent = info.error;
+            document.getElementById('llama-download-status').className = 'status-message error';
+            document.getElementById('llama-progress-container').style.display = 'none';
+        } else {
+            document.getElementById('llama-download-status').textContent = info.message || 'Download completed';
+            document.getElementById('llama-download-status').className = 'status-message success';
+            document.getElementById('llama-progress-container').style.display = 'none';
+            loadStatus();
+        }
+    })
+    .catch(err => {
+        document.getElementById('llama-download-status').textContent = 'Error: ' + err;
+        document.getElementById('llama-download-status').className = 'status-message error';
+        document.getElementById('llama-progress-container').style.display = 'none';
+    });
+}
+
+function startProgressPollingLlama(downloadId) {
+    if (progressPollInterval) clearInterval(progressPollInterval);
+    progressPollInterval = setInterval(() => {
+        fetch('/api/v1/llamacpp/status')
+            .then(r => r.json())
+            .then(data => {
+                const task = data.downloads?.[downloadId];
+                if (!task) {
+                    clearInterval(progressPollInterval);
+                    loadStatus();
+                    return;
+                }
+                const bytesDownloaded = task.bytes_downloaded || 0;
+                const totalBytes = task.total_bytes || 1;
+                const percent = Math.round(bytesDownloaded / totalBytes * 100);
+                document.getElementById('llama-progress-fill').style.width = percent + '%';
+                document.getElementById('llama-progress-text').textContent = 
+                    `${percent}% (${Math.round(bytesDownloaded/1024/1024)}MB / ${Math.round(totalBytes/1024/1024)}MB)`;
+                document.getElementById('llama-download-status').textContent = 
+                    `Downloading... ${percent}% (${Math.round(bytesDownloaded/1024/1024)}MB / ${Math.round(totalBytes/1024/1024)}MB)`;
+                if (task.status === 'completed') {
+                    clearInterval(progressPollInterval);
+                    document.getElementById('llama-download-status').textContent = 'Download completed!';
+                    document.getElementById('llama-progress-container').style.display = 'none';
+                    loadStatus();
+                } else if (task.status === 'failed') {
+                    clearInterval(progressPollInterval);
+                    document.getElementById('llama-download-status').textContent = 'Download failed: ' + (task.error || 'Unknown error');
+                    document.getElementById('llama-download-status').className = 'status-message error';
+                    document.getElementById('llama-progress-container').style.display = 'none';
+                }
+            })
+            .catch(() => {});
+    }, 1000);
+}
+
+function downloadQdrant() {
+    document.getElementById('qdrant-download-status').textContent = 'Starting download...';
+    document.getElementById('qdrant-download-status').className = 'status-message';
+    document.getElementById('qdrant-progress-container').style.display = 'block';
+
+    fetch('/api/v1/admin/download', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({service: 'qdrant', target: 'all'})
+    })
+    .then(r => r.json())
+    .then(data => {
+        const info = data.data || {};
+        const status = data.status;
+        
+        let message = '';
+        if (info.binary_version) message += `Binary v${info.binary_version} `;
+        if (info.ui_version) message += `Web UI ${info.ui_version}`;
+        if (!message) message = status === 'partial' ? 'Partial update (some components skipped)' : 'Download failed';
+        
+        document.getElementById('qdrant-download-status').textContent = message;
+        document.getElementById('qdrant-download-status').className = 'status-message ' + (status === 'success' ? 'success' : 'warning');
+        document.getElementById('qdrant-progress-container').style.display = 'none';
+        loadStatus();
+    })
+    .catch(err => {
+        document.getElementById('qdrant-download-status').textContent = 'Error: ' + err;
+        document.getElementById('qdrant-download-status').className = 'status-message error';
+        document.getElementById('qdrant-progress-container').style.display = 'none';
+    });
+}
+
+function openQdrantUI() {
+    window.open('http://127.0.0.1:6333/dashboard', '_blank');
+}
+
+// Load config from embedded JSON (synchronous, no visual lag)
+var _CONFIG = {};
+try { _CONFIG = JSON.parse(document.getElementById('config-data').textContent); } catch(e) {}
+
+function applyConfig(cfg) {
+    const hw = (cfg && cfg.Hardware) || {};
+    document.getElementById('os-select').value = hw.os || 'windows';
+    document.getElementById('gpu-select').value = hw.gpu || 'cpu';
+}
+
+function loadStatus() {
+    Promise.all([
+        fetch('/api/v1/admin/status').then(r => r.json()).catch(() => ({})),
+        fetch('/api/v1/llamacpp/status').then(r => r.json()).catch(() => ({})),
+        fetch('/api/v1/qdrant/status').then(r => r.json()).catch(() => ({}))
+    ])
+    .then(([adminResponse, llamaInfo, qdrantInfo]) => {
+        const services = adminResponse.data || {};
+        const llama = services.llama_cpp || {};
+        const qdrant = services.qdrant || {};
+
+        const getStatusClass = (status) => {
+            if (status === 'active') return 'ok';
+            if (status === 'inactive') return 'error';
+            return 'warning';
+        };
+
+        document.getElementById('llama-status').innerHTML = `
+            <div class="status-row">
+                <span class="status-label">Status:</span>
+                <span class="status-dot status-${getStatusClass(llama.status)}"></span>
+                <span>${llama.status || 'unknown'}</span>
+            </div>
+            <div class="status-row">
+                <span class="status-label">Version:</span>
+                <span>${llama.version || 'Not installed'}</span>
+            </div>
+        `;
+
+        document.getElementById('qdrant-status').innerHTML = `
+            <div class="status-row">
+                <span class="status-label">Status:</span>
+                <span class="status-dot status-${getStatusClass(qdrant.status)}"></span>
+                <span>${qdrant.status || 'unknown'}</span>
+            </div>
+            <div class="status-row">
+                <span class="status-label">Binary:</span>
+                <span>${qdrant.version || 'Not installed'}</span>
+            </div>
+            <div class="status-row">
+                <span class="status-label">Web UI:</span>
+                <span>v0.2.11</span>
+            </div>
+        `;
+
+        const isLlamaExternal = llamaInfo.mode === 'external';
+        document.getElementById('llama-start-btn').disabled = isLlamaExternal;
+        document.getElementById('llama-stop-btn').disabled = isLlamaExternal;
+        document.getElementById('llama-download-btn').disabled = isLlamaExternal;
+
+        const isQdrantExternal = qdrantInfo.mode === 'external';
+        document.getElementById('qdrant-start-btn').disabled = isQdrantExternal;
+        document.getElementById('qdrant-stop-btn').disabled = isQdrantExternal;
+        document.getElementById('qdrant-download-btn').disabled = isQdrantExternal;
+    })
+    .catch(err => {
+        document.getElementById('llama-status').innerHTML = '<p class="error">Failed to load status</p>';
+        document.getElementById('qdrant-status').innerHTML = '<p class="error">Failed to load status</p>';
+    });
+}
+
+function saveConfig() {
+    const statusEl = document.getElementById('config-status');
+    statusEl.textContent = 'Saving...';
+    statusEl.className = 'status-message';
+
+    const os = document.getElementById('os-select').value;
+    const gpu = document.getElementById('gpu-select').value;
+
+    fetch('/api/v1/config', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({Hardware: {os: os, gpu: gpu}})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.status === 'success') {
+            statusEl.textContent = data.message || 'Configuration saved';
+            statusEl.className = 'status-message success';
+            loadStatus();
+        } else {
+            statusEl.textContent = data.error || 'Save failed';
+            statusEl.className = 'status-message error';
+        }
+    })
+    .catch(err => {
+        statusEl.textContent = 'Error: ' + err;
+        statusEl.className = 'status-message error';
+    });
+}
+
+document.getElementById('config-form').addEventListener('submit', function(e) {
+e.preventDefault();
+    saveConfig();
+});
+
+function startService(service) {
+    fetch('/api/v1/admin/backend', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({action: 'start', service: service})
+    })
+    .then(r => r.json())
+    .then(data => {
+        alert(data.message || data.error || 'Started');
+        loadStatus();
+    });
+}
+
+function stopService(service) {
+    if (!confirm(`Stop ${service}?`)) return;
+    fetch('/api/v1/admin/backend', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({action: 'stop', service: service})
+    })
+    .then(r => r.json())
+    .then(data => {
+        alert(data.message || data.error || 'Stopped');
+        loadStatus();
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    applyConfig(_CONFIG);
+    loadStatus();
+});
+</script>
+
+{% endblock %}

@@ -14,7 +14,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 def reset_modules():
     """Reset module state between tests."""
     # Clear any cached singletons
-    import src.back.database.core as db_core
+    import src.infrastructure.database.core as db_core
 
     db_core.DatabaseServiceCore._instance = None
     yield

@@ -5,7 +5,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.back.qdrant.storage import _delete_by_source, _make_point_id, store_embeddings
+from src.infrastructure.vectorstore.storage import (
+    _delete_by_source,
+    _make_point_id,
+    store_embeddings,
+)
 
 
 class TestMakePointId:
@@ -94,7 +98,9 @@ class TestStoreEmbeddings:
         mock_client = MagicMock()
         mock_client.get_collections.return_value = MagicMock(collections=[])
 
-        with patch("src.back.qdrant.storage.get_qdrant_client", return_value=mock_client):
+        with patch(
+            "src.infrastructure.vectorstore.storage.get_qdrant_client", return_value=mock_client
+        ):
             result = await store_embeddings(
                 embeddings=[[0.1], [0.2]],
                 documents=["text1", "text2"],
@@ -122,7 +128,9 @@ class TestStoreEmbeddings:
             collections=[MagicMock(name="sigma_rules")]
         )
 
-        with patch("src.back.qdrant.storage.get_qdrant_client", return_value=mock_client):
+        with patch(
+            "src.infrastructure.vectorstore.storage.get_qdrant_client", return_value=mock_client
+        ):
             await store_embeddings(
                 embeddings=[[0.1], [0.2]],
                 documents=["text1", "text2"],
@@ -138,7 +146,9 @@ class TestStoreEmbeddings:
         mock_client = MagicMock()
         mock_client.get_collections.return_value = MagicMock(collections=[])
 
-        with patch("src.back.qdrant.storage.get_qdrant_client", return_value=mock_client):
+        with patch(
+            "src.infrastructure.vectorstore.storage.get_qdrant_client", return_value=mock_client
+        ):
             await store_embeddings(
                 embeddings=[[0.1]],
                 documents=["text"],
@@ -155,7 +165,9 @@ class TestStoreEmbeddings:
             collections=[MagicMock(name="sigma_docs")]
         )
 
-        with patch("src.back.qdrant.storage.get_qdrant_client", return_value=mock_client):
+        with patch(
+            "src.infrastructure.vectorstore.storage.get_qdrant_client", return_value=mock_client
+        ):
             await store_embeddings(
                 embeddings=[[0.1]],
                 documents=["text"],
@@ -177,7 +189,9 @@ class TestStoreEmbeddings:
             collections=[MagicMock(name="sigma_docs")]
         )
 
-        with patch("src.back.qdrant.storage.get_qdrant_client", return_value=mock_client):
+        with patch(
+            "src.infrastructure.vectorstore.storage.get_qdrant_client", return_value=mock_client
+        ):
             await store_embeddings(
                 embeddings=[[0.1], [0.2]],
                 documents=["text1", "text2"],

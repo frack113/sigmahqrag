@@ -4,11 +4,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from src.rag.router import (
+from src.core.search.router import (
     VALID_COLLECTIONS,
-    _get_llm_client,
     _parse_llm_response,
-    reset_llm_client,
     route_query,
 )
 
@@ -60,25 +58,8 @@ class TestParseLlmResponse:
 
     def test_trailing_comma(self) -> None:
         raw = '{"collections": ["sigma_rules",]}'
-        # json.loads handles trailing commas in some parsers but not stdlib
-        # This tests that we handle it gracefully
         result = _parse_llm_response(raw)
-        # Either parses correctly or returns empty (both acceptable)
         assert result in (["sigma_rules"], [])
-
-
-class TestGetLlmClient:
-    def test_singleton(self) -> None:
-        reset_llm_client()
-        c1 = _get_llm_client()
-        c2 = _get_llm_client()
-        assert c1 is c2
-
-    def test_reset(self) -> None:
-        c1 = _get_llm_client()
-        reset_llm_client()
-        c2 = _get_llm_client()
-        assert c1 is not c2
 
 
 class TestRouteQuery:
@@ -93,39 +74,13 @@ class TestRouteQuery:
         assert result == ["sigma_rules", "sigma_docs", "sigma_spec"]
 
     @pytest.mark.asyncio
-    async def test_valid_llm_response(self) -> None:
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {
-            "choices": [{"text": '{"collections": ["sigma_rules"]}'}]
-        }
-        mock_response.raise_for_status = MagicMock()
-
-        mock_http_client = AsyncMock()
-        mock_http_client.post = AsyncMock(return_value=mock_response)
-
-        # Patch at a higher level: replace the entire route_query body
-        with (
-            patch("src.rag.router._get_llm_client") as mock_get,
-        ):
-            mock_llm = MagicMock()
-            mock_llm.base_url = "http://test:8080"
-            mock_get.return_value = mock_llm
-
-            # Directly test _parse_llm_response with valid data
-            raw = '{"collections": ["sigma_rules"]}'
-            result = _parse_llm_response(raw)
-            assert result == ["sigma_rules"]
-
-    @pytest.mark.asyncio
     async def test_llm_failure_falls_back_to_all(self) -> None:
         with (
-            patch("src.rag.router._get_llm_client") as mock_get,
-            patch("src.rag.router.httpx.AsyncClient", side_effect=Exception("connection refused")),
+            patch("src.core.search.router.LlamaClient") as mock_llm_class,
         ):
-            mock_llm = MagicMock()
-            mock_llm.base_url = "http://test:8080"
-            mock_get.return_value = mock_llm
+            mock_instance = MagicMock()
+            mock_instance.generate = AsyncMock(side_effect=Exception("connection refused"))
+            mock_llm_class.return_value = mock_instance
 
             result = await route_query("test query")
 
@@ -134,15 +89,28 @@ class TestRouteQuery:
     @pytest.mark.asyncio
     async def test_invalid_llm_output_falls_back_to_all(self) -> None:
         with (
-            patch("src.rag.router._get_llm_client") as mock_get,
+            patch("src.core.search.router.LlamaClient") as mock_llm_class,
         ):
-            mock_llm = MagicMock()
-            mock_llm.base_url = "http://test:8080"
-            mock_get.return_value = mock_llm
+            mock_instance = MagicMock()
+            mock_instance.generate = AsyncMock(return_value="I cannot classify this")
+            mock_llm_class.return_value = mock_instance
 
-            # Test parse with invalid data
-            result = _parse_llm_response("I cannot classify this")
-            assert result == []
+            result = await route_query("test query")
+
+        assert result == ["sigma_rules", "sigma_docs", "sigma_spec"]
+
+    @pytest.mark.asyncio
+    async def test_empty_llm_output_falls_back_to_all(self) -> None:
+        with (
+            patch("src.core.search.router.LlamaClient") as mock_llm_class,
+        ):
+            mock_instance = MagicMock()
+            mock_instance.generate = AsyncMock(return_value="")
+            mock_llm_class.return_value = mock_instance
+
+            result = await route_query("test query")
+
+        assert result == ["sigma_rules", "sigma_docs", "sigma_spec"]
 
 
 class TestValidCollections:

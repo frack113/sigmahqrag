@@ -25,7 +25,7 @@ class TestAdminHealthEndpoint:
         client: TestClient,
     ) -> None:
         """Given services are running When GET /admin/health Then returns service statuses."""
-        with patch("src.back.services.health_check.HealthCheckService") as mock_service_class:
+        with patch("src.application.system.health.HealthCheckService") as mock_service_class:
             mock_instance = AsyncMock()
             mock_instance.check_all.return_value = {
                 "llamacpp": {"status": "active", "url": "http://localhost:8080"},

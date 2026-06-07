@@ -6,10 +6,10 @@ from typing import Any, cast
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
-from src.back.database.service import DatabaseService
-from src.back.models import EmbeddingManager
-from src.back.models.registry import UnifiedRegistry
-from src.worker.processor import TaskDispatcher
+from src.application.models import EmbeddingManager
+from src.application.models.registry import UnifiedRegistry
+from src.infrastructure.database.service import DatabaseService
+from src.workers.processor import TaskDispatcher
 
 
 def safe_error_response(

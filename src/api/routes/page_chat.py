@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Request
 from fastapi.templating import Jinja2Templates
 
-from src.front import TEMPLATES_DIR
+from src.presentation import TEMPLATES_DIR
 
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
@@ -29,7 +29,7 @@ async def chat_page(request: Request):
 def _get_prompts() -> list[dict]:
     """Fetch system prompts from the database."""
     try:
-        from src.back.system_prompt import list_prompts
+        from src.application.system.prompts import list_prompts
 
         return list_prompts()
     except Exception:

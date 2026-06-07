@@ -4,7 +4,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 
-from src.shared.config import TEMP_DIR
+from src.config.settings import TEMP_DIR
 from src.shared.temp_manager import TempManager, get_temp_manager
 
 

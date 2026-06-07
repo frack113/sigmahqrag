@@ -8,9 +8,9 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from src.back.services.health_check import HealthCheckService
-from src.front import TEMPLATES_DIR
-from src.shared import get_config
+from src.application.system.health import HealthCheckService
+from src.config.settings import get_config
+from src.presentation import TEMPLATES_DIR
 
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
 

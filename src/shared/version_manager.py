@@ -10,7 +10,7 @@ from pathlib import Path
 
 import httpx
 
-from src.shared import BIN_DIR
+from src.config.settings import BIN_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -132,7 +132,7 @@ class VersionManager:
             "windows", "linux", "macos", or None if not specified
         """
         try:
-            from src.shared import get_config
+            from src.config.settings import get_config
 
             config = get_config()
             os_val = config.os
@@ -154,7 +154,7 @@ class VersionManager:
             "hip", "cuda", "cpu", or None if not specified
         """
         try:
-            from src.shared import get_config
+            from src.config.settings import get_config
 
             return get_config().gpu_type
         except Exception as e:
@@ -345,7 +345,7 @@ def _detect_llama_server_binary() -> Path | None:
     """
     import sys
 
-    from src.shared import get_config
+    from src.config.settings import get_config
 
     config = get_config()
     bin_dir = config.resolve_llamacpp_bin_path()
@@ -415,7 +415,7 @@ async def get_current_version(service: str) -> str | None:
     Returns:
         Version string or None
     """
-    from src.shared import get_config
+    from src.config.settings import get_config
 
     config = get_config()
     if service in ("llama", "llama.cpp"):

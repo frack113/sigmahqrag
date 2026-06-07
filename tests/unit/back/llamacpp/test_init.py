@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.back.llamacpp import (
+from src.infrastructure.llm.llamacpp import (
     _detect_llama_server_binary,
     _try_get_llama_version_from_binary,
     get_version,
@@ -19,7 +19,7 @@ class TestDetectLlamaServerBinary:
         mock_config = MagicMock()
         mock_config.resolve_llamacpp_bin_path.return_value = tmp_path
         with (
-            patch("src.back.llamacpp.get_config", return_value=mock_config),
+            patch("src.infrastructure.llm.llamacpp.get_config", return_value=mock_config),
             patch("sys.platform", "win32"),
         ):
             result = _detect_llama_server_binary()
@@ -31,7 +31,7 @@ class TestDetectLlamaServerBinary:
         mock_config = MagicMock()
         mock_config.resolve_llamacpp_bin_path.return_value = tmp_path
         with (
-            patch("src.back.llamacpp.get_config", return_value=mock_config),
+            patch("src.infrastructure.llm.llamacpp.get_config", return_value=mock_config),
             patch("sys.platform", "linux"),
         ):
             result = _detect_llama_server_binary()
@@ -41,7 +41,7 @@ class TestDetectLlamaServerBinary:
         mock_config = MagicMock()
         mock_config.resolve_llamacpp_bin_path.return_value = tmp_path
         with (
-            patch("src.back.llamacpp.get_config", return_value=mock_config),
+            patch("src.infrastructure.llm.llamacpp.get_config", return_value=mock_config),
             patch("sys.platform", "win32"),
         ):
             result = _detect_llama_server_binary()
@@ -53,7 +53,7 @@ class TestDetectLlamaServerBinary:
         mock_config = MagicMock()
         mock_config.resolve_llamacpp_bin_path.return_value = tmp_path
         with (
-            patch("src.back.llamacpp.get_config", return_value=mock_config),
+            patch("src.infrastructure.llm.llamacpp.get_config", return_value=mock_config),
             patch("sys.platform", "win32"),
         ):
             result = _detect_llama_server_binary()
@@ -62,7 +62,9 @@ class TestDetectLlamaServerBinary:
 
 class TestTryGetVersionFromBinary:
     def test_returns_none_when_no_binary(self) -> None:
-        with patch("src.back.llamacpp._detect_llama_server_binary", return_value=None):
+        with patch(
+            "src.infrastructure.llm.llamacpp._detect_llama_server_binary", return_value=None
+        ):
             assert _try_get_llama_version_from_binary() is None
 
     def test_parses_build_number(self) -> None:
@@ -70,7 +72,10 @@ class TestTryGetVersionFromBinary:
         mock_result.stdout = "llama.cpp b1234"
         mock_result.stderr = ""
         with (
-            patch("src.back.llamacpp._detect_llama_server_binary", return_value="/fake/exe"),
+            patch(
+                "src.infrastructure.llm.llamacpp._detect_llama_server_binary",
+                return_value="/fake/exe",
+            ),
             patch("subprocess.run", return_value=mock_result),
         ):
             result = _try_get_llama_version_from_binary()
@@ -81,7 +86,10 @@ class TestTryGetVersionFromBinary:
         mock_result.stdout = ""
         mock_result.stderr = "version: b5678"
         with (
-            patch("src.back.llamacpp._detect_llama_server_binary", return_value="/fake/exe"),
+            patch(
+                "src.infrastructure.llm.llamacpp._detect_llama_server_binary",
+                return_value="/fake/exe",
+            ),
             patch("subprocess.run", return_value=mock_result),
         ):
             result = _try_get_llama_version_from_binary()
@@ -92,7 +100,10 @@ class TestTryGetVersionFromBinary:
         mock_result.stdout = ""
         mock_result.stderr = "llama.cpp b9012"
         with (
-            patch("src.back.llamacpp._detect_llama_server_binary", return_value="/fake/exe"),
+            patch(
+                "src.infrastructure.llm.llamacpp._detect_llama_server_binary",
+                return_value="/fake/exe",
+            ),
             patch("subprocess.run", return_value=mock_result),
         ):
             result = _try_get_llama_version_from_binary()
@@ -103,7 +114,10 @@ class TestTryGetVersionFromBinary:
         mock_result.stdout = "build b3456"
         mock_result.stderr = ""
         with (
-            patch("src.back.llamacpp._detect_llama_server_binary", return_value="/fake/exe"),
+            patch(
+                "src.infrastructure.llm.llamacpp._detect_llama_server_binary",
+                return_value="/fake/exe",
+            ),
             patch("subprocess.run", return_value=mock_result),
         ):
             result = _try_get_llama_version_from_binary()
@@ -114,7 +128,10 @@ class TestTryGetVersionFromBinary:
         mock_result.stdout = "some output 7890"
         mock_result.stderr = ""
         with (
-            patch("src.back.llamacpp._detect_llama_server_binary", return_value="/fake/exe"),
+            patch(
+                "src.infrastructure.llm.llamacpp._detect_llama_server_binary",
+                return_value="/fake/exe",
+            ),
             patch("subprocess.run", return_value=mock_result),
         ):
             result = _try_get_llama_version_from_binary()
@@ -125,7 +142,10 @@ class TestTryGetVersionFromBinary:
         mock_result.stdout = "garbage output"
         mock_result.stderr = ""
         with (
-            patch("src.back.llamacpp._detect_llama_server_binary", return_value="/fake/exe"),
+            patch(
+                "src.infrastructure.llm.llamacpp._detect_llama_server_binary",
+                return_value="/fake/exe",
+            ),
             patch("subprocess.run", return_value=mock_result),
         ):
             result = _try_get_llama_version_from_binary()
@@ -133,7 +153,10 @@ class TestTryGetVersionFromBinary:
 
     def test_returns_none_on_exception(self) -> None:
         with (
-            patch("src.back.llamacpp._detect_llama_server_binary", return_value="/fake/exe"),
+            patch(
+                "src.infrastructure.llm.llamacpp._detect_llama_server_binary",
+                return_value="/fake/exe",
+            ),
             patch("subprocess.run", side_effect=OSError("fail")),
         ):
             result = _try_get_llama_version_from_binary()
@@ -144,7 +167,7 @@ class TestGetVersion:
     def test_returns_configured_version(self) -> None:
         mock_config = MagicMock()
         mock_config.llamacpp_version = "b1234"
-        with patch("src.back.llamacpp.get_config", return_value=mock_config):
+        with patch("src.infrastructure.llm.llamacpp.get_config", return_value=mock_config):
             result = get_version()
         assert result == "b1234"
 
@@ -152,9 +175,15 @@ class TestGetVersion:
         mock_config = MagicMock()
         mock_config.llamacpp_version = "0"
         with (
-            patch("src.back.llamacpp.get_config", return_value=mock_config),
-            patch("src.back.llamacpp._detect_llama_server_binary", return_value="/fake/exe"),
-            patch("src.back.llamacpp._try_get_llama_version_from_binary", return_value="b9999"),
+            patch("src.infrastructure.llm.llamacpp.get_config", return_value=mock_config),
+            patch(
+                "src.infrastructure.llm.llamacpp._detect_llama_server_binary",
+                return_value="/fake/exe",
+            ),
+            patch(
+                "src.infrastructure.llm.llamacpp._try_get_llama_version_from_binary",
+                return_value="b9999",
+            ),
         ):
             result = get_version()
         assert result == "b9999"
@@ -165,9 +194,15 @@ class TestGetVersion:
         mock_config = MagicMock()
         mock_config.llamacpp_version = "0"
         with (
-            patch("src.back.llamacpp.get_config", return_value=mock_config),
-            patch("src.back.llamacpp._detect_llama_server_binary", return_value="/fake/exe"),
-            patch("src.back.llamacpp._try_get_llama_version_from_binary", return_value=None),
+            patch("src.infrastructure.llm.llamacpp.get_config", return_value=mock_config),
+            patch(
+                "src.infrastructure.llm.llamacpp._detect_llama_server_binary",
+                return_value="/fake/exe",
+            ),
+            patch(
+                "src.infrastructure.llm.llamacpp._try_get_llama_version_from_binary",
+                return_value=None,
+            ),
         ):
             result = get_version()
         assert result == "installed"
@@ -176,8 +211,8 @@ class TestGetVersion:
         mock_config = MagicMock()
         mock_config.llamacpp_version = "0"
         with (
-            patch("src.back.llamacpp.get_config", return_value=mock_config),
-            patch("src.back.llamacpp._detect_llama_server_binary", return_value=None),
+            patch("src.infrastructure.llm.llamacpp.get_config", return_value=mock_config),
+            patch("src.infrastructure.llm.llamacpp._detect_llama_server_binary", return_value=None),
         ):
             result = get_version()
         assert result == "0"
@@ -186,7 +221,7 @@ class TestGetVersion:
 class TestSetVersion:
     def test_sets_and_saves(self) -> None:
         mock_config = MagicMock()
-        with patch("src.back.llamacpp.get_config", return_value=mock_config):
+        with patch("src.infrastructure.llm.llamacpp.get_config", return_value=mock_config):
             set_version("b9999")
         assert mock_config.llamacpp_version == "b9999"
         mock_config.save.assert_called_once()
