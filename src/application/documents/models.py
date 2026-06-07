@@ -2,20 +2,9 @@
 
 from __future__ import annotations
 
-import warnings
-
 from pydantic import BaseModel, Field
 
-from src.shared.schemas.sigma_rule import SigmaRule as _SigmaRule
-
-warnings.warn(
-    "Import SigmaRule from src.application.documents.models is deprecated; "
-    "use src.shared.schemas.sigma_rule.SigmaRule instead.",
-    DeprecationWarning,
-    stacklevel=2,
-)
-
-SigmaRule = _SigmaRule
+from src.shared.schemas.sigma_rule import SigmaRule
 
 
 class ValidationError(BaseModel):
