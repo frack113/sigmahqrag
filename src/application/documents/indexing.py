@@ -2,17 +2,28 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Any
 
 from llama_index.core.schema import TextNode
 
 from src.config.settings import get_config
-from src.core.pipeline.ingestion import get_embedding_dimension
-from src.infrastructure.vectorstore import QdrantService
+from src.core.pipeline.ingestion import IngestionPipelineBuilder
+from src.infrastructure.vectorstore.client import get_qdrant_client
 from src.core.sigma.models import SigmaRule
 
 logger = logging.getLogger(__name__)
+
+# Module-level lock registry — prevents concurrent writes to same collection
+_collection_locks: dict[str, asyncio.Lock] = {}
+
+
+def _get_collection_lock(collection_name: str) -> asyncio.Lock:
+    """Get or create an asyncio lock per collection."""
+    if collection_name not in _collection_locks:
+        _collection_locks.setdefault(collection_name, asyncio.Lock())
+    return _collection_locks[collection_name]
 
 
 async def index_sigma_rules(
@@ -35,20 +46,16 @@ async def index_sigma_rules(
 
     config = get_config()
     collection = collection_name or config.qdrant_collection_name
-    embed_dim = get_embedding_dimension()
 
-    service = QdrantService(
-        collection_name=collection,
-        vector_size=embed_dim,
-        host=config.qdrant_host,
-        port=config.qdrant_port,
-    )
+    service_client = get_qdrant_client(host=config.qdrant_host, port=config.qdrant_port)
 
+    # Delete + full reindex strategy: clear old vectors before pipeline insert
     try:
-        await service.initialize()
+        service_client.delete_collection(collection)
     except Exception as e:
-        logger.error(f"Failed to initialize Qdrant: {e}")
-        return {"success": False, "error": str(e), "indexed": 0}
+        logger.warning(
+            "Collection %s not found or cannot be deleted (first run?): %s", collection, e
+        )
 
     nodes = []
     for rule in rules:
@@ -74,19 +81,27 @@ async def index_sigma_rules(
     if not nodes:
         return {"success": True, "indexed": 0}
 
-    try:
-        embeddings = await _generate_embeddings(nodes)
-        await service.add_vectors(
-            embeddings=embeddings,
-            documents=[n.text for n in nodes],
-            metadata=[n.metadata for n in nodes],
-        )
-    except Exception as e:
-        logger.error(f"Failed to add vectors: {e}")
-        return {"success": False, "error": str(e), "indexed": 0}
+    lock = _get_collection_lock(collection)
+    async with lock:
+        try:
+            builder = IngestionPipelineBuilder(
+                collection_name=collection,
+            )
+            pipeline = builder.build(skip_splitter=True)  # chunks already created by chunker
+            nodes_list = await asyncio.to_thread(
+                pipeline.run, documents=nodes, num_workers=builder._num_workers
+            )
+        except Exception as e:
+            logger.error(f"Failed to index via pipeline: {e}")
+            return {"success": False, "error": str(e), "indexed": 0}
 
     logger.info(f"Indexed {len(nodes)} chunks ({len(rules)} rules) to {collection}")
-    return {"success": True, "indexed": len(nodes), "rules": len(rules), "collection": collection}
+    return {
+        "success": True,
+        "indexed": len(nodes_list),
+        "rules": len(rules),
+        "collection": collection,
+    }
 
 
 def _sigma_rule_to_text(rule: SigmaRule) -> str:
@@ -163,13 +178,3 @@ def _sigma_rule_to_rich_chunks(rule: SigmaRule) -> list[TextNode]:
         )
 
     return nodes
-
-
-async def _generate_embeddings(nodes: list[TextNode]) -> list[list[float]]:
-    """Generate embeddings for nodes using batched inference."""
-    from llama_index.core.schema import Document
-
-    from src.core.embedding.factory import embed_documents
-
-    docs = [Document(text=node.text) for node in nodes]
-    return await embed_documents(docs)

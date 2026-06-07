@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import warnings
 from pathlib import Path
 from typing import Any
 
@@ -152,7 +153,13 @@ class QdrantVectorService:
         documents: list[str],
         metadata: list[dict[str, Any]] | None = None,
     ) -> None:
-        """Add vectors to the collection."""
+        """Add vectors to the collection (legacy direct path — prefer IngestionPipelineBuilder.run())."""
+        warnings.warn(
+            "QdrantService.add_vectors() is deprecated; use IngestionPipelineBuilder.run()",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
         if self._vector_store is None:
             await self.initialize()
 
