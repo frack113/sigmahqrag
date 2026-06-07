@@ -201,9 +201,9 @@ class IngestionPipelineBuilder:
             return None
 
         from .transforms.base import TransformConfig
-        from src.rag.transforms.markdown.chunker import _get_llm_client
+        from src.rag.transforms.generique.clients import get_llm_client
 
-        llm_client = _get_llm_client()
+        llm_client = get_llm_client()
         config = TransformConfig(
             collection_name=self._collection_name,
             collection=self._collection_name,
@@ -378,7 +378,7 @@ class IngestionPipelineBuilder:
     def _make_transform_config(self, file_path: str | Path) -> Any:
         """Build a TransformConfig suited for a specific file."""
         from .transforms.base import TransformConfig
-        from src.rag.transforms.markdown.chunker import _get_llm_client
+        from src.rag.transforms.generique.clients import get_llm_client
 
         source = ""
         if self._collection_name:
@@ -393,7 +393,7 @@ class IngestionPipelineBuilder:
             model_name=self._model_name,
             chunk_size=chunk_cfg.get("chunk_size", 512),
             chunk_overlap=chunk_cfg.get("chunk_overlap", 50),
-            llm_client=_get_llm_client(),
+            llm_client=get_llm_client(),
         )
 
     async def arun(
