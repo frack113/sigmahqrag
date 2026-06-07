@@ -1,6 +1,9 @@
-"""Chat-related Pydantic schemas."""
+"""Chat, search and mode Pydantic schemas."""
 
 from __future__ import annotations
+
+from enum import StrEnum
+from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -19,5 +22,33 @@ class ChatMessageResponse(BaseModel):
 
     response: str = Field(..., description="AI response text")
     timestamp: str = Field(..., description="ISO timestamp")
-    citations: list[str] = Field(default_factory=list, description="Source citations")
+    citations: list[dict[str, Any]] = Field(default_factory=list, description="Source citations")
     mode: str = Field("search", description="Mode used for response")
+
+
+class ChatMode(StrEnum):
+    """Chat operation modes."""
+
+    SEARCH = "search"
+    EXPLAIN = "explain"
+    COVERAGE = "coverage"
+
+    @classmethod
+    def values(cls) -> list[str]:
+        """Get all mode values."""
+        return [m.value for m in cls]
+
+
+class SearchRequest(BaseModel):
+    """Search request."""
+
+    query: str
+    limit: int = Field(default=10, ge=1, le=100)
+    mode: str = Field(default="search")
+
+
+class SearchResponse(BaseModel):
+    """Search response."""
+
+    data: list[dict[str, Any]]
+    meta: dict[str, Any] = Field(default_factory=dict)

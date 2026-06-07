@@ -21,7 +21,7 @@ from src.shared.utils.identify_file_type import (
     SUPPORTED_REFERENCE_DOC_TYPES,
 )
 from src.infrastructure.database import DatabaseService
-from src.shared.schemas.sigma_rule import is_sigma_rule_dict
+from src.core.sigma.models import is_sigma_rule_dict
 from src.shared.utils import iso_now
 
 logger = logging.getLogger(__name__)

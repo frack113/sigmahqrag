@@ -7,14 +7,14 @@ from typing import Optional
 
 import yaml
 
-from src.shared.schemas.sigma_rule import is_sigma_rule as is_sigma_rule_fn
+from src.core.sigma.models import is_sigma_rule as is_sigma_rule_fn
 
 
 def is_sigma_rule(file_path: Path) -> bool:
     """Check if a YAML file is a Sigma rule.
 
     Re-export of the canonical ``is_sigma_rule`` from
-    ``src.shared.schemas.sigma_rule`` for the ``Path``-only call-signature.
+    ``src.core.sigma.models`` for the ``Path``-only call-signature.
     """
     return is_sigma_rule_fn(file_path)
 

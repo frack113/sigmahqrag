@@ -10,7 +10,7 @@ from llama_index.core.schema import TextNode
 from src.config.settings import get_config
 from src.core.pipeline.ingestion import get_embedding_dimension
 from src.infrastructure.vectorstore import QdrantService
-from src.shared.schemas.sigma_rule import SigmaRule
+from src.core.sigma.models import SigmaRule
 
 logger = logging.getLogger(__name__)
 

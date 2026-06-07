@@ -10,7 +10,7 @@ from pathlib import Path
 import puremagic
 import yaml
 
-from src.shared.schemas.sigma_rule import is_sigma_rule_candidate
+from src.core.sigma.models import is_sigma_rule_candidate
 
 UTF8_BOM = b"\xef\xbb\xbf"
 MAX_FILE_SIZE = 100 * 1024 * 1024

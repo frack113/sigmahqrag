@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 
 
-from src.shared.schemas.sigma_rule import SigmaRule
+from src.core.sigma.models import SigmaRule
 from src.application.documents.parser import parse_sigma_rule, scan_directory
 from src.application.documents.validator import validate_sigma_rule
 

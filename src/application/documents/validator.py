@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 
 from src.application.documents.models import ValidationError, ValidationResult
-from src.shared.schemas.sigma_rule import SigmaRule
+from src.core.sigma.models import SigmaRule
 
 logger = logging.getLogger(__name__)
 

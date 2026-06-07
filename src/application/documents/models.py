@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-from src.shared.schemas.sigma_rule import SigmaRule
+from src.core.sigma.models import SigmaRule
 
 
 class ValidationError(BaseModel):

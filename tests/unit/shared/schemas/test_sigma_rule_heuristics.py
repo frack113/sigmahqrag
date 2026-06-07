@@ -2,7 +2,7 @@
 
 import yaml
 
-from src.shared.schemas.sigma_rule import (
+from src.core.sigma.models import (
     is_sigma_rule,
     is_sigma_rule_candidate,
     is_sigma_rule_content,

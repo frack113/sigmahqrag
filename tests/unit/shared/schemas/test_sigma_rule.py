@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from src.shared.schemas.sigma_rule import SigmaRule
+from src.core.sigma.models import SigmaRule
 
 
 def test_sigma_rule_model_init() -> None:

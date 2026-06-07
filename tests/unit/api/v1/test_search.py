@@ -69,7 +69,7 @@ class TestSearchResultSchema:
 
     def test_response_structure(self) -> None:
         """Test response structure has rules key."""
-        from src.shared.schemas.search import SearchRequest, SearchResponse
+        from src.api.v1.chat.schemas import SearchRequest, SearchResponse
 
         req = SearchRequest(query="test", limit=10)
         assert req.query == "test"

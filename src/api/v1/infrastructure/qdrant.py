@@ -22,7 +22,7 @@ from src.infrastructure.vectorstore.service import get_qdrant_service
 from src.infrastructure.vectorstore.storage import delete_point, store_embeddings
 from src.infrastructure.vectorstore.storage import search as qdrant_search
 from src.shared.download_manager import create_download_manager
-from src.shared.schemas.qdrant import (
+from src.api.v1.infrastructure.schemas import (
     CancelPayload,
     CollectionManagementPayload,
     DataManagementPayload,

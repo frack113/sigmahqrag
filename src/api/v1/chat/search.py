@@ -7,7 +7,7 @@ import logging
 from fastapi import APIRouter, HTTPException, Query, status
 
 from src.core.search.engine import SearchEngine
-from src.shared.schemas.search import SearchResponse
+from src.api.v1.chat.schemas import SearchResponse
 
 logger = logging.getLogger(__name__)
 

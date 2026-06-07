@@ -17,7 +17,7 @@ from src.application.sigma.translate import (
 )
 from src.application.tools import ToolContext, ToolDispatcher, get_tools
 from src.core.search.engine import SearchEngine
-from src.shared.schemas.chat_mode import ChatMode
+from src.api.v1.chat.schemas import ChatMode
 
 logger = logging.getLogger(__name__)
 

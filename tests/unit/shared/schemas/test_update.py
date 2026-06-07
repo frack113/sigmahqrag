@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from src.shared.schemas.update import (
+from src.application.system.schemas import (
     BackupInfo,
     ServiceVersionInfo,
     UpdateApplyRequest,

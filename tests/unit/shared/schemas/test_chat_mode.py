@@ -1,6 +1,6 @@
 """Tests for chat mode schema."""
 
-from src.shared.schemas.chat_mode import ChatMode
+from src.api.v1.chat.schemas import ChatMode
 
 
 class TestChatMode:

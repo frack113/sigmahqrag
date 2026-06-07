@@ -1,6 +1,6 @@
 """Tests for download schemas."""
 
-from src.shared.schemas.download import (
+from src.api.v1.models.schemas import (
     DownloadCancelRequest,
     DownloadCancelResponse,
     DownloadProgress,
