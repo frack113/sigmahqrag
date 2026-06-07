@@ -13,7 +13,7 @@ from pathlib import Path
 from src.config.settings import get_config
 from src.core import TransformRegistry
 from src.core.base import TransformConfig
-from src.core.document.generic_parser import GenericTransform
+from src.core.document.parser.generic_parser import GenericTransform
 from src.core.pipeline.ingestion import IngestionPipelineBuilder
 from src.infrastructure.database import DatabaseService
 

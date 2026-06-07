@@ -12,9 +12,9 @@ from pathlib import Path
 
 from llama_index.core.schema import Document
 
-from ..base import DocumentTransform
-from ..registry import TransformRegistry
-from .llm import LLMClientLike, enrich_by_llm
+from ...base import DocumentTransform
+from ...registry import TransformRegistry
+from ..llm import LLMClientLike, enrich_by_llm
 
 logger = logging.getLogger(__name__)
 

@@ -3,9 +3,29 @@
 import pytest
 
 from src.core.base import DocumentTransform, TransformConfig
+from src.core.document.chunker import MarkdownChunker
+from src.core.document.parser import GenericTransform, OfficeTransform, PDFTransform
 from src.core.registry import TransformRegistry
 from src.core.sigma.parser import SigmaParser
 from src.core.sigma.chunker import SigmaChunker
+
+
+class TestDeepImportPaths:
+    """Smoke tests verifying all deep import paths resolve correctly."""
+
+    def test_parser_imports_resolve(self):
+        assert issubclass(PDFTransform, DocumentTransform)
+        assert issubclass(OfficeTransform, DocumentTransform)
+        assert issubclass(GenericTransform, DocumentTransform)
+
+    def test_chunker_import_resolves(self):
+        assert issubclass(MarkdownChunker, DocumentTransform)
+
+    def test_sigma_parser_import_resolves(self):
+        assert issubclass(SigmaParser, DocumentTransform)
+
+    def test_sigma_chunker_import_resolves(self):
+        assert issubclass(SigmaChunker, DocumentTransform)
 
 
 @pytest.fixture

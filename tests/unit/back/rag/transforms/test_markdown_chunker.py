@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 from src.core.base import TransformConfig
-from src.core.document.markdown_chunker import MarkdownChunker
+from src.core.document.chunker import MarkdownChunker
 
 
 SAMPLE_MD = """# Chapter 1

@@ -52,7 +52,7 @@ class TestUnifiedIndexerIngestionPath:
             return_value=mock_transform,
         ):
             with patch(
-                "src.core.document.generic_parser.GenericTransform._build_default_config",
+                "src.core.document.parser.generic_parser.GenericTransform._build_default_config",
                 return_value=TransformConfig(),
             ):
                 with patch(
@@ -93,7 +93,7 @@ class TestUnifiedIndexerIngestionPath:
             return_value=mock_transform,
         ):
             with patch(
-                "src.core.document.generic_parser.GenericTransform._build_default_config",
+                "src.core.document.parser.generic_parser.GenericTransform._build_default_config",
                 return_value=TransformConfig(),
             ):
                 with patch(
@@ -131,7 +131,7 @@ class TestUnifiedIndexerIngestionPath:
             return_value=mock_transform,
         ):
             with patch(
-                "src.core.document.generic_parser.GenericTransform._build_default_config",
+                "src.core.document.parser.generic_parser.GenericTransform._build_default_config",
                 return_value=TransformConfig(),
             ):
                 with patch(
