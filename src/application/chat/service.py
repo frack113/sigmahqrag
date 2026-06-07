@@ -8,9 +8,9 @@ from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
 from typing import Any
 
-from src.application.services.rag_pipeline import RAGPipeline
-from src.application.services.sigma_validator import SigmaValidator
-from src.application.services.translate_service import (
+from src.application.chat.rag import RAGPipeline
+from src.application.sigma.validator import SigmaValidator
+from src.application.sigma.translate import (
     detect_sigma_yaml,
     extract_yaml_block,
     translate_detection,

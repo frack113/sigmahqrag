@@ -3,7 +3,7 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from src.application.services.translate_service import (
+from src.application.sigma.translate import (
     detect_sigma_yaml,
     extract_yaml_block,
     translate_detection,

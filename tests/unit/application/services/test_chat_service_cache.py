@@ -4,14 +4,14 @@ from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from src.application.services.chat_service import ChatService
+from src.application.chat.service import ChatService
 
 
 def _make_service() -> ChatService:
     with (
-        patch("src.application.services.chat_service.SearchEngine"),
-        patch("src.application.services.chat_service.RAGPipeline"),
-        patch("src.application.services.chat_service.SigmaValidator"),
+        patch("src.application.chat.service.SearchEngine"),
+        patch("src.application.chat.service.RAGPipeline"),
+        patch("src.application.chat.service.SigmaValidator"),
     ):
         svc = ChatService()
     svc.rag_pipeline.llm_client.erase_slot_cache = AsyncMock()
@@ -65,13 +65,13 @@ class TestSearchStreamCacheCleanup:
             yield "token2"
 
         with (
-            patch("src.application.services.chat_service.detect_sigma_yaml", return_value=True),
+            patch("src.application.chat.service.detect_sigma_yaml", return_value=True),
             patch(
-                "src.application.services.chat_service.extract_yaml_block",
+                "src.application.chat.service.extract_yaml_block",
                 return_value="detection:\n  condition: selection",
             ),
             patch(
-                "src.application.services.chat_service.translate_detection",
+                "src.application.chat.service.translate_detection",
                 new_callable=AsyncMock,
                 return_value="Translated text",
             ),

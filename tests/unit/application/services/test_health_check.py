@@ -10,7 +10,7 @@ import pytest
 
 @pytest.fixture
 def health_service():
-    from src.application.services.health_check import HealthCheckService
+    from src.application.system.health import HealthCheckService
 
     return HealthCheckService()
 

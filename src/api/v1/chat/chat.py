@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from fastapi import APIRouter, HTTPException, UploadFile, status
 from fastapi.responses import StreamingResponse
 
-from src.application.services.chat_service import ChatService
+from src.application.chat.service import ChatService
 from src.shared.exceptions import ValidationError
 from src.shared.schemas.chat import ChatMessageRequest, ChatMessageResponse
 

@@ -13,7 +13,7 @@ from jinja2 import Template
 from src.core.search.engine import SearchEngine
 from src.infrastructure.llm.llamacpp import LlamaClient
 
-from .cache import ResponseCache
+from src.application.system.cache import ResponseCache
 
 logger = logging.getLogger(__name__)
 

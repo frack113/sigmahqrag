@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 from fastapi import FastAPI
 
 from src.api.v1.sigma.translate import router
-from src.application.services.translate_service import _render_safe, SIGMA_YAML_STOP_SEQUENCES
+from src.application.sigma.translate import _render_safe, SIGMA_YAML_STOP_SEQUENCES
 
 app = FastAPI()
 app.include_router(router)

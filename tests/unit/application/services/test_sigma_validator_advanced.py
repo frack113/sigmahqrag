@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from src.application.services.sigma_validator import SigmaValidator
+from src.application.sigma.validator import SigmaValidator
 from src.shared.exceptions import ValidationError
 
 
