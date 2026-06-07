@@ -17,7 +17,7 @@ except ImportError:
     sys.exit(1)
 
 from src.back.database import DatabaseServiceProtocol
-from src.shared.constants import (
+from src.config.constants import (
     SIGMA_SPEC_REPO,
     SIGMA_SPEC_REF,
     SCHEMA_VERSION,
@@ -26,7 +26,7 @@ from src.shared.constants import (
     DEFAULT_QDRANT_COLLECTION,
     DEFAULT_QDRANT_VECTOR_SIZE,
 )
-from src.shared import LLM_DIR, EMBEDDINGS_DIR
+from src.config.settings import LLM_DIR, EMBEDDINGS_DIR
 from src.worker.processor import TaskDispatcher
 from src.worker.enums import WorkerName, WorkerStatus
 

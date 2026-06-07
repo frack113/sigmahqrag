@@ -44,7 +44,7 @@ from src.back.service_manager import shutdown_all_services
 from src.worker.processor import TaskDispatcher
 from src.front import STATIC_DIR
 from src.shared.exceptions import SigmaError
-from src.shared import TEMP_DIR
+from src.config.settings import TEMP_DIR
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +63,7 @@ def _parse_log_size(size_str: str) -> int:
 
 def _setup_logging(level: str = "INFO", max_size: str = "10M", max_files: int = 5) -> None:
     """Setup logging to file with rotation."""
-    from src.shared import LOGS_DIR
+    from src.config.settings import LOGS_DIR
 
     log_file = LOGS_DIR / "sigmahqrag.log"
     log_level = getattr(logging, level.upper(), logging.INFO)
@@ -99,7 +99,7 @@ async def _init_qdrant_collections() -> None:
 def _clean_at_startup() -> None:
     """Clean temp, pid, and log files at startup when clean_at_startup is enabled."""
     import shutil
-    from src.shared import PID_DIR, LOGS_DIR
+    from src.config.settings import PID_DIR, LOGS_DIR
 
     for d in (TEMP_DIR, PID_DIR):
         if d.exists():
@@ -137,7 +137,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
         sync_prompts_from_files()
 
-        from src.shared import Config, get_config
+        from src.config.settings import Config, get_config
 
         Config.init_app()
         config = get_config()
@@ -207,7 +207,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 def _validate_services() -> None:
     """Validate required services are configured."""
-    from src.shared import get_config
+    from src.config.settings import get_config
 
     config = get_config()
     if not config.llama_base_url:

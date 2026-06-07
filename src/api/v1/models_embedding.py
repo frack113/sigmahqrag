@@ -31,7 +31,7 @@ async def list_installed_embedding_models() -> JSONResponse:
     try:
         db = get_database_service()
         reg = get_unified_registry()
-        from src.shared import EMBEDDINGS_DIR
+        from src.config.settings import EMBEDDINGS_DIR
 
         reg.sync_embeddings_folder(EMBEDDINGS_DIR, db)
         embeddings = reg.list_embeddings(db)

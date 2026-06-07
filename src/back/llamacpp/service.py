@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from src.shared import Config
+    from src.config.settings import Config
 
 _llama_service: LlamaBinaryService | None = None
 
@@ -21,7 +21,7 @@ class LlamaBinaryService:
         subprocess_manager=None,
     ) -> None:
         """Initialize LlamaBinaryService."""
-        from src.shared import get_config
+        from src.config.settings import get_config
 
         self._config = config or get_config()
         self.llama_bin = self._config.resolve_llamacpp_bin_path()

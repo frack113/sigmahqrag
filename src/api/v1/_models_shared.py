@@ -14,7 +14,7 @@ def _delete_all_models_of_type(model_type: str) -> None:
     from pathlib import Path
 
     from src.api.dependencies import get_database_service, get_unified_registry
-    from src.shared import LLM_DIR as llm_dir, EMBEDDINGS_DIR as emb_dir
+    from src.config.settings import LLM_DIR as llm_dir, EMBEDDINGS_DIR as emb_dir
 
     db = get_database_service()
     reg = get_unified_registry()
@@ -82,7 +82,7 @@ def _delete_llm_model_file(repo_id: str, filename: str) -> dict[str, Any]:
     from pathlib import Path
 
     from src.api.dependencies import get_database_service, get_unified_registry
-    from src.shared import LLM_DIR
+    from src.config.settings import LLM_DIR
 
     err = _validate_repo_id(repo_id)
     if err:
@@ -133,7 +133,7 @@ def _delete_embedding_model(repo_id: str) -> dict[str, Any]:
     from pathlib import Path
 
     from src.api.dependencies import get_database_service, get_unified_registry
-    from src.shared import EMBEDDINGS_DIR
+    from src.config.settings import EMBEDDINGS_DIR
 
     err = _validate_repo_id_simple(repo_id)
     if err:

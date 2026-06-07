@@ -8,7 +8,7 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
 from src.api.dependencies import get_database_service, get_unified_registry
-from src.shared import LLM_DIR
+from src.config.settings import LLM_DIR
 from src.api.v1._models_shared import _delete_llm_model_file, _delete_embedding_model
 
 logger = logging.getLogger(__name__)

@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 def _find_qdrant_binary() -> Path | None:
     """Find the qdrant executable in the expected location."""
-    from src.shared import get_config
+    from src.config.settings import get_config
 
     config = get_config()
     qdrant_bin = Path(config.qdrant_binary_path).resolve()
@@ -72,7 +72,7 @@ def get_version() -> str | None:
 
     Detects from config first, then falls back to binary detection if version is "0".
     """
-    from src.shared import get_config
+    from src.config.settings import get_config
 
     config = get_config()
     version = config.qdrant_version
@@ -94,7 +94,7 @@ def get_version() -> str | None:
 
 def set_version(version: str) -> None:
     """Set qdrant version."""
-    from src.shared import get_config
+    from src.config.settings import get_config
 
     config = get_config()
     config.qdrant_version = version
@@ -103,7 +103,7 @@ def set_version(version: str) -> None:
 
 def set_webui_version(version: str) -> None:
     """Set qdrant webui version."""
-    from src.shared import get_config
+    from src.config.settings import get_config
 
     config = get_config()
     config.qdrant_webui_version = version
@@ -121,7 +121,7 @@ class QdrantVectorService:
         port: int | None = None,
     ) -> None:
         """Initialize QdrantVectorService."""
-        from src.shared import get_config
+        from src.config.settings import get_config
 
         config = get_config()
         self.collection_name = collection_name or config.qdrant_collection_name

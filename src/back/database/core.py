@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 def _default_db_path() -> str:
-    from src.shared.config import get_config
+    from src.config.settings import get_config
 
     return get_config().paths_duckdb_path
 

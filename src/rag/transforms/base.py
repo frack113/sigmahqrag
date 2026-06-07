@@ -242,7 +242,7 @@ class DocumentTransform(ABC):
     @classmethod
     def _build_default_config(cls) -> TransformConfig:
         """Build default config from Config."""
-        from src.shared.config import get_config
+        from src.config.settings import get_config
 
         cfg = get_config()
         collection_name = getattr(cfg, "qdrant_collection_name", "default")

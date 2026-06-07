@@ -11,7 +11,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 
 from src.back.database import DatabaseService
-from src.shared.config import get_config
+from src.config.settings import get_config
 
 logger = logging.getLogger(__name__)
 

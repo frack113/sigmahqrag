@@ -16,7 +16,7 @@ from git import Repo
 from git.exc import InvalidGitRepositoryError
 
 from src.back.database import DatabaseService
-from src.shared.config import get_config
+from src.config.settings import get_config
 
 logger = logging.getLogger(__name__)
 

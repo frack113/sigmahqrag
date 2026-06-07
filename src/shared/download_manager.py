@@ -14,7 +14,7 @@ from typing import Any
 
 import httpx
 
-from src.shared import BIN_DIR
+from src.config.settings import BIN_DIR
 from src.shared.exceptions import DownloadError
 from src.shared.temp_manager import get_temp_manager
 from src.shared.version_manager import (
@@ -99,11 +99,11 @@ class DownloadManager:
             version_to_check = version.lstrip("v")
 
         if service in ("llama", "llama.cpp"):
-            from src.shared import get_config
+            from src.config.settings import get_config
 
             current_version = get_config().llamacpp_version
         elif service in ("qdrant", "qdrant_db"):
-            from src.shared import get_config
+            from src.config.settings import get_config
 
             current_version = get_config().qdrant_version
         else:
@@ -257,13 +257,13 @@ class DownloadManager:
                     version_str = task.version.lstrip("v")
 
                     if task.service in ("llama", "llama.cpp"):
-                        from src.shared import get_config
+                        from src.config.settings import get_config
 
                         config = get_config()
                         config.llamacpp_version = version_str
                         config.save()
                     elif task.service in ("qdrant", "qdrant_db"):
-                        from src.shared import get_config
+                        from src.config.settings import get_config
 
                         config = get_config()
                         config.qdrant_version = version_str

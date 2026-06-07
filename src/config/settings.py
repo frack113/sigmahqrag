@@ -102,7 +102,6 @@ class Config:
                 qdrant = services["qdrant"]
                 if "base_url" in qdrant:
                     self.qdrant_base_url = qdrant["base_url"]
-                    # Parse host/port from base_url for internal consumers
                     from urllib.parse import urlparse
 
                     parsed = urlparse(qdrant["base_url"])

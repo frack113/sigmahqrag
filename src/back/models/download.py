@@ -10,7 +10,7 @@ from typing import Any
 from src.back.database.service import DatabaseService
 from src.back.models.exceptions import DownloadError
 from src.back.models.types import HFRepo
-from src.shared import TEMP_DIR
+from src.config.settings import TEMP_DIR
 
 
 class HFDownloadService:

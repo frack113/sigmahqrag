@@ -1164,7 +1164,7 @@ class TestDefaultDbPathFunction:
 
         mock_cfg = MagicMock()
         mock_cfg.paths_duckdb_path = "test/path.db"
-        with patch("src.shared.config.get_config", return_value=mock_cfg):
+        with patch("src.config.settings.get_config", return_value=mock_cfg):
             result = _default_db_path()
         assert result == "test/path.db"
 

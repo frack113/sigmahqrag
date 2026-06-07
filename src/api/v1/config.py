@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from src.back.database.service import DatabaseService
-from src.shared import get_config
+from src.config.settings import get_config
 
 logger = logging.getLogger(__name__)
 

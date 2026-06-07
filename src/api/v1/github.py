@@ -27,7 +27,7 @@ from src.back.github.git import (
     update_repo,
 )
 
-from src.shared.config import get_config
+from src.config.settings import get_config
 
 logger = logging.getLogger(__name__)
 

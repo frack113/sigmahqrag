@@ -75,7 +75,7 @@ class GenericDiscoveryWorker(DiscoveryWorker):
     # ------------------------------------------------------------------
 
     def _process_local(self, task: dict, worker_name: WorkerName) -> None:
-        from src.shared.config import get_config
+        from src.config.settings import get_config
 
         cfg = get_config()
         config_base_path = Path(cfg.local_documents_path).resolve()

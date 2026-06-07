@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from src.shared.config import get_config
+from src.config.settings import get_config
 from src.worker.base import BaseWorker
 from src.worker.enums import WorkerName, WorkerStatus
 from src.back.documents.sigma_ref_processor import process_sigma_refs

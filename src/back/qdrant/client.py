@@ -28,7 +28,7 @@ def get_qdrant_client(
         Configured QdrantClient.
     """
     global _client_instance
-    from src.shared import get_config
+    from src.config.settings import get_config
 
     cfg = get_config()
     resolved_host = host or cfg.qdrant_host

@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from src.shared import get_config
+from src.config.settings import get_config
 
 from .client import LlamaClient
 from .health import check_health

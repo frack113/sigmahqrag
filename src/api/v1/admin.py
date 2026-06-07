@@ -11,7 +11,7 @@ from fastapi import APIRouter, Header
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from src.shared import get_config
+from src.config.settings import get_config
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +66,7 @@ async def check_service_health() -> dict[str, Any]:
 
     from src.back.llamacpp import get_version as get_llama_version
     from src.back.qdrant import get_version as get_qdrant_version
-    from src.shared import get_config
+    from src.config.settings import get_config
 
     config = get_config()
     llama_version = get_llama_version() or "Not installed"
@@ -151,7 +151,7 @@ async def post_backend(request: dict) -> JSONResponse:
             from pathlib import Path
 
             from src.back.llamacpp.service import get_llama_service
-            from src.shared import LLM_DIR
+            from src.config.settings import LLM_DIR
 
             models = list(Path(LLM_DIR).rglob("*.gguf"))
             model_path = str(models[0]) if models else None
@@ -271,7 +271,7 @@ async def start_download(service: str | None = None, target: str | None = None) 
         if target_component in ("binary", "all"):
             binary_result = await installer.download_binary()
             if binary_result.get("success"):
-                from src.shared import get_config
+                from src.config.settings import get_config
 
                 config = get_config()
                 config.qdrant_version = QDRANT_BINARY_VERSION
@@ -280,7 +280,7 @@ async def start_download(service: str | None = None, target: str | None = None) 
         if target_component in ("web_ui", "all"):
             ui_result = await installer.download_web_ui()
             if ui_result.get("success"):
-                from src.shared import get_config
+                from src.config.settings import get_config
 
                 config = get_config()
                 config.qdrant_webui_version = QDRANT_UI_VERSION

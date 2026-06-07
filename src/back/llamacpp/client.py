@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 def _default_base_url() -> str:
     """Resolve the llama base URL from app config, with a safe fallback."""
     try:
-        from src.shared import get_config
+        from src.config.settings import get_config
 
         return get_config().llama_base_url or "http://127.0.0.1:8080"
     except ImportError:

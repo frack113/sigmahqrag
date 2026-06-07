@@ -6,7 +6,7 @@ import logging
 import time
 from typing import Any
 
-from src.shared import get_config
+from src.config.settings import get_config
 
 logger = logging.getLogger(__name__)
 

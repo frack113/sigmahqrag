@@ -32,7 +32,7 @@ class QdrantInstallerService:
         bin_dir: Path | None = None,
         static_dir: Path | None = None,
     ) -> None:
-        from src.shared.config import get_config
+        from src.config.settings import get_config
 
         self.bin_dir = bin_dir or Path(get_config().qdrant_binary_path).resolve()
         self.static_dir = static_dir or (self.bin_dir / "static")

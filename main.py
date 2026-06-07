@@ -2,7 +2,7 @@ import logging
 import re
 import sys
 
-from src.shared.constants import SCHEMA_VERSION
+from src.config.constants import SCHEMA_VERSION
 
 
 class _Filter2xx(logging.Filter):

@@ -38,7 +38,7 @@ async def list_installed_llm_models() -> JSONResponse:
     try:
         db = get_database_service()
         reg = get_unified_registry()
-        from src.shared import LLM_DIR
+        from src.config.settings import LLM_DIR
 
         reg.sync_llm_folder(LLM_DIR, db)
         llms = reg.list_llms(db)
@@ -139,7 +139,7 @@ async def download_llm_model(
 
     from huggingface_hub import hf_hub_download
 
-    from src.shared import LLM_DIR
+    from src.config.settings import LLM_DIR
 
     _delete_all_models_of_type("llm")
 

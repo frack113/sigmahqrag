@@ -52,7 +52,7 @@ def _recreate_collection(client: Any, collection_name: str, vector_size: int | N
 
     if vector_size is None:
         try:
-            from src.shared import get_config
+            from src.config.settings import get_config
 
             vector_size = get_config().qdrant_vector_size
         except Exception:
@@ -69,7 +69,7 @@ async def qdrant_status():
     """Get status and version for qdrant service."""
     try:
         health_result = await check_health()
-        from src.shared import get_config
+        from src.config.settings import get_config
 
         config = get_config()
         qdrant_base_url = config.qdrant_base_url
@@ -119,7 +119,7 @@ async def qdrant_action(
     action = request.action
     payload = request.payload
 
-    from src.shared import get_config
+    from src.config.settings import get_config
 
     config = get_config()
     host = config.qdrant_host
@@ -132,7 +132,7 @@ async def qdrant_action(
             async def post_install_call(target_path: Path):
                 logger.info(f"post_intall_call triggered: {target_path}")
                 try:
-                    from src.shared import Config
+                    from src.config.settings import Config
 
                     Config.ensure_qdrant_config()
                     logger.info("Qdrant config generated via Config.ensure_qdrant_config()")
@@ -282,7 +282,7 @@ async def qdrant_action(
 
             logger.warning("Reindex requested for %s — wiping points + resetting status", target)
             client = get_qdrant_client()
-            from src.shared import get_config
+            from src.config.settings import get_config
 
             vector_size = get_config().qdrant_vector_size
             try:

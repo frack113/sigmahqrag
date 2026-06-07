@@ -13,7 +13,7 @@ from pydantic import BaseModel
 
 from src.api.dependencies import get_dispatcher
 from src.back.database.service import DatabaseService
-from src.shared.config import get_config
+from src.config.settings import get_config
 from src.back.utils.identify_file_type import SUPPORTED_DOC_EXTENSION_MAP, identify
 from src.worker.enums import WorkerName
 from src.shared.utils import iso_now

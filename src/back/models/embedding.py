@@ -10,7 +10,7 @@ from src.back.database import DatabaseService
 from src.back.models.download import HFDownloadService
 from src.back.models.exceptions import DownloadError
 from src.back.models.types import HFRepo
-from src.shared import EMBEDDINGS_DIR
+from src.config.settings import EMBEDDINGS_DIR
 
 
 class EmbeddingManager:

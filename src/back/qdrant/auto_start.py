@@ -19,7 +19,7 @@ async def start_qdrant(
     binary_service: Any | None = None,
     health_check: Callable[..., Awaitable[dict]] | None = None,
 ) -> None:
-    from src.shared import get_config
+    from src.config.settings import get_config
 
     config = get_config()
 

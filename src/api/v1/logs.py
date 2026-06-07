@@ -11,7 +11,7 @@ from typing import Any
 from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from src.shared.config import get_config
+from src.config.settings import get_config
 
 logger = logging.getLogger(__name__)
 

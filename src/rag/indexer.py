@@ -15,7 +15,7 @@ from src.rag.embeddings import embed_documents
 from src.rag.transforms import TransformRegistry
 from src.rag.transforms.base import TransformConfig
 from src.rag.transforms.generique.parser import GenericTransform
-from src.shared.config import get_config
+from src.config.settings import get_config
 
 logger = logging.getLogger(__name__)
 

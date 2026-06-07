@@ -16,7 +16,7 @@ def get_subprocess_manager() -> SubprocessManager:
     if _subprocess_manager is None:
         from pathlib import Path
 
-        from src.shared import get_config
+        from src.config.settings import get_config
         from src.shared.subprocess_manager import SubprocessManager
 
         config = get_config()

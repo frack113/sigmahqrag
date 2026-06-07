@@ -14,7 +14,7 @@ _started_binary_service = None
 
 def _find_first_model() -> str | None:
     """Find the first available GGUF model in the LLM directory."""
-    from src.shared import LLM_DIR
+    from src.config.settings import LLM_DIR
 
     gguf_files = sorted(Path(LLM_DIR).rglob("*.gguf"))
     if not gguf_files:
@@ -25,7 +25,7 @@ def _find_first_model() -> str | None:
 
 
 async def start_llamacpp() -> None:
-    from src.shared import get_config
+    from src.config.settings import get_config
 
     config = get_config()
 

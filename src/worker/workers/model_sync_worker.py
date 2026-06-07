@@ -3,7 +3,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from src.shared.config import get_config
+from src.config.settings import get_config
 from src.worker.base import BaseWorker
 from src.worker.enums import WorkerName, WorkerStatus
 

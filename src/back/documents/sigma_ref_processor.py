@@ -12,7 +12,7 @@ import httpx
 
 from src.back.utils.identify_file_type import SUPPORTED_REFERENCE_DOC_TYPES
 from src.back.utils.sigma_utils import extract_sigma_references
-from src.shared.config import get_config
+from src.config.settings import get_config
 from src.shared.utils import iso_now
 
 logger = logging.getLogger(__name__)

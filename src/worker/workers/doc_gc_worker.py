@@ -3,7 +3,7 @@
 import logging
 from pathlib import Path
 
-from src.shared.config import get_config
+from src.config.settings import get_config
 from src.worker.base import BaseWorker
 from src.worker.enums import WorkerName, WorkerStatus
 
@@ -137,7 +137,7 @@ class DocGCWorker(BaseWorker):
 
         # Case 3: sigmaref files ��' local base with file_name or hash prefix
         if org == "sigmaref":
-            from src.shared.config import get_config
+            from src.config.settings import get_config
 
             sigmaref_base = get_config().sigmaref_documents_path
             candidates.append(Path(sigmaref_base) / file_name)

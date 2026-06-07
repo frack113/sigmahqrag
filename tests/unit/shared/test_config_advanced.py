@@ -3,7 +3,7 @@
 from pathlib import Path
 from unittest.mock import patch
 
-from src.shared.config import Config, get_config
+from src.config.settings import Config, get_config
 
 
 class TestConfigToDict:
@@ -31,20 +31,20 @@ class TestConfigApplyDbOverrides:
 class TestConfigInitApp:
     def test_init_app_returns_config(self) -> None:
         with (
-            patch("src.shared.config.Config.ensure_config_file"),
-            patch("src.shared.config.Config.ensure_qdrant_config"),
+            patch("src.config.settings.Config.ensure_config_file"),
+            patch("src.config.settings.Config.ensure_qdrant_config"),
         ):
             cfg = Config.init_app()
             assert isinstance(cfg, Config)
 
     def test_init_app_creates_global_config(self) -> None:
         with (
-            patch("src.shared.config._config", None),
-            patch("src.shared.config.Config.ensure_config_file"),
-            patch("src.shared.config.Config.ensure_qdrant_config"),
+            patch("src.config.settings._config", None),
+            patch("src.config.settings.Config.ensure_config_file"),
+            patch("src.config.settings.Config.ensure_qdrant_config"),
         ):
             cfg = Config.init_app()
-            from src.shared.config import _config as global_cfg
+            from src.config.settings import _config as global_cfg
 
             assert global_cfg is cfg
 
@@ -77,8 +77,8 @@ class TestConfigResolveLlamaCppBinPath:
 class TestConfigEnsureConfigFile:
     def test_creates_config_when_missing(self, tmp_path: Path) -> None:
         with (
-            patch("src.shared.config.CONFIG_FILE", tmp_path / "sigmahqrag.toml"),
-            patch("src.shared.config.Config.to_dict", return_value={"key": "val"}),
+            patch("src.config.settings.CONFIG_FILE", tmp_path / "sigmahqrag.toml"),
+            patch("src.config.settings.Config.to_dict", return_value={"key": "val"}),
         ):
             Config.ensure_config_file()
             assert (tmp_path / "sigmahqrag.toml").exists()
@@ -86,13 +86,13 @@ class TestConfigEnsureConfigFile:
     def test_skips_when_exists(self, tmp_path: Path) -> None:
         config_file = tmp_path / "sigmahqrag.toml"
         config_file.write_text("existing")
-        with patch("src.shared.config.CONFIG_FILE", config_file):
+        with patch("src.config.settings.CONFIG_FILE", config_file):
             Config.ensure_config_file()
             assert config_file.read_text() == "existing"
 
     def test_handles_save_error(self, tmp_path: Path) -> None:
         with (
-            patch("src.shared.config.CONFIG_FILE", tmp_path / "sigmahqrag.toml"),
+            patch("src.config.settings.CONFIG_FILE", tmp_path / "sigmahqrag.toml"),
             patch("src.shared.toml_service.TOMLService") as mock_svc,
         ):
             mock_svc.return_value.save.return_value = False
@@ -101,7 +101,7 @@ class TestConfigEnsureConfigFile:
 
 class TestLoadFromToml:
     def test_returns_early_when_no_file(self, tmp_path: Path) -> None:
-        with patch("src.shared.config.CONFIG_FILE", tmp_path / "nonexistent.toml"):
+        with patch("src.config.settings.CONFIG_FILE", tmp_path / "nonexistent.toml"):
             cfg = Config()
             assert cfg.os == "windows"
 
@@ -109,7 +109,7 @@ class TestLoadFromToml:
         config_file = tmp_path / "sigmahqrag.toml"
         config_file.write_text("key = 'val'", encoding="utf-8")
         with (
-            patch("src.shared.config.CONFIG_FILE", config_file),
+            patch("src.config.settings.CONFIG_FILE", config_file),
             patch("src.shared.toml_service.TOMLService.load", side_effect=RuntimeError("fail")),
         ):
             cfg = Config()
@@ -125,8 +125,8 @@ class TestEnsureQdrantConfig:
         cfg = Config()
         cfg.qdrant_binary_path = str(qdrant_dir)
         with (
-            patch("src.shared.config.CONFIG_FILE", tmp_path / "nonexistent.toml"),
-            patch("src.shared.config.Config", return_value=cfg),
+            patch("src.config.settings.CONFIG_FILE", tmp_path / "nonexistent.toml"),
+            patch("src.config.settings.Config", return_value=cfg),
         ):
             Config.ensure_qdrant_config()
         assert config_file.read_text() == "existing"
@@ -138,8 +138,8 @@ class TestEnsureQdrantConfig:
         cfg.qdrant_storage_path = str(tmp_path / "storage")
         cfg.qdrant_snapshots_path = str(tmp_path / "snapshots")
         with (
-            patch("src.shared.config.CONFIG_FILE", tmp_path / "nonexistent.toml"),
-            patch("src.shared.config.Config", return_value=cfg),
+            patch("src.config.settings.CONFIG_FILE", tmp_path / "nonexistent.toml"),
+            patch("src.config.settings.Config", return_value=cfg),
             patch.dict("sys.modules", {"jinja2": None}),
         ):
             Config.ensure_qdrant_config()
@@ -152,8 +152,8 @@ class TestEnsureQdrantConfig:
         cfg.qdrant_storage_path = str(tmp_path / "storage")
         cfg.qdrant_snapshots_path = str(tmp_path / "snapshots")
         with (
-            patch("src.shared.config.CONFIG_FILE", tmp_path / "nonexistent.toml"),
-            patch("src.shared.config.Config", return_value=cfg),
+            patch("src.config.settings.CONFIG_FILE", tmp_path / "nonexistent.toml"),
+            patch("src.config.settings.Config", return_value=cfg),
         ):
             Config.ensure_qdrant_config()
         assert (qdrant_dir / "config" / "config.yaml").exists()
@@ -163,13 +163,13 @@ class TestConfigRemaining:
     def test_resolve_returns_default_when_nonexistent(self) -> None:
         cfg = Config()
         cfg.llama_binary_path = "data/bin/nonexistent"
-        with patch("src.shared.config.Path.exists", return_value=False):
+        with patch("src.config.settings.Path.exists", return_value=False):
             result = cfg.resolve_llamacpp_bin_path()
             assert result == Path("data/bin/nonexistent").resolve()
 
     def test_ensure_config_file_handles_error(self, tmp_path: Path) -> None:
         with (
-            patch("src.shared.config.CONFIG_FILE", tmp_path / "sigmahqrag.toml"),
+            patch("src.config.settings.CONFIG_FILE", tmp_path / "sigmahqrag.toml"),
             patch("src.shared.toml_service.TOMLService") as mock_svc,
         ):
             mock_svc.return_value.save.side_effect = RuntimeError("save failed")
@@ -182,8 +182,8 @@ class TestConfigRemaining:
         template_path = Path("templates/qdrant/config.yaml.j2")
         assert template_path.exists(), "Template file must exist for this test"
         with (
-            patch("src.shared.config.CONFIG_FILE", tmp_path / "nonexistent.toml"),
-            patch("src.shared.config.Config", return_value=cfg),
+            patch("src.config.settings.CONFIG_FILE", tmp_path / "nonexistent.toml"),
+            patch("src.config.settings.Config", return_value=cfg),
         ):
             Config.ensure_qdrant_config()
         generated = qdrant_dir / "config" / "config.yaml"
@@ -193,7 +193,7 @@ class TestConfigRemaining:
 class TestGetConfig:
     def test_returns_global_config(self) -> None:
         with (
-            patch("src.shared.config._config", None),
+            patch("src.config.settings._config", None),
             patch.object(Config, "init_app") as mock_init,
         ):
             mock_init.return_value = "test"
@@ -202,6 +202,6 @@ class TestGetConfig:
 
     def test_returns_cached(self) -> None:
         cached = Config()
-        with patch("src.shared.config._config", cached):
+        with patch("src.config.settings._config", cached):
             result = get_config()
             assert result is cached

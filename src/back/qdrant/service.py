@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from src.shared import Config
+    from src.config.settings import Config
 
 _qdrant_service: QdrantBinaryService | None = None
 
@@ -20,7 +20,7 @@ class QdrantBinaryService:
         subprocess_manager=None,
     ) -> None:
         """Initialize QdrantBinaryService."""
-        from src.shared import get_config
+        from src.config.settings import get_config
 
         self._config = config or get_config()
         self.qdrant_bin = Path(self._config.qdrant_binary_path).resolve()

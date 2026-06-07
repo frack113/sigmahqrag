@@ -16,7 +16,7 @@ from llama_index.core.storage.docstore import SimpleDocumentStore
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.vector_stores.qdrant import QdrantVectorStore
 
-from src.shared.config import get_config
+from src.config.settings import get_config
 
 import threading
 

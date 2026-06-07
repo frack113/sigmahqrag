@@ -20,7 +20,7 @@ import duckdb
 def _db_path() -> Path:
     """Resolve DuckDB path the same way the app does."""
     try:
-        from src.shared.config import get_config
+        from src.config.settings import get_config
 
         return Path(get_config().paths_duckdb_path)
     except Exception:
