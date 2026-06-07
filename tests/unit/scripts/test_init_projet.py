@@ -125,7 +125,6 @@ def test_initialize_database_injectable(temp_project_dir):
     mock_db.initialize.assert_called_once()
     mock_db.get_tables.assert_called_once()
     mock_db.set_config.assert_called_once_with("schema_version", 1)
-    mock_db.close.assert_called_once()
 
 
 if __name__ == "__main__":

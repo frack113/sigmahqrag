@@ -18,6 +18,8 @@ def rag_pipeline() -> RAGPipeline:
         pipeline = RAGPipeline()
         pipeline.search_engine = mock_search.return_value
         pipeline.llm_client = mock_llm.return_value
+        # Mock _resolve_prompt to avoid DB access
+        pipeline._resolve_prompt = MagicMock(return_value="You are a helpful assistant.")
         # Mock the jinja2 environment to avoid template loading
         pipeline.env = MagicMock()
         yield pipeline

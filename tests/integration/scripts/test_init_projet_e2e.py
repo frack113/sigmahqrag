@@ -70,7 +70,7 @@ def test_full_init_e2e_creates_all_structure(temp_project_dir):
     assert "[services.llama]" in config_content
     assert "[services.qdrant]" in config_content
     assert "[logging]" in config_content
-    assert "[rag]" in config_content
+    assert "[Hardware]" in config_content
     assert "[backend]" not in config_content
 
     # Verify sigma-specification cloned

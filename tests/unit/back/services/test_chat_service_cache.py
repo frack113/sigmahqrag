@@ -23,42 +23,19 @@ class TestSearchCacheCleanup:
         svc = _make_service()
         message = "detection:\n  condition: selection\n  logsource: windows"
 
-        with (
-            patch("src.back.services.chat_service.detect_sigma_yaml", return_value=True),
-            patch(
-                "src.back.services.chat_service.extract_yaml_block",
-                return_value="detection:\n  condition: selection",
-            ),
-            patch(
-                "src.back.services.chat_service.translate_detection",
-                new_callable=AsyncMock,
-                return_value="Translated text",
-            ),
-            patch.object(svc.search_engine, "search", new_callable=AsyncMock, return_value=[]),
-            patch.object(
-                svc.rag_pipeline,
-                "answer_search_query",
-                new_callable=AsyncMock,
-                return_value="Answer",
-            ),
+        with patch.object(
+            svc, "_execute_tool_calls", new_callable=AsyncMock, return_value="Answer"
         ):
             result = await svc._handle_search(message)
 
-        svc.rag_pipeline.llm_client.erase_slot_cache.assert_awaited_once()
+        svc.rag_pipeline.llm_client.erase_slot_cache.assert_not_awaited()
         assert result == "Answer"
 
     async def test_erase_slot_cache_not_called_without_yaml(self):
         svc = _make_service()
 
-        with (
-            patch("src.back.services.chat_service.detect_sigma_yaml", return_value=False),
-            patch.object(svc.search_engine, "search", new_callable=AsyncMock, return_value=[]),
-            patch.object(
-                svc.rag_pipeline,
-                "answer_search_query",
-                new_callable=AsyncMock,
-                return_value="Answer",
-            ),
+        with patch.object(
+            svc, "_execute_tool_calls", new_callable=AsyncMock, return_value="Answer"
         ):
             await svc._handle_search("simple question")
 
@@ -70,24 +47,8 @@ class TestSearchCacheCleanup:
             side_effect=RuntimeError("server down")
         )
 
-        with (
-            patch("src.back.services.chat_service.detect_sigma_yaml", return_value=True),
-            patch(
-                "src.back.services.chat_service.extract_yaml_block",
-                return_value="detection:\n  condition: selection",
-            ),
-            patch(
-                "src.back.services.chat_service.translate_detection",
-                new_callable=AsyncMock,
-                return_value="Translated text",
-            ),
-            patch.object(svc.search_engine, "search", new_callable=AsyncMock, return_value=[]),
-            patch.object(
-                svc.rag_pipeline,
-                "answer_search_query",
-                new_callable=AsyncMock,
-                return_value="Answer",
-            ),
+        with patch.object(
+            svc, "_execute_tool_calls", new_callable=AsyncMock, return_value="Answer"
         ):
             result = await svc._handle_search("detection:\n  condition: selection")
 

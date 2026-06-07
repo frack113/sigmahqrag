@@ -37,6 +37,9 @@ def chat_service() -> ChatService:
         "detection": {"selection": {"EventID": 4625}},
     }
 
+    # Mock the tool execution to avoid HTTP calls to LLM
+    service._execute_tool_calls = AsyncMock(return_value="I found 2 relevant rules...")
+
     return service
 
 
@@ -79,7 +82,7 @@ async def test_search_flow(chat_service: ChatService) -> None:
 
     response = await chat_service._handle_search("failed logon events")
     assert "found" in response.lower()
-    chat_service.rag_pipeline.answer_search_query.assert_called_once()
+    chat_service._execute_tool_calls.assert_called_once()
 
 
 @pytest.mark.asyncio

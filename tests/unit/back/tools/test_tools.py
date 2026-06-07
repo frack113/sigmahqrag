@@ -1,9 +1,19 @@
 """Tests for registered tool functions and schema validation."""
 
+import importlib
+
 from src.back.tools.registry import (
     _VALID_FILTER_FIELDS,
     get_tools,
+    reset_tools,
 )
+
+
+def _ensure_sigma_tools_registered() -> None:
+    """Re-register sigma tools if they were cleared by reset_tools()."""
+    import src.back.tools.sigma.tools  # noqa: F401
+
+    importlib.reload(src.back.tools.sigma.tools)
 
 
 class TestFilterMetadataEnumValidation:
@@ -17,6 +27,10 @@ class TestFilterMetadataEnumValidation:
 
 class TestToolFunctionRegistration:
     """Tests that all 5 tool functions are registered correctly."""
+
+    def setup_method(self) -> None:
+        reset_tools()
+        _ensure_sigma_tools_registered()
 
     def get_sigma_tool_names(self) -> list[str]:
         """Return the names of the 5 registered sigma tools."""
@@ -156,21 +170,27 @@ class TestToolContextModel:
         class MockPipeline:
             pass
 
+        class MockLLMClient:
+            pass
+
         ctx = ToolContext(
             search_engine=MockEngine(),
             rag_pipeline=MockPipeline(),
+            llm_client=MockLLMClient(),
         )
 
         assert ctx.search_engine is not None
         assert ctx.rag_pipeline is not None
+        assert ctx.llm_client is not None
 
     def test_tool_context_fields(self) -> None:
         """Test ToolContext has expected fields."""
         from src.back.tools.models import ToolContext
 
-        ctx = ToolContext(search_engine=None, rag_pipeline=None)
+        ctx = ToolContext(search_engine=None, rag_pipeline=None, llm_client=None)
         assert hasattr(ctx, "search_engine")
         assert hasattr(ctx, "rag_pipeline")
+        assert hasattr(ctx, "llm_client")
 
 
 class TestToolCallModel:
