@@ -14,8 +14,8 @@ from src.config.settings import get_config
 from src.core import TransformRegistry
 from src.core.base import TransformConfig
 from src.core.document.generic_parser import GenericTransform
+from src.core.pipeline.ingestion import IngestionPipelineBuilder
 from src.infrastructure.database import DatabaseService
-from src.infrastructure.vectorstore.storage import store_embeddings
 
 logger = logging.getLogger(__name__)
 
@@ -107,24 +107,25 @@ class UnifiedIndexer:
                     continue
 
                 # Some transforms (notably SigmaParser → SigmaChunker) may emit
-                # chunks with empty text (missing fields). ``embed_documents``
-                # filters those out, which would cause store_embeddings to fail
-                # on the "Document count must match embedding count" check.
-                # Align the three lists to only chunks that have non-empty text.
+                # chunks with empty text (missing fields). The pipeline filters
+                # those out internally, but we skip empties early to avoid the
+                # embedding step cost.
                 non_empty = [d for d in docs if d.text]
                 if not non_empty:
                     continue
 
-                from src.core.embedding.factory import embed_documents as _embed_documents
-
-                embeddings = await _embed_documents(non_empty)
-
-                await store_embeddings(
-                    embeddings=embeddings,
-                    documents=[d.text for d in non_empty],
-                    metadata=[d.metadata for d in non_empty],
+                builder = IngestionPipelineBuilder(
                     collection_name=route.qdrant_collection,
                 )
+                nodes = builder.run(non_empty)
+
+                if not nodes:
+                    logger.warning(
+                        "Pipeline produced no nodes for %s (%s)",
+                        row.get("file_name"),
+                        route.qdrant_collection,
+                    )
+                    continue
 
                 self._update_status(route.table_name, row, "embedded")
                 result.processed += 1
