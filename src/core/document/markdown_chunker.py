@@ -14,14 +14,14 @@ from llama_index.core.schema import Document
 
 from ..base import DocumentTransform
 from ..registry import TransformRegistry
-from .llm import enrich_by_llm
+from .llm import LLMClientLike, enrich_by_llm
 
 logger = logging.getLogger(__name__)
 
 ATX_HEADING_RE = re.compile(r"^(#{1,6})\s+(.+)$", re.MULTILINE)
 
 
-def _extract_keywords(text: str, llm_client: object | None) -> tuple[str, str]:
+def _extract_keywords(text: str, llm_client: LLMClientLike | None) -> tuple[str, str]:
     """Extract summary and keywords from text via LLM.
 
     Args:

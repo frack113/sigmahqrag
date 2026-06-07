@@ -77,10 +77,10 @@ class TestRouteQuery:
     async def test_llm_failure_falls_back_to_all(self) -> None:
         with (
             patch("src.core.search.router.LlamaClient") as mock_llm_class,
-            patch("httpx.AsyncClient") as mock_client_class,
         ):
-            mock_llm_class.return_value.base_url = "http://test:8080"
-            mock_client_class.side_effect = Exception("connection refused")
+            mock_instance = MagicMock()
+            mock_instance.generate = AsyncMock(side_effect=Exception("connection refused"))
+            mock_llm_class.return_value = mock_instance
 
             result = await route_query("test query")
 
@@ -88,41 +88,25 @@ class TestRouteQuery:
 
     @pytest.mark.asyncio
     async def test_invalid_llm_output_falls_back_to_all(self) -> None:
-        mock_response = MagicMock()
-        mock_response.json.return_value = {"choices": [{"text": "I cannot classify this"}]}
-        mock_response.raise_for_status = MagicMock()
-
-        mock_http = AsyncMock()
-        mock_http.post = AsyncMock(return_value=mock_response)
-
         with (
-            patch("httpx.AsyncClient") as mock_client_class,
             patch("src.core.search.router.LlamaClient") as mock_llm_class,
         ):
-            mock_client_class.return_value.__aenter__.return_value = mock_http
-            mock_client_class.return_value.__aexit__.return_value = None
-            mock_llm_class.return_value.base_url = "http://test:8080"
+            mock_instance = MagicMock()
+            mock_instance.generate = AsyncMock(return_value="I cannot classify this")
+            mock_llm_class.return_value = mock_instance
 
             result = await route_query("test query")
 
         assert result == ["sigma_rules", "sigma_docs", "sigma_spec"]
 
     @pytest.mark.asyncio
-    async def test_no_choices_falls_back_to_all(self) -> None:
-        mock_response = MagicMock()
-        mock_response.json.return_value = {"choices": []}
-        mock_response.raise_for_status = MagicMock()
-
-        mock_http = AsyncMock()
-        mock_http.post = AsyncMock(return_value=mock_response)
-
+    async def test_empty_llm_output_falls_back_to_all(self) -> None:
         with (
-            patch("httpx.AsyncClient") as mock_client_class,
             patch("src.core.search.router.LlamaClient") as mock_llm_class,
         ):
-            mock_client_class.return_value.__aenter__.return_value = mock_http
-            mock_client_class.return_value.__aexit__.return_value = None
-            mock_llm_class.return_value.base_url = "http://test:8080"
+            mock_instance = MagicMock()
+            mock_instance.generate = AsyncMock(return_value="")
+            mock_llm_class.return_value = mock_instance
 
             result = await route_query("test query")
 

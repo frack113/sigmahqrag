@@ -3,7 +3,7 @@ from src.core.sigma.models import is_sigma_rule as is_sigma_rule_fn
 __all__ = ["is_sigma_rule"]
 
 
-def is_sigma_rule(doc: dict) -> bool:  # type: ignore[no-redef]
+def is_sigma_rule(doc: dict) -> bool:
     """Determine si le fichier est une regle sigma.
 
     Re-export of the canonical ``is_sigma_rule`` from

@@ -11,8 +11,6 @@ import json
 import logging
 import re
 
-import httpx
-
 from src.infrastructure.llm.llamacpp.client import LlamaClient
 
 logger = logging.getLogger(__name__)
@@ -98,26 +96,7 @@ async def route_query(
         client = llm_client or LlamaClient()
         prompt = ROUTER_PROMPT.format(query=query)
 
-        async with httpx.AsyncClient() as http_client:
-            response = await http_client.post(
-                f"{client.base_url}/v1/completions",
-                json={
-                    "prompt": prompt,
-                    "temperature": 0.0,
-                    "max_tokens": 64,
-                    "stream": False,
-                },
-                timeout=timeout,
-            )
-            response.raise_for_status()
-            payload = response.json()
-
-        choices = payload.get("choices") or []
-        if not choices:
-            logger.warning("Router LLM returned no choices")
-            return list(DEFAULT_COLLECTIONS)
-
-        raw_text = choices[0].get("text", "")
+        raw_text = await client.generate(prompt=prompt, temperature=0.0, max_tokens=64)
         collections = _parse_llm_response(raw_text)
 
         if not collections:

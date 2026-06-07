@@ -8,7 +8,7 @@ from pathlib import Path
 from llama_index.core.schema import Document
 
 from ..base import DocumentTransform
-from ..document.llm import enrich_by_llm
+from ..document.llm import LLMClientLike, enrich_by_llm
 from ..registry import TransformRegistry
 from .chunk_factory import make_chunk
 from .flattening import flatten_detection_values, split_field_operator
@@ -86,7 +86,7 @@ class SigmaChunker(DocumentTransform):
 
         return documents
 
-    def _chunk_rule(self, rule: dict, llm_client: object | None = None) -> list[dict]:
+    def _chunk_rule(self, rule: dict, llm_client: LLMClientLike | None = None) -> list[dict]:
         """Chunk a single Sigma rule dict into enriched chunk dicts.
 
         This is the refactored version of the legacy chunk_sigma_rules_rich function.

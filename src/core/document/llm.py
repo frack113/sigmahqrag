@@ -20,8 +20,16 @@ from __future__ import annotations
 import functools
 import logging
 import pathlib
+from typing import Protocol
 
 logger = logging.getLogger(__name__)
+
+
+class LLMClientLike(Protocol):
+    """Minimal protocol for any object that exposes a ``generate`` method."""
+
+    def generate(self, prompt: str, max_tokens: int = ..., temperature: float = ...) -> str: ...
+
 
 __all__ = ["enrich_by_llm", "load_enrich_prompt"]
 
@@ -50,7 +58,7 @@ def load_enrich_prompt() -> str:
 
 def enrich_by_llm(
     text: str,
-    llm_client: object,
+    llm_client: LLMClientLike,
     *,
     prompt_template: str | None = None,
     max_tokens: int = 512,

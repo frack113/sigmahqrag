@@ -197,28 +197,16 @@ class ChatService:
         tools: list[dict[str, Any]],
     ) -> dict[str, Any]:
         """Send a chat request with tools and return the raw JSON response."""
-        import httpx
-
-        payload: dict[str, Any] = {
-            "messages": messages,
-            "temperature": 0.3,
-            "max_tokens": 1024,
-            "stream": False,
-            "tools": tools,
-        }
-
-        async with httpx.AsyncClient() as client:
-            try:
-                response = await client.post(
-                    f"{self.rag_pipeline.llm_client.base_url}/v1/chat/completions",
-                    json=payload,
-                    timeout=120.0,
-                )
-                response.raise_for_status()
-                return response.json()
-            except Exception as e:
-                logger.error("Tool-calling chat failed: %s", e)
-                raise
+        try:
+            return await self.rag_pipeline.llm_client.chat_raw(
+                messages=messages,
+                temperature=0.3,
+                max_tokens=1024,
+                tools=tools,
+            )
+        except Exception as e:
+            logger.error("Tool-calling chat failed: %s", e)
+            raise
 
     async def _handle_search(self, message: str) -> str:
         """Handle search mode: multi-turn tool-calling loop.
