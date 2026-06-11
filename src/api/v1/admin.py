@@ -208,6 +208,7 @@ class DownloadRequest(BaseModel):
     action: str | None = "install"
     service: str | None = "qdrant"
     target: str | None = None
+    version: str | None = None
 
 
 class CancelRequest(BaseModel):

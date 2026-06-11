@@ -1,0 +1,83 @@
+{#
+    Reusable GitHub release tag selector component.
+
+    Include this template and then populate the select via JS:
+
+        {% include 'shared/_release-selector.html' %}
+
+        <div class="form-group">
+          <label>Release Tag:</label>
+          <select id="my-release-select" class="release-select"></select>
+        </div>
+        <script>
+          loadReleaseTags('my-release-select', 'llama.cpp');
+        </script>
+
+    For a custom repo (not in SERVICE_REPOS_EXTENDED), use loadCustomReleaseTags:
+
+        <script>
+          loadCustomReleaseTags('my-select', 'qdrant', 'qdrant-web-ui');
+        </script>
+#}
+<script>
+/**
+ * Populate a <select> element with release tags for a known service.
+ * @param {string} selectId - DOM id of the <select> element
+ * @param {string} service - Service name (llama.cpp, qdrant, qdrant-web-ui, ...)
+ * @param {object} [opts] - Optional overrides
+ * @param {string} [opts.placeholder] - Placeholder option text (default: "Latest (auto)")
+ * @param {function} [opts.onLoad] - Callback after options are populated (receives releases array)
+ */
+function loadReleaseTags(selectId, service, opts) {
+    opts = opts || {};
+    var sel = document.getElementById(selectId);
+    if (!sel) return;
+    sel.innerHTML = '<option value="">' + (opts.placeholder || 'Latest (auto)') + '</option>';
+    var url = '/api/v1/releases/' + encodeURIComponent(service);
+    fetch(url)
+        .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+        .then(function(data) {
+            var releases = data.releases || [];
+            releases.forEach(function(r) {
+                var opt = document.createElement('option');
+                opt.value = r.tag_name;
+                opt.textContent = r.tag_name + (r.prerelease ? ' (pre-release)' : '');
+                sel.appendChild(opt);
+            });
+            if (opts.onLoad) opts.onLoad(releases);
+        })
+        .catch(function(err) {
+            sel.innerHTML = '<option value="">Error: ' + err.message + '</option>';
+        });
+}
+
+/**
+ * Populate a <select> element with release tags for a custom GitHub repo.
+ * @param {string} selectId - DOM id of the <select> element
+ * @param {string} owner - GitHub owner
+ * @param {string} repo - Repository name
+ * @param {object} [opts] - Same options as loadReleaseTags
+ */
+function loadCustomReleaseTags(selectId, owner, repo, opts) {
+    opts = opts || {};
+    var sel = document.getElementById(selectId);
+    if (!sel) return;
+    sel.innerHTML = '<option value="">' + (opts.placeholder || 'Latest (auto)') + '</option>';
+    var url = '/api/v1/releases/custom/?owner=' + encodeURIComponent(owner) + '&repo=' + encodeURIComponent(repo);
+    fetch(url)
+        .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+        .then(function(data) {
+            var releases = data.releases || [];
+            releases.forEach(function(r) {
+                var opt = document.createElement('option');
+                opt.value = r.tag_name;
+                opt.textContent = r.tag_name + (r.prerelease ? ' (pre-release)' : '');
+                sel.appendChild(opt);
+            });
+            if (opts.onLoad) opts.onLoad(releases);
+        })
+        .catch(function(err) {
+            sel.innerHTML = '<option value="">Error: ' + err.message + '</option>';
+        });
+}
+</script>
