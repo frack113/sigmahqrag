@@ -11,7 +11,7 @@ from src.infrastructure.database import DatabaseService
 
 logger = logging.getLogger(__name__)
 
-PROMPTS_DIR = Path(__file__).parent.parent.parent / "templates" / "prompts" / "chat"
+PROMPTS_DIR = Path(__file__).parent.parent.parent.parent / "templates" / "prompts" / "chat"
 
 _prompts: dict[str, Prompt] = {}
 

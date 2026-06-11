@@ -37,10 +37,7 @@ __all__ = ["enrich_by_llm", "load_enrich_prompt"]
 # Prompt template loading (from templates/prompts/enrich_chunk.md)
 # ---------------------------------------------------------------------------
 _PROMPTS_DIR = (
-    pathlib.Path(__file__).resolve().parent.parent.parent.parent.parent.parent
-    / "templates"
-    / "prompts"
-    / "rag"
+    pathlib.Path(__file__).resolve().parent.parent.parent.parent / "templates" / "prompts" / "rag"
 )
 _enrich_prompt_cache: str | None = None
 
