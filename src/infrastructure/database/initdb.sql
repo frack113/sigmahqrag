@@ -109,6 +109,13 @@ CREATE TABLE IF NOT EXISTS worker_state (
     last_heartbeat TEXT
 );
 
+-- release_cache (GitHub release tag cache — refreshed on demand)
+CREATE TABLE IF NOT EXISTS release_cache (
+    service TEXT PRIMARY KEY,
+    data TEXT NOT NULL,
+    fetched_at TEXT NOT NULL
+);
+
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_models_type ON models(model_type);
 CREATE INDEX IF NOT EXISTS idx_prompts_name ON system_prompts(name);

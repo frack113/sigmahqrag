@@ -72,7 +72,13 @@ function loadReleaseTags(selectId, service, opts) {
         .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
         .then(function(data) {
             var releases = data.releases || [];
-            _populateSelect(sel, releases, opts, fmt);
+            if (releases.length) {
+                _populateSelect(sel, releases, opts, fmt);
+            } else if (opts.value) {
+                sel.innerHTML = '<option value="' + opts.value + '" selected>' + opts.value.replace(/^[vb]/i, '') + ' (installed)</option><option value="">\u2014 Refresh to load releases \u2014</option>';
+            } else {
+                sel.innerHTML = '<option value="">\u2014 Press \u21bb Refresh \u2014</option>';
+            }
             if (opts.onLoad) opts.onLoad(releases);
         })
         .catch(function() {
@@ -101,14 +107,43 @@ function loadCustomReleaseTags(selectId, owner, repo, opts) {
         .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
         .then(function(data) {
             var releases = data.releases || [];
-            _populateSelect(sel, releases, opts, fmt);
+            if (releases.length) {
+                _populateSelect(sel, releases, opts, fmt);
+            } else {
+                sel.innerHTML = '<option value="">\u2014 Press \u21bb Refresh \u2014</option>';
+            }
             if (opts.onLoad) opts.onLoad(releases);
         })
         .catch(function() {
-            if (opts.value) {
-                sel.innerHTML = '<option value="' + opts.value + '" selected>' + opts.value.replace(/^[vb]/i, '') + ' (installed)</option>';
-            } else {
-                sel.innerHTML = '<option value="">Unavailable</option>';
+            sel.innerHTML = '<option value="">Unavailable</option>';
+        });
+}
+
+/**
+ * Refresh all release caches from GitHub and re-populate all selectors.
+ * @param {Array} services - Array of {selectId, service}
+ * @param {Array} customServices - Array of {selectId, owner, repo}
+ * @param {object} [opts] - Options with version info for pre-selection
+ * @param {function} [opts.onComplete] - Called after all selects re-populated
+ */
+function refreshAllReleases(services, customServices, opts) {
+    opts = opts || {};
+    fetch('/api/v1/releases/refresh', { method: 'POST' })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (services) {
+                services.forEach(function(s) {
+                    loadReleaseTags(s.selectId, s.service, s.opts || {});
+                });
             }
+            if (customServices) {
+                customServices.forEach(function(s) {
+                    loadCustomReleaseTags(s.selectId, s.owner, s.repo, s.opts || {});
+                });
+            }
+            if (opts.onComplete) opts.onComplete(data);
+        })
+        .catch(function(err) {
+            console.error('Refresh failed:', err);
         });
 }

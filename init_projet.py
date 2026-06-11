@@ -203,6 +203,7 @@ EXPECTED_TABLES = frozenset(
         "git_selected_dirs",
         "sigma_spec",
         "doc_error",
+        "release_cache",
     }
 )
 

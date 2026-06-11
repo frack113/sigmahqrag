@@ -39,10 +39,12 @@ EXPECTED_TABLES: set[str] = {
     "system_prompts",
     "models",
     "doc_registry",
+    "sigma_spec",
     "doc_error",
     "git_metadata",
     "git_selected_dirs",
     "worker_state",
+    "release_cache",
 }
 
 

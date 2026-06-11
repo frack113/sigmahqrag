@@ -7,10 +7,41 @@
 {% block styles %}
 {{ super() }}
 <link rel="stylesheet" href="{{ url_for('static', path='/css/admin.css') }}">
+<style>
+.notification {
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 14px;
+}
+.notification.error {
+    display: flex;
+    background: #2d1b1b;
+    border: 1px solid #e74c3c;
+    color: #e74c3c;
+}
+.notification .close-btn {
+    background: none;
+    border: none;
+    color: inherit;
+    cursor: pointer;
+    font-size: 18px;
+    opacity: 0.7;
+    padding: 0 4px;
+}
+.notification .close-btn:hover { opacity: 1; }
+</style>
 {% endblock %}
 
 {% block content %}
 <div id="update-banner"></div>
+<div id="notification" class="notification">
+    <span id="notification-text"></span>
+    <button class="close-btn" onclick="closeNotification()">&times;</button>
+</div>
 
 <div class="card">
     <h2>Configuration</h2>
@@ -37,6 +68,10 @@
         </div>
     </form>
     <div id="config-status" class="status-message"></div>
+</div>
+
+<div style="margin-bottom:12px; text-align:right">
+    <button class="btn btn-secondary" onclick="doRefresh()">↻ Refresh releases</button>
 </div>
 
 <div class="card">
@@ -98,7 +133,7 @@
 </div>
 
 <script id="config-data" type="application/json">{{ config_json | safe }}</script>
-<script src="{{ url_for('static', path='/js/release-selector.js') }}?v=3"></script>
+<script src="{{ url_for('static', path='/js/release-selector.js') }}"></script>
 <script>
 var _CONFIG = {};
 try { _CONFIG = JSON.parse(document.getElementById('config-data').textContent); } catch(e) {}
@@ -317,6 +352,36 @@ function stopService(service) {
 
 function openQdrantUI() {
     window.open('http://127.0.0.1:6333/dashboard', '_blank');
+}
+
+function showNotification(msg, type) {
+    var el = document.getElementById('notification');
+    var text = document.getElementById('notification-text');
+    text.textContent = msg;
+    el.className = 'notification ' + (type || 'error');
+}
+
+function closeNotification() {
+    var el = document.getElementById('notification');
+    el.className = 'notification';
+}
+
+function doRefresh() {
+    fetch('/api/v1/releases/refresh', { method: 'POST' })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.errors) {
+                var msgs = Object.values(data.errors);
+                var rateLimited = msgs.some(function(m) { return m.indexOf('rate limit') !== -1; });
+                if (rateLimited) {
+                    showNotification('GitHub API rate limit reached. Please wait a few minutes and try again.', 'error');
+                }
+            }
+            loadStatus();
+        })
+        .catch(function() {
+            showNotification('Failed to refresh releases. Check your connection.', 'error');
+        });
 }
 
 document.addEventListener('DOMContentLoaded', function() {
