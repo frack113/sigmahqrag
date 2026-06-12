@@ -113,12 +113,16 @@ async function startUnifiedIndex() {
     if (btn && btn.disabled) return;  // already running
     if (btn) btn.disabled = true;
 
-    var specSection = document.getElementById('indexer-progress-spec');
-    var docsSection = document.getElementById('indexer-progress-docs');
-    var specFill = document.getElementById('indexer-progress-spec-fill');
-    var docsFill = document.getElementById('indexer-progress-docs-fill');
-    var specText = document.getElementById('indexer-progress-spec-text');
-    var docsText = document.getElementById('indexer-progress-docs-text');
+    var specBar = new ProgressBar({
+        container: document.getElementById('indexer-progress-spec'),
+        fill: document.getElementById('indexer-progress-spec-fill'),
+        text: document.getElementById('indexer-progress-spec-text'),
+    });
+    var docsBar = new ProgressBar({
+        container: document.getElementById('indexer-progress-docs'),
+        fill: document.getElementById('indexer-progress-docs-fill'),
+        text: document.getElementById('indexer-progress-docs-text'),
+    });
     var resultEl = document.getElementById('indexer-result');
     var errorEl = document.getElementById('indexer-error');
 
@@ -126,17 +130,13 @@ async function startUnifiedIndex() {
     if (errorEl) errorEl.style.display = 'none';
 
     function setSpecProgress(pct, label) {
-        if (!specSection) return;
-        specSection.style.display = 'block';
-        if (specFill) { specFill.style.width = pct + '%'; specFill.style.background = pct === 100 ? '#4caf50' : 'linear-gradient(to right, rgb(0, 0, 1), rgb(0, 0, 255))'; }
-        if (specText) specText.textContent = label;
+        specBar.setProgress(pct);
+        specBar.setText(label);
     }
 
     function setDocsProgress(pct, label) {
-        if (!docsSection) return;
-        docsSection.style.display = 'block';
-        if (docsFill) { docsFill.style.width = pct + '%'; docsFill.style.background = pct === 100 ? '#4caf50' : 'linear-gradient(to right, rgb(0, 0, 1), rgb(0, 0, 255))'; }
-        if (docsText) docsText.textContent = label;
+        docsBar.setProgress(pct);
+        docsBar.setText(label);
     }
 
     async function callGroup(group) {

@@ -90,15 +90,6 @@
     white-space: nowrap;
 }
 
-/* ── Indexer progress bars ────────────────────────────────── */
-
-.progress-label {
-    font-size: 0.95rem;
-    font-weight: 600;
-    margin-bottom: 4px;
-    color: #333;
-}
-
 /* ── Embed documents table ────────────────────────────────── */
 
 #embed-table th {

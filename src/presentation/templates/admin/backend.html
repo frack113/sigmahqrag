@@ -94,7 +94,7 @@
     </div>
     <div id="llama-download-status" class="status-message"></div>
     <div id="llama-progress-container" style="display:none;">
-        <div class="progress-bar"><div id="llama-progress-fill"></div></div>
+        <div class="progress-bar"><div class="progress-fill" id="llama-progress-fill"></div></div>
         <p id="llama-progress-text">Downloading...</p>
     </div>
 </div>
@@ -127,13 +127,14 @@
     </div>
     <div id="qdrant-download-status" class="status-message"></div>
     <div id="qdrant-progress-container" style="display:none;">
-        <div class="progress-bar"><div id="qdrant-progress-fill"></div></div>
+        <div class="progress-bar"><div class="progress-fill" id="qdrant-progress-fill"></div></div>
         <p id="qdrant-progress-text">Downloading...</p>
     </div>
 </div>
 
 <script id="config-data" type="application/json">{{ config_json | safe }}</script>
 <script src="{{ url_for('static', path='/js/release-selector.js') }}"></script>
+<script src="{{ url_for('static', path='/js/progress-bar.js') }}"></script>
 <script>
 var _CONFIG = {};
 try { _CONFIG = JSON.parse(document.getElementById('config-data').textContent); } catch(e) {}
@@ -205,30 +206,51 @@ function populateSelects(llamaInfo, qdrantInfo) {
     loadCustomReleaseTags('qdrant-ui-release-select', 'qdrant', 'qdrant-web-ui');
 }
 
+function makeProgressBar(prefix) {
+    return new ProgressBar({
+        container: document.getElementById(prefix + '-progress-container'),
+        fill: document.getElementById(prefix + '-progress-fill'),
+        text: document.getElementById(prefix + '-progress-text'),
+    });
+}
+
 function downloadLlama() {
+    var btn = document.getElementById('llama-download-btn');
+    if (btn && btn.disabled) return;
+    if (btn) btn.disabled = true;
     var sel = document.getElementById('llama-release-select');
     var version = sel ? sel.value : '';
     var url = '/api/v1/llamacpp/download' + (version ? '?version=' + encodeURIComponent(version) : '');
-    document.getElementById('llama-download-status').textContent = 'Starting download...';
-    document.getElementById('llama-download-status').className = 'status-message';
-    document.getElementById('llama-progress-container').style.display = 'block';
+    var pb = makeProgressBar('llama');
+    var statusEl = document.getElementById('llama-download-status');
+    statusEl.textContent = 'Starting download...';
+    statusEl.className = 'status-message';
+    pb.show();
     fetch(url, { method: 'POST' })
         .then(function(r) { return r.json(); })
         .then(function(data) {
             if (data.download_id) {
-                document.getElementById('llama-download-status').textContent = 'Download started';
-                document.getElementById('llama-download-status').className = 'status-message success';
-                startProgressPolling('llama', data.download_id);
+                statusEl.textContent = 'Download started';
+                statusEl.className = 'status-message success';
+                ProgressBar.pollDownload({
+                    endpoint: '/api/v1/llamacpp/status',
+                    downloadId: data.download_id,
+                    onUpdate: function(pct, text) { pb.setProgress(pct); pb.setText(text); },
+                    onComplete: function() { pb.hide(); statusEl.textContent = 'Download completed!'; if (btn) btn.disabled = false; loadStatus(); },
+                    onError: function(msg) { pb.hide(); statusEl.textContent = 'Download failed: ' + msg; statusEl.className = 'status-message error'; if (btn) btn.disabled = false; }
+                });
             } else {
-                document.getElementById('llama-download-status').textContent = data.message || data.error || 'Download completed';
-                document.getElementById('llama-download-status').className = 'status-message ' + (data.error ? 'error' : 'success');
-                document.getElementById('llama-progress-container').style.display = 'none';
+                statusEl.textContent = data.message || data.error || 'Download completed';
+                statusEl.className = 'status-message ' + (data.error ? 'error' : 'success');
+                pb.hide();
+                if (btn) btn.disabled = false;
             }
         })
         .catch(function(err) {
-            document.getElementById('llama-download-status').textContent = 'Error: ' + err.message;
-            document.getElementById('llama-download-status').className = 'status-message error';
-            document.getElementById('llama-progress-container').style.display = 'none';
+            statusEl.textContent = 'Error: ' + err.message;
+            statusEl.className = 'status-message error';
+            pb.hide();
+            if (btn) btn.disabled = false;
         });
 }
 
@@ -245,9 +267,14 @@ function downloadQdrantUI() {
 }
 
 function downloadQdrant(target, version) {
-    document.getElementById('qdrant-download-status').textContent = 'Starting download...';
-    document.getElementById('qdrant-download-status').className = 'status-message';
-    document.getElementById('qdrant-progress-container').style.display = 'block';
+    var btn = target === 'web_ui' ? document.getElementById('qdrant-ui-download-btn') : document.getElementById('qdrant-download-btn');
+    if (btn && btn.disabled) return;
+    if (btn) btn.disabled = true;
+    var pb = makeProgressBar('qdrant');
+    var statusEl = document.getElementById('qdrant-download-status');
+    statusEl.textContent = 'Starting download...';
+    statusEl.className = 'status-message';
+    pb.show();
     var body = { service: 'qdrant', target: target || 'all' };
     if (version) body.version = version;
     fetch('/api/v1/admin/download', {
@@ -263,51 +290,21 @@ function downloadQdrant(target, version) {
         if (info.binary_version) message += 'Binary v' + info.binary_version + ' ';
         if (info.ui_version) message += 'Web UI ' + info.ui_version;
         if (!message) message = status === 'partial' ? 'Partial update' : (status === 'success' ? 'Completed' : 'Failed');
-        document.getElementById('qdrant-download-status').textContent = message;
-        document.getElementById('qdrant-download-status').className = 'status-message ' + (status === 'success' ? 'success' : 'warning');
-        document.getElementById('qdrant-progress-container').style.display = 'none';
+        statusEl.textContent = message;
+        statusEl.className = 'status-message ' + (status === 'success' ? 'success' : 'warning');
+        pb.hide();
+        if (btn) btn.disabled = false;
         loadStatus();
     })
     .catch(function(err) {
-        document.getElementById('qdrant-download-status').textContent = 'Error: ' + err.message;
-        document.getElementById('qdrant-download-status').className = 'status-message error';
-        document.getElementById('qdrant-progress-container').style.display = 'none';
+        statusEl.textContent = 'Error: ' + err.message;
+        statusEl.className = 'status-message error';
+        pb.hide();
+        if (btn) btn.disabled = false;
     });
 }
 
-function startProgressPolling(service, downloadId) {
-    var statusEndpoint = service === 'llama' ? '/api/v1/llamacpp/status' : '/api/v1/qdrant/status';
-    var prefix = service === 'llama' ? 'llama' : 'qdrant';
-    var interval = setInterval(function() {
-        fetch(statusEndpoint)
-            .then(function(r) { return r.json(); })
-            .then(function(data) {
-                var task = data.downloads ? data.downloads[downloadId] : null;
-                if (!task) {
-                    clearInterval(interval);
-                    loadStatus();
-                    return;
-                }
-                var downloaded = task.bytes_downloaded || 0;
-                var total = task.total_bytes || 1;
-                var pct = Math.round(downloaded / total * 100);
-                document.getElementById(prefix + '-progress-fill').style.width = pct + '%';
-                document.getElementById(prefix + '-progress-text').textContent = pct + '% (' + Math.round(downloaded/1024/1024) + 'MB / ' + Math.round(total/1024/1024) + 'MB)';
-                if (task.status === 'completed') {
-                    clearInterval(interval);
-                    document.getElementById(prefix + '-download-status').textContent = 'Download completed!';
-                    document.getElementById(prefix + '-progress-container').style.display = 'none';
-                    loadStatus();
-                } else if (task.status === 'failed') {
-                    clearInterval(interval);
-                    document.getElementById(prefix + '-download-status').textContent = 'Download failed: ' + (task.error || 'Unknown error');
-                    document.getElementById(prefix + '-download-status').className = 'status-message error';
-                    document.getElementById(prefix + '-progress-container').style.display = 'none';
-                }
-            })
-            .catch(function() {});
-    }, 1000);
-}
+
 
 function saveConfig() {
     var statusEl = document.getElementById('config-status');

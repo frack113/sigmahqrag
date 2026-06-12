@@ -42,15 +42,14 @@
     </div>
     <div id="download-status" class="status-message"></div>
     <div id="progress-container" style="display:none;">
-        <div class="progress-bar"><div id="progress-fill"></div></div>
+        <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
         <p id="progress-text">Downloading...</p>
     </div>
 </div>
 
 <script id="config-data" type="application/json">{{ config_json | safe }}</script>
+<script src="{{ url_for('static', path='/js/progress-bar.js') }}"></script>
 <script>
-let activeDownloadId = null;
-let progressPollInterval = null;
 
 // Load config from embedded JSON (synchronous, no visual lag)
 var _CONFIG = {};
@@ -117,9 +116,18 @@ document.getElementById('config-form').addEventListener('submit', function(e) {
 });
 
 function downloadLlama() {
-    document.getElementById('download-status').textContent = 'Starting download...';
-    document.getElementById('download-status').className = 'status-message';
-    document.getElementById('progress-container').style.display = 'block';
+    var btn = document.getElementById('llama-download-btn');
+    if (btn && btn.disabled) return;
+    if (btn) btn.disabled = true;
+    var pb = new ProgressBar({
+        container: document.getElementById('progress-container'),
+        fill: document.getElementById('progress-fill'),
+        text: document.getElementById('progress-text'),
+    });
+    var statusEl = document.getElementById('download-status');
+    statusEl.textContent = 'Starting download...';
+    statusEl.className = 'status-message';
+    pb.show();
 
     fetch('/api/v1/llamacpp/download', {
         method: 'POST'
@@ -127,67 +135,33 @@ function downloadLlama() {
     .then(r => r.json())
     .then(data => {
         if (data.download_id) {
-            activeDownloadId = data.download_id;
-            document.getElementById('download-status').textContent = data.message || 'Download started: ' + activeDownloadId;
-            document.getElementById('download-status').className = 'status-message success';
-            startProgressPolling(activeDownloadId);
+            statusEl.textContent = data.message || 'Download started: ' + data.download_id;
+            statusEl.className = 'status-message success';
+            ProgressBar.pollDownload({
+                endpoint: '/api/v1/llamacpp/status',
+                downloadId: data.download_id,
+                onUpdate: function(pct, text) { pb.setProgress(pct); pb.setText(text); statusEl.textContent = 'Downloading... ' + text; },
+                onComplete: function() { pb.hide(); statusEl.textContent = 'Download completed!'; statusEl.className = 'status-message success'; if (btn) btn.disabled = false; loadLlamaInfo(); },
+                onError: function(msg) { pb.hide(); statusEl.textContent = 'Download failed: ' + msg; statusEl.className = 'status-message error'; if (btn) btn.disabled = false; }
+            });
         } else if (data.message) {
-            document.getElementById('download-status').textContent = data.message;
-            document.getElementById('download-status').className = 'status-message success';
-            document.getElementById('progress-container').style.display = 'none';
+            statusEl.textContent = data.message;
+            statusEl.className = 'status-message success';
+            pb.hide();
+            if (btn) btn.disabled = false;
         } else {
-            document.getElementById('download-status').textContent = data.error || 'Download failed';
-            document.getElementById('download-status').className = 'status-message error';
-            document.getElementById('progress-container').style.display = 'none';
+            statusEl.textContent = data.error || 'Download failed';
+            statusEl.className = 'status-message error';
+            pb.hide();
+            if (btn) btn.disabled = false;
         }
     })
     .catch(err => {
-        document.getElementById('download-status').textContent = 'Error: ' + err;
-        document.getElementById('download-status').className = 'status-message error';
-        document.getElementById('progress-container').style.display = 'none';
+        statusEl.textContent = 'Error: ' + err;
+        statusEl.className = 'status-message error';
+        pb.hide();
+        if (btn) btn.disabled = false;
     });
-}
-
-function startProgressPolling(downloadId) {
-    if (progressPollInterval) clearInterval(progressPollInterval);
-    
-    progressPollInterval = setInterval(() => {
-        fetch('/api/v1/llamacpp/status')
-            .then(r => r.json())
-            .then(data => {
-                const task = data.downloads?.[downloadId];
-                if (!task) {
-                    clearInterval(progressPollInterval);
-                    document.getElementById('download-status').textContent = 'Download task not found';
-                    document.getElementById('download-status').className = 'status-message error';
-                    return;
-                }
-                
-                const bytesDownloaded = task.bytes_downloaded || 0;
-                const totalBytes = task.total_bytes || 1;
-                const percent = Math.round(bytesDownloaded / totalBytes * 100);
-                
-                document.getElementById('progress-fill').style.width = percent + '%';
-                document.getElementById('progress-text').textContent = 
-                    `${percent}% (${Math.round(bytesDownloaded/1024/1024)}MB / ${Math.round(totalBytes/1024/1024)}MB)`;
-                document.getElementById('download-status').textContent = 
-                    `Downloading... ${percent}% (${Math.round(bytesDownloaded/1024/1024)}MB / ${Math.round(totalBytes/1024/1024)}MB)`;
-                
-                if (task.status === 'completed') {
-                    clearInterval(progressPollInterval);
-                    document.getElementById('download-status').textContent = 'Download completed!';
-                    document.getElementById('download-status').className = 'status-message success';
-                    document.getElementById('progress-container').style.display = 'none';
-                    loadLlamaInfo();
-                } else if (task.status === 'failed') {
-                    clearInterval(progressPollInterval);
-                    document.getElementById('download-status').textContent = 'Download failed: ' + (task.error || 'Unknown error');
-                    document.getElementById('download-status').className = 'status-message error';
-                    document.getElementById('progress-container').style.display = 'none';
-                }
-            })
-            .catch(() => {});
-    }, 1000);
 }
 
 function updateLlama() {
