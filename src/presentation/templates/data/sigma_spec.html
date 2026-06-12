@@ -8,30 +8,34 @@
 <p>Manage the Sigma specification repository for indexing.</p>
 
 <div class="card">
-    <div class="github-actions">
-        <button id="sync-btn" class="btn btn-primary" type="button">Sync</button>
-        <button id="scan-btn" class="btn btn-primary" type="button">List document</button>
-        <button id="index-btn" class="btn btn-success" type="button">Index</button>
-    </div>
+    <div class="card-body">
+        <div class="github-actions">
+            <button id="sync-btn" class="btn btn-primary" type="button">Sync</button>
+            <button id="scan-btn" class="btn btn-primary" type="button">List document</button>
+            <button id="index-btn" class="btn btn-success" type="button">Index</button>
+        </div>
 
-    <div class="repo-info card" style="margin-top: 1rem;">
-        <h3>Repository</h3>
-        <p><strong>Source:</strong> <a href="https://github.com/SigmaHQ/sigma-specification" target="_blank">SigmaHQ/sigma-specification</a></p>
-        <p><strong>Local path:</strong> <code>data/sigma-specification</code></p>
-        <p><strong>Qdrant collection:</strong> <code>sigma_spec</code></p>
-    </div>
+        <div class="card card-raised card-spacing">
+            <div class="card-body">
+                <h2>Repository</h2>
+                <p><strong>Source:</strong> <a href="https://github.com/SigmaHQ/sigma-specification" target="_blank">SigmaHQ/sigma-specification</a></p>
+                <p><strong>Local path:</strong> <code>data/sigma-specification</code></p>
+                <p><strong>Qdrant collection:</strong> <code>sigma_spec</code></p>
+            </div>
+        </div>
 
-    <div id="status-message" style="margin-top: 0.5rem;"></div>
+        <div id="status-message" class="card-spacing"></div>
 
-    {{ dir_browser_card(
-        id="spec",
-        mode="tree",
-        title="Select folders to include",
-        hint="Only files from selected folders will be scanned and embedded."
-    ) }}
+        {{ dir_browser_card(
+            id="spec",
+            mode="tree",
+            title="Select folders to include",
+            hint="Only files from selected folders will be scanned and embedded."
+        ) }}
 
-    <div id="spec-files-list" style="margin-top: 1rem;">
-        <p>Loading files...</p>
+        <div id="spec-files-list" class="card-spacing">
+            <p>Loading files...</p>
+        </div>
     </div>
 </div>
 {% endblock %}

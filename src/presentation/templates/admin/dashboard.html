@@ -8,9 +8,14 @@
 <div id="update-banner"></div>
 
 <div class="card">
-    <h2>System Status <button class="btn btn-primary" onclick="refreshStatus()" style="float:right;">Refresh</button></h2>
-    <div id="status-cards">
-        <p>Loading status...</p>
+    <div class="card-header">
+        <h2>System Status</h2>
+        <button class="btn btn-primary btn-sm" onclick="refreshStatus()">Refresh</button>
+    </div>
+    <div class="card-body">
+        <div id="status-cards">
+            <p>Loading status...</p>
+        </div>
     </div>
 </div>
 

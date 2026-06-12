@@ -44,91 +44,99 @@
 </div>
 
 <div class="card">
-    <h2>Configuration</h2>
-    <form id="config-form">
+    <div class="card-header">
+        <h2>Configuration</h2>
+    </div>
+    <div class="card-body">
+        <form id="config-form">
+            <div class="config-row">
+                <div class="form-group inline">
+                    <label for="os-select">OS:</label>
+                    <select id="os-select" name="os">
+                        <option value="windows" {% if config.Hardware.os == 'windows' %}selected{% endif %}>Windows</option>
+                        <option value="linux" {% if config.Hardware.os == 'linux' %}selected{% endif %}>Linux</option>
+                        <option value="macos" {% if config.Hardware.os == 'macos' %}selected{% endif %}>macOS</option>
+                    </select>
+                </div>
+                <div class="form-group inline">
+                    <label for="gpu-select">GPU Backend:</label>
+                    <select id="gpu-select" name="gpu">
+                        <option value="cpu" {% if config.Hardware.gpu == 'cpu' %}selected{% endif %}>CPU</option>
+                        <option value="cuda" {% if config.Hardware.gpu == 'cuda' %}selected{% endif %}>CUDA</option>
+                        <option value="hip" {% if config.Hardware.gpu == 'hip' %}selected{% endif %}>HIP (AMD)</option>
+                        <option value="vulkan" {% if config.Hardware.gpu == 'vulkan' %}selected{% endif %}>Vulkan</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary">Save Configuration</button>
+            </div>
+        </form>
+        <div id="config-status" class="status-message"></div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2>llama.cpp Management</h2>
+    </div>
+    <div class="card-body">
+        <div id="llama-status" class="status-row">
+            <span class="status-dot status-unknown"></span>
+            <span id="llama-status-text">Loading...</span>
+            <button class="btn btn-secondary btn-sm" onclick="loadStatus()">Refresh status</button>
+        </div>
         <div class="config-row">
             <div class="form-group inline">
-                <label for="os-select">OS:</label>
-                <select id="os-select" name="os">
-                    <option value="windows" {% if config.Hardware.os == 'windows' %}selected{% endif %}>Windows</option>
-                    <option value="linux" {% if config.Hardware.os == 'linux' %}selected{% endif %}>Linux</option>
-                    <option value="macos" {% if config.Hardware.os == 'macos' %}selected{% endif %}>macOS</option>
-                </select>
+                <label>Release:</label>
+                <select id="llama-release-select" style="min-width:200px"></select>
             </div>
+            <button id="llama-download-btn" class="btn btn-primary" onclick="downloadLlama()">Update</button>
+        </div>
+        <div class="form-actions">
+            <button id="llama-start-btn" class="btn btn-success" onclick="startService('llama')">Start</button>
+            <button id="llama-stop-btn" class="btn btn-danger" onclick="stopService('llama')">Stop</button>
+        </div>
+        <div id="llama-download-status" class="status-message"></div>
+        <div id="llama-progress-container" style="display:none;">
+            <div class="progress-bar"><div class="progress-fill" id="llama-progress-fill"></div></div>
+            <p id="llama-progress-text">Downloading...</p>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2>Qdrant Management</h2>
+    </div>
+    <div class="card-body">
+        <div id="qdrant-status" class="status-row">
+            <span class="status-dot status-unknown"></span>
+            <span id="qdrant-status-text">Loading...</span>
+            <button class="btn btn-secondary btn-sm" onclick="loadStatus()">Refresh status</button>
+        </div>
+        <div class="config-row">
             <div class="form-group inline">
-                <label for="gpu-select">GPU Backend:</label>
-                <select id="gpu-select" name="gpu">
-                    <option value="cpu" {% if config.Hardware.gpu == 'cpu' %}selected{% endif %}>CPU</option>
-                    <option value="cuda" {% if config.Hardware.gpu == 'cuda' %}selected{% endif %}>CUDA</option>
-                    <option value="hip" {% if config.Hardware.gpu == 'hip' %}selected{% endif %}>HIP (AMD)</option>
-                    <option value="vulkan" {% if config.Hardware.gpu == 'vulkan' %}selected{% endif %}>Vulkan</option>
-                </select>
+                <label>Binary:</label>
+                <select id="qdrant-release-select" style="min-width:200px"></select>
             </div>
-            <button type="submit" class="btn btn-primary">Save Configuration</button>
+            <button id="qdrant-download-btn" class="btn btn-primary" onclick="downloadQdrantBinary()">Update</button>
         </div>
-    </form>
-    <div id="config-status" class="status-message"></div>
-</div>
-
-<div style="margin-bottom:12px; text-align:right">
-    <button class="btn btn-secondary" onclick="doRefresh()">↻ Refresh releases</button>
-</div>
-
-<div class="card">
-    <h2>llama.cpp Management</h2>
-    <div id="llama-status" class="status-row">
-        <span class="status-dot status-unknown"></span>
-        <span id="llama-status-text">Loading...</span>
-        <button class="btn btn-secondary btn-sm" onclick="loadStatus()" style="margin-left:8px">Refresh status</button>
-    </div>
-    <div class="config-row" style="margin-top:10px">
-        <div class="form-group inline">
-            <label>Release:</label>
-            <select id="llama-release-select" style="min-width:200px"></select>
+        <div class="config-row">
+            <div class="form-group inline">
+                <label>Web UI:</label>
+                <select id="qdrant-ui-release-select" style="min-width:200px"></select>
+            </div>
+            <button id="qdrant-ui-download-btn" class="btn btn-primary" onclick="downloadQdrantUI()">Update</button>
         </div>
-        <button id="llama-download-btn" class="btn btn-primary" onclick="downloadLlama()">Update</button>
-    </div>
-    <div style="margin-top:10px">
-        <button id="llama-start-btn" class="btn btn-success" onclick="startService('llama')">Start</button>
-        <button id="llama-stop-btn" class="btn btn-danger" onclick="stopService('llama')">Stop</button>
-    </div>
-    <div id="llama-download-status" class="status-message"></div>
-    <div id="llama-progress-container" style="display:none;">
-        <div class="progress-bar"><div class="progress-fill" id="llama-progress-fill"></div></div>
-        <p id="llama-progress-text">Downloading...</p>
-    </div>
-</div>
-
-<div class="card">
-    <h2>Qdrant Management</h2>
-    <div id="qdrant-status" class="status-row">
-        <span class="status-dot status-unknown"></span>
-        <span id="qdrant-status-text">Loading...</span>
-        <button class="btn btn-secondary btn-sm" onclick="loadStatus()" style="margin-left:8px">Refresh status</button>
-    </div>
-    <div class="config-row" style="margin-top:10px">
-        <div class="form-group inline">
-            <label>Binary:</label>
-            <select id="qdrant-release-select" style="min-width:200px"></select>
+        <div class="form-actions">
+            <button id="qdrant-start-btn" class="btn btn-success" onclick="startService('qdrant')">Start</button>
+            <button id="qdrant-stop-btn" class="btn btn-danger" onclick="stopService('qdrant')">Stop</button>
+            <button class="btn btn-secondary" onclick="openQdrantUI()">Open Web UI</button>
         </div>
-        <button id="qdrant-download-btn" class="btn btn-primary" onclick="downloadQdrantBinary()">Update</button>
-    </div>
-    <div class="config-row" style="margin-top:5px">
-        <div class="form-group inline">
-            <label>Web UI:</label>
-            <select id="qdrant-ui-release-select" style="min-width:200px"></select>
+        <div id="qdrant-download-status" class="status-message"></div>
+        <div id="qdrant-progress-container" style="display:none;">
+            <div class="progress-bar"><div class="progress-fill" id="qdrant-progress-fill"></div></div>
+            <p id="qdrant-progress-text">Downloading...</p>
         </div>
-        <button id="qdrant-ui-download-btn" class="btn btn-primary" onclick="downloadQdrantUI()">Update</button>
-    </div>
-    <div style="margin-top:10px">
-        <button id="qdrant-start-btn" class="btn btn-success" onclick="startService('qdrant')">Start</button>
-        <button id="qdrant-stop-btn" class="btn btn-danger" onclick="stopService('qdrant')">Stop</button>
-        <button class="btn btn-secondary" onclick="openQdrantUI()">Open Web UI</button>
-    </div>
-    <div id="qdrant-download-status" class="status-message"></div>
-    <div id="qdrant-progress-container" style="display:none;">
-        <div class="progress-bar"><div class="progress-fill" id="qdrant-progress-fill"></div></div>
-        <p id="qdrant-progress-text">Downloading...</p>
     </div>
 </div>
 

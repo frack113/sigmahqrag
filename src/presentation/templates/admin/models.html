@@ -7,42 +7,50 @@
 {% block content %}
 
 <div class="card">
-  <h3>LLM Model <span class="text-muted" style="font-weight:normal;font-size:0.9rem">— Download New Model from HuggingFace</span></h3>
-  <div id="llm-model"><p>Loading...</p></div>
-  <hr>
-  <div class="form-group">
-    <label>Download New Model:</label>
-    <input type="text" id="llm-dl-repo" placeholder="org/model" style="width:350px">
-    <button class="btn btn-secondary btn-sm" onclick="listLLMFiles()">List Files</button>
+  <div class="card-header">
+    <h2>LLM Model <span class="text-muted">Download from HuggingFace</span></h2>
   </div>
-  <div id="llm-dl-files" style="display:none">
+  <div class="card-body">
+    <div id="llm-model"><p>Loading...</p></div>
+    <hr>
     <div class="form-group">
-      <label>GGUF Version:</label>
-      <select id="llm-dl-select" style="width:350px"></select>
+      <label>Download New Model:</label>
+      <input type="text" id="llm-dl-repo" placeholder="org/model" class="input-sm">
+      <button class="btn btn-secondary btn-sm" onclick="listLLMFiles()">List Files</button>
     </div>
-    <button class="btn btn-primary" onclick="startLLMDownload()">Download</button>
+    <div id="llm-dl-files" style="display:none">
+      <div class="form-group">
+        <label>GGUF Version:</label>
+        <select id="llm-dl-select" class="input-sm"></select>
+      </div>
+      <button class="btn btn-primary" onclick="startLLMDownload()">Download</button>
+    </div>
+    <div id="llm-dl-progress" style="display:none">
+      <progress id="llm-dl-bar" value="0" max="100" class="progress-bar-inline"></progress>
+      <p id="llm-dl-text">Starting...</p>
+    </div>
+    <p id="llm-dl-error" class="error" style="display:none"></p>
   </div>
-  <div id="llm-dl-progress" style="display:none">
-    <progress id="llm-dl-bar" value="0" max="100" style="width:100%"></progress>
-    <p id="llm-dl-text">Starting...</p>
-  </div>
-  <p id="llm-dl-error" class="error" style="display:none"></p>
 </div>
 
 <div class="card">
-  <h3>Embedding Model <span class="text-muted" style="font-weight:normal;font-size:0.9rem">— Download New Model from HuggingFace</span></h3>
-  <div id="embedding-model"><p>Loading...</p></div>
-  <hr>
-  <div class="form-group">
-    <label>Download New Model:</label>
-    <input type="text" id="emb-dl-repo" placeholder="org/model" style="width:350px">
-    <button class="btn btn-primary" onclick="startEmbDownload()">Download</button>
+  <div class="card-header">
+    <h2>Embedding Model <span class="text-muted">Download from HuggingFace</span></h2>
   </div>
-  <div id="emb-dl-progress" style="display:none">
-    <progress id="emb-dl-bar" value="0" max="100" style="width:100%"></progress>
-    <p id="emb-dl-text">Starting...</p>
+  <div class="card-body">
+    <div id="embedding-model"><p>Loading...</p></div>
+    <hr>
+    <div class="form-group">
+      <label>Download New Model:</label>
+      <input type="text" id="emb-dl-repo" placeholder="org/model" class="input-sm">
+      <button class="btn btn-primary" onclick="startEmbDownload()">Download</button>
+    </div>
+    <div id="emb-dl-progress" style="display:none">
+      <progress id="emb-dl-bar" value="0" max="100" class="progress-bar-inline"></progress>
+      <p id="emb-dl-text">Starting...</p>
+    </div>
+    <p id="emb-dl-error" class="error" style="display:none"></p>
   </div>
-  <p id="emb-dl-error" class="error" style="display:none"></p>
 </div>
 
 <script src="{{ url_for('static', path='/js/progress-bar.js') }}"></script>
@@ -63,7 +71,7 @@ function loadModels() {
       const name = f.filename || m.repo_id;
       el.innerHTML = `
         <p><strong>${escHtml(name)}</strong> (${size} MB) &mdash; ${escHtml(m.repo_id)}
-        <button class="btn btn-danger btn-sm" style="margin-left:1em" onclick="deleteLLM('${escAttr(m.repo_id)}', '${escAttr(f.filename || '')}')">Delete</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteLLM('${escAttr(m.repo_id)}', '${escAttr(f.filename || '')}')">Delete</button>
         </p>`;
     })
     .catch(() => {
@@ -83,7 +91,7 @@ function loadModels() {
       const m = models[0];
       el.innerHTML = `
         <p><strong>${escHtml(m.repo_id)}</strong>
-        <button class="btn btn-danger btn-sm" style="margin-left:1em" onclick="deleteEmbedding('${escAttr(m.repo_id)}')">Delete</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteEmbedding('${escAttr(m.repo_id)}')">Delete</button>
         </p>`;
     })
     .catch(() => {

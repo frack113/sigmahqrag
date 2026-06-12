@@ -25,22 +25,24 @@
 {% macro dir_browser_card(id, mode, title="Browse directories", hint="") %}
 {% set tree_id = id ~ "-tree" %}
 {% set count_id = id ~ "-count" %}
-<div class="card dir-browser" style="margin-top: 1rem;">
-    <div class="dir-browser-header">
-        <h3>{{ title }}</h3>
+<div class="card dir-browser">
+    <div class="card-header">
+        <h2>{{ title }}</h2>
         {% if mode == "tree" %}
-        <div class="dir-browser-actions">
+        <div>
             <button class="btn btn-sm" onclick="window['_db_expand_{{ id }}']()">Expand All</button>
             <button class="btn btn-sm" onclick="window['_db_collapse_{{ id }}']()">Collapse All</button>
         </div>
         {% endif %}
     </div>
-    {% if hint %}
-    <p class="hint" style="font-size:0.9rem;opacity:0.8;margin:0 0 0.5rem;">{{ hint }}</p>
-    {% endif %}
-    <div id="{{ tree_id }}" class="dir-browser-tree">
-        <p class="dir-browser-empty">Loading directories...</p>
+    <div class="card-body">
+        {% if hint %}
+        <p class="hint">{{ hint }}</p>
+        {% endif %}
+        <div id="{{ tree_id }}" class="dir-browser-tree">
+            <p class="dir-browser-empty">Loading directories...</p>
+        </div>
+        <div id="{{ count_id }}" class="dir-browser-count"></div>
     </div>
-    <div id="{{ count_id }}" class="dir-browser-count"></div>
 </div>
 {% endmacro %}
