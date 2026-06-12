@@ -784,6 +784,16 @@ td:has(.btn) {
     min-width: 200px;
 }
 
+.release-select {
+    min-width: 200px;
+    padding: 6px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    background: var(--c-surface);
+    color: var(--c-text);
+    font-size: 0.9rem;
+}
+
 /* ── Card Spacing Utility ───────────────────────────────── */
 
 .card-spacing {
