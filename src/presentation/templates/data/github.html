@@ -157,7 +157,7 @@
             detailContainer.destroy();
             detailContainer = null;
         }
-        document.getElementById('repo-detail').style.display = 'none';
+        document.getElementById('repo-detail').classList.add('hidden');
         currentRepo = null;
         document.getElementById('github-tree').innerHTML = '<p class="dir-browser-empty">Loading directories...</p>';
     }
