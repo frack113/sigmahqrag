@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import logging
 from pathlib import Path
@@ -10,6 +11,7 @@ from typing import Any
 from fastapi import APIRouter
 from pydantic import BaseModel
 
+from src.config.constants import SIGMA_SPEC_REF, SIGMA_SPEC_REPO
 from src.config.settings import get_config
 from src.infrastructure.database import DatabaseService
 
@@ -66,6 +68,44 @@ def _walk_selected(spec_dir: Path) -> list[Path]:
 
     logger.debug("_walk_selected: found %d files", len(files))
     return sorted(set(files))
+
+
+@router.post("/sync", response_model=SpecResponse)
+async def sync_spec_repo() -> SpecResponse:
+    """Clone or git pull the sigma-specification repository."""
+    spec_dir = _spec_dir()
+
+    if not spec_dir.exists():
+        spec_dir.parent.mkdir(parents=True, exist_ok=True)
+        proc = await asyncio.create_subprocess_exec(
+            "git",
+            "clone",
+            "--depth",
+            "1",
+            "-b",
+            SIGMA_SPEC_REF,
+            SIGMA_SPEC_REPO,
+            str(spec_dir),
+        )
+        await proc.wait()
+        if proc.returncode != 0:
+            return SpecResponse(
+                success=False, error="Failed to clone sigma-specification repository"
+            )
+        return SpecResponse(success=True, message="Repository cloned successfully")
+
+    proc = await asyncio.create_subprocess_exec(
+        "git",
+        "-C",
+        str(spec_dir),
+        "pull",
+        "origin",
+        SIGMA_SPEC_REF,
+    )
+    await proc.wait()
+    if proc.returncode != 0:
+        return SpecResponse(success=False, error="Failed to pull sigma-specification repository")
+    return SpecResponse(success=True, message="Repository synced successfully")
 
 
 @router.get("/dirs", response_model=SpecResponse)

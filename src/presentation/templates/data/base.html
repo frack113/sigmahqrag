@@ -6,6 +6,8 @@
 {% block styles %}
 {{ super() }}
 <link rel="stylesheet" href="{{ url_for('static', path='/css/data.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', path='/css/dir_browser.css') }}">
+<script src="{{ url_for('static', path='/js/dir_browser.js') }}"></script>
 {% endblock %}
 
 {% block sidebar_title %}Data Sources{% endblock %}

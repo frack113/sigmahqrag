@@ -1,4 +1,5 @@
 {% extends "data/base.html" %}
+{% from "shared/_dir_browser.html" import dir_browser_card %}
 
 {% block title %}Sigma Spec - Data Sources{% endblock %}
 
@@ -8,8 +9,9 @@
 
 <div class="card">
     <div class="github-actions">
-        <button id="scan-btn" class="btn btn-primary" onclick="scanSpec()">Scan for new files</button>
-        <button id="refresh-btn" class="btn btn-primary" onclick="loadSpecFiles()">Refresh</button>
+        <button id="sync-btn" class="btn btn-primary" type="button">Sync</button>
+        <button id="scan-btn" class="btn btn-primary" type="button">List document</button>
+        <button id="index-btn" class="btn btn-success" type="button">Index</button>
     </div>
 
     <div class="repo-info card" style="margin-top: 1rem;">
@@ -19,13 +21,14 @@
         <p><strong>Qdrant collection:</strong> <code>sigma_spec</code></p>
     </div>
 
-    <div class="card" style="margin-top: 1rem;">
-        <h3>Select folders to include</h3>
-        <p class="hint">Only files from selected folders will be scanned and embedded.</p>
-        <div id="dirs-container">
-            <p>Loading directories...</p>
-        </div>
-    </div>
+    <div id="status-message" style="margin-top: 0.5rem;"></div>
+
+    {{ dir_browser_card(
+        id="spec",
+        mode="tree",
+        title="Select folders to include",
+        hint="Only files from selected folders will be scanned and embedded."
+    ) }}
 
     <div id="spec-files-list" style="margin-top: 1rem;">
         <p>Loading files...</p>
@@ -35,131 +38,122 @@
 
 {% block scripts %}
 <script>
-function escHtml(s) {
-    if (s == null) return '';
-    return String(s)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
-}
+(function () {
+    const STATUS = document.getElementById('status-message');
+    const SYNC = document.getElementById('sync-btn');
+    const SCAN = document.getElementById('scan-btn');
+    const INDEX = document.getElementById('index-btn');
+    const FILES = document.getElementById('spec-files-list');
 
-async function loadDirs() {
-    const container = document.getElementById('dirs-container');
-    try {
-        const [dirsResp, selResp] = await Promise.all([
-            fetch('/api/v1/spec/dirs'),
-            fetch('/api/v1/spec/selected-dirs'),
-        ]);
-        const dirsData = await dirsResp.json();
-        const selData = await selResp.json();
-        if (!dirsData.success) {
-            container.innerHTML = '<p class="error-message">' + escHtml(dirsData.error) + '</p>';
-            return;
-        }
-        const dirs = dirsData.data?.dirs || [];
-        const selected = selData.data?.selected || [];
-        if (dirs.length === 0) {
-            container.innerHTML = '<p>No subdirectories found.</p>';
-            return;
-        }
-        container.innerHTML = dirs.map(d => `
-            <label class="dir-checkbox">
-                <input type="checkbox" value="${escHtml(d)}" ${selected.includes(d) ? 'checked' : ''}
-                    onchange="onDirToggle()">
-                ${escHtml(d)}
-            </label>
-        `).join('');
-    } catch (error) {
-        console.error('Failed to load dirs:', error);
-        container.innerHTML = '<p>Error loading directories.</p>';
+    function setStatus(msg, type) {
+        STATUS.innerHTML = '<p class="' + type + '-message">' + escHtml(msg) + '</p>';
     }
-}
 
-async function onDirToggle() {
-    const checkboxes = document.querySelectorAll('#dirs-container input[type="checkbox"]');
-    const selected = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value);
-    try {
-        const resp = await fetch('/api/v1/spec/selected-dirs', {
-            method: 'PUT',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({selected}),
-        });
-        const data = await resp.json();
-        if (!data.success) {
-            console.error('Failed to save selection:', data.error);
-        }
-    } catch (error) {
-        console.error('Failed to save selection:', error);
+    function setLoading(btn, text, loading) {
+        btn.disabled = loading;
+        btn.textContent = text;
     }
+
+    SYNC.addEventListener('click', async function () {
+        setLoading(SYNC, 'Syncing...', true);
+        setStatus('Syncing repository...', 'info');
+        try {
+            const resp = await fetch('/api/v1/spec/sync', { method: 'POST' });
+            const result = await resp.json();
+            setStatus(result.success ? (result.message || 'Sync completed') : (result.error || 'Sync failed'), result.success ? 'info' : 'error');
+        } catch {
+            setStatus('Sync request failed', 'error');
+        } finally {
+            setLoading(SYNC, 'Sync', false);
+        }
+    });
+
+    SCAN.addEventListener('click', async function () {
+        setLoading(SCAN, 'Scanning...', true);
+        setStatus('Scanning files...', 'info');
+        try {
+            const resp = await fetch('/api/v1/spec/scan', { method: 'POST' });
+            const result = await resp.json();
+            if (result.success) {
+                setStatus('Scan completed: ' + (result.data?.count || 0) + ' file(s) found', 'info');
+                loadSpecFiles();
+            } else {
+                setStatus(result.error || 'Scan failed', 'error');
+            }
+        } catch {
+            setStatus('Scan request failed', 'error');
+        } finally {
+            setLoading(SCAN, 'List document', false);
+        }
+    });
+
+    INDEX.addEventListener('click', async function () {
+        setLoading(INDEX, 'Indexing...', true);
+        setStatus('Indexing sigma_spec into Qdrant...', 'info');
+        try {
+            const resp = await fetch('/api/v1/qdrant', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'index_all', payload: { action: 'index_all', group: 'spec' } }),
+            });
+            const result = await resp.json();
+            if (result.status === 'success') {
+                const processed = result.data?.results?.[0]?.processed || 0;
+                setStatus('Indexed ' + processed + ' document(s) successfully', 'info');
+                loadSpecFiles();
+            } else {
+                setStatus(result.message || 'Index failed', 'error');
+            }
+        } catch {
+            setStatus('Index request failed', 'error');
+        } finally {
+            setLoading(INDEX, 'Index', false);
+        }
+    });
+
+    async function loadSpecFiles() {
+        FILES.innerHTML = '<p>Loading...</p>';
+        try {
+            const resp = await fetch('/api/v1/spec/files');
+            const result = await resp.json();
+            if (!result.success) {
+                FILES.innerHTML = '<p class="info-message">' + escHtml(result.error || 'Failed to list files') + '</p>';
+                return;
+            }
+            const files = result.data?.files || [];
+            if (files.length === 0) {
+                FILES.innerHTML = '<p>No specification files found for the selected folders.</p>';
+                return;
+            }
+            let html = '<p><strong>' + files.length + '</strong> specification files found</p>' +
+                '<table class="table"><thead><tr><th>File</th><th>Type</th><th>Size</th></tr></thead><tbody>';
+            for (let i = 0; i < files.length; i++) {
+                const f = files[i];
+                html += '<tr><td>' + escHtml(f.name) + '</td><td>' + escHtml(f.type || 'unknown') + '</td><td>' + (f.size ? (f.size / 1024).toFixed(1) + ' KB' : '-') + '</td></tr>';
+            }
+            html += '</tbody></table>';
+            FILES.innerHTML = html;
+        } catch (error) {
+            console.error('Failed to load spec files:', error);
+            FILES.innerHTML = '<p>Error loading files.</p>';
+        }
+    }
+
+    new DirBrowser('spec-tree', {
+        mode: 'tree',
+        endpoints: {
+            list: '/api/v1/spec/dirs',
+            selected: '/api/v1/spec/selected-dirs',
+            save: '/api/v1/spec/selected-dirs'
+        },
+        saveMethod: 'PUT',
+        saveOnChange: true,
+        selectedCountEl: 'spec-count',
+        onSelectionChange: function () { loadSpecFiles(); }
+    }).load();
+
     loadSpecFiles();
-}
-
-async function loadSpecFiles() {
-    const container = document.getElementById('spec-files-list');
-    container.innerHTML = '<p>Loading...</p>';
-    try {
-        const response = await fetch('/api/v1/spec/files');
-        const result = await response.json();
-        if (!result.success) {
-            container.innerHTML = '<p class="info-message">' + escHtml(result.error || 'Failed to list files') + '</p>';
-            return;
-        }
-        const files = result.data?.files || [];
-        if (files.length === 0) {
-            container.innerHTML = '<p>No specification files found for the selected folders.</p>';
-            return;
-        }
-        container.innerHTML = `
-            <p><strong>${files.length}</strong> specification files found</p>
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th>File</th>
-                        <th>Type</th>
-                        <th>Size</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${files.map(f => `
-                        <tr>
-                            <td>${escHtml(f.name)}</td>
-                            <td>${escHtml(f.type || 'unknown')}</td>
-                            <td>${f.size ? (f.size / 1024).toFixed(1) + ' KB' : '-'}</td>
-                        </tr>
-                    `).join('')}
-                </tbody>
-            </table>
-        `;
-    } catch (error) {
-        console.error('Failed to load spec files:', error);
-        container.innerHTML = '<p>Error loading files.</p>';
-    }
-}
-
-async function scanSpec() {
-    const btn = document.getElementById('scan-btn');
-    btn.disabled = true;
-    btn.textContent = 'Scanning...';
-    try {
-        const response = await fetch('/api/v1/spec/scan', { method: 'POST' });
-        const result = await response.json();
-        if (result.success) {
-            alert('Scan completed: ' + (result.data?.count || 0) + ' files found.');
-            loadSpecFiles();
-        } else {
-            alert(result.error || 'Scan failed');
-        }
-    } catch (error) {
-        alert('Scan failed');
-    } finally {
-        btn.disabled = false;
-        btn.textContent = 'Scan for new files';
-    }
-}
-
-loadDirs();
-loadSpecFiles();
+})();
 </script>
 {% endblock %}
 
@@ -168,18 +162,9 @@ loadSpecFiles();
 <style>
 .repo-info { padding: 1rem; }
 .repo-info h3 { margin-top: 0; }
+.error-message { color: #721c24; padding: 0.75rem; text-align: center; background: #f8d7da; border-radius: 4px; }
 .table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; }
 .table th, .table td { padding: 0.5rem; text-align: left; border-bottom: 1px solid var(--border-color); }
 .table th { font-weight: 600; }
-.dir-checkbox {
-    display: inline-block;
-    margin: 0.25rem 0.5rem;
-    padding: 0.25rem 0.5rem;
-    border: 1px solid var(--border-color, #ccc);
-    border-radius: 4px;
-    cursor: pointer;
-}
-.dir-checkbox input { margin-right: 0.25rem; }
-.hint { font-size: 0.9rem; opacity: 0.8; margin: 0.25rem 0 0.5rem; }
 </style>
 {% endblock %}
