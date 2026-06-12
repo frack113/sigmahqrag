@@ -255,52 +255,86 @@ function downloadLlama() {
 }
 
 function downloadQdrantBinary() {
-    var sel = document.getElementById('qdrant-release-select');
-    var version = sel ? sel.value : '';
-    downloadQdrant('binary', version);
-}
-
-function downloadQdrantUI() {
-    var sel = document.getElementById('qdrant-ui-release-select');
-    var version = sel ? sel.value : '';
-    downloadQdrant('web_ui', version);
-}
-
-function downloadQdrant(target, version) {
-    var btn = target === 'web_ui' ? document.getElementById('qdrant-ui-download-btn') : document.getElementById('qdrant-download-btn');
-    if (btn && btn.disabled) return;
-    if (btn) btn.disabled = true;
     var pb = makeProgressBar('qdrant');
     var statusEl = document.getElementById('qdrant-download-status');
     statusEl.textContent = 'Starting download...';
     statusEl.className = 'status-message';
     pb.show();
-    var body = { service: 'qdrant', target: target || 'all' };
-    if (version) body.version = version;
-    fetch('/api/v1/admin/download', {
+    var sel = document.getElementById('qdrant-release-select');
+    var version = sel ? sel.value : 'latest';
+    fetch('/api/v1/qdrant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
+        body: JSON.stringify({
+            action: 'download_update',
+            payload: { action: 'download_update', version: version, force: false }
+        })
     })
     .then(function(r) { return r.json(); })
     .then(function(data) {
-        var info = data.data || {};
-        var status = data.status;
-        var message = '';
-        if (info.binary_version) message += 'Binary v' + info.binary_version + ' ';
-        if (info.ui_version) message += 'Web UI ' + info.ui_version;
-        if (!message) message = status === 'partial' ? 'Partial update' : (status === 'success' ? 'Completed' : 'Failed');
-        statusEl.textContent = message;
-        statusEl.className = 'status-message ' + (status === 'success' ? 'success' : 'warning');
-        pb.hide();
-        if (btn) btn.disabled = false;
-        loadStatus();
+        if (data.status === 'started' && data.download_id) {
+            statusEl.textContent = 'Download started';
+            statusEl.className = 'status-message success';
+            ProgressBar.pollDownload({
+                endpoint: '/api/v1/qdrant/status',
+                downloadId: data.download_id,
+                onUpdate: function(pct, text) { pb.setProgress(pct); pb.setText(text); },
+                onComplete: function() { pb.hide(); statusEl.textContent = 'Download completed!'; loadStatus(); },
+                onError: function(msg) { pb.hide(); statusEl.textContent = 'Download failed: ' + msg; statusEl.className = 'status-message error'; }
+            });
+        } else {
+            statusEl.textContent = data.message || data.error || 'Download failed';
+            statusEl.className = 'status-message ' + (data.status === 'started' ? 'success' : 'error');
+            pb.hide();
+            loadStatus();
+        }
     })
     .catch(function(err) {
         statusEl.textContent = 'Error: ' + err.message;
         statusEl.className = 'status-message error';
         pb.hide();
-        if (btn) btn.disabled = false;
+    });
+}
+
+function downloadQdrantUI() {
+    var pb = makeProgressBar('qdrant');
+    var statusEl = document.getElementById('qdrant-download-status');
+    statusEl.textContent = 'Starting download...';
+    statusEl.className = 'status-message';
+    pb.show();
+    var sel = document.getElementById('qdrant-ui-release-select');
+    var version = sel ? sel.value : 'latest';
+    fetch('/api/v1/qdrant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            action: 'download_update',
+            payload: { action: 'download_update', version: version, force: false }
+        })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.status === 'started' && data.download_id) {
+            statusEl.textContent = 'Download started';
+            statusEl.className = 'status-message success';
+            ProgressBar.pollDownload({
+                endpoint: '/api/v1/qdrant/status',
+                downloadId: data.download_id,
+                onUpdate: function(pct, text) { pb.setProgress(pct); pb.setText(text); },
+                onComplete: function() { pb.hide(); statusEl.textContent = 'Web UI downloaded!'; loadStatus(); },
+                onError: function(msg) { pb.hide(); statusEl.textContent = 'Download failed: ' + msg; statusEl.className = 'status-message error'; }
+            });
+        } else {
+            statusEl.textContent = data.message || data.error || 'Download failed';
+            statusEl.className = 'status-message ' + (data.status === 'started' ? 'success' : 'error');
+            pb.hide();
+            loadStatus();
+        }
+    })
+    .catch(function(err) {
+        statusEl.textContent = 'Error: ' + err.message;
+        statusEl.className = 'status-message error';
+        pb.hide();
     });
 }
 

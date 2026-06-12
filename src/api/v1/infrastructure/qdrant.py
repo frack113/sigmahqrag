@@ -79,7 +79,13 @@ async def qdrant_status():
 
         manager = create_download_manager()
         downloads = {
-            k: {"status": v.status, "service": v.service, "version": v.version}
+            k: {
+                "status": v.status,
+                "service": v.service,
+                "version": v.version,
+                "bytes_downloaded": v.bytes_downloaded,
+                "total_bytes": v.total_bytes,
+            }
             for k, v in manager.active_downloads.items()
             if v.service == SERVICE_NAME
         }

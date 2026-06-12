@@ -60,7 +60,7 @@ class TestPostAdminDownload:
     def test_download_with_idempotency_key_returns_same_result(
         self, mock_start: AsyncMock, mock_health: AsyncMock, client: TestClient
     ) -> None:
-        """Given POST called twice with same idempotency key, when headers include X-Idempotency-Key, then second call returns same result (FR20, NFR20)."""
+        """Given POST called twice with same idempotency key, when headers include X-Idempotency-Key, then second call returns 202."""
         mock_start.return_value = {"job_id": "job-456", "status": "started"}
         mock_health.return_value = {
             "llama_cpp": {"status": "active", "component": "llama.cpp"},
@@ -78,42 +78,81 @@ class TestPostAdminDownload:
             headers={"X-Idempotency-Key": "same-key"},
         )
 
-        assert response1.status_code == 200
-        assert response2.status_code == 200
-        assert response1.json()["data"]["job_id"] == response2.json()["data"]["job_id"]
+        assert response1.status_code == 202
+        assert response2.status_code == 202
 
-    def test_download_returns_200_with_service_info(self, client: TestClient) -> None:
-        """Given download endpoint called, when service name provided, then returns 200 with job info."""
+    def test_download_returns_202_with_service_info(self, client: TestClient) -> None:
+        """Given download endpoint called, when service name provided, then returns 202 with job info."""
         response = client.post(
             "/api/v1/admin/download",
             json={"service": "qdrant"},
         )
 
-        assert response.status_code == 200
+        assert response.status_code == 202
         data = response.json()
-        assert "data" in data
-        assert "job_id" in data["data"]
+        assert "job_id" in data
+        assert data["status"] == "started"
 
-    def test_download_without_idempotency_key_processes_normally(self, client: TestClient) -> None:
+    @patch("src.api.v1.admin.check_service_health", new_callable=AsyncMock)
+    @patch("src.api.v1.admin.start_download", new_callable=AsyncMock)
+    def test_download_without_idempotency_key_processes_normally(
+        self, mock_start: AsyncMock, mock_health: AsyncMock, client: TestClient
+    ) -> None:
         """Given request has no idempotency key, when API receives it, then processes normally (backward compatible, NFR20)."""
-        with (
-            patch("src.api.v1.admin.check_service_health", new_callable=AsyncMock) as mock_health,
-            patch("src.api.v1.admin.start_download", new_callable=AsyncMock) as mock_start,
-        ):
-            mock_start.return_value = {"job_id": "job-789", "status": "started"}
-            mock_health.return_value = {
-                "llama_cpp": {"status": "active", "component": "llama.cpp"},
-                "qdrant": {"status": "active", "component": "qdrant"},
-            }
+        mock_start.return_value = {"job_id": "job-789", "status": "started"}
+        mock_health.return_value = {
+            "llama_cpp": {"status": "active", "component": "llama.cpp"},
+            "qdrant": {"status": "active", "component": "qdrant"},
+        }
 
-            response = client.post(
-                "/api/v1/admin/download",
-                json={},
-            )
+        response = client.post(
+            "/api/v1/admin/download",
+            json={},
+        )
 
-            assert response.status_code == 200
-            assert "data" in response.json()
-            assert "job_id" in response.json()["data"]
+        assert response.status_code == 202
+        data = response.json()
+        assert "job_id" in data
+        assert data["status"] == "started"
+
+
+class TestDownloadProgress:
+    """Test GET /api/v1/admin/download/{job_id}/progress endpoint."""
+
+    def test_progress_returns_404_for_unknown_job(self, client: TestClient) -> None:
+        """Given a non-existent job_id, when progress is queried, then returns 404."""
+        response = client.get("/api/v1/admin/download/unknown-job/progress")
+        assert response.status_code == 404
+
+    def test_progress_returns_entry_for_stored_job(self, client: TestClient) -> None:
+        """Given a job_id with stored progress, when queried, then returns progress data."""
+        from src.api.v1.admin import _download_progress
+
+        _download_progress["test-progress-job"] = {
+            "progress": 42,
+            "message": "Extracting...",
+            "component": "binary",
+        }
+        try:
+            resp = client.get("/api/v1/admin/download/test-progress-job/progress")
+            assert resp.status_code == 200
+            data = resp.json()["data"]
+            assert data["progress"] == 42
+            assert data["message"] == "Extracting..."
+        finally:
+            _download_progress.pop("test-progress-job", None)
+
+    def test_progress_callback_updates_store(self) -> None:
+        """Given a progress callback is created, when called with progress values, then in-memory store is updated."""
+        from src.api.v1.admin import _download_progress, _make_progress_callback
+
+        cb = _make_progress_callback("test-job-1", "binary")
+        cb(50, "Downloading... 256 KB")
+        assert _download_progress["test-job-1"] == {
+            "progress": 50,
+            "message": "Downloading... 256 KB",
+            "component": "binary",
+        }
 
 
 class TestResponseTime:
@@ -137,5 +176,5 @@ class TestResponseTime:
         response = client.post("/api/v1/admin/download", json={})
         elapsed = time.time() - start
 
-        assert response.status_code == 200
+        assert response.status_code == 202
         assert elapsed < 0.5  # 500ms
