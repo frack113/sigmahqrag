@@ -18,18 +18,18 @@
       <input type="text" id="llm-dl-repo" placeholder="org/model" class="input-sm">
       <button class="btn btn-secondary btn-sm" onclick="listLLMFiles()">List Files</button>
     </div>
-    <div id="llm-dl-files" style="display:none">
+    <div id="llm-dl-files" class="hidden">
       <div class="form-group">
         <label>GGUF Version:</label>
         <select id="llm-dl-select" class="input-sm"></select>
       </div>
       <button class="btn btn-primary" onclick="startLLMDownload()">Download</button>
     </div>
-    <div id="llm-dl-progress" style="display:none">
+    <div id="llm-dl-progress" class="hidden">
       <progress id="llm-dl-bar" value="0" max="100" class="progress-bar-inline"></progress>
       <p id="llm-dl-text">Starting...</p>
     </div>
-    <p id="llm-dl-error" class="error" style="display:none"></p>
+    <p id="llm-dl-error" class="error error-message hidden"></p>
   </div>
 </div>
 
@@ -45,11 +45,11 @@
       <input type="text" id="emb-dl-repo" placeholder="org/model" class="input-sm">
       <button class="btn btn-primary" onclick="startEmbDownload()">Download</button>
     </div>
-    <div id="emb-dl-progress" style="display:none">
+    <div id="emb-dl-progress" class="hidden">
       <progress id="emb-dl-bar" value="0" max="100" class="progress-bar-inline"></progress>
       <p id="emb-dl-text">Starting...</p>
     </div>
-    <p id="emb-dl-error" class="error" style="display:none"></p>
+    <p id="emb-dl-error" class="error error-message hidden"></p>
   </div>
 </div>
 
@@ -103,26 +103,26 @@ function listLLMFiles() {
   const repoId = document.getElementById('llm-dl-repo').value.trim();
   if (!repoId) { alert('Enter a HuggingFace model ID'); return; }
   const errEl = document.getElementById('llm-dl-error');
-  errEl.style.display = 'none';
-  document.getElementById('llm-dl-files').style.display = 'none';
+  errEl.classList.add('hidden');
+  document.getElementById('llm-dl-files').classList.add('hidden');
   fetch('/api/v1/models/llm/files?repo_id=' + encodeURIComponent(repoId))
     .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
     .then(data => {
       const files = data.files || [];
       if (files.length === 0) {
         errEl.textContent = 'No GGUF files found.';
-        errEl.style.display = 'block';
+        errEl.classList.remove('hidden');
         return;
       }
       const select = document.getElementById('llm-dl-select');
       select.innerHTML = files.map(f =>
         `<option value="${escAttr(f.filename)}">${escHtml(f.filename)} (${Math.round((f.size || 0) / 1024 / 1024) || '?'} MB)</option>`
       ).join('');
-      document.getElementById('llm-dl-files').style.display = 'block';
+      document.getElementById('llm-dl-files').classList.remove('hidden');
     })
     .catch(e => {
       errEl.textContent = 'Error: ' + e.message;
-      errEl.style.display = 'block';
+      errEl.classList.remove('hidden');
     });
 }
 
@@ -138,10 +138,10 @@ function startLLMDownload() {
   const bar = document.getElementById('llm-dl-bar');
   const textEl = document.getElementById('llm-dl-text');
   const errEl = document.getElementById('llm-dl-error');
-  document.getElementById('llm-dl-progress').style.display = 'block';
+  document.getElementById('llm-dl-progress').classList.remove('hidden');
   bar.value = 0;
   textEl.textContent = 'Deleting old model and downloading...';
-  errEl.style.display = 'none';
+  errEl.classList.add('hidden');
   _llmPollId = ProgressBar.pollProgressEndpoint({
     url: '/api/v1/models/llm/progress?repo_id=' + encodeURIComponent(repoId),
     interval: 2000,
@@ -165,10 +165,10 @@ function startEmbDownload() {
   const bar = document.getElementById('emb-dl-bar');
   const textEl = document.getElementById('emb-dl-text');
   const errEl = document.getElementById('emb-dl-error');
-  document.getElementById('emb-dl-progress').style.display = 'block';
+  document.getElementById('emb-dl-progress').classList.remove('hidden');
   bar.value = 0;
   textEl.textContent = 'Deleting old model and downloading...';
-  errEl.style.display = 'none';
+  errEl.classList.add('hidden');
   _embPollId = ProgressBar.pollProgressEndpoint({
     url: '/api/v1/models/embedding/progress?repo_id=' + encodeURIComponent(repoId),
     interval: 2000,
