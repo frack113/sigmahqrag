@@ -190,7 +190,25 @@ body {
     color: #0c5460;
 }
 
-/* Progress bar with blue gradient */
+/* ── Progress bars ─────────────────────────────────────────── */
+
+/* Default progress bar (flat blue fill) */
+.progress-bar {
+    width: 100%;
+    height: 20px;
+    background: #e9ecef;
+    border-radius: 4px;
+    margin-top: 10px;
+    overflow: hidden;
+}
+.progress-bar .progress-fill {
+    height: 100%;
+    background: #0d6efd;
+    width: 0%;
+    transition: width 0.3s;
+}
+
+/* Blue gradient progress bar */
 .progress-blue-gradient {
     width: 100%;
     height: 20px;
@@ -200,14 +218,14 @@ body {
     border-radius: 10px;
     overflow: hidden;
 }
-
-.progress-blue-gradient-fill {
+.progress-blue-gradient .progress-fill {
     height: 100%;
     width: 0%;
     background: linear-gradient(to right, rgb(0, 0, 1), rgb(0, 0, 255));
     transition: width 0.3s ease;
 }
 
+/* Shared progress bar layout helpers */
 .progress-text {
     font-size: 0.9em;
     font-weight: 600;
@@ -222,8 +240,16 @@ body {
     gap: 12px;
     margin-bottom: 8px;
 }
-.progress-bar-container .progress-blue-gradient {
+.progress-bar-container .progress-blue-gradient,
+.progress-bar-container .progress-bar {
     flex: 1;
+}
+
+.progress-label {
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: #333;
 }
 
 /* Toast notifications */
@@ -439,22 +465,6 @@ td:has(.btn) {
 .status-message.error {
     background: #f8d7da;
     color: #721c24;
-}
-
-/* Progress bar */
-.progress-bar {
-    width: 100%;
-    height: 20px;
-    background: #e9ecef;
-    border-radius: 4px;
-    margin-top: 10px;
-    overflow: hidden;
-}
-.progress-bar div {
-    height: 100%;
-    background: #0d6efd;
-    width: 0%;
-    transition: width 0.3s;
 }
 
 /* Update alert banner */

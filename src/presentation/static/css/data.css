@@ -38,17 +38,34 @@
     gap: 8px;
 }
 
-.repo-status {
-    display: inline-block;
-    padding: 4px 12px;
-    border-radius: 12px;
-    font-size: 12px;
-    background: #27ae60;
-    color: #ffffff;
+/* Shared info/empty state message */
+.info-message {
+    color: var(--text-muted, #999);
+    padding: 1.25rem;
+    text-align: center;
 }
 
-.status-badge.configured {
-    background: #27ae60;
-    color: #ffffff;
+/* Repo detail section (github) */
+.repo-detail-section {
+    margin-top: 1.25rem;
+    padding: 1rem;
+    background: var(--card-bg, #f8f9fa);
+    border-radius: 8px;
+}
+.repo-detail-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+/* Select repo prompt */
+.select-repo-prompt {
+    padding: 1.25rem;
+    text-align: center;
+    color: var(--text-muted, #999);
+    background: var(--card-bg, #f8f9fa);
+    border-radius: 4px;
+    margin-top: 0.5rem;
 }
 

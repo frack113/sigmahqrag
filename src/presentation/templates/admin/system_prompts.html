@@ -5,54 +5,58 @@
 {% block header %}System Prompts{% endblock %}
 
 {% block content %}
-<div class="card mb-4">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <span class="h5 mb-0">Prompts List</span>
+<div class="card">
+    <div class="card-header">
+        <h2>Prompts List</h2>
         <div>
             <button class="btn btn-sm btn-success" onclick="syncFromFiles()">Sync from files</button>
             <button class="btn btn-sm btn-primary" onclick="EnableEditForm()">Add new</button>
             <button class="btn btn-sm btn-secondary" onclick="refreshList()">Refresh list</button>
         </div>
     </div>
-    <div class="table-responsive">
-        <table class="table table-striped table-hover">
-            <thead class="table-light">
-                <tr>
-                    <th>Name</th>
-                    <th>Description</th>
-                    <th class="text-end">Actions</th>
-                </tr>
-            </thead>
-            <tbody id="prompts-table-body">
-            </tbody>
-        </table>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead class="table-light">
+                    <tr>
+                        <th>Name</th>
+                        <th>Description</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="prompts-table-body">
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 
 <div class="card" id="prompt-form-container">
-    <h2 class="card-header" id="edit-form-title">Edit Prompt</h2>
+    <div class="card-header">
+        <h2 id="edit-form-title">Edit Prompt</h2>
+    </div>
     <div class="card-body">
-        <div class="form-group mb-3">
+        <div class="form-group">
             <label for="prompt-id" class="form-label">ID:</label>
             <input type="text" id="prompt-id" class="form-control" placeholder="UUID will be generated" readonly>
         </div>
-        <div class="form-group mb-3">
+        <div class="form-group">
             <label for="prompt-name" class="form-label">Name (kebab-case, max 25):</label>
             <input type="text" id="prompt-name" class="form-control" placeholder="ex: analyste-sigma" maxlength="25" disabled>
         </div>
-        <div class="form-group mb-3">
+        <div class="form-group">
             <label for="prompt-description" class="form-label">Description (max 100):</label>
             <input type="text" id="prompt-description" class="form-control" placeholder="Brief description..." maxlength="100" disabled>
         </div>
-        <div class="form-group mb-3">
+        <div class="form-group">
             <label for="prompt-content-input" class="form-label">Content (Markdown):</label>
             <textarea id="prompt-content-input" class="form-control" rows="10" cols="120" placeholder="Enter prompt content..." disabled></textarea>
         </div>
-        <div class="d-flex justify-content-end gap-2">
+        <div class="card-footer">
             <button class="btn btn-secondary" id="btn-cancel" onclick="resetForm()" disabled>Cancel</button>
             <button class="btn btn-primary" id="btn-save" onclick="savePrompt()" disabled>Save Prompt</button>
         </div>
-        <div id="save-status" class="mt-3 status-message" role="status" aria-live="polite"></div>
+        <div id="save-status" class="card-spacing status-message" role="status" aria-live="polite"></div>
     </div>
 </div>
 
@@ -147,7 +151,7 @@ function resetForm() {
     
     document.getElementById('edit-form-title').textContent = 'Create New Prompt';
     document.getElementById('save-status').textContent = '';
-    document.getElementById('save-status').className = 'mt-3 status-message';
+    document.getElementById('save-status').className = 'status-message';
     toggleFormInputs(true);
 }
 
@@ -176,7 +180,7 @@ async function editPrompt(id) {
         document.getElementById('prompt-content-input').value = data.content || '';
         document.getElementById('edit-form-title').textContent = 'Edit Prompt';
         document.getElementById('save-status').textContent = '';
-        document.getElementById('save-status').className = 'mt-3 status-message';
+        document.getElementById('save-status').className = 'status-message';
         toggleFormInputs(false);
     } catch (err) {
         console.error('Error loading prompt:', err);
@@ -251,10 +255,10 @@ async function deletePrompt(id, name) {
 function showStatus(msg, type) {
     const el = document.getElementById('save-status');
     el.textContent = msg;
-    if (type === 'error') el.className = 'mt-3 status-message text-danger';
-    else if (type === 'success') el.className = 'mt-3 status-message text-success';
-    else if (type === 'info') el.className = 'mt-3 status-message text-info';
-    else el.className = 'mt-3 status-message';
+    if (type === 'error') el.className = 'status-message';
+    else if (type === 'success') el.className = 'status-message';
+    else if (type === 'info') el.className = 'status-message';
+    else el.className = 'status-message';
 }
 
 document.addEventListener('DOMContentLoaded', loadPrompts);

@@ -7,44 +7,53 @@
 {% block content %}
 
 <div class="card">
-  <h3>LLM Model <span class="text-muted" style="font-weight:normal;font-size:0.9rem">— Download New Model from HuggingFace</span></h3>
-  <div id="llm-model"><p>Loading...</p></div>
-  <hr>
-  <div class="form-group">
-    <label>Download New Model:</label>
-    <input type="text" id="llm-dl-repo" placeholder="org/model" style="width:350px">
-    <button class="btn btn-secondary btn-sm" onclick="listLLMFiles()">List Files</button>
+  <div class="card-header">
+    <h2>LLM Model <span class="text-muted">Download from HuggingFace</span></h2>
   </div>
-  <div id="llm-dl-files" style="display:none">
+  <div class="card-body">
+    <div id="llm-model"><p>Loading...</p></div>
+    <hr>
     <div class="form-group">
-      <label>GGUF Version:</label>
-      <select id="llm-dl-select" style="width:350px"></select>
+      <label>Download New Model:</label>
+      <input type="text" id="llm-dl-repo" placeholder="org/model" class="input-sm">
+      <button class="btn btn-secondary btn-sm" onclick="listLLMFiles()">List Files</button>
     </div>
-    <button class="btn btn-primary" onclick="startLLMDownload()">Download</button>
+    <div id="llm-dl-files" style="display:none">
+      <div class="form-group">
+        <label>GGUF Version:</label>
+        <select id="llm-dl-select" class="input-sm"></select>
+      </div>
+      <button class="btn btn-primary" onclick="startLLMDownload()">Download</button>
+    </div>
+    <div id="llm-dl-progress" style="display:none">
+      <progress id="llm-dl-bar" value="0" max="100" class="progress-bar-inline"></progress>
+      <p id="llm-dl-text">Starting...</p>
+    </div>
+    <p id="llm-dl-error" class="error" style="display:none"></p>
   </div>
-  <div id="llm-dl-progress" style="display:none">
-    <progress id="llm-dl-bar" value="0" max="100" style="width:100%"></progress>
-    <p id="llm-dl-text">Starting...</p>
-  </div>
-  <p id="llm-dl-error" class="error" style="display:none"></p>
 </div>
 
 <div class="card">
-  <h3>Embedding Model <span class="text-muted" style="font-weight:normal;font-size:0.9rem">— Download New Model from HuggingFace</span></h3>
-  <div id="embedding-model"><p>Loading...</p></div>
-  <hr>
-  <div class="form-group">
-    <label>Download New Model:</label>
-    <input type="text" id="emb-dl-repo" placeholder="org/model" style="width:350px">
-    <button class="btn btn-primary" onclick="startEmbDownload()">Download</button>
+  <div class="card-header">
+    <h2>Embedding Model <span class="text-muted">Download from HuggingFace</span></h2>
   </div>
-  <div id="emb-dl-progress" style="display:none">
-    <progress id="emb-dl-bar" value="0" max="100" style="width:100%"></progress>
-    <p id="emb-dl-text">Starting...</p>
+  <div class="card-body">
+    <div id="embedding-model"><p>Loading...</p></div>
+    <hr>
+    <div class="form-group">
+      <label>Download New Model:</label>
+      <input type="text" id="emb-dl-repo" placeholder="org/model" class="input-sm">
+      <button class="btn btn-primary" onclick="startEmbDownload()">Download</button>
+    </div>
+    <div id="emb-dl-progress" style="display:none">
+      <progress id="emb-dl-bar" value="0" max="100" class="progress-bar-inline"></progress>
+      <p id="emb-dl-text">Starting...</p>
+    </div>
+    <p id="emb-dl-error" class="error" style="display:none"></p>
   </div>
-  <p id="emb-dl-error" class="error" style="display:none"></p>
 </div>
 
+<script src="{{ url_for('static', path='/js/progress-bar.js') }}"></script>
 <script>
 function loadModels() {
   fetch('/api/v1/models/llm/installed')
@@ -62,7 +71,7 @@ function loadModels() {
       const name = f.filename || m.repo_id;
       el.innerHTML = `
         <p><strong>${escHtml(name)}</strong> (${size} MB) &mdash; ${escHtml(m.repo_id)}
-        <button class="btn btn-danger btn-sm" style="margin-left:1em" onclick="deleteLLM('${escAttr(m.repo_id)}', '${escAttr(f.filename || '')}')">Delete</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteLLM('${escAttr(m.repo_id)}', '${escAttr(f.filename || '')}')">Delete</button>
         </p>`;
     })
     .catch(() => {
@@ -82,7 +91,7 @@ function loadModels() {
       const m = models[0];
       el.innerHTML = `
         <p><strong>${escHtml(m.repo_id)}</strong>
-        <button class="btn btn-danger btn-sm" style="margin-left:1em" onclick="deleteEmbedding('${escAttr(m.repo_id)}')">Delete</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteEmbedding('${escAttr(m.repo_id)}')">Delete</button>
         </p>`;
     })
     .catch(() => {
@@ -117,67 +126,62 @@ function listLLMFiles() {
     });
 }
 
+var _llmPollId = 0;
+var _embPollId = 0;
+
 function startLLMDownload() {
   const repoId = document.getElementById('llm-dl-repo').value.trim();
   const filename = document.getElementById('llm-dl-select').value;
   if (!repoId || !filename) return;
+  if (_llmPollId) { clearInterval(_llmPollId); _llmPollId = 0; }
   const url = '/api/v1/models/llm/download?repo_id=' + encodeURIComponent(repoId) + '&filename=' + encodeURIComponent(filename);
+  const bar = document.getElementById('llm-dl-bar');
+  const textEl = document.getElementById('llm-dl-text');
+  const errEl = document.getElementById('llm-dl-error');
   document.getElementById('llm-dl-progress').style.display = 'block';
-  document.getElementById('llm-dl-bar').value = 0;
-  document.getElementById('llm-dl-text').textContent = 'Deleting old model and downloading...';
-  document.getElementById('llm-dl-error').style.display = 'none';
-  const poll = setInterval(() => {
-    fetch('/api/v1/models/llm/progress?repo_id=' + encodeURIComponent(repoId))
-      .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
-      .then(d => {
-        const p = d.progress || 0;
-        document.getElementById('llm-dl-bar').value = p;
-        document.getElementById('llm-dl-text').textContent = 'Downloading... ' + p + '%';
-        if (p >= 100 || d.status === 'completed') {
-          clearInterval(poll);
-          document.getElementById('llm-dl-text').textContent = 'Complete!';
-          setTimeout(loadModels, 2000);
-        }
-      })
-      .catch(() => { clearInterval(poll); document.getElementById('llm-dl-text').textContent = 'Poll error'; });
-  }, 2000);
+  bar.value = 0;
+  textEl.textContent = 'Deleting old model and downloading...';
+  errEl.style.display = 'none';
+  _llmPollId = ProgressBar.pollProgressEndpoint({
+    url: '/api/v1/models/llm/progress?repo_id=' + encodeURIComponent(repoId),
+    interval: 2000,
+    onUpdate: function(p) { bar.value = p; textEl.textContent = 'Downloading... ' + p + '%'; },
+    onComplete: function() { _llmPollId = 0; textEl.textContent = 'Complete!'; setTimeout(loadModels, 2000); },
+    onError: function(msg) { _llmPollId = 0; textEl.textContent = msg; }
+  });
   fetch(url, { method: 'POST' })
     .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
     .then(d => {
-      if (!d.success) { clearInterval(poll); document.getElementById('llm-dl-text').textContent = 'Failed: ' + (d.error || d.message); }
+      if (!d.success) { clearInterval(_llmPollId); _llmPollId = 0; textEl.textContent = 'Failed: ' + (d.error || d.message); }
     })
-    .catch(e => { clearInterval(poll); document.getElementById('llm-dl-text').textContent = 'Error: ' + e.message; });
+    .catch(e => { clearInterval(_llmPollId); _llmPollId = 0; textEl.textContent = 'Error: ' + e.message; });
 }
 
 function startEmbDownload() {
   const repoId = document.getElementById('emb-dl-repo').value.trim();
   if (!repoId) { alert('Enter a HuggingFace model ID'); return; }
+  if (_embPollId) { clearInterval(_embPollId); _embPollId = 0; }
   const url = '/api/v1/models/embedding/download?repo_id=' + encodeURIComponent(repoId);
+  const bar = document.getElementById('emb-dl-bar');
+  const textEl = document.getElementById('emb-dl-text');
+  const errEl = document.getElementById('emb-dl-error');
   document.getElementById('emb-dl-progress').style.display = 'block';
-  document.getElementById('emb-dl-bar').value = 0;
-  document.getElementById('emb-dl-text').textContent = 'Deleting old model and downloading...';
-  document.getElementById('emb-dl-error').style.display = 'none';
-  const poll = setInterval(() => {
-    fetch('/api/v1/models/embedding/progress?repo_id=' + encodeURIComponent(repoId))
-      .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
-      .then(d => {
-        const p = d.progress || 0;
-        document.getElementById('emb-dl-bar').value = p;
-        document.getElementById('emb-dl-text').textContent = 'Downloading... ' + p + '%';
-        if (p >= 100 || d.status === 'completed') {
-          clearInterval(poll);
-          document.getElementById('emb-dl-text').textContent = 'Complete!';
-          setTimeout(loadModels, 2000);
-        }
-      })
-      .catch(() => { clearInterval(poll); document.getElementById('emb-dl-text').textContent = 'Poll error'; });
-  }, 2000);
+  bar.value = 0;
+  textEl.textContent = 'Deleting old model and downloading...';
+  errEl.style.display = 'none';
+  _embPollId = ProgressBar.pollProgressEndpoint({
+    url: '/api/v1/models/embedding/progress?repo_id=' + encodeURIComponent(repoId),
+    interval: 2000,
+    onUpdate: function(p) { bar.value = p; textEl.textContent = 'Downloading... ' + p + '%'; },
+    onComplete: function() { _embPollId = 0; textEl.textContent = 'Complete!'; setTimeout(loadModels, 2000); },
+    onError: function(msg) { _embPollId = 0; textEl.textContent = msg; }
+  });
   fetch(url, { method: 'POST' })
     .then(r => r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
     .then(d => {
-      if (!d.success) { clearInterval(poll); document.getElementById('emb-dl-text').textContent = 'Failed: ' + (d.error || d.message); }
+      if (!d.success) { clearInterval(_embPollId); _embPollId = 0; textEl.textContent = 'Failed: ' + (d.error || d.message); }
     })
-    .catch(e => { clearInterval(poll); document.getElementById('emb-dl-text').textContent = 'Error: ' + e.message; });
+    .catch(e => { clearInterval(_embPollId); _embPollId = 0; textEl.textContent = 'Error: ' + e.message; });
 }
 
 function deleteLLM(repoId, filename) {

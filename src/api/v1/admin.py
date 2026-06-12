@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from typing import Any
@@ -23,6 +24,24 @@ router = APIRouter(prefix="/api/v1/admin", tags=["admin-v1"])
 _idempotency_store: dict[str, tuple[Any, float, str]] = {}
 _IDEMPOTENCY_TTL = 3600  # 1 hour TTL for MVP
 _IDEMPOTENCY_MAX_SIZE = 1000  # Prevent memory leaks
+
+# In-memory store for download progress
+# Format: {job_id: {"progress": int, "message": str, "component": str}}
+_download_progress: dict[str, dict[str, Any]] = {}
+_download_lock = asyncio.Lock()
+
+
+def _make_progress_callback(job_id: str, component: str) -> Any:
+    """Create a progress callback that updates the download progress store."""
+
+    def callback(progress: int, message: str) -> None:
+        _download_progress[job_id] = {
+            "progress": progress,
+            "message": message,
+            "component": component,
+        }
+
+    return callback
 
 
 def _is_valid_idempotency_key(key: str | None) -> bool:
@@ -208,6 +227,7 @@ class DownloadRequest(BaseModel):
     action: str | None = "install"
     service: str | None = "qdrant"
     target: str | None = None
+    version: str | None = None
 
 
 class CancelRequest(BaseModel):
@@ -216,7 +236,11 @@ class CancelRequest(BaseModel):
     job_id: str
 
 
-async def start_download(service: str | None = None, target: str | None = None) -> dict[str, Any]:
+async def start_download(
+    service: str | None = None,
+    target: str | None = None,
+    job_id: str | None = None,
+) -> dict[str, Any]:
     """Start download action and return job info."""
     import uuid
 
@@ -225,7 +249,7 @@ async def start_download(service: str | None = None, target: str | None = None) 
     target_service = service or "qdrant"
     target_component = target or "all"
 
-    job_id = f"job-{uuid.uuid4().hex[:8]}"
+    job_id = job_id or f"job-{uuid.uuid4().hex[:8]}"
 
     if target_service == "llama":
         try:
@@ -263,13 +287,44 @@ async def start_download(service: str | None = None, target: str | None = None) 
             create_qdrant_installer,
         )
 
+        # Stop Qdrant before overwriting the binary
+        try:
+            from src.shared.service_manager import get_subprocess_manager
+
+            mgr = get_subprocess_manager()
+            result = await mgr.stop_service("qdrant")
+            if not result.get("success"):
+                err = result.get("error", "")
+                if "not running" in err:
+                    logger.warning(
+                        "Qdrant not tracked by manager (may be external), continuing download"
+                    )
+                else:
+                    logger.error("Could not stop Qdrant before download: %s", err)
+                    return {
+                        "job_id": job_id,
+                        "status": "failed",
+                        "service": target_service,
+                        "error": f"Could not stop Qdrant: {err}",
+                    }
+        except Exception:
+            logger.exception("Error stopping Qdrant before download")
+            return {
+                "job_id": job_id,
+                "status": "failed",
+                "service": target_service,
+                "error": "Unexpected error stopping Qdrant before download",
+            }
+
         installer = create_qdrant_installer()
 
-        binary_result = {"success": False, "error": "skipped (binary running)"}
+        binary_result = {"success": False, "error": "skipped"}
         ui_result = {"success": False, "error": "skipped"}
 
         if target_component in ("binary", "all"):
-            binary_result = await installer.download_binary()
+            binary_result = await installer.download_binary(
+                progress_callback=_make_progress_callback(job_id, "binary"),
+            )
             if binary_result.get("success"):
                 from src.config.settings import get_config
 
@@ -278,7 +333,9 @@ async def start_download(service: str | None = None, target: str | None = None) 
                 config.save()
 
         if target_component in ("web_ui", "all"):
-            ui_result = await installer.download_web_ui()
+            ui_result = await installer.download_web_ui(
+                progress_callback=_make_progress_callback(job_id, "web_ui"),
+            )
             if ui_result.get("success"):
                 from src.config.settings import get_config
 
@@ -332,35 +389,80 @@ async def download_action(
     x_idempotency_key: str | None = Header(default=None, alias="X-Idempotency-Key"),
 ) -> JSONResponse:
     """POST /api/v1/admin/download - Download/update services."""
+    import uuid
+
     service = request.service if request else "qdrant"
     target = request.target if request else "all"
+    job_id = f"job-{uuid.uuid4().hex[:8]}"
+
+    async with _download_lock:
+        _download_progress[job_id] = {"progress": 0, "message": "Starting...", "component": ""}
 
     if _is_valid_idempotency_key(x_idempotency_key):
         _cleanup_expired_entries()
         cache_key = f"download:{x_idempotency_key}"
         if cache_key in _idempotency_store:
             cached_content, _, _ = _idempotency_store[cache_key]
+            async with _download_lock:
+                _download_progress.pop(job_id, None)
             return JSONResponse(content=cached_content)
 
-    result = await start_download(service=service, target=target)
+    # Launch download in background to avoid blocking the HTTP response
+    async def _run_download():
+        try:
+            result = await start_download(service=service, target=target, job_id=job_id)
+            status = result.get("status", "")
+            if status in ("completed", "partial"):
+                async with _download_lock:
+                    _download_progress[job_id] = {
+                        "progress": 100,
+                        "message": "Complete",
+                        "component": "",
+                    }
+            elif status == "failed":
+                async with _download_lock:
+                    _download_progress[job_id] = {
+                        "progress": 0,
+                        "message": result.get("error", "Failed"),
+                        "component": "",
+                    }
+        except Exception as e:
+            logger.exception("Download task failed for job %s", job_id)
+            try:
+                async with _download_lock:
+                    _download_progress[job_id] = {
+                        "progress": 0,
+                        "message": f"Task error: {e}",
+                        "component": "",
+                    }
+            except Exception:
+                pass
 
-    response_content = {
-        "data": result,
-        "status": (
-            "success"
-            if result.get("status") in ("completed", "started")
-            else result.get("status", "success")
-        ),
-    }
+    asyncio.create_task(_run_download())
 
-    if _is_valid_idempotency_key(x_idempotency_key):
-        _idempotency_store[f"download:{x_idempotency_key}"] = (
-            response_content,
-            time.time(),
-            "download",
+    return JSONResponse(
+        content={
+            "job_id": job_id,
+            "service": service,
+            "target": target,
+            "status": "started",
+            "message": f"Download started for {service}",
+        },
+        status_code=202,
+    )
+
+
+@router.get("/download/{job_id}/progress")
+async def get_download_progress(job_id: str) -> JSONResponse:
+    """GET /api/v1/admin/download/{job_id}/progress - Get download progress."""
+    async with _download_lock:
+        entry = _download_progress.get(job_id)
+    if entry is None:
+        return JSONResponse(
+            status_code=404,
+            content={"status": "error", "error": "Job not found"},
         )
-
-    return JSONResponse(content=response_content)
+    return JSONResponse(content={"data": entry, "status": "success"})
 
 
 @router.get("/status")

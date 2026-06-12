@@ -31,6 +31,7 @@ _VALID_TABLES = frozenset(
         "git_metadata",
         "git_selected_dirs",
         "worker_state",
+        "release_cache",
     }
 )
 
@@ -191,3 +192,27 @@ class DatabaseServiceCore:
                 self.persist()
             except Exception:
                 logger.warning("Auto-persist after set_config failed (non-fatal)")
+
+    # ------------------------------------------------------------------
+    # Release cache
+    # ------------------------------------------------------------------
+
+    def get_release_cache(self, service: str) -> list[dict[str, Any]] | None:
+        result = self._safe_query("SELECT data FROM release_cache WHERE service = ?", (service,))
+        if result:
+            try:
+                return json.loads(result[0])
+            except (json.JSONDecodeError, TypeError):
+                return None
+        return None
+
+    def set_release_cache(self, service: str, releases: list[dict[str, Any]]) -> None:
+        from datetime import datetime, timezone
+
+        with self._lock:
+            self._writer_conn.execute(
+                "INSERT INTO release_cache (service, data, fetched_at) VALUES (?, ?, ?) "
+                "ON CONFLICT (service) DO UPDATE SET data = EXCLUDED.data, fetched_at = EXCLUDED.fetched_at",
+                (service, json.dumps(releases), datetime.now(timezone.utc).isoformat()),
+            )
+            self._writer_conn.commit()

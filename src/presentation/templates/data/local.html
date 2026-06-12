@@ -156,22 +156,6 @@
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
     }
 
-    .progress-bar {
-        width: 100%;
-        height: 8px;
-        background: #ecf0f1;
-        border-radius: 4px;
-        overflow: hidden;
-        margin-top: 8px;
-    }
-
-    .progress-fill {
-        height: 100%;
-        background: #3498db;
-        width: 0%;
-        transition: width 0.3s;
-    }
-
     #status-message {
         margin-top: 12px;
         font-size: 14px;
@@ -210,6 +194,8 @@
         <div class="progress-fill" id="progress-fill"></div>
     </div>
 </div>
+
+<script src="{{ url_for('static', path='/js/progress-bar.js') }}"></script>
 
 <div class="files-table">
     <table>
@@ -355,20 +341,23 @@ async function deleteFile(idx, originalUrl) {
 
 async function handleFiles(fileList) {
     const uploadProgress = document.getElementById('upload-progress');
-    const progressFill = document.getElementById('progress-fill');
     const statusMessage = document.getElementById('status-message');
+    const pb = new ProgressBar({
+        container: uploadProgress,
+        fill: document.getElementById('progress-fill'),
+        text: document.getElementById('status-message'),
+    });
 
-    uploadProgress.style.display = 'block';
-    progressFill.style.width = '0%';
-    statusMessage.textContent = `Uploading ${fileList.length} file(s)...`;
+    pb.show();
+    pb.setText(`Uploading ${fileList.length} file(s)...`);
 
     let successCount = 0;
     let errorCount = 0;
 
     for (let i = 0; i < fileList.length; i++) {
         const file = fileList[i];
-        progressFill.style.width = `${((i + 1) / fileList.length) * 50}%`;
-        statusMessage.textContent = `Uploading ${i + 1}/${fileList.length}: ${file.name}`;
+        pb.setProgress(((i + 1) / fileList.length) * 100);
+        pb.setText(`Uploading ${i + 1}/${fileList.length}: ${file.name}`);
 
         try {
             const formData = new FormData();
@@ -393,11 +382,11 @@ async function handleFiles(fileList) {
         }
     }
 
-    progressFill.style.width = '100%';
-    statusMessage.textContent = `Complete: ${successCount} uploaded, ${errorCount} errors`;
+    pb.complete();
+    pb.setText(`Complete: ${successCount} uploaded, ${errorCount} errors`);
 
     setTimeout(() => {
-        uploadProgress.style.display = 'none';
+        pb.hide();
         loadLocalFiles();
     }, 2000);
 }

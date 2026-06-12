@@ -6,6 +6,7 @@ import logging
 import os
 import signal
 import subprocess
+import threading
 from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
@@ -45,6 +46,7 @@ class SubprocessManager:
         self.pid_dir = Path(pid_dir)
 
         self._processes: dict[str, ServiceProcess] = {}
+        self._lock = threading.Lock()
         self._sync_from_pid_files()
 
     def _sync_from_pid_files(self) -> None:
@@ -54,9 +56,10 @@ class SubprocessManager:
             try:
                 pid = int(pid_file.read_text().strip())
                 if self._is_process_running(pid):
-                    self._processes[service_name] = ServiceProcess(
-                        name=service_name, pid=pid, is_running=True
-                    )
+                    with self._lock:
+                        self._processes[service_name] = ServiceProcess(
+                            name=service_name, pid=pid, is_running=True
+                        )
                 else:
                     pid_file.unlink()
             except (ValueError, OSError):
@@ -77,6 +80,36 @@ class SubprocessManager:
         except (OSError, ProcessLookupError):
             return False
 
+    def _find_process_by_port(self, port: int) -> int | None:
+        """Find PID of process listening on a given Windows port.
+
+        Args:
+            port: TCP port number
+
+        Returns:
+            PID if found, None otherwise
+        """
+        try:
+            import subprocess
+
+            result = subprocess.run(
+                ["netstat", "-ano"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            for line in result.stdout.splitlines():
+                parts = line.split()
+                for part in parts:
+                    if f":{port}" == part and len(parts) >= 5:
+                        try:
+                            return int(parts[-1])
+                        except (ValueError, IndexError):
+                            pass
+        except Exception as e:
+            logger.warning(f"Could not find process on port {port}: {e}")
+        return None
+
     def is_healthy(self, name: str) -> bool:
         """Check if a service process is healthy (running).
 
@@ -86,14 +119,13 @@ class SubprocessManager:
         Returns:
             True if service is running
         """
-        if name not in self._processes:
-            return False
-
-        proc_info = self._processes[name]
-        if not proc_info.is_running or proc_info.pid is None:
-            return False
-
-        return self._is_process_running(proc_info.pid)
+        with self._lock:
+            if name not in self._processes:
+                return False
+            proc_info = self._processes[name]
+            if not proc_info.is_running or proc_info.pid is None:
+                return False
+            return self._is_process_running(proc_info.pid)
 
     async def start_service(
         self,
@@ -115,8 +147,9 @@ class SubprocessManager:
         Returns:
             Dict with start status
         """
-        if name in self._processes and self._processes[name].is_running:
-            return {"success": False, "error": f"{name} already running"}
+        with self._lock:
+            if name in self._processes and self._processes[name].is_running:
+                return {"success": False, "error": f"{name} already running"}
 
         log_handle = None
         try:
@@ -143,15 +176,16 @@ class SubprocessManager:
             except OSError as e:
                 logger.warning(f"Failed to write PID file for {name}: {e}")
 
-            self._processes[name] = ServiceProcess(
-                name=name,
-                process=process,
-                pid=process.pid,
-                log_file=log_file,
-                pid_file=pid_file,
-                log_handle=log_handle,
-                is_running=True,
-            )
+            with self._lock:
+                self._processes[name] = ServiceProcess(
+                    name=name,
+                    process=process,
+                    pid=process.pid,
+                    log_file=log_file,
+                    pid_file=pid_file,
+                    log_handle=log_handle,
+                    is_running=True,
+                )
 
             logger.info(f"Started {name} (PID: {process.pid})")
             return {
@@ -178,34 +212,46 @@ class SubprocessManager:
         Returns:
             Dict with stop status
         """
-        process_info = self._processes.get(name)
-        if not process_info or not process_info.is_running or process_info.process is None:
-            return {"success": False, "error": f"{name} not running"}
+        with self._lock:
+            process_info = self._processes.get(name)
+            if not process_info or not process_info.is_running:
+                if process_info and process_info.log_handle is not None:
+                    try:
+                        process_info.log_handle.close()
+                    except OSError:
+                        pass
+                self._processes.pop(name, None)
+                return {"success": False, "error": f"{name} not running"}
+
+            if process_info.pid is None:
+                return {"success": False, "error": f"{name} has no PID"}
 
         try:
-            process_info.process.terminate()
-
-            try:
-                process_info.process.wait(timeout=10)
-            except subprocess.TimeoutExpired:
-                process_info.process.kill()
+            if process_info.process is not None:
+                process_info.process.terminate()
                 try:
-                    process_info.process.wait(timeout=5)
+                    process_info.process.wait(timeout=10)
                 except subprocess.TimeoutExpired:
-                    logger.warning(f"Could not kill {name} (PID {process_info.pid})")
-
-            if process_info.log_handle is not None:
-                process_info.log_handle.close()
-                process_info.log_handle = None
-
-            logger.info(f"Stopped {name}")
-            process_info.is_running = False
-            process_info.process = None
-            process_info.pid = None
-            del self._processes[name]
-
-            return {"success": True}
-
+                    process_info.process.kill()
+                    try:
+                        process_info.process.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        logger.warning(f"Could not kill {name} (PID {process_info.pid})")
+            else:
+                if os.name == "nt":
+                    try:
+                        subprocess.run(
+                            ["taskkill", "/F", "/PID", str(process_info.pid)],
+                            capture_output=True,
+                            timeout=10,
+                        )
+                    except subprocess.TimeoutExpired:
+                        logger.warning(f"taskkill timed out for {name} (PID {process_info.pid})")
+                else:
+                    try:
+                        os.kill(process_info.pid, signal.SIGTERM)
+                    except ProcessLookupError:
+                        logger.debug(f"{name} (PID {process_info.pid}) already exited")
         except Exception as e:
             logger.error(f"Failed to stop {name}: {e}")
             try:
@@ -214,6 +260,21 @@ class SubprocessManager:
             except OSError:
                 pass
             return {"success": False, "error": str(e)}
+        finally:
+            if process_info.log_handle is not None:
+                try:
+                    process_info.log_handle.close()
+                except OSError:
+                    pass
+                process_info.log_handle = None
+
+            logger.info(f"Stopped {name}")
+            process_info.is_running = False
+            process_info.process = None
+            process_info.pid = None
+            self._processes.pop(name, None)
+
+            return {"success": True}
 
     def get_logs(self, name: str, lines: int = 50) -> str:
         """Get recent log lines for a service.

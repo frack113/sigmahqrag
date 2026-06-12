@@ -94,9 +94,9 @@ class DownloadManager:
         # Check if requested version is already installed
         if version == "latest":
             release = await self.version_manager.get_release(service, version)
-            version_to_check = release.tag_name.lstrip("v")
+            version_to_check = release.tag_name.removeprefix("v")
         else:
-            version_to_check = version.lstrip("v")
+            version_to_check = version.removeprefix("v")
 
         if service in ("llama", "llama.cpp"):
             from src.config.settings import get_config
@@ -239,6 +239,17 @@ class DownloadManager:
 
                     task.bytes_downloaded = downloaded
 
+                    if task.service in ("llama", "llama.cpp"):
+                        try:
+                            from src.infrastructure.llm.llamacpp.service import LlamaBinaryService
+
+                            service = LlamaBinaryService()
+                            stop_result = await service.stop()
+                            if stop_result.get("success"):
+                                logger.info("Stopped llama.cpp before extracting update")
+                        except Exception as e:
+                            logger.warning(f"Could not stop llama.cpp before extraction: {e}")
+
                     await self._extract_and_install(task.temp_path, task.target_path, task.service)
 
                     task.status = "completed"
@@ -254,7 +265,7 @@ class DownloadManager:
                             }
                         )
 
-                    version_str = task.version.lstrip("v")
+                    version_str = task.version.removeprefix("v")
 
                     if task.service in ("llama", "llama.cpp"):
                         from src.config.settings import get_config
@@ -301,30 +312,21 @@ class DownloadManager:
         # Clean up existing service directory
         if service_dir.exists():
             try:
-                # On Windows, first try to remove read-only files
-                for item in service_dir.rglob("*"):
-                    try:
-                        if item.is_file():
-                            item.chmod(0o777)
-                    except Exception:
-                        pass
                 shutil.rmtree(service_dir)
                 logger.info(f"Cleaned existing directory: {service_dir}")
             except Exception as e:
-                logger.warning(f"Could not clean {service_dir}: {e}")
-                # Try alternative: rename old dir and create new one
+                logger.warning(f"Could not remove {service_dir}: {e}")
+                # Rename old dir so we can create a fresh one
                 try:
                     import time
 
                     old_dir = service_dir.with_suffix(f".old.{int(time.time())}")
                     service_dir.rename(old_dir)
-                    logger.info(f"Renamed old dir to {old_dir}")
-                except Exception:
-                    pass
+                    logger.info(f"Moved aside old dir to {old_dir}")
+                except Exception as rename_err:
+                    logger.warning(f"Could not move aside {service_dir}: {rename_err}")
 
-        # Create fresh directory
         service_dir.mkdir(parents=True, exist_ok=True)
-        logger.info(f"Created service directory: {service_dir}")
 
         try:
             if temp_path.suffix == ".zip":

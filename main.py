@@ -17,7 +17,7 @@ class _Filter2xx(logging.Filter):
 def _validate_schema_version() -> None:
     """Validate project is initialized by checking schema_version in DuckDB."""
     try:
-        from src.back.database import DatabaseService
+        from src.infrastructure.database import DatabaseService
 
         db = DatabaseService()
         db.initialize()

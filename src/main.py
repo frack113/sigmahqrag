@@ -33,6 +33,7 @@ from src.api.v1.system.logs import router as logs_v1_router
 from src.api.v1.models.models_embedding import router as models_embedding_router
 from src.api.v1.models.models_llm import router as models_llm_router
 from src.api.v1.infrastructure.qdrant import router as qdrant_router
+from src.api.v1.infrastructure.releases import router as releases_v1_router
 from src.api.v1.chat.search import router as search_v1_router
 from src.api.v1.documents.spec import router as spec_v1_router
 from src.api.v1.system.system_prompt import router as prompts_v1_router
@@ -271,6 +272,7 @@ def create_app() -> FastAPI:
     app.include_router(models_llm_router)
     app.include_router(models_embedding_router)
     app.include_router(qdrant_router)
+    app.include_router(releases_v1_router)
     app.include_router(search_v1_router)
     app.include_router(spec_v1_router)
     app.include_router(prompts_v1_router)

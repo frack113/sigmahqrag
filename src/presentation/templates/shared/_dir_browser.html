@@ -1,0 +1,48 @@
+{#
+    Shared Directory Browser — reusable tree/flat file selection UI.
+
+    Macro:
+        dir_browser_card  — renders the HTML skeleton
+
+    Parameters:
+        id          — unique DOM id prefix (e.g. "spec", "github")
+        mode        — "tree" or "flat"
+        title       — card heading
+        hint        — optional help text below heading
+
+    Usage:
+        {% from "shared/_dir_browser.html" import dir_browser_card %}
+        {{ dir_browser_card(id="my", mode="tree", title="Browse") }}
+        <script>
+        new DirBrowser('my-tree', {
+            mode: 'tree',
+            endpoints: { list: '/api/v1/dirs', save: '/api/v1/dirs' },
+            saveMethod: 'PUT', saveOnChange: true
+        }).load();
+        </script>
+    #}
+
+{% macro dir_browser_card(id, mode, title="Browse directories", hint="") %}
+{% set tree_id = id ~ "-tree" %}
+{% set count_id = id ~ "-count" %}
+<div class="card dir-browser">
+    <div class="card-header">
+        <h2>{{ title }}</h2>
+        {% if mode == "tree" %}
+        <div>
+            <button class="btn btn-sm" onclick="window['_db_expand_{{ id }}']()">Expand All</button>
+            <button class="btn btn-sm" onclick="window['_db_collapse_{{ id }}']()">Collapse All</button>
+        </div>
+        {% endif %}
+    </div>
+    <div class="card-body">
+        {% if hint %}
+        <p class="hint">{{ hint }}</p>
+        {% endif %}
+        <div id="{{ tree_id }}" class="dir-browser-tree">
+            <p class="dir-browser-empty">Loading directories...</p>
+        </div>
+        <div id="{{ count_id }}" class="dir-browser-count"></div>
+    </div>
+</div>
+{% endmacro %}

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Request
+from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from src.presentation import TEMPLATES_DIR
@@ -14,8 +15,8 @@ router = APIRouter(prefix="", tags=["page-data"])
 
 @router.get("/data")
 async def data_page(request: Request):
-    """Serve the data sources page."""
-    return templates.TemplateResponse(request=request, name="data/overview.html")
+    """Redirect data root to GitHub data source page."""
+    return RedirectResponse(url="/data/github")
 
 
 @router.get("/data/github")
