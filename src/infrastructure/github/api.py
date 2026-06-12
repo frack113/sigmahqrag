@@ -33,8 +33,7 @@ async def list_releases(owner: str, repo: str, github_token: str | None = None) 
 
 async def info_release(owner: str, repo: str, tag: str, github_token: str | None = None) -> dict:
     """Get release info by tag."""
-    tag_prefixed = tag if tag.startswith("v") else f"v{tag}"
-    url = f"{GITHUB_API_URL}/{owner}/{repo}/releases/tags/{tag_prefixed}"
+    url = f"{GITHUB_API_URL}/{owner}/{repo}/releases/tags/{tag}"
     headers = {"Accept": "application/vnd.github+json"}
     if github_token:
         headers["Authorization"] = f"Bearer {github_token}"
@@ -49,8 +48,7 @@ async def list_release_files(
     owner: str, repo: str, tag: str, github_token: str | None = None
 ) -> list[dict]:
     """List all files (assets) of a release."""
-    tag_prefixed = tag if tag.startswith("v") else f"v{tag}"
-    url = f"{GITHUB_API_URL}/{owner}/{repo}/releases/tags/{tag_prefixed}"
+    url = f"{GITHUB_API_URL}/{owner}/{repo}/releases/tags/{tag}"
     headers = {"Accept": "application/vnd.github+json"}
     if github_token:
         headers["Authorization"] = f"Bearer {github_token}"
@@ -78,8 +76,7 @@ async def download_release_file(
     github_token: str | None = None,
 ) -> dict:
     """Download a specific file from a release."""
-    tag_prefixed = tag if tag.startswith("v") else f"v{tag}"
-    url = f"{GITHUB_API_URL}/{owner}/{repo}/releases/tags/{tag_prefixed}"
+    url = f"{GITHUB_API_URL}/{owner}/{repo}/releases/tags/{tag}"
     headers = {"Accept": "application/vnd.github+json"}
     if github_token:
         headers["Authorization"] = f"Bearer {github_token}"
@@ -98,4 +95,4 @@ async def download_release_file(
                     "content_type": asset["content_type"],
                 }
 
-        raise ValueError(f"File '{filename}' not found in release '{tag_prefixed}'")
+        raise ValueError(f"File '{filename}' not found in release '{tag}'")

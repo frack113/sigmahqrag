@@ -182,8 +182,7 @@ class VersionManager:
         if version == "latest" or not version:
             url = f"{self.GITHUB_API_URL}/{owner}/{repo}/releases/latest"
         else:
-            tag = version if version.startswith("v") else f"v{version}"
-            url = f"{self.GITHUB_API_URL}/{owner}/{repo}/releases/tags/{tag}"
+            url = f"{self.GITHUB_API_URL}/{owner}/{repo}/releases/tags/{version}"
 
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.get(url, headers=self._get_headers())
@@ -456,7 +455,7 @@ async def check_for_updates(service: str) -> dict | None:
 
     try:
         release = await vm.get_release(service, "latest")
-        latest = release.tag_name.lstrip("v") if release.tag_name else None
+        latest = release.tag_name.removeprefix("v") if release.tag_name else None
 
         if not latest:
             return None

@@ -101,12 +101,25 @@ class TestInfoRelease:
             assert result["tag_name"] == "v1.0.0"
 
     @pytest.mark.asyncio
-    async def test_adds_v_prefix(self, mock_client: AsyncMock, sample_release_detail: dict) -> None:
+    async def test_uses_tag_as_is_without_v_prefix(
+        self, mock_client: AsyncMock, sample_release_detail: dict
+    ) -> None:
         mock_client.get.return_value = _mock_response(sample_release_detail)
         with patch("httpx.AsyncClient", return_value=mock_client):
             await info_release("owner", "repo", "1.0.0")
             call_url = mock_client.get.call_args[0][0]
-            assert "v1.0.0" in call_url
+            assert "1.0.0" in call_url
+            assert "v1.0.0" not in call_url
+
+    @pytest.mark.asyncio
+    async def test_handles_b_prefix_tag(
+        self, mock_client: AsyncMock, sample_release_detail: dict
+    ) -> None:
+        mock_client.get.return_value = _mock_response(sample_release_detail)
+        with patch("httpx.AsyncClient", return_value=mock_client):
+            await info_release("owner", "repo", "b9601")
+            call_url = mock_client.get.call_args[0][0]
+            assert "b9601" in call_url
 
     @pytest.mark.asyncio
     async def test_preserves_v_prefix(

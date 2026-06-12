@@ -1,7 +1,9 @@
 """Tests for version manager."""
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 
 from src.shared.version_manager import VersionManager, create_version_manager
@@ -160,6 +162,70 @@ class TestGetBinaryName:
             asset = _make_asset("other.zip")
             result = vm.get_binary_name("other", asset)
             assert "other.zip" in str(result)
+
+
+class TestGetRelease:
+    @pytest.mark.asyncio
+    async def test_uses_v_prefix_tag_as_is(self) -> None:
+        vm = VersionManager()
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "tag_name": "v1.10.0",
+            "assets": [],
+        }
+        mock_response.raise_for_status.return_value = None
+        mock_client = AsyncMock()
+        mock_client.__aenter__.return_value = mock_client
+        mock_client.get.return_value = mock_response
+        with patch("httpx.AsyncClient", return_value=mock_client):
+            result = await vm.get_release("qdrant", "v1.10.0")
+            call_url = mock_client.get.call_args[0][0]
+            assert "v1.10.0" in call_url
+            assert result.tag_name == "v1.10.0"
+
+    @pytest.mark.asyncio
+    async def test_uses_b_prefix_tag_as_is(self) -> None:
+        vm = VersionManager()
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "tag_name": "b9601",
+            "assets": [],
+        }
+        mock_response.raise_for_status.return_value = None
+        mock_client = AsyncMock()
+        mock_client.__aenter__.return_value = mock_client
+        mock_client.get.return_value = mock_response
+        with patch("httpx.AsyncClient", return_value=mock_client):
+            result = await vm.get_release("llama.cpp", "b9601")
+            call_url = mock_client.get.call_args[0][0]
+            # Must NOT add 'v' prefix to 'b' tag
+            assert "b9601" in call_url
+            assert "vb9601" not in call_url
+            assert result.tag_name == "b9601"
+
+    @pytest.mark.asyncio
+    async def test_latest_path(self) -> None:
+        vm = VersionManager()
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            "tag_name": "v1.10.0",
+            "assets": [],
+        }
+        mock_response.raise_for_status.return_value = None
+        mock_client = AsyncMock()
+        mock_client.__aenter__.return_value = mock_client
+        mock_client.get.return_value = mock_response
+        with patch("httpx.AsyncClient", return_value=mock_client):
+            result = await vm.get_release("qdrant", "latest")
+            call_url = mock_client.get.call_args[0][0]
+            assert "releases/latest" in call_url
+            assert result.tag_name == "v1.10.0"
+
+    @pytest.mark.asyncio
+    async def test_unsupported_service(self) -> None:
+        vm = VersionManager()
+        with pytest.raises(ValueError, match="Unsupported service"):
+            await vm.get_release("unknown", "v1.0.0")
 
 
 class TestCreateVersionManager:
