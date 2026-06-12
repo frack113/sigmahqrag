@@ -1,0 +1,36 @@
+/* Tables */
+
+table {
+    border-collapse: collapse;
+    width: 100%;
+}
+
+table, th, td {
+    border: 1px solid black;
+}
+
+th {
+    text-align: center;
+    color: black;
+    font-weight: bold;
+}
+
+td {
+    text-align: left;
+}
+
+/* Alignment utilities for table cells */
+.text-center {
+    text-align: center;
+}
+
+/* Automatically center buttons in cells if possible */
+td:has(button),
+td:has(.btn) {
+    text-align: center;
+}
+
+/* For numbers, use .num or .text-center class */
+.num {
+    text-align: center;
+}

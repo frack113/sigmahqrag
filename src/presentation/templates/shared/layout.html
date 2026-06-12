@@ -6,8 +6,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Sigmahqrag{% endblock %}</title>
     <link rel="icon" type="image/x-icon" href="{{ url_for('static', path='/favicon.ico') }}">
-    <link rel="stylesheet" href="{{ url_for('static', path='/css/main.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', path='/css/_shared-layout.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/base/reset.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/base/typography.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/layout/header-nav.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/layout/app-layout.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/layout/sidebar.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/layout/main-content.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/components/buttons.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/components/cards.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/components/forms.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/components/tables.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/components/modals.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/components/progress-bar.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/components/status.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/components/toasts.css') }}">
     {% block styles %}{% endblock %}
 </head>
 <body>

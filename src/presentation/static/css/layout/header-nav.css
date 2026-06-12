@@ -1,0 +1,32 @@
+/* Header and navigation */
+
+header {
+    padding: 16px;
+    border-bottom: 2px solid #3498db;
+    background: #2c3e50;
+}
+
+header h1 {
+    color: #ffffff;
+}
+
+nav ul {
+    list-style: none;
+    display: flex;
+    gap: 16px;
+}
+
+nav a {
+    color: #ffffff;
+    text-decoration: none;
+    padding: 8px 16px;
+}
+
+nav a.active {
+    background: #333;
+}
+
+nav a:focus {
+    outline: 2px solid #00FF00;
+    outline-offset: 2px;
+}

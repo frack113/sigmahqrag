@@ -1,0 +1,26 @@
+/* Legacy styles — for templates extending base.html (old layout) */
+/* This file replaces the old main.css for backwards compatibility */
+
+/* Re-export all base + layout + components */
+@import url('/css/base/reset.css');
+@import url('/css/base/typography.css');
+@import url('/css/layout/header-nav.css');
+@import url('/css/layout/app-layout.css');
+@import url('/css/layout/sidebar.css');
+@import url('/css/layout/main-content.css');
+@import url('/css/components/buttons.css');
+@import url('/css/components/cards.css');
+@import url('/css/components/forms.css');
+@import url('/css/components/tables.css');
+@import url('/css/components/modals.css');
+@import url('/css/components/progress-bar.css');
+@import url('/css/components/status.css');
+@import url('/css/components/toasts.css');
+
+main {
+    padding: 16px;
+}
+
+section {
+    margin-bottom: 32px;
+}
