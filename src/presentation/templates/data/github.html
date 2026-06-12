@@ -32,7 +32,7 @@
     {{ dir_browser_card(id="github", mode="tree", title="Select Directories to Index") }}
 </div>
 
-<div id="add-repo-modal" class="modal" style="display: none;">
+<div id="add-repo-modal" class="modal hidden">
     <div class="modal-content">
         <h2>Add GitHub Repository</h2>
         <form id="add-repo-form">
@@ -163,7 +163,7 @@
     }
 
     function closeModal() {
-        document.getElementById('add-repo-modal').style.display = 'none';
+        document.getElementById('add-repo-modal').classList.add('hidden');
         document.getElementById('add-repo-form').reset();
     }
 
@@ -293,7 +293,7 @@
     }
 
     document.getElementById('add-repo-btn').addEventListener('click', function () {
-        document.getElementById('add-repo-modal').style.display = 'block';
+        document.getElementById('add-repo-modal').classList.remove('hidden');
     });
 
     document.getElementById('modal-cancel-btn').addEventListener('click', closeModal);

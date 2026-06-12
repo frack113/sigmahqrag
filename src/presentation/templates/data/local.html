@@ -119,21 +119,6 @@
         color: #721c24;
     }
 
-    .btn-delete {
-        background: #e74c3c;
-        color: white;
-        border: none;
-        padding: 6px 12px;
-        border-radius: 4px;
-        cursor: pointer;
-        font-size: 13px;
-        transition: background 0.2s;
-    }
-
-    .btn-delete:hover {
-        background: #c0392b;
-    }
-
     .empty-state {
         text-align: center;
         padding: 60px 20px;
@@ -311,7 +296,7 @@ async function loadLocalFiles() {
                 <td>${getFileType(file.content_type)}</td>
                 <td>${file.file_size ? formatFileSize(file.file_size) : '0 B'}</td>
                 <td>${getEmbedStatusBadge(file.embed_status)}</td>
-                <td><button class="btn-delete" onclick="deleteFile(${idx}, '${file.original_url}')">Delete</button></td>
+                <td><button class="btn btn-danger btn-sm" onclick="deleteFile(${idx}, '${file.original_url}')">Delete</button></td>
             </tr>
         `).join('');
 

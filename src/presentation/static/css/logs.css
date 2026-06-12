@@ -124,25 +124,6 @@
     font-size: 13px;
 }
 
-.form-control-sm {
-    padding: 4px 8px;
-    border: 1px solid #4a6280;
-    border-radius: 3px;
-    background: #34495e;
-    color: #ecf0f1;
-    font-size: 12px;
-    width: 70px;
-}
-
-.form-control-sm:focus {
-    outline: none;
-    border-color: #3498db;
-}
-
-select.form-control-sm {
-    width: 80px;
-}
-
 .level-value {
     font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
     font-size: 12px;

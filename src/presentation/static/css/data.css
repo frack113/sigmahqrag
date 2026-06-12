@@ -38,13 +38,6 @@
     gap: 8px;
 }
 
-/* Shared info/empty state message */
-.info-message {
-    color: var(--text-muted, #999);
-    padding: 1.25rem;
-    text-align: center;
-}
-
 /* Repo detail section (github) */
 .repo-detail-section {
     margin-top: 1.25rem;

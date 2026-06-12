@@ -393,6 +393,9 @@ td:has(.btn) {
     align-items: center;
     justify-content: center;
 }
+.modal.hidden {
+    display: none !important;
+}
 
 .modal-content {
     background: #ffffff;
@@ -475,6 +478,50 @@ td:has(.btn) {
     border-radius: 4px;
     margin-bottom: 15px;
 }
+.update-alert.show {
+    display: block;
+}
+
+/* Notification inline alert with close button */
+.notification {
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin-bottom: 12px;
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.95em;
+}
+.notification.show {
+    display: flex;
+}
+.notification .close-btn {
+    background: none;
+    border: none;
+    color: inherit;
+    cursor: pointer;
+    font-size: 18px;
+    opacity: 0.7;
+    padding: 0 4px;
+}
+.notification .close-btn:hover {
+    opacity: 1;
+}
+.notification.error {
+    background: #fff5f5;
+    border: 1px solid #e74c3c;
+    color: #e74c3c;
+}
+.notification.success {
+    background: #f0faf0;
+    border: 1px solid #27ae60;
+    color: #27ae60;
+}
+.notification.info {
+    background: #f0f5ff;
+    border: 1px solid #3498db;
+    color: #3498db;
+}
 
 /* Text color utilities */
 .text-danger { color: #dc3545; }
@@ -487,4 +534,58 @@ td:has(.btn) {
     border: 1px solid #ddd;
     border-radius: 4px;
     min-width: 150px;
+}
+
+/* Form control (standard input/textarea) */
+.form-control {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    background: #fff;
+    color: #1a1a1a;
+}
+.form-control:focus {
+    outline: none;
+    border-color: #3498db;
+    box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+}
+.form-control:disabled,
+.form-control[readonly] {
+    background: #f5f5f5;
+    color: #7f8c8d;
+}
+
+/* Small form control */
+.form-control-sm {
+    padding: 4px 8px;
+    border: 1px solid #4a6280;
+    border-radius: 3px;
+    font-size: 12px;
+    background: #34495e;
+    color: #ecf0f1;
+    width: 70px;
+}
+.form-control-sm:focus {
+    outline: none;
+    border-color: #3498db;
+}
+select.form-control-sm {
+    width: 80px;
+}
+
+/* Card spacing utility */
+.card-spacing {
+    padding: 16px;
+    border-radius: 8px;
+    background: #ffffff;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Info/empty state message */
+.info-message {
+    color: #999;
+    padding: 1.25rem;
+    text-align: center;
 }
