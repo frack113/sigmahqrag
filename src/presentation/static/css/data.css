@@ -62,3 +62,40 @@
     margin-top: 0.5rem;
 }
 
+/* ── Local Files page (local.html) ─────────────────────────── */
+
+.empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: #7f8c8d;
+}
+
+.empty-state svg {
+    width: 64px;
+    height: 64px;
+    margin-bottom: 16px;
+    opacity: 0.5;
+}
+
+#upload-progress {
+    display: none;
+    background: white;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 24px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+#upload-progress.show {
+    display: block;
+}
+
+#status-message {
+    margin-top: 12px;
+    font-size: 14px;
+}
+
+#file-input {
+    display: none;
+}
+

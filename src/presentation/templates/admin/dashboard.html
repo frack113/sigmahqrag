@@ -89,7 +89,7 @@ function loadStatus() {
         // Update banner
         let bannerHtml = '';
         if (llamaInfo.update_available) {
-            bannerHtml += `<div class="update-alert">Update available for llama.cpp: v${llamaInfo.latest_version}</div>`;
+            bannerHtml += `<div class="update-alert show">Update available for llama.cpp: v${llamaInfo.latest_version}</div>`;
         }
         document.getElementById('update-banner').innerHTML = bannerHtml;
     })

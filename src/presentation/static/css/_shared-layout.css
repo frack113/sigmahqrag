@@ -190,6 +190,21 @@ body {
     color: #0c5460;
 }
 
+.status-badge.discovery {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.status-badge.embedded {
+    background: #d4edda;
+    color: #155724;
+}
+
+.status-badge.unknown {
+    background: #f8f9fa;
+    color: #6c757d;
+}
+
 /* ── Progress bars ─────────────────────────────────────────── */
 
 /* Default progress bar (flat blue fill) */
@@ -482,6 +497,47 @@ td:has(.btn) {
     display: block;
 }
 
+/* System dashboard service rows */
+.service-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 0;
+    border-bottom: 1px solid #ecf0f1;
+    gap: 16px;
+}
+
+.service-row:last-child {
+    border-bottom: none;
+}
+
+.service-name {
+    font-weight: 600;
+    min-width: 100px;
+}
+
+.service-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #666;
+}
+
+.status-text {
+    font-size: 0.9em;
+}
+
+.version {
+    font-size: 0.85em;
+    color: #999;
+    font-family: monospace;
+}
+
+.service-actions {
+    display: flex;
+    gap: 6px;
+}
+
 /* Notification inline alert with close button */
 .notification {
     padding: 12px 16px;
@@ -588,4 +644,92 @@ select.form-control-sm {
     color: #999;
     padding: 1.25rem;
     text-align: center;
+}
+
+/* ── File management utilities (from local.html) ───────────── */
+
+.file-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.stat-card {
+    background: white;
+    border-radius: 8px;
+    padding: 16px;
+    text-align: center;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.stat-card .stat-value {
+    font-size: 28px;
+    font-weight: bold;
+    color: #2c3e50;
+}
+
+.stat-card .stat-label {
+    font-size: 14px;
+    color: #7f8c8d;
+    margin-top: 4px;
+}
+
+.upload-section {
+    background: white;
+    border: 2px dashed #bdc3c7;
+    border-radius: 8px;
+    padding: 40px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-bottom: 24px;
+}
+
+.upload-section:hover,
+.upload-section.dragover {
+    border-color: #3498db;
+    background: #f7fbff;
+}
+
+.upload-section h3 {
+    margin: 0 0 8px 0;
+    color: #2c3e50;
+}
+
+.upload-section p {
+    margin: 0;
+    color: #7f8c8d;
+    font-size: 14px;
+}
+
+.files-table {
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.files-table table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.files-table th {
+    background: #2c3e50;
+    color: white;
+    padding: 12px 16px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.files-table td {
+    padding: 12px 16px;
+    border-bottom: 1px solid #ecf0f1;
+    font-size: 14px;
+}
+
+.files-table tr:hover {
+    background: #f8f9fa;
 }

@@ -32,7 +32,7 @@ class ProgressBar {
             this.fill.style.background = clamped === 100 ? '#4caf50' : '';
         }
         if (this.container) {
-            this.container.style.display = 'block';
+            this.container.classList.add('show');
         }
     }
 
@@ -50,13 +50,13 @@ class ProgressBar {
 
     show() {
         if (this.container) {
-            this.container.style.display = 'block';
+            this.container.classList.add('show');
         }
     }
 
     hide() {
         if (this.container) {
-            this.container.style.display = 'none';
+            this.container.classList.remove('show');
         }
     }
 
