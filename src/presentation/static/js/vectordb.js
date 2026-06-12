@@ -21,9 +21,9 @@ async function loadVectorDB() {
     var errorEl = document.getElementById('vectordb-error');
     var tableBody = document.getElementById('collections-list');
 
-    if (loadingEl) loadingEl.style.display = 'block';
-    if (contentEl) contentEl.style.display = 'none';
-    if (errorEl) errorEl.style.display = 'none';
+    if (loadingEl) loadingEl.classList.add('hidden');
+    if (contentEl) contentEl.classList.add('hidden');
+    if (errorEl) errorEl.classList.add('hidden');
 
     try {
         var status = await getQdrantStatus();
@@ -60,17 +60,17 @@ async function loadVectorDB() {
             }
         }
 
-        if (contentEl) contentEl.style.display = 'block';
+        if (contentEl) contentEl.classList.remove('hidden');
 
     } catch (e) {
         console.error('Error loading Vector DB:', e);
         if (errorEl) {
             errorEl.textContent = 'Error: ' + e.message;
-            errorEl.style.display = 'block';
+            errorEl.classList.remove('hidden');
         }
     } finally {
         window.isProcessing = false;
-        if (loadingEl) loadingEl.style.display = 'none';
+        if (loadingEl) loadingEl.classList.remove('hidden');
     }
 }
 
@@ -126,8 +126,8 @@ async function startUnifiedIndex() {
     var resultEl = document.getElementById('indexer-result');
     var errorEl = document.getElementById('indexer-error');
 
-    if (resultEl) resultEl.style.display = 'none';
-    if (errorEl) errorEl.style.display = 'none';
+    if (resultEl) resultEl.classList.add('hidden');
+    if (errorEl) errorEl.classList.add('hidden');
 
     function setSpecProgress(pct, label) {
         specBar.setProgress(pct);
@@ -165,7 +165,7 @@ async function startUnifiedIndex() {
             console.log('Indexer: spec done, ' + specCount + ' documents');
         } else {
             setSpecProgress(0, 'Erreur');
-            if (errorEl) { errorEl.textContent = 'Erreur spécification: ' + (specResult.message || 'Échec'); errorEl.style.display = 'block'; }
+            if (errorEl) { errorEl.textContent = 'Erreur spécification: ' + (specResult.message || 'Échec'); errorEl.classList.remove('hidden'); }
             console.error('Indexer: spec failed', specResult);
             return;
         }
@@ -180,7 +180,7 @@ async function startUnifiedIndex() {
             console.log('Indexer: docs done, ' + docsCount + ' documents');
         } else {
             setDocsProgress(0, 'Erreur');
-            if (errorEl) { errorEl.textContent = 'Erreur documents: ' + (docsResult.message || 'Échec'); errorEl.style.display = 'block'; }
+            if (errorEl) { errorEl.textContent = 'Erreur documents: ' + (docsResult.message || 'Échec'); errorEl.classList.remove('hidden'); }
             console.error('Indexer: docs failed', docsResult);
             return;
         }
@@ -194,13 +194,13 @@ async function startUnifiedIndex() {
                 return r.route + ': ' + r.processed + ' documents' + (r.errors && r.errors.length ? ' (' + r.errors.length + ' erreurs)' : '');
             });
             resultEl.innerHTML = '<strong>Terminé</strong><br>' + lines.join('<br>');
-            resultEl.style.display = 'block';
+            resultEl.classList.remove('hidden');
         }
     } catch (error) {
         console.error('Indexer error:', error);
         if (errorEl) {
             errorEl.textContent = 'Erreur: ' + error.message;
-            errorEl.style.display = 'block';
+            errorEl.classList.remove('hidden');
         }
     } finally {
         if (btn) btn.disabled = false;

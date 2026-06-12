@@ -10,12 +10,12 @@
     <p>Loading Vector DB status...</p>
 </div>
 
-<div id="vectordb-error" class="vectordb-error" style="display:none;">
+<div id="vectordb-error" class="vectordb-error hidden">
     <p>Failed to load Vector DB status.</p>
     <button class="btn btn-primary" onclick="loadVectorDB()">Retry</button>
 </div>
 
-<div id="vectordb-content" style="display:none;">
+<div id="vectordb-content" class="hidden">
     
     <!-- Collections Card -->
     <div class="card w-100">
@@ -64,7 +64,7 @@
             </div>
 
             <div id="indexer-result" class="vectordb-message" ></div>
-            <div id="indexer-error" class="vectordb-message" style="display:none;color:#f44336;"></div>
+            <div id="indexer-error" class="vectordb-message hidden"></div>
         </div>
         <div class="card-footer vectordb-card-actions">
             <button class="btn btn-success" id="btn-index-docs" onclick="startUnifiedIndex()">Indexer</button>
