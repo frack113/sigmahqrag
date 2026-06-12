@@ -42,21 +42,6 @@ def read_log_file(path: Path) -> list[str]:
         return f.readlines()
 
 
-async def _tail_log_file(
-    log_path: Path,
-    lines: int = 50,
-) -> str:
-    """Read last N lines from log file."""
-    if not log_path.exists():
-        return _sse("error", "Log file not found")
-
-    all_lines = read_log_file(log_path)
-    if lines > 0:
-        recent = all_lines[-lines:]
-    entries = [line.strip() for line in recent]
-    return _sse("init", entries, line_count=len(entries))
-
-
 def _sse(event: str, data, **extra) -> str:
     payload: dict[str, Any] = {"type": event}
     if isinstance(data, list):
@@ -85,28 +70,68 @@ async def stream_logs(
     log_path = logs_dir / log_filename
 
     async def event_generator():
-        # Track line counts to send only new lines
-        init_msg = await _tail_log_file(log_path, lines=effective_lines)
-        yield init_msg
+        prev_total = 0
+        prev_size = 0
+        encoding = "utf-8"
+        incomplete = ""
 
         while True:
             try:
-                await asyncio.sleep(1)
                 if not log_path.exists():
                     yield _sse("error", "Log file deleted")
                     break
 
-                all_lines = read_log_file(log_path)
+                current_size = log_path.stat().st_size
 
-                # Only yield lines beyond what was already sent
-                total = len(all_lines)
-                if effective_lines > 0:
-                    recent = all_lines[-effective_lines:]
+                if current_size == prev_size:
+                    await asyncio.sleep(0.5)
+                    continue
+
+                if prev_size == 0 or current_size < prev_size:
+                    # First read or file truncated — full read with encoding detection
+                    for enc in ["utf-8", "latin-1", "cp1252", "ascii"]:
+                        try:
+                            with open(log_path, encoding=enc, errors="strict") as f:
+                                all_text = f.read()
+                            encoding = enc
+                            break
+                        except UnicodeDecodeError:
+                            continue
+                    else:
+                        with open(log_path, encoding="utf-8", errors="replace") as f:
+                            all_text = f.read()
+                        encoding = "utf-8"
+
+                    all_lines = all_text.splitlines()
+                    total = len(all_lines)
+                    recent = all_lines[-effective_lines:] if effective_lines > 0 else all_lines
+                    entries = [line.strip() for line in recent]
+                    yield _sse("init", entries, line_count=total)
+                    prev_total = total
+                    incomplete = ""
                 else:
-                    recent = all_lines
-                new_entries = [line.strip() for line in recent]
-                if new_entries:
-                    yield _sse("update", new_entries, line_count=total)
+                    # File grew — read only the new bytes
+                    with open(log_path, encoding=encoding, errors="replace") as f:
+                        f.seek(prev_size)
+                        new_text = f.read()
+
+                    combined = incomplete + new_text
+                    lines = combined.splitlines()
+
+                    # If the last char isn't a newline, the last line is partial
+                    if new_text and new_text[-1] not in ("\n", "\r"):
+                        incomplete = lines[-1] if lines else ""
+                        lines = lines[:-1] if lines else []
+                    else:
+                        incomplete = ""
+
+                    if lines:
+                        entries = [line.strip() for line in lines]
+                        yield _sse("update", entries, line_count=prev_total + len(lines))
+                        prev_total += len(lines)
+
+                prev_size = current_size
+                await asyncio.sleep(0.5)
             except asyncio.CancelledError:
                 break
 

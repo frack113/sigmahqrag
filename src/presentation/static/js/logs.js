@@ -63,10 +63,14 @@ function getLines() {
 function toggleTail() {
     isTailMode = document.getElementById('tail-mode').checked;
     scrollLocked = true;
+    const pauseBtn = document.getElementById('pause-btn');
+    if (pauseBtn) pauseBtn.textContent = isTailMode ? 'Pause' : 'Resume';
+    stopTail();
+    allLines = [];
+    allLinesLower = [];
     if (isTailMode) {
         startTail();
     } else {
-        stopTail();
         loadLogs();
     }
 }
@@ -86,37 +90,23 @@ function startTail() {
     const url = `/api/v1/logs/stream?source=${encodeURIComponent(currentSource)}&lines=${lines}`;
     eventSource = new EventSource(url);
 
-    let totalSeen = 0;
     eventSource.addEventListener('log', (event) => {
         try {
             const data = JSON.parse(event.data);
             if (data.type === 'init') {
                 allLines = data.lines || [];
                 allLinesLower = allLines.map(l => l.toLowerCase());
-                totalSeen = allLines.length;
                 scrollLocked = true;
                 trimLines();
             } else if (data.type === 'update') {
                 const newLines = data.lines || [];
-                const newTotal = data.line_count || 0;
-                // File was truncated/rotated — reset buffer
-                if (newTotal < totalSeen) {
-                    allLines = newLines;
-                    allLinesLower = allLines.map(l => l.toLowerCase());
-                    totalSeen = newTotal;
-                } else {
-                    const countToAdd = newTotal - totalSeen;
-                    const toAdd = newLines.slice(-countToAdd);
-                    allLines.push(...toAdd);
-                    allLinesLower.push(...toAdd.map(l => l.toLowerCase()));
-                    totalSeen = newTotal;
-                }
+                allLines.push(...newLines);
+                allLinesLower.push(...newLines.map(l => l.toLowerCase()));
                 scrollLocked = true;
                 trimLines();
             } else if (data.type === 'error') {
                 allLines = [`Error: ${data.message}`];
                 allLinesLower = [allLines[0].toLowerCase()];
-                totalSeen = 0;
             }
             renderFilteredLogs();
         } catch (e) {
@@ -239,13 +229,16 @@ async function togglePause() {
         btn.textContent = 'Resume';
         btn.classList.remove('btn-secondary');
         btn.classList.add('btn-primary');
+        isTailMode = false;
     } else {
-        startTail();
+        isTailMode = true;
         scrollLocked = true;
         btn.textContent = 'Pause';
         btn.classList.remove('btn-primary');
         btn.classList.add('btn-secondary');
+        startTail();
     }
+    document.getElementById('tail-mode').checked = isTailMode;
 }
 
 function escAttr(s) {
