@@ -18,12 +18,12 @@
 
     <div id="repos-list" class="repos-grid"></div>
 
-    <div id="select-repo-prompt" class="select-repo-prompt" style="display: none;">
+    <div id="select-repo-prompt" class="select-repo-prompt hidden">
         <p>Click "Browse" on a repository to view and select directories for indexing.</p>
     </div>
 </div>
 
-<div id="repo-detail" class="repo-detail-section" style="display: none;">
+<div id="repo-detail" class="repo-detail-section hidden">
     <div class="repo-detail-header">
         <h2 id="selected-repo-name">Repository</h2>
         <button id="close-detail-btn" class="btn" type="button">Close</button>
@@ -82,11 +82,11 @@
 
             if (repos.length === 0) {
                 container.innerHTML = '<p>No repositories managed</p>';
-                prompt.style.display = 'none';
+                prompt.classList.add('hidden');
                 return;
             }
 
-            prompt.style.display = 'block';
+            prompt.classList.remove('hidden');
 
             container.innerHTML = repos.map(function (repo) { return [
                 '<div class="repo-card">',
@@ -136,7 +136,7 @@
         const tree = document.getElementById('github-tree');
         tree.innerHTML = '<p class="dir-browser-empty">Loading directories...</p>';
 
-        document.getElementById('repo-detail').style.display = 'block';
+        document.getElementById('repo-detail').classList.remove('hidden');
         document.getElementById('github-count').textContent = '';
 
         detailContainer = new DirBrowser('github-tree', {
