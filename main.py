@@ -1,4 +1,5 @@
 import logging
+import os
 import re
 import sys
 
@@ -51,8 +52,16 @@ if __name__ == "__main__":
     import uvicorn
     from uvicorn.config import LOGGING_CONFIG
 
+    # Parse CLI arguments
+    setup_mode = "--setup" in sys.argv
+
+    if setup_mode:
+        os.environ["_SIGMA_SETUP_MODE"] = "1"
+        print("Running in setup mode...")
+
     # Check schema version in DuckDB
-    _validate_schema_version()
+    if not setup_mode:
+        _validate_schema_version()
 
     if sys.platform == "win32":
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())

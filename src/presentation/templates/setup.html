@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Setup Wizard - SigmaHQ RAG</title>
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', path='/favicon.ico') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/main.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/_shared-layout.css') }}">
+    <style>
+        .setup-page {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #f5f5f5;
+        }
+        .setup-container {
+            width: 100%;
+            max-width: 1100px;
+            margin: 40px 20px;
+        }
+        .setup-header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+        .setup-header h1 {
+            font-size: 28px;
+            color: #1a1a1a;
+            margin-bottom: 8px;
+        }
+        .setup-header p {
+            color: #555;
+            font-size: 14px;
+        }
+        .setup-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+        .data-rows {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 4px 16px;
+            margin-top: 8px;
+        }
+        .data-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 8px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        .data-row .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .data-dot-ok {
+            background: #28a745;
+        }
+        .data-dot-warn {
+            background: #ffc107;
+        }
+        .data-dot-missing {
+            background: #dc3545;
+        }
+        .data-row .label {
+            font-size: 13px;
+            color: #333;
+        }
+        .setup-container .card-body p {
+            font-size: 14px;
+        }
+        .model-table {
+            width: 100%;
+            margin-top: 8px;
+            font-size: 13px;
+        }
+        .model-table td {
+            padding: 4px 8px;
+            border-top: 1px solid #eee;
+        }
+        .search-row {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        .search-row input {
+            flex: 1;
+            padding: 6px 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+        .search-results {
+            margin-top: 8px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        .search-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 8px;
+            border-radius: 4px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .search-item:hover {
+            background: #f8f9fa;
+        }
+        .system-info {
+            font-size: 13px;
+            margin-top: 8px;
+        }
+        .system-info .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .system-info .info-label {
+            color: #555;
+        }
+        .system-info .info-value {
+            color: #1a1a1a;
+            font-weight: 500;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #eee;
+            border-radius: 3px;
+            margin-top: 4px;
+            overflow: hidden;
+        }
+        .progress-bar .fill {
+            height: 100%;
+            background: #007bff;
+            transition: width 0.3s;
+            border-radius: 3px;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+        .status-badge.ok { background: #d4edda; color: #155724; }
+        .status-badge.warn { background: #fff3cd; color: #856404; }
+        .status-badge.error { background: #f8d7da; color: #721c24; }
+        .status-badge.info { background: #d1ecf1; color: #0c5460; }
+    </style>
+</head>
+<body>
+    <div class="setup-page">
+        <div class="setup-container">
+            <div class="setup-header">
+                <h1>SigmaHQ RAG</h1>
+                <p>Initial Setup Wizard</p>
+            </div>
+
+            <div class="setup-grid">
+                <!-- Card 1: Data -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Data</h2>
+                    </div>
+                    <div class="card-body">
+                        <div id="data-global-status" class="global-status data-global-hidden"></div>
+                        <div id="data-dirs-list"></div>
+                    </div>
+                </div>
+
+                <!-- Card 2: LLM -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2>LLM</h2>
+                    </div>
+                    <div class="card-body">
+                        <div id="llm-global-status" class="global-status">
+                            <span class="status-dot"></span>
+                            <span id="llm-global-text">Loading...</span>
+                        </div>
+                        <div id="llm-models-list"></div>
+                        <div class="search-row">
+                            <input type="text" id="llm-search-input" placeholder="Search HuggingFace...">
+                            <button class="btn btn-primary btn-sm" onclick="searchLlmModel()">Search</button>
+                        </div>
+                        <div id="llm-search-results" class="search-results"></div>
+                        <div class="form-actions">
+                            <button class="btn btn-primary btn-sm" onclick="downloadLlmModel()" id="btn-download-llm">Download</button>
+                            <button class="btn btn-danger btn-sm" onclick="deleteLlmModel()" id="btn-delete-llm">Delete</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card 3: Embedding -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Embedding</h2>
+                    </div>
+                    <div class="card-body">
+                        <div id="emb-global-status" class="global-status">
+                            <span class="status-dot"></span>
+                            <span id="emb-global-text">Loading...</span>
+                        </div>
+                        <div id="emb-models-list"></div>
+                        <div class="search-row">
+                            <input type="text" id="emb-search-input" placeholder="Search HuggingFace...">
+                            <button class="btn btn-primary btn-sm" onclick="searchEmbModel()">Search</button>
+                        </div>
+                        <div id="emb-search-results" class="search-results"></div>
+                        <div class="form-actions">
+                            <button class="btn btn-primary btn-sm" onclick="downloadEmbModel()" id="btn-download-emb">Download</button>
+                            <button class="btn btn-danger btn-sm" onclick="deleteEmbModel()" id="btn-delete-emb">Delete</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card 4: System -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2>System</h2>
+                    </div>
+                    <div class="card-body">
+                        <div id="system-global-status" class="global-status">
+                            <span class="status-dot"></span>
+                            <span id="system-global-text">Loading...</span>
+                        </div>
+                        <div id="system-info" class="system-info"></div>
+                        <div id="qdrant-info" class="system-info qdrant-info-extra"></div>
+                        <div class="form-actions">
+                            <button class="btn btn-primary btn-sm" onclick="refreshSystemStatus()">Refresh</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // ─── Configuration ───
+    var CONFIG = {
+        data: {
+            list: '/api/v1/system/data-dirs',
+            create: '/api/v1/system/data-dirs/fix',
+            clean: '/api/v1/system/data-dirs/clean',
+            reset: '/api/v1/system/data-dirs/hard-reset'
+        },
+        llm: {
+            installed: '/api/v1/models/llm/installed',
+            download: '/api/v1/models/llm/download',
+            delete: '/api/v1/models/llm',
+            progress: '/api/v1/models/llm/progress'
+        },
+        embedding: {
+            installed: '/api/v1/models/embedding/installed',
+            search: '/api/v1/models/embeddings/search',
+            download: '/api/v1/models/embedding/download',
+            delete: '/api/v1/models/embedding',
+            progress: '/api/v1/models/embedding/progress',
+            config: '/api/v1/models/embeddings/config'
+        },
+        system: {
+            status: '/api/v1/system/system/status',
+            qdrant: '/api/v1/system/qdrant/status'
+        }
+    };
+
+    var selectedLlmRepo = null;
+    var selectedEmbRepo = null;
+
+    // ─── DATA CARD ───
+    function renderDataDirs(dirs) {
+        var readyCount = 0;
+        var dirtyCount = 0;
+        var missingCount = 0;
+
+        for (var i = 0; i < dirs.length; i++) {
+            var d = dirs[i];
+            if (d.is_healthy) readyCount++;
+            else if (d.is_dirty) dirtyCount++;
+            else missingCount++;
+        }
+
+        var statusEl = document.getElementById('data-global-status');
+        statusEl.className = 'global-status';
+
+        if (readyCount === dirs.length) {
+            statusEl.classList.add('ok');
+        }
+
+        var dotClass = readyCount === dirs.length ? 'data-dot-ok' : (missingCount > 0 && readyCount === 0 ? 'data-dot-missing' : 'data-dot-warn');
+        var summaryClass = (readyCount === dirs.length) ? 'text-success' : (missingCount > 0 && readyCount === 0 ? 'text-danger' : 'text-warning');
+        var summaryLabel = readyCount === dirs.length ? 'READY' : (missingCount > 0 && readyCount === 0 ? 'ERROR' : 'PARTIAL');
+
+        var fixBtnHtml = readyCount === dirs.length ? '' : '<button class="btn btn-primary btn-sm" onclick="createDataDirs()">Fix</button>';
+        var listEl = document.getElementById('data-dirs-list');
+        listEl.innerHTML =
+            '<div class="data-row data-summary-row">' +
+                '<span class="' + dotClass + ' status-dot"></span>' +
+                '<span class="label">Data folders — ' + readyCount + '/' + dirs.length + ' ready</span>' +
+                '<span class="' + summaryClass + ' data-status-label">' + summaryLabel + '</span>' +
+                '<span class="data-action-buttons">' +
+                    fixBtnHtml +
+                    '<button class="btn btn-danger btn-sm" onclick="cleanDataDirs()">Clean</button>' +
+                    '<button class="btn btn-danger btn-sm" onclick="resetDataDirs()">Hard Reset</button>' +
+                '</span>' +
+            '</div>';
+    }
+
+     function checkDataDirs() {
+        fetch(CONFIG.data.list)
+            .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
+            .then(function(dirs) { renderDataDirs(dirs); })
+            .catch(function(e) {
+                console.error(e);
+                document.getElementById('data-dirs-list').innerHTML =
+                    '<div class="data-row"><span class="label error-text">Error loading data: ' + escHtml(e.message) + '</span></div>';
+            });
+    }
+
+    function createDataDirs() {
+        fetch(CONFIG.data.create, { method: 'POST' })
+            .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
+            .then(function() { checkDataDirs(); })
+            .catch(function(e) { alert('Error: ' + e.message); });
+    }
+
+    function cleanDataDirs() {
+        if (!confirm('Clean all data directories? Non-official contents will be deleted.')) return;
+        fetch(CONFIG.data.clean, { method: 'POST' })
+            .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
+            .then(function() { checkDataDirs(); })
+            .catch(function(e) { alert('Error: ' + e.message); });
+    }
+
+    function resetDataDirs() {
+        if (!confirm('⚠️ HARD RESET — This will permanently delete ALL data in the data/ directory. Continue?')) return;
+        fetch(CONFIG.data.reset, { method: 'POST' })
+            .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
+            .then(function() { checkDataDirs(); })
+            .catch(function(e) { alert('Error: ' + e.message); });
+    }
+
+    // ─── LLM CARD ───
+    function renderLlmModels(models) {
+        var listEl = document.getElementById('llm-models-list');
+        var statusEl = document.getElementById('llm-global-status');
+        var textEl = document.getElementById('llm-global-text');
+        var btnDownload = document.getElementById('btn-download-llm');
+        var btnDelete = document.getElementById('btn-delete-llm');
+
+        statusEl.className = 'global-status';
+
+        if (!models || models.length === 0) {
+            statusEl.classList.add('warn');
+            textEl.textContent = 'No LLM models installed';
+            btnDownload.style.display = 'inline-block';
+            btnDelete.style.display = 'none';
+            listEl.innerHTML = '<p class="info-text info-text-with-margin info-text-size">Search and download a model to get started.</p>';
+            return;
+        }
+
+        statusEl.classList.add('ok');
+        textEl.textContent = models.length + ' model(s) installed';
+        btnDownload.style.display = 'none';
+        btnDelete.style.display = 'inline-block';
+
+        var html = '<table class="model-table"><tbody>';
+        for (var i = 0; i < models.length; i++) {
+            var m = models[i];
+            html += '<tr>';
+            html += '<td class="model-name" onclick="selectLlmModel(\'' + escHtml(m.repo_id) + '\')">' + escHtml(m.repo_id) + '</td>';
+            html += '<td>' + (m.files ? m.files.length + ' file(s)' : '') + '</td>';
+            html += '</tr>';
+        }
+        html += '</tbody></table>';
+        listEl.innerHTML = html;
+        selectedLlmRepo = models[0].repo_id;
+    }
+
+    function checkLlmModels() {
+        fetch(CONFIG.llm.installed)
+            .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
+            .then(function(data) { renderLlmModels(data.models); })
+            .catch(function(e) {
+                console.error(e);
+                var statusEl = document.getElementById('llm-global-status');
+                var textEl = document.getElementById('llm-global-text');
+                statusEl.className = 'global-status critical';
+                textEl.textContent = 'Error loading LLM models';
+            });
+    }
+
+    function selectLlmModel(repoId) {
+        selectedLlmRepo = repoId;
+        var listEl = document.getElementById('llm-models-list');
+        var rows = listEl.querySelectorAll('.model-name');
+        for (var i = 0; i < rows.length; i++) {
+            rows[i].style.fontWeight = 'normal';
+            rows[i].style.color = '#007bff';
+        }
+        if (rows.length > 0) {
+            for (var j = 0; j < rows.length; j++) {
+                if (rows[j].textContent === repoId) {
+                    rows[j].style.fontWeight = 'bold';
+                    rows[j].style.color = '#0056b3';
+                    break;
+                }
+            }
+        }
+    }
+
+    function searchLlmModel() {
+        var query = document.getElementById('llm-search-input').value.trim();
+        if (!query) return;
+        
+        fetch(CONFIG.llm.search + '?q=' + encodeURIComponent(query) + '&limit=10')
+            .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
+            .then(function(data) {
+                var resultsEl = document.getElementById('llm-search-results');
+                if (!data.models || data.models.length === 0) {
+                    resultsEl.innerHTML = '<p class="info-text info-text-size">No results found.</p>';
+                    return;
+                }
+
+                var html = '';
+                for (var i = 0; i < data.models.length; i++) {
+                    var m = data.models[i];
+                    html += '<div class="search-item">';
+                    html += '<span class="result-name">' + escHtml(m.repo_id) + '</span>';
+                    html += '<button class="btn btn-primary btn-sm" onclick="downloadLlmModelDirect(\'' + escHtml(m.repo_id) + '\')">Download</button>';
+                    html += '</div>';
+                }
+                resultsEl.innerHTML = html;
+            })
+            .catch(function(e) {
+                console.error(e);
+                document.getElementById('llm-search-results').innerHTML = '<p class="error-text error-text-size">Search error.</p>';
+            });
+    }
+
+    function downloadLlmModel() {
+        if (!selectedLlmRepo) return;
+        fetch(CONFIG.llm.download + '?repo_id=' + encodeURIComponent(selectedLlmRepo), { method: 'POST' })
+            .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
+            .then(function() {
+                var btn = document.getElementById('btn-download-llm');
+                btn.textContent = 'Downloading...';
+                btn.disabled = true;
+                
+                var checkProgress = setInterval(function() {
+                    fetch(CONFIG.llm.progress + '?repo_id=' + encodeURIComponent(selectedLlmRepo))
+                        .then(function(r) { return r.json(); })
+                        .then(function(data) {
+                            if (data.status === 'completed') {
+                                clearInterval(checkProgress);
+                                btn.textContent = 'Download';
+                                btn.disabled = false;
+                                checkLlmModels();
+                            } else if (data.status && data.status.startsWith('error')) {
+                                clearInterval(checkProgress);
+                                btn.textContent = 'Download';
+                                btn.disabled = false;
+                                alert('Download failed: ' + data.status);
+                            }
+                        })
+                        .catch(function() {});
+                }, 1000);
+            })
+            .catch(function(e) { alert('Error: ' + e.message); });
+    }
+
+    function downloadLlmModelDirect(repoId) {
+        selectedLlmRepo = repoId;
+        downloadLlmModel();
+    }
+
+    function deleteLlmModel() {
+        if (!selectedLlmRepo) return;
+        if (!confirm('Delete model ' + selectedLlmRepo + '?')) return;
+        
+        fetch(CONFIG.llm.delete + '/' + encodeURIComponent(selectedLlmRepo), { method: 'DELETE' })
+            .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
+            .then(function() { 
+                selectedLlmRepo = null;
+                checkLlmModels(); 
+            })
+            .catch(function(e) { alert('Error: ' + e.message); });
+    }
+
+    // ─── EMBEDDING CARD ───
+    function renderEmbModels(models) {
+        var listEl = document.getElementById('emb-models-list');
+        var statusEl = document.getElementById('emb-global-status');
+        var textEl = document.getElementById('emb-global-text');
+        var btnDownload = document.getElementById('btn-download-emb');
+        var btnDelete = document.getElementById('btn-delete-emb');
+
+        statusEl.className = 'global-status';
+
+        if (!models || models.length === 0) {
+            statusEl.classList.add('warn');
+            textEl.textContent = 'No embedding models installed';
+            btnDownload.style.display = 'inline-block';
+            btnDelete.style.display = 'none';
+            listEl.innerHTML = '<p class="info-text info-text-with-margin info-text-size">Search and download a model to get started.</p>';
+            return;
+        }
+
+        statusEl.classList.add('ok');
+        textEl.textContent = models.length + ' model(s) installed';
+        btnDownload.style.display = 'none';
+        btnDelete.style.display = 'inline-block';
+
+        var html = '<table class="model-table"><tbody>';
+        for (var i = 0; i < models.length; i++) {
+            var m = models[i];
+            var repoId = Object.keys(m)[0];
+            html += '<tr>';
+            html += '<td class="model-name" onclick="selectEmbModel(\'' + escHtml(repoId) + '\')">' + escHtml(repoId) + '</td>';
+            html += '</tr>';
+        }
+        html += '</tbody></table>';
+        listEl.innerHTML = html;
+        if (models.length > 0) {
+            selectedEmbRepo = Object.keys(models[0]);
+            selectedEmbRepo = selectedEmbRepo[0];
+        }
+    }
+
+    function checkEmbModels() {
+        fetch(CONFIG.embedding.installed)
+            .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
+            .then(function(data) { renderEmbModels(data.models); })
+            .catch(function(e) {
+                console.error(e);
+                var statusEl = document.getElementById('emb-global-status');
+                var textEl = document.getElementById('emb-global-text');
+                statusEl.className = 'global-status critical';
+                textEl.textContent = 'Error loading embedding models';
+            });
+    }
+
+    function selectEmbModel(repoId) {
+        selectedEmbRepo = repoId;
+        var listEl = document.getElementById('emb-models-list');
+        var rows = listEl.querySelectorAll('.model-name');
+        for (var i = 0; i < rows.length; i++) {
+            rows[i].style.fontWeight = 'normal';
+            rows[i].style.color = '#007bff';
+        }
+        if (rows.length > 0) {
+            for (var j = 0; j < rows.length; j++) {
+                if (rows[j].textContent === repoId) {
+                    rows[j].style.fontWeight = 'bold';
+                    rows[j].style.color = '#0056b3';
+                    break;
+                }
+            }
+        }
+    }
+
+    function searchEmbModel() {
+        var query = document.getElementById('emb-search-input').value.trim();
+        if (!query) return;
+        
+        fetch(CONFIG.embedding.search + '?query=' + encodeURIComponent(query) + '&limit=10')
+            .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
+            .then(function(data) {
+                var resultsEl = document.getElementById('emb-search-results');
+                if (!data.models || data.models.length === 0) {
+                    resultsEl.innerHTML = '<p class="info-text info-text-size">No results found.</p>';
+                    return;
+                }
+
+                var html = '';
+                for (var i = 0; i < data.models.length; i++) {
+                    var m = data.models[i];
+                    html += '<div class="search-item">';
+                    html += '<span class="result-name">' + escHtml(m.repo_id) + '</span>';
+                    html += '<button class="btn btn-primary btn-sm" onclick="downloadEmbModelDirect(\'' + escHtml(m.repo_id) + '\')">Download</button>';
+                    html += '</div>';
+                }
+                resultsEl.innerHTML = html;
+            })
+            .catch(function(e) {
+                console.error(e);
+                document.getElementById('emb-search-results').innerHTML = '<p class="error-text error-text-size">Search error.</p>';
+            });
+    }
+
+    function downloadEmbModel() {
+        if (!selectedEmbRepo) return;
+        fetch(CONFIG.embedding.download + '?repo_id=' + encodeURIComponent(selectedEmbRepo), { method: 'POST' })
+            .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
+            .then(function() {
+                var btn = document.getElementById('btn-download-emb');
+                btn.textContent = 'Downloading...';
+                btn.disabled = true;
+                
+                var checkProgress = setInterval(function() {
+                    fetch(CONFIG.embedding.progress + '?repo_id=' + encodeURIComponent(selectedEmbRepo))
+                        .then(function(r) { return r.json(); })
+                        .then(function(data) {
+                            if (data.status === 'completed') {
+                                clearInterval(checkProgress);
+                                btn.textContent = 'Download';
+                                btn.disabled = false;
+                                checkEmbModels();
+                            } else if (data.status && data.status.startsWith('error')) {
+                                clearInterval(checkProgress);
+                                btn.textContent = 'Download';
+                                btn.disabled = false;
+                                alert('Download failed: ' + data.status);
+                            }
+                        })
+                        .catch(function() {});
+                }, 1000);
+            })
+            .catch(function(e) { alert('Error: ' + e.message); });
+    }
+
+    function downloadEmbModelDirect(repoId) {
+        selectedEmbRepo = repoId;
+        downloadEmbModel();
+    }
+
+    function deleteEmbModel() {
+        if (!selectedEmbRepo) return;
+        if (!confirm('Delete model ' + selectedEmbRepo + '?')) return;
+        
+        fetch(CONFIG.embedding.delete + '/' + encodeURIComponent(selectedEmbRepo), { method: 'DELETE' })
+            .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
+            .then(function() { 
+                selectedEmbRepo = null;
+                checkEmbModels(); 
+            })
+            .catch(function(e) { alert('Error: ' + e.message); });
+    }
+
+    // ─── SYSTEM CARD ───
+    function renderSystemStatus(status, qdrant) {
+        var infoEl = document.getElementById('system-info');
+        var qdrantEl = document.getElementById('qdrant-info');
+        var statusEl = document.getElementById('system-global-status');
+        var textEl = document.getElementById('system-global-text');
+
+        statusEl.className = 'global-status';
+
+        var hasError = false;
+        if (status.error) {
+            statusEl.classList.add('critical');
+            textEl.textContent = 'Error loading system status';
+            hasError = true;
+        }
+
+        if (!hasError) {
+            var llamaOk = status.llama && status.llama.status === 'installed';
+            var baseOk = status.base_dir_exists;
+            
+            if (llamaOk && baseOk) {
+                statusEl.classList.add('ok');
+                textEl.textContent = 'System operational';
+            } else if (baseOk) {
+                statusEl.classList.add('warn');
+                textEl.textContent = 'System ready (LLM missing)';
+            } else {
+                statusEl.classList.add('critical');
+                textEl.textContent = 'Base directory missing';
+            }
+
+            var html = '';
+            html += '<div class="info-row"><span class="info-label">Hostname</span><span class="info-value">' + escHtml(status.hostname) + '</span></div>';
+            html += '<div class="info-row"><span class="info-label">OS</span><span class="info-value">' + escHtml(status.os) + '</span></div>';
+            html += '<div class="info-row"><span class="info-label">Python</span><span class="info-value">' + escHtml(status.python_version) + '</span></div>';
+            html += '<div class="info-row"><span class="info-label">LLM</span><span class="info-value">' + escHtml(status.llama ? status.llama.version : 'N/A') + ' <span class="status-badge ' + (llamaOk ? 'ok' : 'warn') + '">' + (status.llama ? status.llama.status : 'unknown') + '</span></span></div>';
+            infoEl.innerHTML = html;
+
+            if (qdrant) {
+                var qdrantOk = qdrant.connected;
+                var qdrantHtml = '';
+                qdrantHtml += '<div class="info-row"><span class="info-label">Qdrant</span><span class="info-value">' + (qdrant.connected ? 'Connected' : 'Disconnected') + ' <span class="status-badge ' + (qdrantOk ? 'ok' : 'error') + '">' + (qdrant.connected ? 'ok' : 'error') + '</span></span></div>';
+                qdrantHtml += '<div class="info-row"><span class="info-label">Port</span><span class="info-value">' + escHtml(qdrant.port) + '</span></div>';
+                qdrantHtml += '<div class="info-row"><span class="info-label">Storage</span><span class="info-value">' + escHtml(qdrant.storage_path) + '</span></div>';
+                qdrantEl.innerHTML = qdrantHtml;
+            }
+        }
+    }
+
+    function checkSystemStatus() {
+        Promise.all([
+            fetch(CONFIG.system.status).then(function(r) { return r.json(); }),
+            fetch(CONFIG.system.qdrant).then(function(r) { return r.json(); })
+        ])
+        .then(function(data) {
+            renderSystemStatus(data[0], data[1]);
+        })
+        .catch(function(e) {
+            console.error(e);
+            var statusEl = document.getElementById('system-global-status');
+            var textEl = document.getElementById('system-global-text');
+            statusEl.className = 'global-status critical';
+            textEl.textContent = 'Error loading system status';
+        });
+    }
+
+    function refreshSystemStatus() {
+        checkSystemStatus();
+    }
+
+    // ─── Utilities ───
+    function escHtml(s) {
+        if (s == null) return '';
+        return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        checkDataDirs();
+        checkLlmModels();
+        checkEmbModels();
+        checkSystemStatus();
+    });
+    </script>
+</body>
+</html>

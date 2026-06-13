@@ -488,3 +488,367 @@ td:has(.btn) {
     border-radius: 4px;
     min-width: 150px;
 }
+
+/* ── Setup page: global status indicators ────────────────────── */
+
+.global-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    font-size: 13px;
+}
+
+.global-status .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+}
+
+.global-status.ok {
+    background: #d4edda;
+    color: #155724;
+}
+
+.global-status.ok .status-dot {
+    background: #28a745;
+}
+
+.global-status.warn {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.global-status.warn .status-dot {
+    background: #ffc107;
+}
+
+.global-status.critical {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.global-status.critical .status-dot {
+    background: #dc3545;
+}
+
+/* ── Setup page: data directory rows ─────────────────────────── */
+
+.data-rows {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 16px;
+    margin-top: 8px;
+}
+
+.data-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 8px;
+    background: #f8f9fa;
+    border-radius: 4px;
+}
+
+.data-row .status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.data-dot-ok,
+.status-dot.status-ok {
+    background: #28a745;
+}
+
+.data-dot-warn,
+.status-dot.warning {
+    background: #ffc107;
+}
+
+.data-dot-missing,
+.status-dot.error {
+    background: #dc3545;
+}
+
+.data-row .label {
+    font-size: 13px;
+    color: #333;
+}
+
+.data-status-char {
+    font-size: 11px;
+    font-weight: bold;
+    color: #666;
+}
+
+/* ── Setup page: setup-specific layout ───────────────────────── */
+
+.setup-page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f5f5f5;
+}
+
+.setup-container {
+    width: 100%;
+    max-width: 1100px;
+    margin: 40px 20px;
+}
+
+.setup-header {
+    text-align: center;
+    margin-bottom: 32px;
+}
+
+.setup-header h1 {
+    font-size: 28px;
+    color: #1a1a1a;
+    margin-bottom: 8px;
+}
+
+.setup-header p {
+    color: #555;
+    font-size: 14px;
+}
+
+.setup-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+}
+
+.setup-container .card-body p {
+    color: #999;
+    font-size: 14px;
+}
+
+/* ── Setup page: model table ─────────────────────────────────── */
+
+.model-table {
+    width: 100%;
+    margin-top: 8px;
+    font-size: 13px;
+}
+
+.model-table td {
+    padding: 4px 8px;
+    border-top: 1px solid #eee;
+}
+
+/* ── Setup page: search ──────────────────────────────────────── */
+
+.search-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.search-row input {
+    flex: 1;
+    padding: 6px 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+.search-results {
+    margin-top: 8px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.search-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 8px;
+    border-radius: 4px;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.search-item:hover {
+    background: #f8f9fa;
+}
+
+.search-item .model-name {
+    cursor: pointer;
+    color: #007bff;
+}
+
+/* ── System info ─────────────────────────────────────────────── */
+
+.system-info {
+    font-size: 13px;
+    margin-top: 8px;
+}
+
+.system-info .info-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 0;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.system-info .info-label {
+    color: #555;
+}
+
+.system-info .info-value {
+    color: #1a1a1a;
+    font-weight: 500;
+}
+
+/* ── Progress bars ───────────────────────────────────────────── */
+
+.progress-bar {
+    width: 100%;
+    height: 6px;
+    background: #eee;
+    border-radius: 3px;
+    margin-top: 4px;
+    overflow: hidden;
+}
+
+.progress-bar .fill {
+    height: 100%;
+    background: #007bff;
+    transition: width 0.3s;
+    border-radius: 3px;
+}
+
+/* ── Utility: text color classes ─────────────────────────────── */
+
+.text-success {
+    color: #28a745;
+}
+
+.text-warning {
+    color: #ffc107;
+}
+
+.text-danger {
+    color: #dc3545;
+}
+
+/* ── Utility: status badge ───────────────────────────────────── */
+
+.status-badge {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 500;
+}
+
+.status-badge.ok {
+    background: #d4edda;
+    color: #155724;
+}
+
+.status-badge.warn {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.status-badge.error {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.status-badge.info {
+    background: #d1ecf1;
+    color: #0c5460;
+}
+
+/* -- Setup page: search result text colors --------------------- */
+
+.info-text {
+    color: #999;
+}
+
+.error-text {
+    color: #dc3545;
+}
+
+/* -- Setup page: search result layout -------------------------- */
+
+.search-result-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px;
+    border-bottom: 1px solid #eee;
+}
+
+
+
+.qdrant-info-extra {
+    margin-top: 12px;
+}
+
+.data-status-label {
+    margin-left: auto;
+    font-size: 11px;
+    font-weight: bold;
+}
+
+/* -- Setup page: text paragraphs ------------------------------- */
+
+p.info-text {
+    color: #999;
+}
+
+p.error-text {
+    color: #dc3545;
+}
+
+.info-text-with-margin {
+    margin-top: 8px;
+}
+
+.info-text-size,
+.error-text-size {
+    font-size: 13px;
+}
+
+/* -- Setup page: search results --------------------------------- */
+
+.search-item .result-name {
+    flex: 1;
+    font-size: 13px;
+    color: #1a1a1a;
+}
+
+.search-item .btn {
+    flex-shrink: 0;
+    margin-left: 8px;
+}
+@
+
+.data-global-hidden {
+    display: none;
+}
+
+
+/* -- Summary row with inline buttons ------------------------------- */
+
+.data-summary-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.data-action-buttons {
+    display: flex;
+    gap: 4px;
+    margin-left: auto;
+}
