@@ -83,21 +83,21 @@
 }
 
 .status-inactive {
-    color: #FF0000;
+    color: var(--color-danger);
 }
 
 .status-unknown {
-    color: #FFA500;
+    color: var(--color-warning);
 }
 
-.text-danger { color: #dc3545; }
-.text-success { color: #28a745; }
-.text-info { color: #17a2b8; }
+.text-danger { color: var(--color-danger); }
+.text-success { color: var(--color-success); }
+.text-info { color: var(--color-primary); }
 
 .update-alert {
     padding: 10px;
     background: #fff3cd;
-    border: 1px solid #ffc107;
+    border: 1px solid var(--color-warning);
     border-radius: 4px;
     margin-bottom: 15px;
     color: #856404;

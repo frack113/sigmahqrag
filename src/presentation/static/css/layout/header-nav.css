@@ -38,7 +38,7 @@ nav a {
 }
 
 nav a.active {
-    background: #333;
+    background: var(--bg-nav-active);
 }
 
 nav a:focus {
