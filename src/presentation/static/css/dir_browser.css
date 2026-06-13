@@ -1,12 +1,12 @@
 /* Shared Directory Browser — tree and flat modes */
 
 .dir-browser {
-    background: #ffffff;
-    border: 1px solid #ddd;
+    background: var(--bg-card);
+    border: 1px solid var(--border-input);
     border-radius: 6px;
     padding: 1rem;
     margin-top: 1rem;
-    color: #1a1a1a;
+    color: var(--text-body);
 }
 .dir-browser-header {
     display: flex;
@@ -14,12 +14,12 @@
     align-items: center;
     margin-bottom: 0.75rem;
     padding-bottom: 0.5rem;
-    border-bottom: 1px solid #eee;
+    border-bottom: 1px solid var(--border-card);
 }
 .dir-browser-header h3 {
     margin: 0;
     font-size: 1rem;
-    color: #1a1a1a;
+    color: var(--text-card-title);
 }
 .dir-browser-actions {
     display: flex;
@@ -32,13 +32,13 @@
 .dir-browser-count {
     margin-top: 0.5rem;
     padding: 0.5rem;
-    background: #e8f4f8;
+    background: var(--bg-status-row);
     border-radius: 4px;
     font-size: 0.85rem;
-    color: #1a1a1a;
+    color: var(--text-body);
 }
 .dir-browser-empty {
-    color: #999;
+    color: var(--text-muted);
     padding: 1rem;
     text-align: center;
 }
@@ -82,23 +82,22 @@
     cursor: pointer;
 }
 .tree-folder-name:hover {
-    color: #2c3e50;
+    color: var(--color-primary);
 }
 
-/* Flat mode */
 .dir-checkbox {
     display: inline-block;
     margin: 0.25rem 0.5rem;
     padding: 0.25rem 0.5rem;
-    border: 1px solid #ccc;
+    border: 1px solid var(--border-input);
     border-radius: 4px;
     cursor: pointer;
     font-size: 0.9rem;
-    color: #1a1a1a;
+    color: var(--text-body);
 }
 .dir-checkbox:hover {
-    border-color: #3498db;
-    background: #f7fbff;
+    border-color: var(--color-primary);
+    background: var(--bg-status-row);
 }
 .dir-checkbox input {
     margin-right: 0.25rem;

@@ -5,7 +5,7 @@ h1, h2, h3 {
 }
 
 pre {
-    background: #2a2a2a;
+    background: var(--bg-code);
     padding: 16px;
     overflow-x: auto;
 }

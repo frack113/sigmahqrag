@@ -1,0 +1,94 @@
+:root {
+    --bg-body: #f5f5f5;
+    --bg-card: #ffffff;
+    --bg-input: #ffffff;
+    --bg-header: #2c3e50;
+    --bg-sidebar: #2c3e50;
+    --bg-sidebar-hover: #3d566e;
+    --bg-sidebar-active: #3498db;
+    --bg-table-th: #34495e;
+    --bg-modal: #ffffff;
+    --bg-code: #2a2a2a;
+    --bg-progress: #e9ecef;
+    --bg-status-row: #f8f9fa;
+
+    --text-body: #1a1a1a;
+    --text-header: #ffffff;
+    --text-sidebar: #d5d5d5;
+    --text-sidebar-active: #ffffff;
+    --text-sidebar-hover: #ffffff;
+    --text-card-title: #1a1a1a;
+    --text-card-label: #7f8c8d;
+    --text-card-body: #555;
+    --text-input: #1a1a1a;
+    --text-table-th: #ffffff;
+    --text-muted: #999;
+    --text-progress: #333;
+
+    --border-header: #3498db;
+    --border-card: #e9ecef;
+    --border-input: #ddd;
+    --border-table: #ddd;
+    --border-table-inner: #ecf0f1;
+    --border-sidebar: #4a6280;
+
+    --shadow-card: rgba(0,0,0,0.1);
+    --shadow-modal: rgba(0,0,0,0.2);
+    --shadow-modal-overlay: rgba(0,0,0,0.7);
+
+    --color-primary: #3498db;
+    --color-primary-hover: #2980b9;
+    --color-success: #27ae60;
+    --color-success-hover: #219a52;
+    --color-danger: #e74c3c;
+    --color-danger-hover: #c0392b;
+    --color-warning: #f39c12;
+    --color-warning-hover: #d68910;
+    --color-secondary: #7f8c8d;
+    --color-secondary-hover: #6c7a7d;
+    --color-unknown: #95a5a6;
+    --color-unknown-hover: #7f8c8d;
+
+    --color-focus: #00FF00;
+}
+
+[data-theme="dark"] {
+    --bg-body: #121212;
+    --bg-card: #1e1e1e;
+    --bg-input: #2a2a2a;
+    --bg-header: #0d0d0d;
+    --bg-sidebar: #161616;
+    --bg-sidebar-hover: #2a2a2a;
+    --bg-sidebar-active: #3498db;
+    --bg-table-th: #1e1e1e;
+    --bg-modal: #1e1e1e;
+    --bg-code: #1a1a1a;
+    --bg-progress: #333;
+    --bg-status-row: #1a1a1a;
+
+    --text-body: #e0e0e0;
+    --text-header: #ffffff;
+    --text-sidebar: #b0b0b0;
+    --text-sidebar-active: #ffffff;
+    --text-sidebar-hover: #ffffff;
+    --text-card-title: #e0e0e0;
+    --text-card-label: #888;
+    --text-card-body: #aaa;
+    --text-input: #e0e0e0;
+    --text-table-th: #e0e0e0;
+    --text-muted: #666;
+    --text-progress: #ccc;
+
+    --border-header: #3498db;
+    --border-card: #333;
+    --border-input: #444;
+    --border-table: #333;
+    --border-table-inner: #2a2a2a;
+    --border-sidebar: #2a2a2a;
+
+    --shadow-card: rgba(0,0,0,0.3);
+    --shadow-modal: rgba(0,0,0,0.4);
+    --shadow-modal-overlay: rgba(0,0,0,0.8);
+
+    --color-focus: #00FF00;
+}

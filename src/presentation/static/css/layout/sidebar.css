@@ -2,7 +2,7 @@
 
 .app-sidebar {
     width: 240px;
-    background: #2c3e50;
+    background: var(--bg-sidebar);
     padding: 20px 0;
     flex-shrink: 0;
     display: flex;
@@ -11,19 +11,19 @@
 
 .sidebar-header {
     padding: 0 20px 20px;
-    border-bottom: 1px solid #4a6280;
+    border-bottom: 1px solid var(--border-sidebar);
     margin-bottom: 20px;
 }
 
 .sidebar-header h2 {
     font-size: 1.2em;
     margin-bottom: 4px;
-    color: #ffffff;
+    color: var(--text-header);
 }
 
 .sidebar-header p {
     font-size: 0.85em;
-    color: #bdc3c7;
+    color: var(--text-sidebar);
 }
 
 .sidebar-nav {
@@ -33,7 +33,7 @@
 }
 
 .sidebar-nav a {
-    color: #d5d5d5;
+    color: var(--text-sidebar);
     text-decoration: none;
     padding: 14px 20px;
     transition: all 0.2s;
@@ -44,18 +44,18 @@
 }
 
 .sidebar-nav a:hover {
-    background: #3d566e;
-    color: #ffffff;
+    background: var(--bg-sidebar-hover);
+    color: var(--text-sidebar-hover);
 }
 
 .sidebar-nav a.active {
-    background: #3498db;
-    color: #ffffff;
+    background: var(--bg-sidebar-active);
+    color: var(--text-sidebar-active);
     font-weight: 500;
 }
 
 .sidebar-nav a.disabled {
-    color: #7f8c8d;
+    color: var(--color-secondary);
     pointer-events: none;
     opacity: 0.6;
 }

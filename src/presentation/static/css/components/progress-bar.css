@@ -4,7 +4,7 @@
 .progress-bar {
     width: 100%;
     height: 20px;
-    background: #e9ecef;
+    background: var(--bg-progress);
     border-radius: 4px;
     margin-top: 10px;
     overflow: hidden;
@@ -21,7 +21,7 @@
     width: 100%;
     height: 20px;
     min-height: 20px;
-    background: #e9ecef;
+    background: var(--bg-progress);
     border: 1px solid #000000;
     border-radius: 10px;
     overflow: hidden;
@@ -37,7 +37,7 @@
 .progress-text {
     font-size: 0.9em;
     font-weight: 600;
-    color: #1a1a1a;
+    color: var(--text-body);
     min-width: 45px;
     text-align: right;
 }
@@ -57,5 +57,5 @@
     font-size: 0.95rem;
     font-weight: 600;
     margin-bottom: 4px;
-    color: #333;
+    color: var(--text-progress);
 }

@@ -3,7 +3,7 @@
 .app-content {
     flex: 1;
     padding: 24px;
-    background: #f5f5f5;
-    color: #1a1a1a;
+    background: var(--bg-body);
+    color: var(--text-body);
     overflow-y: auto;
 }

@@ -2,7 +2,7 @@
 
 /* Native button element */
 button {
-    background: #333;
+    background: var(--color-secondary);
     color: #ffffff;
     border: none;
     padding: 8px 16px;
@@ -11,11 +11,11 @@ button {
 }
 
 button:hover {
-    background: #444;
+    background: var(--color-secondary-hover);
 }
 
 button:focus {
-    outline: 2px solid #00FF00;
+    outline: 2px solid var(--color-focus);
     outline-offset: 2px;
 }
 
@@ -39,35 +39,35 @@ button:focus {
 }
 
 .btn-primary {
-    background: #3498db;
+    background: var(--color-primary);
     color: white;
 }
 .btn-primary:hover {
-    background: #2980b9;
+    background: var(--color-primary-hover);
 }
 
 .btn-success {
-    background: #27ae60;
+    background: var(--color-success);
     color: white;
 }
 .btn-success:hover {
-    background: #219a52;
+    background: var(--color-success-hover);
 }
 
 .btn-danger {
-    background: #e74c3c;
+    background: var(--color-danger);
     color: white;
 }
 .btn-danger:hover {
-    background: #c0392b;
+    background: var(--color-danger-hover);
 }
 
 .btn-secondary {
-    background: #7f8c8d;
+    background: var(--color-secondary);
     color: white;
 }
 .btn-secondary:hover {
-    background: #6c7a7d;
+    background: var(--color-secondary-hover);
 }
 
 .btn-ghost {
@@ -81,17 +81,17 @@ button:focus {
 }
 
 .btn-warning {
-    background: #f39c12;
+    background: var(--color-warning);
     color: white;
 }
 .btn-warning:hover {
-    background: #d68910;
+    background: var(--color-warning-hover);
 }
 
 .btn-unknown {
-    background: #95a5a6;
+    background: var(--color-unknown);
     color: white;
 }
 .btn-unknown:hover {
-    background: #7f8c8d;
+    background: var(--color-unknown-hover);
 }

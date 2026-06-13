@@ -1,29 +1,29 @@
 /* Cards */
 
 .card {
-    background: #ffffff;
+    background: var(--bg-card);
     border-radius: 8px;
     padding: 20px;
     margin-bottom: 20px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 4px var(--shadow-card);
 }
 
 .card h2 {
     font-size: 1.2em;
     margin-bottom: 15px;
-    color: #1a1a1a;
+    color: var(--text-card-title);
 }
 
 .card h3 {
     margin: 0 0 8px;
     font-size: 14px;
-    color: #7f8c8d;
+    color: var(--text-card-label);
     text-transform: uppercase;
     letter-spacing: 0.5px;
 }
 
 .card p {
-    color: #555;
+    color: var(--text-card-body);
     font-size: 0.95em;
     line-height: 1.5;
 }
@@ -34,7 +34,7 @@
     justify-content: space-between;
     padding-bottom: 12px;
     margin-bottom: 12px;
-    border-bottom: 1px solid #e9ecef;
+    border-bottom: 1px solid var(--border-card);
 }
 
 .card-header h2 {
@@ -48,7 +48,7 @@
 .card-footer {
     padding-top: 16px;
     margin-top: 16px;
-    border-top: 1px solid #e9ecef;
+    border-top: 1px solid var(--border-card);
     display: flex;
     align-items: center;
     gap: 8px;
@@ -56,7 +56,7 @@
 }
 
 .card-raised {
-    box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+    box-shadow: 0 4px 12px var(--shadow-card);
 }
 
 .card-spacing {
@@ -68,20 +68,20 @@
 }
 
 .stat-card {
-    background: #ffffff;
+    background: var(--bg-card);
     border-radius: 8px;
     padding: 20px;
     text-align: center;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 4px var(--shadow-card);
 }
 .stat-card .stat-value {
     font-size: 2em;
     font-weight: 700;
-    color: #1a1a1a;
+    color: var(--text-card-title);
     line-height: 1.2;
 }
 .stat-card .stat-label {
     font-size: 0.85em;
-    color: #7f8c8d;
+    color: var(--text-card-label);
     margin-top: 4px;
 }
