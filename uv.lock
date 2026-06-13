@@ -1655,15 +1655,6 @@ wheels = [
 ]
 
 [[package]]
-name = "npyscreen"
-version = "5.0.2"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/bb/e5/704fa2704e9aa6ed5ddb9a1a64e0de15fa552896e181154b95f6a4b109e3/npyscreen-5.0.2.tar.gz", hash = "sha256:a8dbf425cb01ca28d2509483d37133223e8f4120d6c9890d33d75af55ee2beb6", size = 82250, upload-time = "2026-01-29T16:21:06Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/ba/88/7f3d69c262216ada7cc979f94c1cd58843444d5eeb1a6e7e98aa79104bd2/npyscreen-5.0.2-py3-none-any.whl", hash = "sha256:af02fbea2c5ab6d170563d7738a655b28afaddae2849edcd1b8931016d486753", size = 106645, upload-time = "2026-01-29T16:21:03.95Z" },
-]
-
-[[package]]
 name = "numpy"
 version = "2.4.4"
 source = { registry = "https://pypi.org/simple" }
@@ -2793,16 +2784,13 @@ dependencies = [
     { name = "llama-index-llms-openai-like" },
     { name = "llama-index-readers-file" },
     { name = "llama-index-vector-stores-qdrant" },
-    { name = "npyscreen" },
     { name = "puremagic" },
     { name = "pymupdf" },
     { name = "python-multipart" },
     { name = "python-pptx" },
     { name = "pyyaml" },
-    { name = "rich" },
     { name = "tomli-w" },
     { name = "uvicorn" },
-    { name = "windows-curses" },
 ]
 
 [package.dev-dependencies]
@@ -2831,16 +2819,13 @@ requires-dist = [
     { name = "llama-index-llms-openai-like", specifier = ">=0.7.2" },
     { name = "llama-index-readers-file", specifier = ">=0.6.0" },
     { name = "llama-index-vector-stores-qdrant", specifier = ">=0.10.1" },
-    { name = "npyscreen", specifier = ">=5.0.2" },
     { name = "puremagic", specifier = ">=2.2.0" },
     { name = "pymupdf", specifier = ">=1.27.2.3" },
     { name = "python-multipart", specifier = ">=0.0.30" },
     { name = "python-pptx", specifier = ">=1.0.2" },
     { name = "pyyaml", specifier = ">=6.0.3" },
-    { name = "rich", specifier = ">=14.0.0" },
     { name = "tomli-w", specifier = ">=1.2.0" },
     { name = "uvicorn", specifier = ">=0.48.0" },
-    { name = "windows-curses", specifier = ">=2.4.2" },
 ]
 
 [package.metadata.requires-dev]
@@ -3290,19 +3275,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/15/ba/1f6e8c957e4932be060dcdc482d339c12e0216351478add3645cdaa53c05/virtualenv-21.3.3.tar.gz", hash = "sha256:f5bda277e553b1c2b3c1a8debfc30496e1288cc93ce6b7b71b3280047e317328", size = 7613784, upload-time = "2026-05-13T18:01:30.19Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/f4/34/a9dbe051de88a63eb7408ea66630bac38e72f7f6077d4be58737106860d9/virtualenv-21.3.3-py3-none-any.whl", hash = "sha256:7d5987d8369e098e41406efb780a3d4ca79280097293899e351a6407ee153ab3", size = 7594554, upload-time = "2026-05-13T18:01:27.815Z" },
-]
-
-[[package]]
-name = "windows-curses"
-version = "2.4.2"
-source = { registry = "https://pypi.org/simple" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/2e/9c/b2a3706c8edadae8ae88b327ba072d6056ad1b492f9996214cff027e9f01/windows_curses-2.4.2-cp312-cp312-win32.whl", hash = "sha256:7ec4629685add716d494e8fbdd0b83485de726e9deeda57d30e742c77a32a156", size = 71547, upload-time = "2026-03-31T12:44:37.797Z" },
-    { url = "https://files.pythonhosted.org/packages/8b/ee/8c5da36191524856fb2c675f8cae99211ccf77bcd4e4a9010477e08000ac/windows_curses-2.4.2-cp312-cp312-win_amd64.whl", hash = "sha256:df782859176f9e8142618e4966d6cee7a53a8b1c819faeb6e606a60fa4f8972a", size = 82282, upload-time = "2026-03-31T12:44:39.106Z" },
-    { url = "https://files.pythonhosted.org/packages/b1/54/195f2c4d0258ced34a401c8e3c9eefa2aa2221a9f0179ae64ad3cb039e64/windows_curses-2.4.2-cp313-cp313-win32.whl", hash = "sha256:248bf3f1d973e92ca193b1ea8a626ec7f81a66be6f6d6c5e31ff82056453678d", size = 71458, upload-time = "2026-03-31T12:44:40.184Z" },
-    { url = "https://files.pythonhosted.org/packages/47/e8/38fd0fef95271280a77a4f3b65e0961d3c39716388b39c08b3040bfb4f2c/windows_curses-2.4.2-cp313-cp313-win_amd64.whl", hash = "sha256:1bf3d0c902374b6c430a954adcb686a5ecd7a31fc4195d31136385b5c1bea925", size = 82200, upload-time = "2026-03-31T12:44:41.503Z" },
-    { url = "https://files.pythonhosted.org/packages/d2/22/f90c7d1d83464eb63345802f33e8de41bd732521d9a60a69ad985c8faa90/windows_curses-2.4.2-cp314-cp314-win32.whl", hash = "sha256:a970bf067b3126251423b4da051ef8c1c77acf6294ec96a7d6de7f6b9e5c27a0", size = 77028, upload-time = "2026-03-31T12:44:42.611Z" },
-    { url = "https://files.pythonhosted.org/packages/6f/6a/1f8754de746474a049a841e139b443b250a96908d6913ccf2db9a4303584/windows_curses-2.4.2-cp314-cp314-win_amd64.whl", hash = "sha256:6c22cb0310500dfbfe54c76354e37070e300d5473596d48ac4f9c65b2d578b6f", size = 86361, upload-time = "2026-03-31T12:44:43.893Z" },
 ]
 
 [[package]]

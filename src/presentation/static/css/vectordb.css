@@ -4,17 +4,17 @@
     gap: 8px;
     font-size: 1.1em;
     font-weight: 600;
-    color: var(--text-card-title);
+    color: #1a1a1a;
 }
 .vectordb-collection-list {
     display: grid;
     gap: 8px;
 }
 .vectordb-collection-item {
-    background: var(--bg-card);
+    background: #ffffff;
     padding: 16px 20px;
     border-radius: 6px;
-    box-shadow: 0 1px 3px var(--shadow-card);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
 }
 .collection-info {
     display: flex;
@@ -24,7 +24,7 @@
 .collection-name {
     font-family: monospace;
     font-size: 1em;
-    color: var(--text-card-title);
+    color: #1a1a1a;
     font-weight: 500;
 }
 .vectordb-loading,
@@ -32,26 +32,26 @@
 .vectordb-empty {
     padding: 40px;
     text-align: center;
-    color: var(--text-card-label);
-    background: var(--bg-card);
+    color: #7f8c8d;
+    background: #ffffff;
     border-radius: 8px;
-    box-shadow: 0 2px 4px var(--shadow-card);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     margin: 20px 0;
 }
 .vectordb-error {
-    color: var(--color-danger);
+    color: #e74c3c;
 }
 .vectordb-error p {
     margin-bottom: 12px;
 }
 .vectordb-card-description {
     margin: 0 0 16px;
-    color: var(--text-card-body);
+    color: #555;
     font-size: 0.95em;
     line-height: 1.5;
 }
 .vectordb-card-description code {
-    background: var(--bg-code);
+    background: #f0f0f0;
     padding: 2px 6px;
     border-radius: 3px;
     font-size: 0.9em;
@@ -62,6 +62,8 @@
 .vectordb-card-actions .btn + .btn {
     margin-left: 8px;
 }
+
+/* --- Progress bar --- (shared classes in _shared-layout.css) */
 
 #collections-table th, 
 #collections-table td {
@@ -74,12 +76,12 @@
     text-transform: uppercase;
     font-size: 0.85rem;
     letter-spacing: 0.05em;
-    color: var(--text-muted);
+    color: #6c757d;
 }
 
 #collections-table td:first-child {
     font-weight: 600;
-    color: var(--text-card-title);
+    color: #1a1a1a;
 }
 
 /* Prevent status and config columns from wrapping too much */
@@ -95,12 +97,12 @@
     text-transform: uppercase;
     font-size: 0.85rem;
     letter-spacing: 0.05em;
-    color: var(--text-muted);
+    color: #6c757d;
 }
 
 #embed-table td:first-child {
     width: 20%;
     white-space: nowrap;
     font-weight: 600;
-    color: var(--text-card-title);
+    color: #1a1a1a;
 }

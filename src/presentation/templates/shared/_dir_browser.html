@@ -30,8 +30,8 @@
         <h2>{{ title }}</h2>
         {% if mode == "tree" %}
         <div>
-            <button class="btn btn-sm btn-secondary" onclick="window['_db_expand_{{ id }}']()">Expand All</button>
-            <button class="btn btn-sm btn-secondary" onclick="window['_db_collapse_{{ id }}']()">Collapse All</button>
+            <button class="btn btn-sm" onclick="window['_db_expand_{{ id }}']()">Expand All</button>
+            <button class="btn btn-sm" onclick="window['_db_collapse_{{ id }}']()">Collapse All</button>
         </div>
         {% endif %}
     </div>

@@ -19,11 +19,20 @@
 }
 .notification.error {
     display: flex;
-    background: var(--chat-message-error-bg);
-    border: 1px solid var(--color-danger);
-    color: var(--color-danger);
+    background: #2d1b1b;
+    border: 1px solid #e74c3c;
+    color: #e74c3c;
 }
-
+.notification .close-btn {
+    background: none;
+    border: none;
+    color: inherit;
+    cursor: pointer;
+    font-size: 18px;
+    opacity: 0.7;
+    padding: 0 4px;
+}
+.notification .close-btn:hover { opacity: 1; }
 </style>
 {% endblock %}
 
@@ -31,7 +40,7 @@
 <div id="update-banner"></div>
 <div id="notification" class="notification">
     <span id="notification-text"></span>
-    <button class="btn btn-ghost" onclick="closeNotification()">&times;</button>
+    <button class="close-btn" onclick="closeNotification()">&times;</button>
 </div>
 
 <div class="card">

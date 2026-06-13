@@ -1,12 +1,12 @@
 /* Shared Directory Browser — tree and flat modes */
 
 .dir-browser {
-    background: var(--bg-card);
-    border: 1px solid var(--border-input);
+    background: #ffffff;
+    border: 1px solid #ddd;
     border-radius: 6px;
     padding: 1rem;
     margin-top: 1rem;
-    color: var(--text-body);
+    color: #1a1a1a;
 }
 .dir-browser-header {
     display: flex;
@@ -14,12 +14,12 @@
     align-items: center;
     margin-bottom: 0.75rem;
     padding-bottom: 0.5rem;
-    border-bottom: 1px solid var(--border-card);
+    border-bottom: 1px solid #eee;
 }
 .dir-browser-header h3 {
     margin: 0;
     font-size: 1rem;
-    color: var(--text-card-title);
+    color: #1a1a1a;
 }
 .dir-browser-actions {
     display: flex;
@@ -32,13 +32,13 @@
 .dir-browser-count {
     margin-top: 0.5rem;
     padding: 0.5rem;
-    background: var(--bg-status-row);
+    background: #e8f4f8;
     border-radius: 4px;
     font-size: 0.85rem;
-    color: var(--text-body);
+    color: #1a1a1a;
 }
 .dir-browser-empty {
-    color: var(--text-muted);
+    color: #999;
     padding: 1rem;
     text-align: center;
 }
@@ -61,10 +61,17 @@
     gap: 0.25rem;
 }
 .tree-toggle {
-    width: 1.25rem;
+    background: none;
+    border: none;
+    cursor: pointer;
     padding: 0;
+    width: 1.25rem;
+    color: #666;
     font-size: 0.75rem;
     flex-shrink: 0;
+}
+.tree-toggle:hover {
+    color: #1a1a1a;
 }
 .tree-spacer {
     width: 1.25rem;
@@ -82,22 +89,23 @@
     cursor: pointer;
 }
 .tree-folder-name:hover {
-    color: var(--color-primary);
+    color: #2c3e50;
 }
 
+/* Flat mode */
 .dir-checkbox {
     display: inline-block;
     margin: 0.25rem 0.5rem;
     padding: 0.25rem 0.5rem;
-    border: 1px solid var(--border-input);
+    border: 1px solid #ccc;
     border-radius: 4px;
     cursor: pointer;
     font-size: 0.9rem;
-    color: var(--text-body);
+    color: #1a1a1a;
 }
 .dir-checkbox:hover {
-    border-color: var(--color-primary);
-    background: var(--bg-status-row);
+    border-color: #3498db;
+    background: #f7fbff;
 }
 .dir-checkbox input {
     margin-right: 0.25rem;

@@ -1,9 +1,45 @@
 /* Admin section shared overrides */
 
+.status-row {
+    margin-bottom: 10px;
+    padding: 8px;
+    background: #f8f9fa;
+    border-radius: 4px;
+}
+.status-label {
+    font-weight: bold;
+    margin-right: 10px;
+}
+
 .config-row {
     display: flex;
     align-items: center;
     gap: 15px;
     flex-wrap: wrap;
 }
+.form-group.inline {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.form-group.inline select,
+.config-row .btn {
+    height: 38px;
+}
+.form-group.inline label {
+    font-weight: bold;
+    margin-bottom: 0;
+}
 
+/* Admin forms: inline labels with fixed width */
+.form-group label {
+    display: inline-block;
+    width: 100px;
+    font-weight: bold;
+}
+.form-group input {
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    min-width: 200px;
+}

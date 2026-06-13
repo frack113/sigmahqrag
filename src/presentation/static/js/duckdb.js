@@ -99,9 +99,9 @@ function renderTable(data, container) {
         container.innerHTML = `<div class="table-controls">
             <h2>${esc(currentTable)}</h2>
             <div class="pagination">
-                <button class="btn btn-sm btn-secondary" onclick="prevPage()" ${prevDisabled}>← Prev</button>
+                <button onclick="prevPage()" ${prevDisabled}>← Prev</button>
                 <span>${data.total} row(s) total</span>
-                <button class="btn btn-sm btn-secondary" disabled>Next →</button>
+                <button disabled>Next →</button>
             </div>
         </div><p class="table-empty">No data</p>`;
         return;
@@ -112,9 +112,9 @@ function renderTable(data, container) {
     let html = `<div class="table-controls">
         <h2>${esc(currentTable)}</h2>
         <div class="pagination">
-            <button class="btn btn-sm btn-secondary" onclick="prevPage()" ${currentOffset === 0 ? 'disabled' : ''}>← Prev</button>
+            <button onclick="prevPage()" ${currentOffset === 0 ? 'disabled' : ''}>← Prev</button>
             <span>rows ${currentOffset + 1}–${Math.min(currentOffset + rows.length, currentTotal)} of ${data.total}</span>
-            <button class="btn btn-sm btn-secondary" onclick="nextPage()" ${currentOffset + rows.length >= currentTotal ? 'disabled' : ''}>Next →</button>
+            <button onclick="nextPage()" ${currentOffset + rows.length >= currentTotal ? 'disabled' : ''}>Next →</button>
         </div>
     </div>`;
 
@@ -155,10 +155,10 @@ function nextPage() {
 
 function showCellModal(content) {
     const overlay = document.createElement('div');
-    overlay.className = 'modal-overlay';
+    overlay.className = 'cell-modal-overlay';
     overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
-    overlay.innerHTML = `<div class="modal-content modal-wide">
-        <button class="btn btn-ghost modal-close">&times;</button>
+    overlay.innerHTML = `<div class="cell-modal">
+        <button class="modal-close">&times;</button>
         <pre>${esc(content)}</pre>
     </div>`;
     overlay.querySelector('.modal-close').addEventListener('click', () => overlay.remove());

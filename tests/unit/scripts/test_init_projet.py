@@ -114,7 +114,6 @@ def test_initialize_database_injectable(temp_project_dir):
         "git_selected_dirs",
         "sigma_spec",
         "doc_error",
-        "release_cache",
     ]
     mock_db.get_table_count.return_value = 1
     mock_db.set_config.return_value = None
