@@ -579,6 +579,7 @@ td:has(.btn) {
 .data-row .label {
     font-size: 13px;
     color: #333;
+    flex: 1;
 }
 
 .data-status-char {
@@ -795,9 +796,9 @@ td:has(.btn) {
 }
 
 .data-status-label {
-    margin-left: auto;
     font-size: 11px;
     font-weight: bold;
+    white-space: nowrap;
 }
 
 /* -- Setup page: text paragraphs ------------------------------- */
@@ -829,23 +830,15 @@ p.error-text {
 
 .search-item .btn {
     flex-shrink: 0;
-    margin-left: 8px;
+   margin-left: 8px;
 }
-@
 
 .data-global-hidden {
     display: none;
 }
 
 
-/* -- Summary row with inline buttons ------------------------------- */
-
-.data-summary-row {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 8px;
-}
+/* -- Action buttons at the right of a row -------------------------- */
 
 .data-action-buttons {
     display: flex;

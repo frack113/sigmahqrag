@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import platform
 import shutil
 from pathlib import Path
@@ -12,6 +13,9 @@ from pydantic import BaseModel
 
 from src.config.settings import BASE_DIR, get_config
 from src.application.system.datadir import DataDirManager
+from src.application.system.duckdb import DuckDbManager
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/system", tags=["system"])
 
@@ -324,36 +328,30 @@ def clean_data_folder():
 # ────────────────────────────────────────────────────────────────
 
 
-class DuckDBStatus(BaseModel):
-    connected: bool
-    path: str
-
-
-@router.get("/duckdb", response_model=DuckDBStatus)
+@router.get("/duckdb", response_model=dict)
 def get_duckdb_status():
-    """Check if the DuckDB database file exists."""
-    config = get_config()
-    db_path = Path(config.paths_duckdb_path)
-    return DuckDBStatus(connected=db_path.exists(), path=str(db_path))
+    """Get DuckDB database status."""
+    manager = DuckDbManager.default()
+    return manager.status()
 
 
-@router.post("/duckdb", response_model=DuckDBStatus)
+@router.post("/duckdb", response_model=dict)
 def create_duckdb():
-    """Create the DuckDB database directory and an empty .duckdb file."""
-    config = get_config()
-    db_path = Path(config.paths_duckdb_path)
-    db_path.parent.mkdir(parents=True, exist_ok=True)
-    if not db_path.exists():
-        db_path.touch()
-    return DuckDBStatus(connected=True, path=str(db_path))
+    """Create the DuckDB database if missing."""
+    manager = DuckDbManager.default()
+    result = manager.create_missing()
+    return {"status": "ok", "path": result or "already exists"}
 
 
 @router.post("/duckdb/clean")
 def clean_duckdb():
     """Delete the DuckDB database file."""
-    config = get_config()
-    db_path = Path(config.paths_duckdb_path)
-    if db_path.exists():
-        db_path.unlink()
-        return JSONResponse(content={"status": "ok", "message": "DuckDB database deleted"})
-    return JSONResponse(content={"status": "ok", "message": "DuckDB database does not exist"})
+    manager = DuckDbManager.default()
+    return manager.clean()
+
+
+@router.post("/duckdb/hard-reset")
+def hard_reset_duckdb():
+    """Delete and recreate the DuckDB database."""
+    manager = DuckDbManager.default()
+    return manager.hard_reset()

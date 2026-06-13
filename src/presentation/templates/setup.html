@@ -170,8 +170,9 @@
                         <h2>Data</h2>
                     </div>
                     <div class="card-body">
-                        <div id="data-global-status" class="global-status data-global-hidden"></div>
+                    <div id="data-global-status" class="global-status data-global-hidden"></div>
                         <div id="data-dirs-list"></div>
+                        <div id="duckdb-status"></div>
                     </div>
                 </div>
 
@@ -221,7 +222,7 @@
                     </div>
                 </div>
 
-                <!-- Card 4: System -->
+                  <!-- Card 4: System -->
                 <div class="card">
                     <div class="card-header">
                         <h2>System</h2>
@@ -265,6 +266,12 @@
             progress: '/api/v1/models/embedding/progress',
             config: '/api/v1/models/embeddings/config'
         },
+        duckdb: {
+            status: '/api/v1/system/duckdb',
+            create: '/api/v1/system/duckdb',
+            clean: '/api/v1/system/duckdb/clean',
+            reset: '/api/v1/system/duckdb/hard-reset'
+        },
         system: {
             status: '/api/v1/system/system/status',
             qdrant: '/api/v1/system/qdrant/status'
@@ -301,7 +308,7 @@
         var fixBtnHtml = readyCount === dirs.length ? '' : '<button class="btn btn-primary btn-sm" onclick="createDataDirs()">Fix</button>';
         var listEl = document.getElementById('data-dirs-list');
         listEl.innerHTML =
-            '<div class="data-row data-summary-row">' +
+            '<div class="data-row">' +
                 '<span class="' + dotClass + ' status-dot"></span>' +
                 '<span class="label">Data folders — ' + readyCount + '/' + dirs.length + ' ready</span>' +
                 '<span class="' + summaryClass + ' data-status-label">' + summaryLabel + '</span>' +
@@ -313,7 +320,7 @@
             '</div>';
     }
 
-     function checkDataDirs() {
+    function checkDataDirs() {
         fetch(CONFIG.data.list)
             .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
             .then(function(dirs) { renderDataDirs(dirs); })
@@ -322,6 +329,98 @@
                 document.getElementById('data-dirs-list').innerHTML =
                     '<div class="data-row"><span class="label error-text">Error loading data: ' + escHtml(e.message) + '</span></div>';
             });
+    }
+
+    // ─── DUCKDB CARD ───
+    function renderDuckDbStatus(status) {
+        var el = document.getElementById('duckdb-status');
+        var dotClass, labelClass, summaryLabel;
+
+        console.log('[DuckDB] status received:', status);
+
+        // Normalize null/undefined state to 'healthy' (existing DB)
+        var st = status.state || 'healthy';
+        console.log('[DuckDB] normalized state:', st);
+
+        // NEW STATES: missing, dirty_tables, excess_tables, healthy
+        if (st === 'healthy') {
+            dotClass = 'data-dot-ok'; labelClass = 'text-success'; summaryLabel = 'READY';
+        } else if (st === 'dirty_tables') {
+            dotClass = 'data-dot-warn'; labelClass = 'text-warning'; summaryLabel = 'DIRTY';
+        } else if (st === 'excess_tables') {
+            dotClass = 'data-dot-warn'; labelClass = 'text-warning'; summaryLabel = 'EXCESS';
+        } else if (st === 'missing') {
+            dotClass = 'data-dot-missing'; labelClass = 'text-danger'; summaryLabel = 'MISSING';
+        } else {
+            // Fallback for unknown states
+            console.warn('[DuckDB] unknown state:', st);
+            dotClass = 'data-dot-missing'; labelClass = 'text-danger'; summaryLabel = 'UNKNOWN (' + st + ')';
+        }
+
+        var size = status.file_size > 0 ? ' (' + formatBytes(status.file_size) + ')' : '';
+        var fixBtnHtml = status.needs_fix ? '<button class="btn btn-primary btn-sm" onclick="createDuckDb()">Fix</button>' : '<button class="btn btn-primary btn-sm" disabled>Fix</button>';
+        var cleanBtnHtml = status.needs_clean ? '<button class="btn btn-warning btn-sm" onclick="cleanDuckDb()">Clean</button>' : '<button class="btn btn-warning btn-sm" disabled>Clean</button>';
+
+        el.innerHTML =
+            '<div class="data-row">' +
+                '<span class="' + dotClass + ' status-dot"></span>' +
+                '<span class="label">DuckDB' + size + '</span>' +
+                '<span class="' + labelClass + ' data-status-label">' + summaryLabel + '</span>' +
+                '<span class="data-action-buttons">' +
+                    fixBtnHtml + ' ' + cleanBtnHtml + ' ' +
+                    '<button class="btn btn-danger btn-sm" onclick="resetDuckDb()">Hard Reset</button>' +
+                '</span>' +
+            '</div>';
+    }
+
+    function formatBytes(bytes) {
+        if (bytes === 0) return '0 B';
+        var k = 1024;
+        var sizes = ['B', 'KB', 'MB', 'GB'];
+        var i = Math.floor(Math.log(bytes) / Math.log(k));
+        return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+    }
+
+    function checkDuckDbStatus() {
+        fetch(CONFIG.duckdb.status)
+            .then(function(r) {
+                if (!r.ok) return Promise.reject(new Error('HTTP ' + r.status));
+                return r.text().then(function(t) { return JSON.parse(t); });
+            })
+            .then(function(status) {
+                console.log('[DuckDB] raw status object:', status);
+                console.log('[DuckDB] typeof status.state:', typeof status.state);
+                console.log('[DuckDB] status.state value:', JSON.stringify(status.state));
+                renderDuckDbStatus(status);
+            })
+            .catch(function(e) {
+                console.error(e);
+                document.getElementById('duckdb-status').innerHTML =
+                    '<span class="label error-text">Error loading DuckDB: ' + escHtml(e.message) + '</span>';
+            });
+    }
+
+    function createDuckDb() {
+        fetch(CONFIG.duckdb.create, { method: 'POST' })
+            .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
+            .then(function() { checkDuckDbStatus(); })
+            .catch(function(e) { alert('Error: ' + e.message); });
+    }
+
+    function cleanDuckDb() {
+        if (!confirm('⚠️ This will remove excess tables not in the schema. Continue?')) return;
+        fetch(CONFIG.duckdb.clean, { method: 'POST' })
+            .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
+            .then(function() { checkDuckDbStatus(); })
+            .catch(function(e) { alert('Error: ' + e.message); });
+    }
+
+    function resetDuckDb() {
+        if (!confirm('⚠️ HARD RESET — This will permanently delete the DuckDB database and create a fresh one. Continue?')) return;
+        fetch(CONFIG.duckdb.reset, { method: 'POST' })
+            .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
+            .then(function() { checkDuckDbStatus(); })
+            .catch(function(e) { alert('Error: ' + e.message); });
     }
 
     function createDataDirs() {
@@ -722,6 +821,7 @@
 
     document.addEventListener('DOMContentLoaded', function() {
         checkDataDirs();
+        checkDuckDbStatus();
         checkLlmModels();
         checkEmbModels();
         checkSystemStatus();
