@@ -1,9 +1,9 @@
-"""Schema sync test - verifies initdb.sql tables match EXPECTED_TABLES in init_projet.py."""
+"""Schema sync test - verifies initdb.sql tables match EXPECTED_TABLES in setup.py."""
 
 import re
 from pathlib import Path
 
-from init_projet import EXPECTED_TABLES
+from setup import EXPECTED_TABLES
 
 
 def test_schema_tables_match_sql():

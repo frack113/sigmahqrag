@@ -23,7 +23,7 @@ def test_atomic_clone_no_partial_dir_on_failure(temp_project_dir):
     """Test that failed clone doesn't leave partial directory in data/."""
     sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
-    from init_projet import clone_or_update_sigma_spec, SIGMA_SPEC_DIR
+    from setup import clone_or_update_sigma_spec, SIGMA_SPEC_DIR
     from git.exc import GitCommandError
 
     # Ensure no existing directory
@@ -33,7 +33,7 @@ def test_atomic_clone_no_partial_dir_on_failure(temp_project_dir):
         shutil.rmtree(SIGMA_SPEC_DIR)
 
     # Mock clone_from to fail
-    with patch("init_projet.git.Repo.clone_from") as mock_clone:
+    with patch("setup.git.Repo.clone_from") as mock_clone:
         mock_clone.side_effect = GitCommandError("clone", "Network error")
 
         with pytest.raises(SystemExit):
@@ -47,7 +47,7 @@ def test_atomic_clone_uses_temp_dir(temp_project_dir):
     """Test that clone uses temporary directory before moving."""
     sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
-    from init_projet import clone_or_update_sigma_spec, SIGMA_SPEC_DIR
+    from setup import clone_or_update_sigma_spec, SIGMA_SPEC_DIR
 
     # Ensure no existing directory
     if SIGMA_SPEC_DIR.exists():
@@ -56,9 +56,9 @@ def test_atomic_clone_uses_temp_dir(temp_project_dir):
         shutil.rmtree(SIGMA_SPEC_DIR)
 
     with (
-        patch("init_projet.git.Repo.clone_from") as mock_clone,
-        patch("init_projet.shutil.move") as mock_move,
-        patch("init_projet.tempfile.TemporaryDirectory") as mock_tempdir,
+        patch("setup.git.Repo.clone_from") as mock_clone,
+        patch("setup.shutil.move") as mock_move,
+        patch("setup.tempfile.TemporaryDirectory") as mock_tempdir,
     ):
         mock_tempdir.return_value.__enter__.return_value = "/tmp/fake-temp"
         mock_tempdir.return_value.__exit__.return_value = None
@@ -87,7 +87,7 @@ def test_git_update_recovers_from_errors(temp_project_dir, scenario):
     """Test that git update recovers from various errors via fetch+reset."""
     sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
-    from init_projet import clone_or_update_sigma_spec, SIGMA_SPEC_DIR
+    from setup import clone_or_update_sigma_spec, SIGMA_SPEC_DIR
     from git.exc import GitCommandError
     from unittest.mock import MagicMock
 
@@ -97,7 +97,7 @@ def test_git_update_recovers_from_errors(temp_project_dir, scenario):
     (SIGMA_SPEC_DIR / ".git").mkdir()
     (SIGMA_SPEC_DIR / ".git" / "config").write_text("[core]\nrepositoryformatversion = 0\n")
 
-    with patch("init_projet.git.Repo") as mock_repo_class:
+    with patch("setup.git.Repo") as mock_repo_class:
         mock_repo = MagicMock()
         mock_repo_class.return_value = mock_repo
         mock_repo.is_dirty.return_value = scenario == "stash_fails_then_recover"
@@ -121,7 +121,7 @@ def test_git_update_fails_when_recovery_fails(temp_project_dir):
     """Test that git update fails when both pull and fetch+reset fail."""
     sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
-    from init_projet import clone_or_update_sigma_spec, SIGMA_SPEC_DIR
+    from setup import clone_or_update_sigma_spec, SIGMA_SPEC_DIR
     from git.exc import GitCommandError
     from unittest.mock import MagicMock
 
@@ -131,7 +131,7 @@ def test_git_update_fails_when_recovery_fails(temp_project_dir):
     (SIGMA_SPEC_DIR / ".git").mkdir()
     (SIGMA_SPEC_DIR / ".git" / "config").write_text("[core]\nrepositoryformatversion = 0\n")
 
-    with patch("init_projet.git.Repo") as mock_repo_class:
+    with patch("setup.git.Repo") as mock_repo_class:
         mock_repo = MagicMock()
         mock_repo_class.return_value = mock_repo
         mock_repo.is_dirty.return_value = False
@@ -148,7 +148,7 @@ def test_clone_retries_with_backoff(temp_project_dir):
     """Test that clone retries with exponential backoff on transient failures."""
     sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
-    from init_projet import clone_or_update_sigma_spec, SIGMA_SPEC_DIR
+    from setup import clone_or_update_sigma_spec, SIGMA_SPEC_DIR
     from git.exc import GitCommandError
 
     # Ensure no existing directory
@@ -173,8 +173,8 @@ def test_clone_retries_with_backoff(temp_project_dir):
         return MagicMock()
 
     with (
-        patch("init_projet.git.Repo.clone_from", side_effect=mock_clone) as mock_clone,
-        patch("init_projet.time.sleep") as mock_sleep,
+        patch("setup.git.Repo.clone_from", side_effect=mock_clone) as mock_clone,
+        patch("setup.time.sleep") as mock_sleep,
     ):
         clone_or_update_sigma_spec()
 

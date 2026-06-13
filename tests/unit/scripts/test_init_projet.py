@@ -1,4 +1,4 @@
-"""Tests for init_projet.py script."""
+"""Tests for setup.py script."""
 
 import tempfile
 from pathlib import Path
@@ -22,7 +22,7 @@ def test_data_structure_created(temp_project_dir):
     """Test that all required data directories are created."""
     sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
-    from init_projet import create_data_structure, DATA_DIRS
+    from setup import create_data_structure, DATA_DIRS
 
     create_data_structure()
 
@@ -35,7 +35,7 @@ def test_config_file_created_no_backend_section(temp_project_dir):
     """Test that sigmarag.toml is created at root without [backend] section."""
     sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
-    from init_projet import create_config_file, CONFIG_FILE
+    from setup import create_config_file, CONFIG_FILE
 
     create_config_file()
 
@@ -52,7 +52,7 @@ def test_config_file_not_overwritten(temp_project_dir):
     """Test that existing config file is not overwritten."""
     sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
-    from init_projet import create_config_file, CONFIG_FILE
+    from setup import create_config_file, CONFIG_FILE
 
     # Create a custom config first
     custom_content = '[custom]\nkey = "value"\n'
@@ -69,7 +69,7 @@ def test_schema_version_set_in_database(temp_project_dir):
     """Test that schema_version is set in DuckDB config table after init."""
     sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
-    from init_projet import (
+    from setup import (
         create_data_structure,
         create_config_file,
         initialize_database,
@@ -98,7 +98,7 @@ def test_initialize_database_injectable(temp_project_dir):
     """Test that initialize_database accepts injected DatabaseService for testing."""
     sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
-    from init_projet import initialize_database, DatabaseServiceProtocol
+    from setup import initialize_database, DatabaseServiceProtocol
     from unittest.mock import MagicMock
 
     # Create mock database service with all required methods
