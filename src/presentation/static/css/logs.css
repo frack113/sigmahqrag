@@ -31,8 +31,8 @@
 }
 
 .logs-output {
-    background: var(--bg-code);
-    color: #d4d4d4;
+    background: var(--log-output-bg);
+    color: var(--log-text);
     font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
     font-size: 12px;
     line-height: 1.6;
@@ -47,36 +47,35 @@
 
 .logs-output:empty::before {
     content: 'No logs loaded';
-    color: #666;
+    color: var(--log-text-muted);
     font-style: italic;
 }
 
-/* Colorized log levels */
 .log-level-error {
-    color: #f87171;
+    color: var(--log-level-error);
     font-weight: 600;
 }
 
 .log-level-warning {
-    color: #facc15;
+    color: var(--log-level-warning);
     font-weight: 500;
 }
 
 .log-level-info {
-    color: #93c5fd;
+    color: var(--log-level-info);
 }
 
 .log-level-debug {
-    color: #6b7280;
+    color: var(--log-level-debug);
 }
 
 .log-line {
-    color: #d4d4d4;
+    color: var(--log-text);
 }
 
 .log-stats {
     font-size: 11px;
-    color: #6b7280;
+    color: var(--log-stat-text);
     margin-top: 8px;
     text-align: right;
 }

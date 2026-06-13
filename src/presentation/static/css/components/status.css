@@ -6,23 +6,23 @@
     height: 12px;
     border-radius: 50%;
     margin-right: 8px;
-    background: #7f8c8d;
+    background: var(--color-secondary);
     transition: background 0.3s ease;
 }
 
 .status-dot.active,
 .status-dot.status-ok {
-    background: #27ae60;
+    background: var(--color-success);
 }
 
 .status-dot.error,
 .status-dot.status-error {
-    background: #e74c3c;
+    background: var(--color-danger);
 }
 
 .status-dot.warning,
 .status-dot.status-warning {
-    background: #f39c12;
+    background: var(--color-warning);
 }
 
 .status-badge {
@@ -34,17 +34,17 @@
 }
 
 .status-badge.success {
-    background: #27ae60;
+    background: var(--color-success);
     color: #ffffff;
 }
 
 .status-badge.error {
-    background: #e74c3c;
+    background: var(--color-danger);
     color: #ffffff;
 }
 
 .status-badge.warning {
-    background: #f39c12;
+    background: var(--color-warning);
     color: #1a1a1a;
 }
 

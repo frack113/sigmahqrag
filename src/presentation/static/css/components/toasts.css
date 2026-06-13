@@ -19,15 +19,15 @@
 }
 
 .toast.success {
-    background: #27ae60;
+    background: var(--color-success);
 }
 
 .toast.error {
-    background: #e74c3c;
+    background: var(--color-danger);
 }
 
 .toast.info {
-    background: #3498db;
+    background: var(--color-primary);
 }
 
 @keyframes toast-in {
@@ -47,7 +47,7 @@
     bottom: 80px;
     left: 50%;
     transform: translateX(-50%);
-    background: #444;
+    background: var(--bg-code);
     padding: 8px 16px;
     border-radius: 8px;
     font-size: 0.85em;

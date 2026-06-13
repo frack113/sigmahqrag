@@ -93,7 +93,7 @@ input[type="file"] {
 .input-sm {
     padding: 4px 8px;
     border: 1px solid var(--border-input);
-    border-radius: 3px;
+    border-radius: 4px;
     font-size: 12px;
 }
 .form-control-sm:focus,
