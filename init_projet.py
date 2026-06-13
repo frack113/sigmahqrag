@@ -267,6 +267,8 @@ def _sync_model_registry_to_db() -> None:
         reg = UnifiedRegistry.get_instance()
         reg.sync_llm_folder(LLM_DIR, db)
         reg.sync_embeddings_folder(EMBEDDINGS_DIR, db)
+    except ImportError as e:
+        console.print(f"[yellow]⚠[/] Model registry sync skipped: {e}")
     except Exception as e:
         console.print(f"[yellow]⚠[/] Model registry sync failed: {e}")
 
