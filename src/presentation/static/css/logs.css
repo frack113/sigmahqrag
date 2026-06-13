@@ -11,15 +11,15 @@
 #logs-header h2 {
     margin: 0;
     font-size: 18px;
-    color: #1a1a1a;
+    color: var(--text-card-title);
 }
 
 #log-search {
     padding: 6px 12px;
-    border: 1px solid #4a6280;
+    border: 1px solid var(--border-sidebar);
     border-radius: 4px;
-    background: #f8f9fa;
-    color: #1a1a1a;
+    background: var(--bg-status-row);
+    color: var(--text-body);
     font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
     font-size: 12px;
     width: 240px;
@@ -27,12 +27,12 @@
 
 #log-search:focus {
     outline: none;
-    border-color: #3498db;
+    border-color: var(--color-primary);
 }
 
 .logs-output {
-    background: #1e1e1e;
-    color: #d4d4d4;
+    background: var(--log-output-bg);
+    color: var(--log-text);
     font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
     font-size: 12px;
     line-height: 1.6;
@@ -47,43 +47,42 @@
 
 .logs-output:empty::before {
     content: 'No logs loaded';
-    color: #666;
+    color: var(--log-text-muted);
     font-style: italic;
 }
 
-/* Colorized log levels */
 .log-level-error {
-    color: #f87171;
+    color: var(--log-level-error);
     font-weight: 600;
 }
 
 .log-level-warning {
-    color: #facc15;
+    color: var(--log-level-warning);
     font-weight: 500;
 }
 
 .log-level-info {
-    color: #93c5fd;
+    color: var(--log-level-info);
 }
 
 .log-level-debug {
-    color: #6b7280;
+    color: var(--log-level-debug);
 }
 
 .log-line {
-    color: #d4d4d4;
+    color: var(--log-text);
 }
 
 .log-stats {
     font-size: 11px;
-    color: #6b7280;
+    color: var(--log-stat-text);
     margin-top: 8px;
     text-align: right;
 }
 
 /* Sidebar sections */
 .sidebar-section {
-    border-bottom: 1px solid #4a6280;
+    border-bottom: 1px solid var(--border-sidebar);
     padding: 12px 0;
 }
 
@@ -91,7 +90,7 @@
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 1px;
-    color: #7f8c8d;
+    color: var(--text-card-label);
     padding: 0 20px 8px;
     font-weight: 600;
 }
@@ -107,12 +106,12 @@
     gap: 8px;
     padding: 6px 0;
     cursor: pointer;
-    color: #ecf0f1;
+    color: var(--text-sidebar);
     font-size: 13px;
 }
 
 .config-toggle input[type="checkbox"] {
-    accent-color: #3498db;
+    accent-color: var(--color-primary);
 }
 
 .config-row {
@@ -120,23 +119,23 @@
     align-items: center;
     justify-content: space-between;
     padding: 6px 0;
-    color: #ecf0f1;
+    color: var(--text-sidebar);
     font-size: 13px;
 }
 
 .form-control-sm {
     padding: 4px 8px;
-    border: 1px solid #4a6280;
+    border: 1px solid var(--border-sidebar);
     border-radius: 3px;
-    background: #34495e;
-    color: #ecf0f1;
+    background: var(--bg-sidebar-hover);
+    color: var(--text-sidebar);
     font-size: 12px;
     width: 70px;
 }
 
 .form-control-sm:focus {
     outline: none;
-    border-color: #3498db;
+    border-color: var(--color-primary);
 }
 
 select.form-control-sm {
@@ -146,25 +145,24 @@ select.form-control-sm {
 .level-value {
     font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
     font-size: 12px;
-    color: #3498db;
+    color: var(--color-primary);
     font-weight: 600;
 }
 
-/* Source links in sidebar */
 #log-sources a {
     display: block;
     padding: 10px 20px;
-    color: #ecf0f1;
+    color: var(--text-sidebar);
     text-decoration: none;
     transition: background 0.2s;
     font-size: 13px;
 }
 
 #log-sources a:hover {
-    background: #34495e;
+    background: var(--bg-sidebar-hover);
 }
 
 #log-sources a.active {
-    background: #3498db;
+    background: var(--bg-sidebar-active);
     font-weight: 500;
 }

@@ -30,9 +30,9 @@ def test_full_init_e2e_creates_all_structure(temp_project_dir):
     shutil.copytree(project_root / "templates", temp_project_dir / "templates")
     shutil.copy(project_root / "pyproject.toml", temp_project_dir / "pyproject.toml")
 
-    # Run init_projet.py
+    # Run init_projet.py in non-interactive mode
     result = subprocess.run(
-        [sys.executable, "init_projet.py"],
+        [sys.executable, "init_projet.py", "--defaults"],
         cwd=temp_project_dir,
         capture_output=True,
         text=True,
@@ -118,7 +118,7 @@ def test_init_idempotent_second_run(temp_project_dir):
 
     # First run
     result1 = subprocess.run(
-        [sys.executable, "init_projet.py"],
+        [sys.executable, "init_projet.py", "--defaults"],
         cwd=temp_project_dir,
         capture_output=True,
         text=True,
@@ -128,7 +128,7 @@ def test_init_idempotent_second_run(temp_project_dir):
 
     # Second run
     result2 = subprocess.run(
-        [sys.executable, "init_projet.py"],
+        [sys.executable, "init_projet.py", "--defaults"],
         cwd=temp_project_dir,
         capture_output=True,
         text=True,

@@ -12,29 +12,9 @@
         margin-bottom: 24px;
     }
 
-    .stat-card {
-        background: white;
-        border-radius: 8px;
-        padding: 16px;
-        text-align: center;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    }
-
-    .stat-card .stat-value {
-        font-size: 28px;
-        font-weight: bold;
-        color: #2c3e50;
-    }
-
-    .stat-card .stat-label {
-        font-size: 14px;
-        color: #7f8c8d;
-        margin-top: 4px;
-    }
-
     .upload-section {
-        background: white;
-        border: 2px dashed #bdc3c7;
+        background: var(--bg-card);
+        border: 2px dashed var(--color-secondary);
         border-radius: 8px;
         padding: 40px 20px;
         text-align: center;
@@ -45,18 +25,18 @@
 
     .upload-section:hover,
     .upload-section.dragover {
-        border-color: #3498db;
-        background: #f7fbff;
+        border-color: var(--color-primary);
+        background: var(--bg-status-row);
     }
 
     .upload-section h3 {
         margin: 0 0 8px 0;
-        color: #2c3e50;
+        color: var(--text-card-title);
     }
 
     .upload-section p {
         margin: 0;
-        color: #7f8c8d;
+        color: var(--text-card-label);
         font-size: 14px;
     }
 
@@ -65,10 +45,10 @@
     }
 
     .files-table {
-        background: white;
+        background: var(--bg-card);
         border-radius: 8px;
         overflow: hidden;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 1px 3px var(--shadow-card);
     }
 
     .files-table table {
@@ -77,8 +57,8 @@
     }
 
     .files-table th {
-        background: #2c3e50;
-        color: white;
+        background: var(--bg-sidebar);
+        color: var(--text-table-th);
         padding: 12px 16px;
         text-align: left;
         font-weight: 600;
@@ -87,57 +67,18 @@
 
     .files-table td {
         padding: 12px 16px;
-        border-bottom: 1px solid #ecf0f1;
+        border-bottom: 1px solid var(--border-table-inner);
         font-size: 14px;
     }
 
     .files-table tr:hover {
-        background: #f8f9fa;
-    }
-
-    .status-badge {
-        display: inline-block;
-        padding: 4px 10px;
-        border-radius: 12px;
-        font-size: 12px;
-        font-weight: 600;
-        text-transform: uppercase;
-    }
-
-    .status-badge.discovery {
-        background: #fff3cd;
-        color: #856404;
-    }
-
-    .status-badge.embedded {
-        background: #d4edda;
-        color: #155724;
-    }
-
-    .status-badge.error {
-        background: #f8d7da;
-        color: #721c24;
-    }
-
-    .btn-delete {
-        background: #e74c3c;
-        color: white;
-        border: none;
-        padding: 6px 12px;
-        border-radius: 4px;
-        cursor: pointer;
-        font-size: 13px;
-        transition: background 0.2s;
-    }
-
-    .btn-delete:hover {
-        background: #c0392b;
+        background: var(--bg-status-row);
     }
 
     .empty-state {
         text-align: center;
         padding: 60px 20px;
-        color: #7f8c8d;
+        color: var(--text-card-label);
     }
 
     .empty-state svg {
@@ -149,11 +90,11 @@
 
     #upload-progress {
         display: none;
-        background: white;
+        background: var(--bg-card);
         border-radius: 8px;
         padding: 16px;
         margin-bottom: 24px;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        box-shadow: 0 1px 3px var(--shadow-card);
     }
 
     #status-message {
@@ -262,7 +203,7 @@ async function formatFileSize(bytes) {
 }
 
 function getFileType(contentType) {
-    if (!contentType || contentType === 'unknown') return '<span class="status-badge" style="background:#ecf0f1;color:#7f8c8d;">Unknown</span>';
+    if (!contentType || contentType === 'unknown') return '<span class="status-badge discovery">Unknown</span>';
     return contentType.charAt(0).toUpperCase() + contentType.slice(1);
 }
 
@@ -311,7 +252,7 @@ async function loadLocalFiles() {
                 <td>${getFileType(file.content_type)}</td>
                 <td>${file.file_size ? formatFileSize(file.file_size) : '0 B'}</td>
                 <td>${getEmbedStatusBadge(file.embed_status)}</td>
-                <td><button class="btn-delete" onclick="deleteFile(${idx}, '${file.original_url}')">Delete</button></td>
+                <td><button class="btn btn-danger btn-sm" onclick="deleteFile(${idx}, '${file.original_url}')">Delete</button></td>
             </tr>
         `).join('');
 

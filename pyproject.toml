@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Local RAG system for Sigma rules"
 requires-python = ">=3.12"
 dependencies = [
+    "rich>=14.0.0",
     "fastapi>=0.136.3",
     "llama-index>=0.14.22",
     "llama-index-vector-stores-qdrant>=0.10.1",
@@ -24,6 +25,8 @@ dependencies = [
     "docx2txt>=0.9",
     "python-pptx>=1.0.2",
     "llama-index-llms-openai-like>=0.7.2",
+    "npyscreen>=5.0.2",
+    "windows-curses>=2.4.2",
 ]
 
 [tool.ruff]

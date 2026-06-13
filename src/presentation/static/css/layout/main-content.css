@@ -1,0 +1,9 @@
+/* Main content area */
+
+.app-content {
+    flex: 1;
+    padding: 24px;
+    background: var(--bg-body);
+    color: var(--text-body);
+    overflow-y: auto;
+}

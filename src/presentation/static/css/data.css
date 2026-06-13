@@ -13,21 +13,14 @@
     gap: 16px;
 }
 
-.repo-card {
-    background: #ffffff;
-    padding: 20px;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
 .repo-card h3 {
     margin: 0 0 8px;
-    color: #1a1a1a;
+    color: var(--text-card-title);
 }
 
 .repo-card p {
     margin: 0 0 12px;
-    color: #666;
+    color: var(--text-card-body);
     font-size: 14px;
 }
 
@@ -40,16 +33,15 @@
 
 /* Shared info/empty state message */
 .info-message {
-    color: var(--text-muted, #999);
+    color: var(--text-muted);
     padding: 1.25rem;
     text-align: center;
 }
 
-/* Repo detail section (github) */
 .repo-detail-section {
     margin-top: 1.25rem;
     padding: 1rem;
-    background: var(--card-bg, #f8f9fa);
+    background: var(--bg-status-row);
     border-radius: 8px;
 }
 .repo-detail-header {
@@ -63,8 +55,8 @@
 .select-repo-prompt {
     padding: 1.25rem;
     text-align: center;
-    color: var(--text-muted, #999);
-    background: var(--card-bg, #f8f9fa);
+    color: var(--text-muted);
+    background: var(--bg-status-row);
     border-radius: 4px;
     margin-top: 0.5rem;
 }

@@ -1,0 +1,107 @@
+/* Forms */
+
+form div {
+    margin-bottom: 16px;
+}
+
+label {
+    display: block;
+    margin-bottom: 8px;
+}
+
+input[type="file"] {
+    font-size: 16px;
+}
+
+.form-group {
+    margin-bottom: 16px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 500;
+    color: var(--text-body);
+}
+
+.form-group input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid var(--border-input);
+    border-radius: 4px;
+    font-size: 14px;
+    background: var(--bg-input);
+    color: var(--text-input);
+}
+
+.form-group input:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+}
+
+.form-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    margin-top: 20px;
+}
+
+/* Shared form select styles (matches form-group input) */
+.form-group select {
+    padding: 8px;
+    border: 1px solid var(--border-input);
+    border-radius: 4px;
+    min-width: 150px;
+    background: var(--bg-input);
+    color: var(--text-input);
+}
+
+/* Inline form group — label and input side by side */
+.form-group.inline {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.form-group.inline label {
+    display: inline-block;
+    width: 100px;
+    font-weight: bold;
+    margin-bottom: 0;
+}
+.form-group.inline select,
+.form-group.inline .btn,
+.config-row .btn {
+    height: 38px;
+}
+
+/* Admin-style form group — fixed-width label */
+.form-group.admin label {
+    display: inline-block;
+    width: 100px;
+    font-weight: bold;
+}
+.form-group.admin input {
+    padding: 8px;
+    border: 1px solid var(--border-input);
+    border-radius: 4px;
+    min-width: 200px;
+}
+
+/* Compact form controls */
+.form-control-sm,
+.input-sm {
+    padding: 4px 8px;
+    border: 1px solid var(--border-input);
+    border-radius: 4px;
+    font-size: 12px;
+}
+.form-control-sm:focus,
+.input-sm:focus {
+    outline: none;
+    border-color: var(--color-primary);
+}
+select.form-control-sm,
+select.input-sm {
+    width: 80px;
+}
