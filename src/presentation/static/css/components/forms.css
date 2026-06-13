@@ -54,3 +54,52 @@ input[type="file"] {
     border-radius: 4px;
     min-width: 150px;
 }
+
+/* Inline form group — label and input side by side */
+.form-group.inline {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.form-group.inline label {
+    display: inline-block;
+    width: 100px;
+    font-weight: bold;
+    margin-bottom: 0;
+}
+.form-group.inline select,
+.form-group.inline .btn,
+.config-row .btn {
+    height: 38px;
+}
+
+/* Admin-style form group — fixed-width label */
+.form-group.admin label {
+    display: inline-block;
+    width: 100px;
+    font-weight: bold;
+}
+.form-group.admin input {
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    min-width: 200px;
+}
+
+/* Compact form controls */
+.form-control-sm,
+.input-sm {
+    padding: 4px 8px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    font-size: 12px;
+}
+.form-control-sm:focus,
+.input-sm:focus {
+    outline: none;
+    border-color: #3498db;
+}
+select.form-control-sm,
+select.input-sm {
+    width: 80px;
+}

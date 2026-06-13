@@ -6,17 +6,33 @@ table {
 }
 
 table, th, td {
-    border: 1px solid black;
+    border: 1px solid #ddd;
 }
 
 th {
     text-align: center;
-    color: black;
-    font-weight: bold;
+    font-weight: 600;
+    background: #34495e;
+    color: #ffffff;
+    padding: 10px 12px;
+    font-size: 13px;
+    white-space: nowrap;
 }
 
 td {
     text-align: left;
+    padding: 8px 12px;
+    border-bottom: 1px solid #ecf0f1;
+    font-size: 13px;
+}
+
+tr:hover td {
+    background: #f8f9fa;
+}
+
+/* Scrollable table wrapper */
+.table-container {
+    overflow-x: auto;
 }
 
 /* Alignment utilities for table cells */

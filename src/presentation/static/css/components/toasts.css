@@ -40,3 +40,22 @@
         transform: translateX(0);
     }
 }
+
+/* Bottom-center toast (e.g., copy confirmation) */
+.toast.bottom {
+    position: fixed;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #444;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 0.85em;
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+    z-index: 1000;
+}
+.toast.bottom.show {
+    opacity: 1;
+}

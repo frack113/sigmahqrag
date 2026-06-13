@@ -43,38 +43,6 @@
     margin-top: 12px;
 }
 
-.table-container {
-    overflow-x: auto;
-}
-
-.table-container table {
-    width: 100%;
-    border-collapse: collapse;
-    background: white;
-    border-radius: 4px;
-    overflow: hidden;
-}
-
-.table-container th {
-    background: #34495e;
-    color: white;
-    padding: 10px 12px;
-    text-align: left;
-    font-weight: 500;
-    font-size: 13px;
-    white-space: nowrap;
-}
-
-.table-container td {
-    padding: 8px 12px;
-    border-bottom: 1px solid #ecf0f1;
-    font-size: 13px;
-    max-width: 300px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
 .table-container td.expandable {
     cursor: pointer;
     color: #2980b9;
@@ -82,10 +50,6 @@
 
 .table-container td.expandable:hover {
     background: #f0f7ff;
-}
-
-.table-container tr:hover td {
-    background: #f8f9fa;
 }
 
 .table-controls {
@@ -126,29 +90,6 @@
     padding: 40px;
     color: #e74c3c;
     font-size: 14px;
-}
-
-.cell-modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0,0,0,0.5);
-    z-index: 1000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.cell-modal {
-    background: white;
-    border-radius: 8px;
-    padding: 24px;
-    max-width: 700px;
-    max-height: 500px;
-    overflow: auto;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
 }
 
 .cell-modal pre {

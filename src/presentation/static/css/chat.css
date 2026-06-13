@@ -496,22 +496,3 @@ body.chat-page .btn-ghost:hover {
     40% { transform: scale(1); opacity: 1; }
 }
 
-.copy-toast {
-    position: fixed;
-    bottom: 80px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: #444;
-    color: #fff;
-    padding: 8px 16px;
-    border-radius: 8px;
-    font-size: 0.85em;
-    z-index: 1000;
-    opacity: 0;
-    transition: opacity 0.3s;
-    pointer-events: none;
-}
-
-.copy-toast.show {
-    opacity: 1;
-}

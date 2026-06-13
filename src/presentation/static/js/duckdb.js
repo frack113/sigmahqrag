@@ -155,9 +155,9 @@ function nextPage() {
 
 function showCellModal(content) {
     const overlay = document.createElement('div');
-    overlay.className = 'cell-modal-overlay';
+    overlay.className = 'modal-overlay';
     overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
-    overlay.innerHTML = `<div class="cell-modal">
+    overlay.innerHTML = `<div class="modal-content modal-wide">
         <button class="btn btn-ghost modal-close">&times;</button>
         <pre>${esc(content)}</pre>
     </div>`;
