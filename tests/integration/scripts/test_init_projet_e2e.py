@@ -24,15 +24,14 @@ def test_full_init_e2e_creates_all_structure(temp_project_dir):
     """Test that running init_projet.py creates all required structure."""
     project_root = Path(__file__).parent.parent.parent.parent
 
-    # Copy init_projet.py to temp dir
+    # Copy required files to temp dir
     shutil.copy(project_root / "init_projet.py", temp_project_dir / "init_projet.py")
     shutil.copytree(project_root / "src", temp_project_dir / "src")
-    shutil.copytree(project_root / "templates", temp_project_dir / "templates")
     shutil.copy(project_root / "pyproject.toml", temp_project_dir / "pyproject.toml")
 
-    # Run init_projet.py
+    # Run in non-interactive mode
     result = subprocess.run(
-        [sys.executable, "init_projet.py"],
+        [sys.executable, "init_projet.py", "--defaults"],
         cwd=temp_project_dir,
         capture_output=True,
         text=True,
@@ -98,6 +97,7 @@ def test_full_init_e2e_creates_all_structure(temp_project_dir):
         "git_selected_dirs",
         "sigma_spec",
         "doc_error",
+        "release_cache",
     }
     db = DatabaseService()
     db.initialize()
@@ -113,22 +113,21 @@ def test_init_idempotent_second_run(temp_project_dir):
     # Copy required files
     shutil.copy(project_root / "init_projet.py", temp_project_dir / "init_projet.py")
     shutil.copytree(project_root / "src", temp_project_dir / "src")
-    shutil.copytree(project_root / "templates", temp_project_dir / "templates")
     shutil.copy(project_root / "pyproject.toml", temp_project_dir / "pyproject.toml")
 
     # First run
     result1 = subprocess.run(
-        [sys.executable, "init_projet.py"],
+        [sys.executable, "init_projet.py", "--defaults"],
         cwd=temp_project_dir,
         capture_output=True,
         text=True,
         timeout=120,
     )
-    assert result1.returncode == 0
+    assert result1.returncode == 0, f"First run failed: {result1.stderr}"
 
-    # Second run
+    # Second run (should succeed: dirs/config already exist)
     result2 = subprocess.run(
-        [sys.executable, "init_projet.py"],
+        [sys.executable, "init_projet.py", "--defaults"],
         cwd=temp_project_dir,
         capture_output=True,
         text=True,
