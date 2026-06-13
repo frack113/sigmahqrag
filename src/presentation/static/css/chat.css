@@ -1,26 +1,20 @@
-body.chat-page > header {
-    display: none;
-}
-
-body {
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
+body.chat-page {
     background: #212121;
     color: #e0e0e0;
-}
-
-main {
-    flex: 1;
+    min-height: 100vh;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
-    padding: 0 !important;
 }
 
-.chat-page-layout {
-    display: flex;
+body.chat-page .app-layout {
     flex: 1;
+    min-height: 0;
+}
+
+body.chat-page .app-content {
+    padding: 0;
+    display: flex;
+    flex-direction: column;
     overflow: hidden;
 }
 
@@ -33,6 +27,7 @@ main {
     display: flex;
     flex-direction: column;
     overflow-y: auto;
+    padding: 0;
 }
 
 .chat-sidebar-nav ul {
