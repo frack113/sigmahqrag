@@ -89,7 +89,7 @@
             prompt.style.display = 'block';
 
             container.innerHTML = repos.map(function (repo) { return [
-                '<div class="repo-card">',
+                '<div class="card repo-card">',
                 '  <h3>' + escHtml(repo.org) + '/' + escHtml(repo.name) + '</h3>',
                 '  <p>Last commit: ' + escHtml(formatDate(repo.last_commit)) + '</p>',
                 '  <div class="repo-actions">',
