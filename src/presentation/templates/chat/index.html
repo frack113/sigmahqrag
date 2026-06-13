@@ -12,7 +12,7 @@
 {% block sidebar %}
 <aside class="app-sidebar chat-sidebar">
     <div class="chat-sidebar-actions">
-        <button class="chat-sidebar-btn" id="new-chat-btn" title="Nouvelle discussion">+ New Chat</button>
+        <button class="btn btn-secondary" id="new-chat-btn" title="Nouvelle discussion">+ New Chat</button>
         <div class="chat-sidebar-group">
             <label class="chat-sidebar-label" for="prompt-select">System Prompt</label>
             <select id="prompt-select" class="chat-sidebar-select">
@@ -42,7 +42,7 @@
     <div class="chat-input-bar">
         <form id="chat-form">
             <textarea id="message-input" placeholder="Ask a question..." rows="1"></textarea>
-            <button type="submit" id="send-btn">Send</button>
+            <button type="submit" id="send-btn" class="btn btn-primary">Send</button>
         </form>
     </div>
 </div>

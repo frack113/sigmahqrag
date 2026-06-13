@@ -18,6 +18,42 @@ body.chat-page .app-content {
     overflow: hidden;
 }
 
+/* Chat-page dark-theme overrides for shared .btn classes */
+body.chat-page .btn {
+    background: #444;
+    color: #e0e0e0;
+    border: 1px solid #555;
+    border-radius: 8px;
+    transition: background 0.15s, color 0.15s;
+}
+body.chat-page .btn:hover {
+    background: #555;
+    color: #fff;
+}
+body.chat-page .btn-primary {
+    background: #2b5278;
+    border-color: #3a6a9a;
+}
+body.chat-page .btn-primary:hover {
+    background: #3a6a9a;
+}
+body.chat-page .btn-secondary {
+    background: #333;
+    border-color: #444;
+}
+body.chat-page .btn-secondary:hover {
+    background: #444;
+}
+body.chat-page .btn-ghost {
+    background: transparent;
+    border: none;
+    color: #666;
+}
+body.chat-page .btn-ghost:hover {
+    background: #333;
+    color: #ccc;
+}
+
 /* ===== Sidebar ===== */
 .chat-sidebar {
     width: 240px;
@@ -66,23 +102,6 @@ body.chat-page .app-content {
     flex-direction: column;
     gap: 16px;
     flex: 1;
-}
-
-.chat-sidebar-btn {
-    background: #333;
-    color: #ccc;
-    border: 1px solid #444;
-    border-radius: 8px;
-    padding: 8px 14px;
-    font-size: 0.85em;
-    cursor: pointer;
-    transition: background 0.15s, color 0.15s;
-    text-align: center;
-}
-
-.chat-sidebar-btn:hover {
-    background: #444;
-    color: #fff;
 }
 
 .chat-sidebar-group {
@@ -146,22 +165,6 @@ body.chat-page .app-content {
 .chat-header-actions {
     display: flex;
     gap: 8px;
-}
-
-.chat-header-btn {
-    background: #333;
-    color: #ccc;
-    border: 1px solid #444;
-    border-radius: 8px;
-    padding: 6px 14px;
-    font-size: 0.85em;
-    cursor: pointer;
-    transition: background 0.15s, color 0.15s;
-}
-
-.chat-header-btn:hover {
-    background: #444;
-    color: #fff;
 }
 
 .chat-messages {
@@ -232,22 +235,6 @@ body.chat-page .app-content {
 
 .message:hover .message-actions {
     opacity: 1;
-}
-
-.message-action-btn {
-    background: none;
-    border: none;
-    color: #666;
-    font-size: 0.75em;
-    cursor: pointer;
-    padding: 2px 6px;
-    border-radius: 4px;
-    transition: color 0.15s, background 0.15s;
-}
-
-.message-action-btn:hover {
-    color: #ccc;
-    background: #333;
 }
 
 .message.user {
@@ -475,26 +462,7 @@ body.chat-page .app-content {
     border-color: #666;
 }
 
-.chat-input-bar button {
-    background: #444;
-    color: #e0e0e0;
-    border: none;
-    border-radius: 12px;
-    padding: 12px 20px;
-    cursor: pointer;
-    font-size: 16px;
-    font-weight: 500;
-    transition: background 0.15s;
-}
 
-.chat-input-bar button:hover {
-    background: #555;
-}
-
-.chat-input-bar button:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
 
 .typing-indicator {
     display: flex;

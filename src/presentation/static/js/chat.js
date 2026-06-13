@@ -136,7 +136,7 @@
             actions.className = "message-actions";
 
             var copyBtn = document.createElement("button");
-            copyBtn.className = "message-action-btn";
+            copyBtn.className = "btn btn-ghost btn-sm";
             copyBtn.textContent = "\u{1F4CB} Copier";
             copyBtn.addEventListener("click", function () {
                 var text = getAnswerText(bodyEl);

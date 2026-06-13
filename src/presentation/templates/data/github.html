@@ -13,7 +13,7 @@
         <button id="sync-all-btn" class="btn btn-success" type="button">Sync All</button>
         <button id="refresh-btn" class="btn btn-primary" type="button">Refresh list</button>
         <button id="list-document-btn" class="btn btn-primary" type="button">List document</button>
-        <button id="download-ref-btn" class="btn" type="button">Download Ref</button>
+        <button id="download-ref-btn" class="btn btn-secondary" type="button">Download Ref</button>
     </div>
 
     <div id="repos-list" class="repos-grid"></div>
@@ -26,7 +26,7 @@
 <div id="repo-detail" class="repo-detail-section" style="display: none;">
     <div class="repo-detail-header">
         <h2 id="selected-repo-name">Repository</h2>
-        <button id="close-detail-btn" class="btn" type="button">Close</button>
+        <button id="close-detail-btn" class="btn btn-secondary" type="button">Close</button>
     </div>
 
     {{ dir_browser_card(id="github", mode="tree", title="Select Directories to Index") }}
@@ -46,7 +46,7 @@
             </div>
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary">Add</button>
-                <button id="modal-cancel-btn" type="button" class="btn">Cancel</button>
+                <button id="modal-cancel-btn" type="button" class="btn btn-secondary">Cancel</button>
             </div>
         </form>
     </div>
@@ -94,7 +94,7 @@
                 '  <p>Last commit: ' + escHtml(formatDate(repo.last_commit)) + '</p>',
                 '  <div class="repo-actions">',
                 '    <button data-action="sync" data-org="' + escAttr(repo.org) + '" data-name="' + escAttr(repo.name) + '" class="btn btn-sm ' + escAttr(repo.sync_class || 'btn-unknown') + '">Sync</button>',
-                '    <button data-action="browse" data-org="' + escAttr(repo.org) + '" data-name="' + escAttr(repo.name) + '" class="btn btn-sm">Browse</button>',
+                '    <button data-action="browse" data-org="' + escAttr(repo.org) + '" data-name="' + escAttr(repo.name) + '" class="btn btn-sm btn-secondary">Browse</button>',
                 '    <button data-action="delete" data-org="' + escAttr(repo.org) + '" data-name="' + escAttr(repo.name) + '" class="btn btn-danger btn-sm">Delete</button>',
                 '  </div>',
                 '</div>'

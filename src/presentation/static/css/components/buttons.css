@@ -69,3 +69,29 @@ button:focus {
 .btn-secondary:hover {
     background: #6c7a7d;
 }
+
+.btn-ghost {
+    background: transparent;
+    color: inherit;
+    border: none;
+    padding: 4px 8px;
+}
+.btn-ghost:hover {
+    background: rgba(0,0,0,0.08);
+}
+
+.btn-warning {
+    background: #f39c12;
+    color: white;
+}
+.btn-warning:hover {
+    background: #d68910;
+}
+
+.btn-unknown {
+    background: #95a5a6;
+    color: white;
+}
+.btn-unknown:hover {
+    background: #7f8c8d;
+}

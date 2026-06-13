@@ -43,20 +43,6 @@
     margin-top: 12px;
 }
 
-.auto-refresh-bar .btn {
-    padding: 4px 12px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    background: white;
-    cursor: pointer;
-    font-size: 12px;
-    color: #666;
-}
-
-.auto-refresh-bar .btn:hover {
-    background: #f0f0f0;
-}
-
 .table-container {
     overflow-x: auto;
 }
@@ -123,24 +109,6 @@
     gap: 8px;
 }
 
-.pagination button {
-    padding: 6px 14px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    background: white;
-    cursor: pointer;
-    font-size: 13px;
-}
-
-.pagination button:hover:not(:disabled) {
-    background: #f0f0f0;
-}
-
-.pagination button:disabled {
-    opacity: 0.5;
-    cursor: default;
-}
-
 .pagination span {
     font-size: 13px;
     color: #666;
@@ -190,16 +158,4 @@
     margin: 0;
 }
 
-.cell-modal .modal-close {
-    float: right;
-    background: none;
-    border: none;
-    font-size: 20px;
-    cursor: pointer;
-    color: #999;
-    padding: 0 4px;
-}
 
-.cell-modal .modal-close:hover {
-    color: #333;
-}

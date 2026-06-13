@@ -311,7 +311,7 @@ async function loadLocalFiles() {
                 <td>${getFileType(file.content_type)}</td>
                 <td>${file.file_size ? formatFileSize(file.file_size) : '0 B'}</td>
                 <td>${getEmbedStatusBadge(file.embed_status)}</td>
-                <td><button class="btn-delete" onclick="deleteFile(${idx}, '${file.original_url}')">Delete</button></td>
+                <td><button class="btn btn-danger btn-sm" onclick="deleteFile(${idx}, '${file.original_url}')">Delete</button></td>
             </tr>
         `).join('');
 
