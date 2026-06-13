@@ -27,6 +27,7 @@ def test_full_init_e2e_creates_all_structure(temp_project_dir):
     # Copy required files to temp dir
     shutil.copy(project_root / "init_projet.py", temp_project_dir / "init_projet.py")
     shutil.copytree(project_root / "src", temp_project_dir / "src")
+    shutil.copytree(project_root / "templates", temp_project_dir / "templates")
     shutil.copy(project_root / "pyproject.toml", temp_project_dir / "pyproject.toml")
 
     # Run in non-interactive mode
@@ -113,6 +114,7 @@ def test_init_idempotent_second_run(temp_project_dir):
     # Copy required files
     shutil.copy(project_root / "init_projet.py", temp_project_dir / "init_projet.py")
     shutil.copytree(project_root / "src", temp_project_dir / "src")
+    shutil.copytree(project_root / "templates", temp_project_dir / "templates")
     shutil.copy(project_root / "pyproject.toml", temp_project_dir / "pyproject.toml")
 
     # First run
