@@ -373,8 +373,9 @@ function renderLoggingConfig(data) {
     if (cleanToggle) {
         cleanToggle.checked = data.clean_at_startup || false;
     }
-    if (toggleLabel) {
-        toggleLabel.classList.toggle('ext', !data.clean_at_startup);
+    var cleanLabel = document.getElementById('log-clean-label');
+    if (cleanLabel) {
+        cleanLabel.textContent = data.clean_at_startup ? 'On' : 'Off';
     }
 }
 
@@ -493,19 +494,27 @@ function loadBackendStatus() {
         if (llamaUrlInput) llamaUrlInput.value = llamaSvc.base_url || 'http://127.0.0.1:8080';
 
         var llamaManageSlider = document.getElementById('llama-manage-internally');
-        if (llamaManageSlider) llamaManageSlider.value = llamaSvc.manage_internally !== false ? '1' : '0';
+        if (llamaManageSlider) llamaManageSlider.checked = llamaSvc.manage_internally !== false;
+        var llamaModeLabel = document.getElementById('llama-mode-label');
+        if (llamaModeLabel) llamaModeLabel.textContent = llamaSvc.manage_internally !== false ? 'External' : 'Internal';
 
         var llamaAutostartSlider = document.getElementById('llama-autorun-at-startup');
-        if (llamaAutostartSlider) llamaAutostartSlider.value = llamaSvc.autorun_at_startup !== false ? '1' : '0';
+        if (llamaAutostartSlider) llamaAutostartSlider.checked = llamaSvc.autorun_at_startup !== false;
+        var llamaAutostartLabel = document.getElementById('llama-autostart-label');
+        if (llamaAutostartLabel) llamaAutostartLabel.textContent = llamaSvc.autorun_at_startup !== false ? 'On' : 'Off';
 
         var qdrantUrlInput = document.getElementById('qdrant-base-url');
         if (qdrantUrlInput) qdrantUrlInput.value = qdrantSvc.base_url || 'http://127.0.0.1:6333';
 
         var qdrantManageSlider = document.getElementById('qdrant-manage-internally');
-        if (qdrantManageSlider) qdrantManageSlider.value = qdrantSvc.manage_internally !== false ? '1' : '0';
+        if (qdrantManageSlider) qdrantManageSlider.checked = qdrantSvc.manage_internally !== false;
+        var qdrantModeLabel = document.getElementById('qdrant-mode-label');
+        if (qdrantModeLabel) qdrantModeLabel.textContent = qdrantSvc.manage_internally !== false ? 'External' : 'Internal';
 
         var qdrantAutostartSlider = document.getElementById('qdrant-autorun-at-startup');
-        if (qdrantAutostartSlider) qdrantAutostartSlider.value = qdrantSvc.autorun_at_startup !== false ? '1' : '0';
+        if (qdrantAutostartSlider) qdrantAutostartSlider.checked = qdrantSvc.autorun_at_startup !== false;
+        var qdrantAutostartLabel = document.getElementById('qdrant-autostart-label');
+        if (qdrantAutostartLabel) qdrantAutostartLabel.textContent = qdrantSvc.autorun_at_startup !== false ? 'On' : 'Off';
 
         // Show version info
         var llamaVer = llamaInfo.current_version || 'N/A';
@@ -530,13 +539,14 @@ function loadBackendStatus() {
 // Backend Service Config Toggles
 // ──────────────────────────────────────────────────────────────
 function updateBackendServiceConfig(service, field, value) {
+    var dynamicKey = 'services.' + service + '.' + field;
+    var payload = {};
+    payload[dynamicKey] = value;
     fetch('/api/v1/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-            backend: {
-                'services.' + service + '.' + field: value
-            }
+            backend: payload
         })
     })
     .then(function(r) { return r.json(); })
@@ -551,27 +561,35 @@ function updateBackendServiceConfig(service, field, value) {
 }
 
 function onLlamaModeChange() {
-    var slider = document.getElementById('llama-manage-internally');
-    var val = parseInt(slider.value, 10);
-    updateBackendServiceConfig('llama', 'manage_internally', val === 1);
+    var cb = document.getElementById('llama-manage-internally');
+    var checked = cb.checked;
+    updateBackendServiceConfig('llama', 'manage_internally', checked);
+    var label = document.getElementById('llama-mode-label');
+    if (label) label.textContent = checked ? 'External' : 'Internal';
 }
 
 function onLlamaAutostartChange() {
-    var slider = document.getElementById('llama-autorun-at-startup');
-    var val = parseInt(slider.value, 10);
-    updateBackendServiceConfig('llama', 'autorun_at_startup', val === 1);
+    var cb = document.getElementById('llama-autorun-at-startup');
+    var checked = cb.checked;
+    updateBackendServiceConfig('llama', 'autorun_at_startup', checked);
+    var label = document.getElementById('llama-autostart-label');
+    if (label) label.textContent = checked ? 'On' : 'Off';
 }
 
 function onQdrantModeChange() {
-    var slider = document.getElementById('qdrant-manage-internally');
-    var val = parseInt(slider.value, 10);
-    updateBackendServiceConfig('qdrant', 'manage_internally', val === 1);
+    var cb = document.getElementById('qdrant-manage-internally');
+    var checked = cb.checked;
+    updateBackendServiceConfig('qdrant', 'manage_internally', checked);
+    var label = document.getElementById('qdrant-mode-label');
+    if (label) label.textContent = checked ? 'External' : 'Internal';
 }
 
 function onQdrantAutostartChange() {
-    var slider = document.getElementById('qdrant-autorun-at-startup');
-    var val = parseInt(slider.value, 10);
-    updateBackendServiceConfig('qdrant', 'autorun_at_startup', val === 1);
+    var cb = document.getElementById('qdrant-autorun-at-startup');
+    var checked = cb.checked;
+    updateBackendServiceConfig('qdrant', 'autorun_at_startup', checked);
+    var label = document.getElementById('qdrant-autostart-label');
+    if (label) label.textContent = checked ? 'On' : 'Off';
 }
 
 function downloadLlama() {

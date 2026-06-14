@@ -304,11 +304,11 @@
                     <input type="number" id="log-max-file-input" value="5" min="1" max="99">
                 </div>
                 <div class="form-group">
-                    <div class="mode-toggle" id="log-clean-toggle">
-                        <span class="mode-label">Clean at Startup</span>
+                    <label class="theme-toggle" id="log-clean-toggle">
                         <input type="checkbox" id="log-clean-at-startup">
-                        <label for="log-clean-at-startup" class="toggle-track"></label>
-                    </div>
+                        <span class="theme-slider"></span>
+                        <span class="theme-text-label" id="log-clean-label">Off</span>
+                    </label>
                 </div>
                 <div class="form-actions">
                     <button class="btn btn-primary btn-sm" onclick="saveLoggingConfig()">Save Logging Config</button>
@@ -842,9 +842,9 @@ function renderLoggingConfig(data) {
     if (maxFileInput) maxFileInput.value = data.log_max_file || 5;
     if (cleanToggle) cleanToggle.checked = data.clean_at_startup || false;
 
-    var toggleLabel = document.getElementById('log-clean-toggle');
-    if (toggleLabel) {
-        toggleLabel.classList.toggle('ext', !data.clean_at_startup);
+    var cleanLabel = document.getElementById('log-clean-label');
+    if (cleanLabel) {
+        cleanLabel.textContent = data.clean_at_startup ? 'On' : 'Off';
     }
 }
 

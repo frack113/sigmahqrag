@@ -100,11 +100,11 @@
                                 <input type="number" id="log-max-file-input" value="5" min="1" max="99">
                             </div>
                             <div class="form-group">
-                                <div class="mode-toggle" id="log-clean-toggle">
-                                    <span class="mode-label">Clean at Startup</span>
+                                <label class="theme-toggle" id="log-clean-toggle">
                                     <input type="checkbox" id="log-clean-at-startup">
-                                    <label for="log-clean-at-startup" class="toggle-track"></label>
-                                </div>
+                                    <span class="theme-slider"></span>
+                                    <span class="theme-text-label" id="log-clean-label">Off</span>
+                                </label>
                             </div>
                             <div class="form-actions">
                                 <button class="btn btn-primary btn-sm" onclick="Config.saveLoggingConfig()">Save Logging Config</button>
@@ -173,20 +173,21 @@
                             </div>
 
                             <div class="form-group" style="margin-bottom:16px;">
-                                <div class="slider-row" id="llama-mode-toggle">
-                                    <span class="slider-label left">Internal</span>
-                                    <input type="range" id="llama-manage-internally" min="0" max="1" value="1" data-onval="1" data-offval="0" onchange="Config.onLlamaModeChange()">
-                                    <span class="slider-label right">External</span>
-                                </div>
+                                <label>Manage internally</label>
+                                <label class="theme-toggle" id="llama-mode-toggle" onchange="Config.onLlamaModeChange()">
+                                    <input type="checkbox" id="llama-manage-internally" checked>
+                                    <span class="theme-slider"></span>
+                                    <span class="theme-text-label" id="llama-mode-label">External</span>
+                                </label>
                             </div>
 
                             <div class="form-group" style="margin-bottom:16px;">
                                 <label style="display:block; font-size:13px; color:var(--layout-card-text); margin-bottom:4px;">Auto start</label>
-                                <div class="slider-row" id="llama-autostart-toggle">
-                                    <span class="slider-label left">Off</span>
-                                    <input type="range" id="llama-autorun-at-startup" min="0" max="1" value="1" data-onval="1" data-offval="0" onchange="Config.onLlamaAutostartChange()">
-                                    <span class="slider-label right">On</span>
-                                </div>
+                                <label class="theme-toggle" id="llama-autostart-toggle" onchange="Config.onLlamaAutostartChange()">
+                                    <input type="checkbox" id="llama-autorun-at-startup" checked>
+                                    <span class="theme-slider"></span>
+                                    <span class="theme-text-label" id="llama-autostart-label">Off</span>
+                                </label>
                             </div>
 
                             <div class="config-row" style="margin-bottom:16px;">
@@ -231,20 +232,21 @@
                             </div>
 
                             <div class="form-group" style="margin-bottom:16px;">
-                                <div class="slider-row" id="qdrant-mode-toggle">
-                                    <span class="slider-label left">Internal</span>
-                                    <input type="range" id="qdrant-manage-internally" min="0" max="1" value="1" data-onval="1" data-offval="0" onchange="Config.onQdrantModeChange()">
-                                    <span class="slider-label right">External</span>
-                                </div>
+                                <label>Manage internally</label>
+                                <label class="theme-toggle" id="qdrant-mode-toggle" onchange="Config.onQdrantModeChange()">
+                                    <input type="checkbox" id="qdrant-manage-internally" checked>
+                                    <span class="theme-slider"></span>
+                                    <span class="theme-text-label" id="qdrant-mode-label">External</span>
+                                </label>
                             </div>
 
                             <div class="form-group" style="margin-bottom:16px;">
                                 <label style="display:block; font-size:13px; color:var(--layout-card-text); margin-bottom:4px;">Auto start</label>
-                                <div class="slider-row" id="qdrant-autostart-toggle">
-                                    <span class="slider-label left">Off</span>
-                                    <input type="range" id="qdrant-autorun-at-startup" min="0" max="1" value="1" data-onval="1" data-offval="0" onchange="Config.onQdrantAutostartChange()">
-                                    <span class="slider-label right">On</span>
-                                </div>
+                                <label class="theme-toggle" id="qdrant-autostart-toggle" onchange="Config.onQdrantAutostartChange()">
+                                    <input type="checkbox" id="qdrant-autorun-at-startup" checked>
+                                    <span class="theme-slider"></span>
+                                    <span class="theme-text-label" id="qdrant-autostart-label">Off</span>
+                                </label>
                             </div>
 
                             <div class="config-row" style="margin-bottom:16px;">

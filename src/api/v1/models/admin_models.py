@@ -16,6 +16,47 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/admin", tags=["admin-models"])
 
 
+@router.get("/status")
+async def get_status():
+    """GET /api/v1/admin/status - Return combined service status (legacy endpoint)."""
+    llama_state = "inactive"
+    try:
+        from src.infrastructure.llm.llamacpp.auto_start import (
+            _llamacpp_started_by_us,
+            _started_binary_service,
+        )
+
+        if _llamacpp_started_by_us and _started_binary_service is not None:
+            if getattr(_started_binary_service, "process", None):
+                if _started_binary_service.process.poll() is None:
+                    llama_state = "active"
+    except Exception:
+        pass
+
+    qdrant_state = "inactive"
+    try:
+        from src.infrastructure.vectorstore.auto_start import (
+            _qdrant_started_by_us,
+            _started_binary_service as _qdrant_svc,
+        )
+
+        if _qdrant_started_by_us and _qdrant_svc is not None:
+            if getattr(_qdrant_svc, "process", None):
+                if _qdrant_svc.process.poll() is None:
+                    qdrant_state = "active"
+    except Exception:
+        pass
+
+    return JSONResponse(
+        content={
+            "data": {
+                "llama_cpp": {"status": llama_state},
+                "qdrant": {"status": qdrant_state},
+            }
+        }
+    )
+
+
 @router.get("/models")
 async def get_models() -> JSONResponse:
     """GET /api/v1/admin/models - Return installed models list."""

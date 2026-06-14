@@ -16,10 +16,7 @@
         <label class="theme-toggle" title="Toggle light/dark theme">
             <input type="checkbox" id="theme-toggle" onchange="toggleTheme()">
             <span class="theme-slider"></span>
-            <span class="theme-label">
-                <svg class="icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-                <svg class="icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2"/><path d="M12 21v2"/><path d="M4.22 4.22l1.42 1.42"/><path d="M18.36 18.36l1.42 1.42"/><path d="M1 12h2"/><path d="M21 12h2"/><path d="M4.22 19.78l1.42-1.42"/><path d="M18.36 5.64l1.42-1.42"/></svg>
-            </span>
+           <span class="theme-label" id="theme-emoji-label">🌙</span>
         </label>
     </div>
 </header>
@@ -84,79 +81,6 @@
     flex-shrink: 0;
 }
 
-/* ── Theme toggle slider ─────────────────────────────────────── */
-
-.theme-toggle {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    cursor: pointer;
-    user-select: none;
-    padding: 6px;
-}
-
-.theme-toggle input {
-    display: none;
-}
-
-.theme-slider {
-    position: relative;
-    width: 48px;
-    height: 26px;
-    background: #34495e;
-    border-radius: 13px;
-    transition: background 0.3s;
-}
-
-.theme-slider::before {
-    content: '';
-    position: absolute;
-    width: 20px;
-    height: 20px;
-    left: 3px;
-    top: 3px;
-    background: #ffffff;
-    border-radius: 50%;
-    transition: transform 0.3s;
-}
-
-.theme-toggle input:checked + .theme-slider {
-    background: #3498db;
-}
-
-.theme-toggle input:checked + .theme-slider::before {
-    transform: translateX(22px);
-}
-
-.theme-label {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    opacity: 0.7;
-}
-
-.theme-label:hover {
-    opacity: 1;
-}
-
-.icon-moon {
-    display: block;
-}
-
-.icon-sun {
-    display: none;
-}
-
-.theme-toggle input:checked ~ .theme-slider .theme-label .icon-moon,
-html[data-theme="light"] .theme-toggle input:checked ~ .theme-slider .theme-label .icon-moon {
-    display: none;
-}
-
-html[data-theme="light"] .theme-toggle input:not(:checked) ~ .theme-slider .theme-label .icon-sun,
-.theme-toggle input:checked ~ .theme-slider .theme-label .icon-sun {
-    display: block;
-}
-
 /* ── Responsive ──────────────────────────────────────────────── */
 
 @media (max-width: 768px) {
@@ -199,19 +123,27 @@ function toggleTheme() {
     var next = current === 'dark' ? 'light' : 'dark';
     setTheme(next);
     applyThemeToggle(next);
-}
-
-function applyThemeToggle(theme) {
-    var toggle = document.getElementById('theme-toggle');
-    if (toggle) {
-        toggle.checked = (theme === 'light');
+    var emojiLabel = document.getElementById('theme-emoji-label');
+    if (emojiLabel) {
+        emojiLabel.textContent = next === 'light' ? '☀️' : '🌙';
     }
 }
+
+          function applyThemeToggle(theme) {
+               var toggle = document.getElementById('theme-toggle');
+               if (toggle) {
+                   toggle.checked = (theme === 'light');
+               }
+           }
 
 // Initialize theme on page load
 (function() {
     var theme = getTheme();
     setTheme(theme);
     applyThemeToggle(theme);
+    var emojiLabel = document.getElementById('theme-emoji-label');
+    if (emojiLabel) {
+        emojiLabel.textContent = theme === 'light' ? '☀️' : '🌙';
+    }
 })();
 </script>
