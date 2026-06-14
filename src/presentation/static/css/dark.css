@@ -8,6 +8,8 @@
     --layout-content-text: #1a1a1a;
     --layout-card-bg: #ffffff;
     --layout-card-text: #1a1a1a;
+    --layout-card-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    --layout-card-overlay-shadow: 0 4px 20px rgba(0,0,0,0.2);
     --layout-border: #e9ecef;
     --layout-text-muted: #999;
     --layout-error-text: #dc3545;

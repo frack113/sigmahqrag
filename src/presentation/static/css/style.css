@@ -110,7 +110,30 @@ body {
     border-radius: 8px;
     padding: 20px;
     margin-bottom: 20px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    box-shadow: var(--layout-card-shadow);
+}
+
+.card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 12px;
+    margin-bottom: 12px;
+    border-bottom: 1px solid var(--layout-border);
+}
+
+.card-header h2 {
+    margin: 0;
+}
+
+.card-body {
+    padding: 0;
+}
+
+.card-footer {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--layout-border);
 }
 
 .card h2 {
@@ -131,23 +154,6 @@ body {
     color: var(--layout-text-muted);
     font-size: 0.95em;
     line-height: 1.5;
-}
-
-.card-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding-bottom: 12px;
-    margin-bottom: 12px;
-    border-bottom: 1px solid var(--layout-border);
-}
-
-.card-header h2 {
-    margin: 0;
-}
-
-.card-body {
-    padding: 0;
 }
 
 /* ── Status indicators ───────────────────────────────────────── */
@@ -421,7 +427,7 @@ td:has(.btn) {
     padding: 24px;
     border-radius: 8px;
     width: 400px;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    box-shadow: var(--layout-card-overlay-shadow);
 }
 
 .modal-content h2 {
@@ -1609,7 +1615,7 @@ main {
     max-width: 700px;
     max-height: 500px;
     overflow: auto;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    box-shadow: var(--layout-card-overlay-shadow);
 }
 
 .cell-modal pre {
@@ -1815,18 +1821,6 @@ select.form-control-sm {
     color: var(--layout-content-text);
 }
 
-.vectordb-collection-list {
-    display: grid;
-    gap: 8px;
-}
-
-.vectordb-collection-item {
-    background: var(--layout-card-bg);
-    padding: 16px 20px;
-    border-radius: 6px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-}
-
 .collection-info {
     display: flex;
     align-items: center;
@@ -1848,7 +1842,7 @@ select.form-control-sm {
     color: var(--layout-text-muted);
     background: var(--layout-card-bg);
     border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    box-shadow: var(--layout-card-shadow);
     margin: 20px 0;
 }
 
@@ -1937,22 +1931,13 @@ select.form-control-sm {
     gap: 16px;
 }
 
-.repo-card {
+.repo-card,
+.vectordb-collection-item {
     background: var(--layout-card-bg);
     padding: 20px;
     border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
-
-.repo-card h3 {
-    margin: 0 0 8px;
-    color: var(--layout-content-text);
-}
-
-.repo-card p {
-    margin: 0 0 12px;
-    color: var(--layout-text-muted);
-    font-size: 14px;
+    margin-bottom: 20px;
+    box-shadow: var(--layout-card-shadow);
 }
 
 .repo-actions {
