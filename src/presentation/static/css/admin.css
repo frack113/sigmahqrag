@@ -3,7 +3,7 @@
 .status-row {
     margin-bottom: 10px;
     padding: 8px;
-    background: #f8f9fa;
+    background: var(--layout-row-bg, #f8f9fa);
     border-radius: 4px;
 }
 .status-label {
@@ -39,7 +39,7 @@
 }
 .form-group input {
     padding: 8px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--layout-input-border, #ddd);
     border-radius: 4px;
     min-width: 200px;
 }

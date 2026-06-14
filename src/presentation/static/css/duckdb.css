@@ -1,7 +1,7 @@
 #table-list a {
     display: block;
     padding: 10px 12px;
-    color: #ecf0f1;
+    color: var(--layout-duckdb-sidebar-text, #ecf0f1);
     text-decoration: none;
     border-radius: 4px;
     transition: background 0.2s;
@@ -9,15 +9,15 @@
 }
 
 #table-list a:hover {
-    background: #34495e;
+    background: var(--layout-duckdb-sidebar-hover-bg, #34495e);
 }
 
 #table-list a.active {
-    background: #3498db;
+    background: var(--layout-duckdb-sidebar-active-bg, #3498db);
 }
 
 .sidebar-loading {
-    color: #95a5a6;
+    color: var(--layout-text-muted, #95a5a6);
     font-size: 13px;
     padding: 10px 12px;
 }
@@ -25,18 +25,18 @@
 .welcome-message {
     text-align: center;
     padding: 60px 20px;
-    color: #666;
+    color: var(--layout-text-muted, #666);
 }
 
 .welcome-message h2 {
     margin-bottom: 12px;
-    color: #1a1a1a;
+    color: var(--layout-content-text, #1a1a1a);
 }
 
 .tables-summary {
     margin-top: 16px;
     font-size: 13px;
-    color: #95a5a6;
+    color: var(--layout-text-muted, #95a5a6);
 }
 
 .auto-refresh-bar {
@@ -45,16 +45,16 @@
 
 .auto-refresh-bar .btn {
     padding: 4px 12px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--layout-input-border, #ddd);
     border-radius: 4px;
-    background: white;
+    background: var(--layout-card-bg, white);
     cursor: pointer;
     font-size: 12px;
-    color: #666;
+    color: var(--layout-text-muted, #666);
 }
 
 .auto-refresh-bar .btn:hover {
-    background: #f0f0f0;
+    background: var(--layout-search-hover, #f0f0f0);
 }
 
 .table-container {
@@ -64,14 +64,14 @@
 .table-container table {
     width: 100%;
     border-collapse: collapse;
-    background: white;
+    background: var(--layout-card-bg, white);
     border-radius: 4px;
     overflow: hidden;
 }
 
 .table-container th {
-    background: #34495e;
-    color: white;
+    background: var(--layout-duckdb-sidebar-bg, #34495e);
+    color: var(--layout-badge-text-ok, white);
     padding: 10px 12px;
     text-align: left;
     font-weight: 500;
@@ -81,7 +81,7 @@
 
 .table-container td {
     padding: 8px 12px;
-    border-bottom: 1px solid #ecf0f1;
+    border-bottom: 1px solid var(--layout-duckdb-sidebar-text, #ecf0f1);
     font-size: 13px;
     max-width: 300px;
     overflow: hidden;
@@ -91,15 +91,15 @@
 
 .table-container td.expandable {
     cursor: pointer;
-    color: #2980b9;
+    color: var(--layout-link-primary);
 }
 
 .table-container td.expandable:hover {
-    background: #f0f7ff;
+    background: var(--layout-search-hover, #f0f7ff);
 }
 
 .table-container tr:hover td {
-    background: #f8f9fa;
+    background: var(--layout-row-bg, #f8f9fa);
 }
 
 .table-controls {
@@ -114,7 +114,7 @@
 .table-controls h2 {
     margin: 0;
     font-size: 18px;
-    color: #1a1a1a;
+    color: var(--layout-content-text, #1a1a1a);
 }
 
 .pagination {
@@ -125,15 +125,15 @@
 
 .pagination button {
     padding: 6px 14px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--layout-input-border, #ddd);
     border-radius: 4px;
-    background: white;
+    background: var(--layout-card-bg, white);
     cursor: pointer;
     font-size: 13px;
 }
 
 .pagination button:hover:not(:disabled) {
-    background: #f0f0f0;
+    background: var(--layout-search-hover, #f0f0f0);
 }
 
 .pagination button:disabled {
@@ -143,20 +143,20 @@
 
 .pagination span {
     font-size: 13px;
-    color: #666;
+    color: var(--layout-text-muted, #666);
 }
 
 .table-empty {
     text-align: center;
     padding: 40px;
-    color: #999;
+    color: var(--layout-text-muted, #999);
     font-size: 14px;
 }
 
 .table-error {
     text-align: center;
     padding: 40px;
-    color: #e74c3c;
+    color: var(--layout-error-text, #e74c3c);
     font-size: 14px;
 }
 
@@ -174,7 +174,7 @@
 }
 
 .cell-modal {
-    background: white;
+    background: var(--layout-card-bg, white);
     border-radius: 8px;
     padding: 24px;
     max-width: 700px;
@@ -196,10 +196,10 @@
     border: none;
     font-size: 20px;
     cursor: pointer;
-    color: #999;
+    color: var(--layout-text-muted, #999);
     padding: 0 4px;
 }
 
 .cell-modal .modal-close:hover {
-    color: #333;
+    color: var(--layout-content-text, #333);
 }

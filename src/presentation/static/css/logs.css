@@ -11,15 +11,15 @@
 #logs-header h2 {
     margin: 0;
     font-size: 18px;
-    color: #1a1a1a;
+    color: var(--layout-content-text, #1a1a1a);
 }
 
 #log-search {
     padding: 6px 12px;
-    border: 1px solid #4a6280;
+    border: 1px solid var(--layout-duckdb-sidebar-border, #4a6280);
     border-radius: 4px;
-    background: #f8f9fa;
-    color: #1a1a1a;
+    background: var(--layout-duckdb-sidebar-bg, #f8f9fa);
+    color: var(--layout-duckdb-sidebar-text, #1a1a1a);
     font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
     font-size: 12px;
     width: 240px;
@@ -83,7 +83,7 @@
 
 /* Sidebar sections */
 .sidebar-section {
-    border-bottom: 1px solid #4a6280;
+    border-bottom: 1px solid var(--layout-duckdb-sidebar-border, #4a6280);
     padding: 12px 0;
 }
 
@@ -91,7 +91,7 @@
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 1px;
-    color: #7f8c8d;
+    color: var(--layout-text-muted, #7f8c8d);
     padding: 0 20px 8px;
     font-weight: 600;
 }
@@ -107,7 +107,7 @@
     gap: 8px;
     padding: 6px 0;
     cursor: pointer;
-    color: #ecf0f1;
+    color: var(--layout-duckdb-sidebar-text, #ecf0f1);
     font-size: 13px;
 }
 
@@ -120,16 +120,16 @@
     align-items: center;
     justify-content: space-between;
     padding: 6px 0;
-    color: #ecf0f1;
+    color: var(--layout-duckdb-sidebar-text, #ecf0f1);
     font-size: 13px;
 }
 
 .form-control-sm {
     padding: 4px 8px;
-    border: 1px solid #4a6280;
+    border: 1px solid var(--layout-duckdb-sidebar-border, #4a6280);
     border-radius: 3px;
-    background: #34495e;
-    color: #ecf0f1;
+    background: var(--layout-duckdb-sidebar-bg, #34495e);
+    color: var(--layout-duckdb-sidebar-text, #ecf0f1);
     font-size: 12px;
     width: 70px;
 }
@@ -146,7 +146,7 @@ select.form-control-sm {
 .level-value {
     font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
     font-size: 12px;
-    color: #3498db;
+    color: var(--layout-duckdb-sidebar-active-bg, #3498db);
     font-weight: 600;
 }
 
@@ -154,17 +154,17 @@ select.form-control-sm {
 #log-sources a {
     display: block;
     padding: 10px 20px;
-    color: #ecf0f1;
+    color: var(--layout-duckdb-sidebar-text, #ecf0f1);
     text-decoration: none;
     transition: background 0.2s;
     font-size: 13px;
 }
 
 #log-sources a:hover {
-    background: #34495e;
+    background: var(--layout-duckdb-sidebar-hover-bg, #34495e);
 }
 
 #log-sources a.active {
-    background: #3498db;
+    background: var(--layout-duckdb-sidebar-active-bg, #3498db);
     font-weight: 500;
 }

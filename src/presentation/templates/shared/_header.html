@@ -1,13 +1,217 @@
 {# Global header #}
-<header>
-    <h1>Sigmahqrag</h1>
-    <nav aria-label="Main navigation">
-        <ul>
-            <li><a href="/chat" {% if request.url.path == '/chat' or request.url.path == '/' %}class="active"{% endif %}>Chat</a></li>
-            <li><a href="/data" {% if '/data' in request.url.path %}class="active"{% endif %}>Data</a></li>
-            <li><a href="/admin" {% if '/admin' in request.url.path %}class="active"{% endif %}>Admin</a></li>
-            <li><a href="/duckdb" {% if '/duckdb' in request.url.path %}class="active"{% endif %}>DuckDB</a></li>
-            <li><a href="/logs" {% if '/logs' in request.url.path %}class="active"{% endif %}>Logs</a></li>
-        </ul>
-    </nav>
+<header class="app-header">
+    <div class="app-header-left">
+        <h1>Sigmahqrag</h1>
+        <nav aria-label="Main navigation">
+            <ul>
+                <li><a href="/chat" {% if request.url.path == '/chat' or request.url.path == '/' %}class="active"{% endif %}>Chat</a></li>
+                <li><a href="/data" {% if '/data' in request.url.path %}class="active"{% endif %}>Data</a></li>
+                <li><a href="/admin" {% if '/admin' in request.url.path %}class="active"{% endif %}>Admin</a></li>
+                <li><a href="/duckdb" {% if '/duckdb' in request.url.path %}class="active"{% endif %}>DuckDB</a></li>
+                <li><a href="/logs" {% if '/logs' in request.url.path %}class="active"{% endif %}>Logs</a></li>
+            </ul>
+        </nav>
+    </div>
+    <div class="app-header-right">
+        <label class="theme-toggle" title="Toggle light/dark theme">
+            <input type="checkbox" id="theme-toggle" onchange="toggleTheme()">
+            <span class="theme-slider"></span>
+            <span class="theme-label">
+                <svg class="icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                <svg class="icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2"/><path d="M12 21v2"/><path d="M4.22 4.22l1.42 1.42"/><path d="M18.36 18.36l1.42 1.42"/><path d="M1 12h2"/><path d="M21 12h2"/><path d="M4.22 19.78l1.42-1.42"/><path d="M18.36 5.64l1.42-1.42"/></svg>
+            </span>
+        </label>
+    </div>
 </header>
+
+<style>
+.app-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 24px;
+    border-bottom: 2px solid #3498db;
+    background: #2c3e50;
+    gap: 16px;
+}
+
+.app-header-left {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    min-width: 0;
+    flex: 1;
+}
+
+.app-header h1 {
+    color: #ffffff;
+    font-size: 20px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.app-header nav ul {
+    list-style: none;
+    display: flex;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+}
+
+.app-header nav a {
+    color: #d5d5d5;
+    text-decoration: none;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-size: 14px;
+    transition: background 0.2s, color 0.2s;
+    white-space: nowrap;
+}
+
+.app-header nav a:hover {
+    background: #3d566e;
+    color: #ffffff;
+}
+
+.app-header nav a.active {
+    background: #3498db;
+    color: #ffffff;
+}
+
+.app-header-right {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+/* ── Theme toggle slider ─────────────────────────────────────── */
+
+.theme-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    user-select: none;
+    padding: 6px;
+}
+
+.theme-toggle input {
+    display: none;
+}
+
+.theme-slider {
+    position: relative;
+    width: 48px;
+    height: 26px;
+    background: #34495e;
+    border-radius: 13px;
+    transition: background 0.3s;
+}
+
+.theme-slider::before {
+    content: '';
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    left: 3px;
+    top: 3px;
+    background: #ffffff;
+    border-radius: 50%;
+    transition: transform 0.3s;
+}
+
+.theme-toggle input:checked + .theme-slider {
+    background: #3498db;
+}
+
+.theme-toggle input:checked + .theme-slider::before {
+    transform: translateX(22px);
+}
+
+.theme-label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    opacity: 0.7;
+}
+
+.theme-label:hover {
+    opacity: 1;
+}
+
+.icon-moon {
+    display: block;
+}
+
+.icon-sun {
+    display: none;
+}
+
+.theme-toggle input:checked ~ .theme-slider .theme-label .icon-moon,
+html[data-theme="light"] .theme-toggle input:checked ~ .theme-slider .theme-label .icon-moon {
+    display: none;
+}
+
+html[data-theme="light"] .theme-toggle input:not(:checked) ~ .theme-slider .theme-label .icon-sun,
+.theme-toggle input:checked ~ .theme-slider .theme-label .icon-sun {
+    display: block;
+}
+
+/* ── Responsive ──────────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+    .app-header {
+        flex-direction: column;
+        gap: 12px;
+        padding: 12px 16px;
+    }
+
+    .app-header-left {
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .app-header nav ul {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+}
+</style>
+
+<script>
+// ── Theme management ──
+function getTheme() {
+    return localStorage.getItem('theme') || 'dark';
+}
+
+function setTheme(theme) {
+    if (theme === 'light') {
+        document.documentElement.setAttribute('data-theme', 'light');
+    } else {
+        document.documentElement.removeAttribute('data-theme');
+    }
+    localStorage.setItem('theme', theme);
+}
+
+function toggleTheme() {
+    var current = getTheme();
+    var next = current === 'dark' ? 'light' : 'dark';
+    setTheme(next);
+    applyThemeToggle(next);
+}
+
+function applyThemeToggle(theme) {
+    var toggle = document.getElementById('theme-toggle');
+    if (toggle) {
+        toggle.checked = (theme === 'light');
+    }
+}
+
+// Initialize theme on page load
+(function() {
+    var theme = getTheme();
+    setTheme(theme);
+    applyThemeToggle(theme);
+})();
+</script>

@@ -1,950 +1,852 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Setup Wizard - SigmaHQ RAG</title>
-    <link rel="icon" type="image/x-icon" href="{{ url_for('static', path='/favicon.ico') }}">
-    <link rel="stylesheet" href="{{ url_for('static', path='/css/main.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', path='/css/_shared-layout.css') }}">
-    <style>
-        .setup-page {
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: #f5f5f5;
-        }
-        .setup-container {
-            width: 100%;
-            max-width: 1100px;
-            margin: 40px 20px;
-        }
-        .setup-header {
-            text-align: center;
-            margin-bottom: 32px;
-        }
-        .setup-header h1 {
-            font-size: 28px;
-            color: #1a1a1a;
-            margin-bottom: 8px;
-        }
-        .setup-header p {
-            color: #555;
-            font-size: 14px;
-        }
-        .setup-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 24px;
-        }
-        .data-rows {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 4px 16px;
-            margin-top: 8px;
-        }
-        .data-row {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 4px 8px;
-            background: #f8f9fa;
-            border-radius: 4px;
-        }
-        .data-row .status-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            flex-shrink: 0;
-        }
-        .data-dot-ok {
-            background: #28a745;
-        }
-        .data-dot-warn {
-            background: #ffc107;
-        }
-        .data-dot-missing {
-            background: #dc3545;
-        }
-        .data-row .label {
-            font-size: 13px;
-            color: #333;
-        }
-        .setup-container .card-body p {
-            font-size: 14px;
-        }
-        .model-table {
-            width: 100%;
-            margin-top: 8px;
-            font-size: 13px;
-        }
-        .model-table td {
-            padding: 4px 8px;
-            border-top: 1px solid #eee;
-        }
-        .search-row {
-            display: flex;
-            gap: 8px;
-            margin-top: 8px;
-        }
-        .search-row input {
-            flex: 1;
-            padding: 6px 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 13px;
-        }
-        .search-results {
-            margin-top: 8px;
-            max-height: 200px;
-            overflow-y: auto;
-        }
-        .search-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 6px 8px;
-            border-radius: 4px;
-            border-bottom: 1px solid #f0f0f0;
-        }
-        .search-item:hover {
-            background: #f8f9fa;
-        }
-        .system-info {
-            font-size: 13px;
-            margin-top: 8px;
-        }
-        .system-info .info-row {
-            display: flex;
-            justify-content: space-between;
-            padding: 4px 0;
-            border-bottom: 1px solid #f0f0f0;
-        }
-        .system-info .info-label {
-            color: #555;
-        }
-        .system-info .info-value {
-            color: #1a1a1a;
-            font-weight: 500;
-        }
-        .progress-bar {
-            width: 100%;
-            height: 6px;
-            background: #eee;
-            border-radius: 3px;
-            margin-top: 4px;
-            overflow: hidden;
-        }
-        .progress-bar .fill {
-            height: 100%;
-            background: #007bff;
-            transition: width 0.3s;
-            border-radius: 3px;
-        }
-        .status-badge {
-            display: inline-block;
-            padding: 2px 6px;
-            border-radius: 10px;
-            font-size: 11px;
-            font-weight: 500;
-        }
-        .status-badge.ok { background: #d4edda; color: #155724; }
-        .status-badge.warn { background: #fff3cd; color: #856404; }
-        .status-badge.error { background: #f8d7da; color: #721c24; }
-        .status-badge.info { background: #d1ecf1; color: #0c5460; }
-    </style>
-</head>
-<body>
-    <div class="setup-page">
-        <div class="setup-container">
-            <div class="setup-header">
-                <h1>SigmaHQ RAG</h1>
-                <p>Initial Setup Wizard</p>
+{# Setup page — Initial Setup Wizard #}
+{% extends "shared/layout.html" %}
+
+{% block title %}Setup - SigmaHQ RAG{% endblock %}
+
+{% block styles %}
+{{ super() }}
+<link rel="stylesheet" href="{{ url_for('static', path='/css/setup.css') }}">
+{% endblock %}
+
+{% block sidebar_title %}Setup{% endblock %}
+{% block sidebar_subtitle %}Initial Configuration{% endblock %}
+
+{% block sidebar_nav %}
+<a href="#data-section" class="active">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+    Data
+</a>
+<a href="#llm-section">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+    LLM
+</a>
+<a href="#embedding-section">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
+    Embedding
+</a>
+<a href="#system-section">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    System
+</a>
+<a href="#logging-section">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg>
+    Logging
+</a>
+{% endblock %}
+
+{% block content %}
+<div class="setup-container">
+    <div class="setup-header">
+        <h1>SigmaHQ RAG</h1>
+        <p>Initial Setup Wizard — Configure your local RAG system</p>
+    </div>
+
+    <div class="setup-grid">
+        <!-- Card 1: Data -->
+        <div class="card" id="data-section">
+            <div class="card-header">
+                <h2>Data</h2>
             </div>
+            <div class="card-body">
+                <div id="data-global-status" class="global-status data-global-hidden"></div>
+                <div id="data-dirs-list"></div>
+                <div id="duckdb-status"></div>
+            </div>
+        </div>
 
-            <div class="setup-grid">
-                <!-- Card 1: Data -->
-                <div class="card">
-                    <div class="card-header">
-                        <h2>Data</h2>
-                    </div>
-                    <div class="card-body">
-                    <div id="data-global-status" class="global-status data-global-hidden"></div>
-                        <div id="data-dirs-list"></div>
-                        <div id="duckdb-status"></div>
-                    </div>
+        <!-- Card 2: LLM -->
+        <div class="card" id="llm-section">
+            <div class="card-header">
+                <h2>LLM</h2>
+            </div>
+            <div class="card-body">
+                <div id="llm-global-status" class="global-status">
+                    <span class="status-dot"></span>
+                    <span id="llm-global-text">Loading...</span>
                 </div>
-
-                <!-- Card 2: LLM -->
-                <div class="card">
-                    <div class="card-header">
-                        <h2>LLM</h2>
-                    </div>
-                    <div class="card-body">
-                        <div id="llm-global-status" class="global-status">
-                            <span class="status-dot"></span>
-                            <span id="llm-global-text">Loading...</span>
-                        </div>
-                        <div id="llm-models-list"></div>
-                        <div class="search-row">
-                            <input type="text" id="llm-search-input" placeholder="Search HuggingFace...">
-                            <button class="btn btn-primary btn-sm" onclick="searchLlmModel()">Search</button>
-                        </div>
-                        <div id="llm-search-results" class="search-results"></div>
-                        <div class="form-actions">
-                            <button class="btn btn-primary btn-sm" onclick="downloadLlmModel()" id="btn-download-llm">Download</button>
-                            <button class="btn btn-danger btn-sm" onclick="deleteLlmModel()" id="btn-delete-llm">Delete</button>
-                        </div>
-                    </div>
+                <div id="llm-models-list"></div>
+                <div class="search-row">
+                    <input type="text" id="llm-search-input" placeholder="Search HuggingFace...">
+                    <button class="btn btn-primary btn-sm" onclick="searchLlmModel()">Search</button>
                 </div>
-
-                <!-- Card 3: Embedding -->
-                <div class="card">
-                    <div class="card-header">
-                        <h2>Embedding</h2>
-                    </div>
-                    <div class="card-body">
-                        <div id="emb-global-status" class="global-status">
-                            <span class="status-dot"></span>
-                            <span id="emb-global-text">Loading...</span>
-                        </div>
-                        <div id="emb-models-list"></div>
-                        <div class="search-row">
-                            <input type="text" id="emb-search-input" placeholder="Search HuggingFace...">
-                            <button class="btn btn-primary btn-sm" onclick="searchEmbModel()">Search</button>
-                        </div>
-                        <div id="emb-search-results" class="search-results"></div>
-                        <div class="form-actions">
-                            <button class="btn btn-primary btn-sm" onclick="downloadEmbModel()" id="btn-download-emb">Download</button>
-                            <button class="btn btn-danger btn-sm" onclick="deleteEmbModel()" id="btn-delete-emb">Delete</button>
-                        </div>
-                    </div>
-                </div>
-
-                  <!-- Card 4: System -->
-                <div class="card">
-                    <div class="card-header">
-                        <h2>System</h2>
-                    </div>
-                    <div class="card-body">
-                        <div id="system-global-status" class="global-status">
-                            <span class="status-dot"></span>
-                            <span id="system-global-text">Loading...</span>
-                        </div>
-                        <div id="system-info" class="system-info"></div>
-                        <div id="qdrant-info" class="system-info qdrant-info-extra"></div>
-                      <div class="form-actions">
-                            <button class="btn btn-primary btn-sm" onclick="refreshSystemStatus()">Refresh</button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Card 5: Logging -->
-                <div class="card">
-                    <div class="card-header">
-                        <h2>Logging</h2>
-                    </div>
-                    <div class="card-body">
-                        <div id="logging-status" class="global-status">
-                            <span class="status-dot"></span>
-                            <span id="logging-status-text">Loading...</span>
-                        </div>
-                        <div class="form-group" style="margin-top:12px;">
-                            <label for="log-level-select">Log Level</label>
-                            <select id="log-level-select">
-                                <option value="DEBUG">DEBUG</option>
-                                <option value="INFO" selected>INFO</option>
-                                <option value="WARNING">WARNING</option>
-                                <option value="ERROR">ERROR</option>
-                                <option value="CRITICAL">CRITICAL</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="log-max-size-input">Log Max Size</label>
-                            <input type="text" id="log-max-size-input" value="10M" placeholder="e.g. 10M, 50M, 100M">
-                        </div>
-                        <div class="form-group">
-                            <label for="log-max-file-input">Log Max Files</label>
-                            <input type="number" id="log-max-file-input" value="5" min="1" max="99">
-                        </div>
-                        <div class="form-group">
-                            <div class="mode-toggle" id="log-clean-toggle">
-                                <span class="mode-label">Clean at Startup</span>
-                                <input type="checkbox" id="log-clean-at-startup">
-                                <label for="log-clean-at-startup" class="toggle-track"></label>
-                            </div>
-                        </div>
-                        <div class="form-actions">
-                            <button class="btn btn-primary btn-sm" onclick="saveLoggingConfig()">Save Logging Config</button>
-                        </div>
-                        <div id="logging-config-status" class="status-message"></div>
-                    </div>
+                <div id="llm-search-results" class="search-results"></div>
+                <div class="form-actions">
+                    <button class="btn btn-primary btn-sm" onclick="downloadLlmModel()" id="btn-download-llm">Download</button>
+                    <button class="btn btn-danger btn-sm" onclick="deleteLlmModel()" id="btn-delete-llm">Delete</button>
                 </div>
             </div>
         </div>
+
+        <!-- Card 3: Embedding -->
+        <div class="card" id="embedding-section">
+            <div class="card-header">
+                <h2>Embedding</h2>
+            </div>
+            <div class="card-body">
+                <div id="emb-global-status" class="global-status">
+                    <span class="status-dot"></span>
+                    <span id="emb-global-text">Loading...</span>
+                </div>
+                <div id="emb-models-list"></div>
+                <div class="search-row">
+                    <input type="text" id="emb-search-input" placeholder="Search HuggingFace...">
+                    <button class="btn btn-primary btn-sm" onclick="searchEmbModel()">Search</button>
+                </div>
+                <div id="emb-search-results" class="search-results"></div>
+                <div class="form-actions">
+                    <button class="btn btn-primary btn-sm" onclick="downloadEmbModel()" id="btn-download-emb">Download</button>
+                    <button class="btn btn-danger btn-sm" onclick="deleteEmbModel()" id="btn-delete-emb">Delete</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 4: System -->
+        <div class="card" id="system-section">
+            <div class="card-header">
+                <h2>System</h2>
+            </div>
+            <div class="card-body">
+                <div id="system-global-status" class="global-status">
+                    <span class="status-dot"></span>
+                    <span id="system-global-text">Loading...</span>
+                </div>
+                <div id="system-info" class="system-info"></div>
+                <div id="qdrant-info" class="system-info qdrant-info-extra"></div>
+                <div class="form-actions">
+                    <button class="btn btn-primary btn-sm" onclick="refreshSystemStatus()">Refresh</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 5: Logging -->
+        <div class="card" id="logging-section">
+            <div class="card-header">
+                <h2>Logging</h2>
+            </div>
+            <div class="card-body">
+                <div id="logging-status" class="global-status">
+                    <span class="status-dot"></span>
+                    <span id="logging-status-text">Loading...</span>
+                </div>
+                <div class="form-group" style="margin-top:12px;">
+                    <label for="log-level-select">Log Level</label>
+                    <select id="log-level-select">
+                        <option value="DEBUG">DEBUG</option>
+                        <option value="INFO" selected>INFO</option>
+                        <option value="WARNING">WARNING</option>
+                        <option value="ERROR">ERROR</option>
+                        <option value="CRITICAL">CRITICAL</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="log-max-size-input">Log Max Size</label>
+                    <input type="text" id="log-max-size-input" value="10M" placeholder="e.g. 10M, 50M, 100M">
+                </div>
+                <div class="form-group">
+                    <label for="log-max-file-input">Log Max Files</label>
+                    <input type="number" id="log-max-file-input" value="5" min="1" max="99">
+                </div>
+                <div class="form-group">
+                    <div class="mode-toggle" id="log-clean-toggle">
+                        <span class="mode-label">Clean at Startup</span>
+                        <input type="checkbox" id="log-clean-at-startup">
+                        <label for="log-clean-at-startup" class="toggle-track"></label>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button class="btn btn-primary btn-sm" onclick="saveLoggingConfig()">Save Logging Config</button>
+                </div>
+                <div id="logging-config-status" class="status-message"></div>
+            </div>
+        </div>
     </div>
+</div>
+{% endblock %}
 
-    <script>
-    // ─── Configuration ───
-    var CONFIG = {
-        data: {
-            list: '/api/v1/system/data-dirs',
-            create: '/api/v1/system/data-dirs/fix',
-            clean: '/api/v1/system/data-dirs/clean',
-            reset: '/api/v1/system/data-dirs/hard-reset'
-        },
-        llm: {
-            installed: '/api/v1/models/llm/installed',
-            download: '/api/v1/models/llm/download',
-            delete: '/api/v1/models/llm',
-            progress: '/api/v1/models/llm/progress'
-        },
-        embedding: {
-            installed: '/api/v1/models/embedding/installed',
-            search: '/api/v1/models/embeddings/search',
-            download: '/api/v1/models/embedding/download',
-            delete: '/api/v1/models/embedding',
-            progress: '/api/v1/models/embedding/progress',
-            config: '/api/v1/models/embeddings/config'
-        },
-        duckdb: {
-            status: '/api/v1/system/duckdb',
-            create: '/api/v1/system/duckdb',
-            clean: '/api/v1/system/duckdb/clean',
-            reset: '/api/v1/system/duckdb/hard-reset'
-        },
-     system: {
-            status: '/api/v1/system/system/status',
-            qdrant: '/api/v1/system/qdrant/status'
-        },
-        logging: {
-            get: '/api/v1/config/logging',
-            save: '/api/v1/config/logging'
-        }
-    };
+{% block scripts %}
+<script>
+// ─── Configuration ───
+var CONFIG = {
+    data: {
+        list: '/api/v1/system/data-dirs',
+        create: '/api/v1/system/data-dirs/fix',
+        clean: '/api/v1/system/data-dirs/clean',
+        reset: '/api/v1/system/data-dirs/hard-reset'
+    },
+    llm: {
+        installed: '/api/v1/models/llm/installed',
+        download: '/api/v1/models/llm/download',
+        delete: '/api/v1/models/llm',
+        progress: '/api/v1/models/llm/progress'
+    },
+    embedding: {
+        installed: '/api/v1/models/embedding/installed',
+        search: '/api/v1/models/embeddings/search',
+        download: '/api/v1/models/embedding/download',
+        delete: '/api/v1/models/embedding',
+        progress: '/api/v1/models/embedding/progress',
+        config: '/api/v1/models/embeddings/config'
+    },
+    duckdb: {
+        status: '/api/v1/system/duckdb',
+        create: '/api/v1/system/duckdb',
+        clean: '/api/v1/system/duckdb/clean',
+        reset: '/api/v1/system/duckdb/hard-reset'
+    },
+    system: {
+        status: '/api/v1/system/system/status',
+        qdrant: '/api/v1/system/qdrant/status'
+    },
+    logging: {
+        get: '/api/v1/config/logging',
+        save: '/api/v1/config/logging'
+    }
+};
 
-    var selectedLlmRepo = null;
-    var selectedEmbRepo = null;
+var selectedLlmRepo = null;
+var selectedEmbRepo = null;
 
-    // ─── DATA CARD ───
-    function renderDataDirs(dirs) {
-        var readyCount = 0;
-        var dirtyCount = 0;
-        var missingCount = 0;
+// ─── DATA CARD ───
+function renderDataDirs(dirs) {
+    var readyCount = 0;
+    var dirtyCount = 0;
+    var missingCount = 0;
 
-        for (var i = 0; i < dirs.length; i++) {
-            var d = dirs[i];
-            if (d.is_healthy) readyCount++;
-            else if (d.is_dirty) dirtyCount++;
-            else missingCount++;
-        }
-
-        var statusEl = document.getElementById('data-global-status');
-        statusEl.className = 'global-status';
-
-        if (readyCount === dirs.length) {
-            statusEl.classList.add('ok');
-        }
-
-        var dotClass = readyCount === dirs.length ? 'data-dot-ok' : (missingCount > 0 && readyCount === 0 ? 'data-dot-missing' : 'data-dot-warn');
-        var summaryClass = (readyCount === dirs.length) ? 'text-success' : (missingCount > 0 && readyCount === 0 ? 'text-danger' : 'text-warning');
-        var summaryLabel = readyCount === dirs.length ? 'READY' : (missingCount > 0 && readyCount === 0 ? 'ERROR' : 'PARTIAL');
-
-        var fixBtnHtml = readyCount === dirs.length ? '' : '<button class="btn btn-primary btn-sm" onclick="createDataDirs()">Fix</button>';
-        var listEl = document.getElementById('data-dirs-list');
-        listEl.innerHTML =
-            '<div class="data-row">' +
-                '<span class="' + dotClass + ' status-dot"></span>' +
-                '<span class="label">Data folders — ' + readyCount + '/' + dirs.length + ' ready</span>' +
-                '<span class="' + summaryClass + ' data-status-label">' + summaryLabel + '</span>' +
-                '<span class="data-action-buttons">' +
-                    fixBtnHtml +
-                    '<button class="btn btn-danger btn-sm" onclick="cleanDataDirs()">Clean</button>' +
-                    '<button class="btn btn-danger btn-sm" onclick="resetDataDirs()">Hard Reset</button>' +
-                '</span>' +
-            '</div>';
+    for (var i = 0; i < dirs.length; i++) {
+        var d = dirs[i];
+        if (d.is_healthy) readyCount++;
+        else if (d.is_dirty) dirtyCount++;
+        else missingCount++;
     }
 
-    function checkDataDirs() {
-        fetch(CONFIG.data.list)
-            .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
-            .then(function(dirs) { renderDataDirs(dirs); })
-            .catch(function(e) {
-                console.error(e);
-                document.getElementById('data-dirs-list').innerHTML =
-                    '<div class="data-row"><span class="label error-text">Error loading data: ' + escHtml(e.message) + '</span></div>';
-            });
-    }
+    var statusEl = document.getElementById('data-global-status');
+    statusEl.className = 'global-status';
 
-    // ─── DUCKDB CARD ───
-    function renderDuckDbStatus(status) {
-        var el = document.getElementById('duckdb-status');
-        var dotClass, labelClass, summaryLabel;
-
-        console.log('[DuckDB] status received:', status);
-
-        // Normalize null/undefined state to 'healthy' (existing DB)
-        var st = status.state || 'healthy';
-        console.log('[DuckDB] normalized state:', st);
-
-        // NEW STATES: missing, dirty_tables, excess_tables, healthy
-        if (st === 'healthy') {
-            dotClass = 'data-dot-ok'; labelClass = 'text-success'; summaryLabel = 'READY';
-        } else if (st === 'dirty_tables') {
-            dotClass = 'data-dot-warn'; labelClass = 'text-warning'; summaryLabel = 'DIRTY';
-        } else if (st === 'excess_tables') {
-            dotClass = 'data-dot-warn'; labelClass = 'text-warning'; summaryLabel = 'EXCESS';
-        } else if (st === 'missing') {
-            dotClass = 'data-dot-missing'; labelClass = 'text-danger'; summaryLabel = 'MISSING';
-        } else {
-            // Fallback for unknown states
-            console.warn('[DuckDB] unknown state:', st);
-            dotClass = 'data-dot-missing'; labelClass = 'text-danger'; summaryLabel = 'UNKNOWN (' + st + ')';
-        }
-
-        var size = status.file_size > 0 ? ' (' + formatBytes(status.file_size) + ')' : '';
-        var fixBtnHtml = status.needs_fix ? '<button class="btn btn-primary btn-sm" onclick="createDuckDb()">Fix</button>' : '<button class="btn btn-primary btn-sm" disabled>Fix</button>';
-        var cleanBtnHtml = status.needs_clean ? '<button class="btn btn-warning btn-sm" onclick="cleanDuckDb()">Clean</button>' : '<button class="btn btn-warning btn-sm" disabled>Clean</button>';
-
-        el.innerHTML =
-            '<div class="data-row">' +
-                '<span class="' + dotClass + ' status-dot"></span>' +
-                '<span class="label">DuckDB' + size + '</span>' +
-                '<span class="' + labelClass + ' data-status-label">' + summaryLabel + '</span>' +
-                '<span class="data-action-buttons">' +
-                    fixBtnHtml + ' ' + cleanBtnHtml + ' ' +
-                    '<button class="btn btn-danger btn-sm" onclick="resetDuckDb()">Hard Reset</button>' +
-                '</span>' +
-            '</div>';
-    }
-
-    function formatBytes(bytes) {
-        if (bytes === 0) return '0 B';
-        var k = 1024;
-        var sizes = ['B', 'KB', 'MB', 'GB'];
-        var i = Math.floor(Math.log(bytes) / Math.log(k));
-        return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
-    }
-
-    function checkDuckDbStatus() {
-        fetch(CONFIG.duckdb.status)
-            .then(function(r) {
-                if (!r.ok) return Promise.reject(new Error('HTTP ' + r.status));
-                return r.text().then(function(t) { return JSON.parse(t); });
-            })
-            .then(function(status) {
-                console.log('[DuckDB] raw status object:', status);
-                console.log('[DuckDB] typeof status.state:', typeof status.state);
-                console.log('[DuckDB] status.state value:', JSON.stringify(status.state));
-                renderDuckDbStatus(status);
-            })
-            .catch(function(e) {
-                console.error(e);
-                document.getElementById('duckdb-status').innerHTML =
-                    '<span class="label error-text">Error loading DuckDB: ' + escHtml(e.message) + '</span>';
-            });
-    }
-
-    function createDuckDb() {
-        fetch(CONFIG.duckdb.create, { method: 'POST' })
-            .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
-            .then(function() { checkDuckDbStatus(); })
-            .catch(function(e) { alert('Error: ' + e.message); });
-    }
-
-    function cleanDuckDb() {
-        if (!confirm('⚠️ This will remove excess tables not in the schema. Continue?')) return;
-        fetch(CONFIG.duckdb.clean, { method: 'POST' })
-            .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
-            .then(function() { checkDuckDbStatus(); })
-            .catch(function(e) { alert('Error: ' + e.message); });
-    }
-
-    function resetDuckDb() {
-        if (!confirm('⚠️ HARD RESET — This will permanently delete the DuckDB database and create a fresh one. Continue?')) return;
-        fetch(CONFIG.duckdb.reset, { method: 'POST' })
-            .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
-            .then(function() { checkDuckDbStatus(); })
-            .catch(function(e) { alert('Error: ' + e.message); });
-    }
-
-    function createDataDirs() {
-        fetch(CONFIG.data.create, { method: 'POST' })
-            .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
-            .then(function() { checkDataDirs(); })
-            .catch(function(e) { alert('Error: ' + e.message); });
-    }
-
-    function cleanDataDirs() {
-        if (!confirm('Clean all data directories? Non-official contents will be deleted.')) return;
-        fetch(CONFIG.data.clean, { method: 'POST' })
-            .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
-            .then(function() { checkDataDirs(); })
-            .catch(function(e) { alert('Error: ' + e.message); });
-    }
-
-    function resetDataDirs() {
-        if (!confirm('⚠️ HARD RESET — This will permanently delete ALL data in the data/ directory. Continue?')) return;
-        fetch(CONFIG.data.reset, { method: 'POST' })
-            .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
-            .then(function() { checkDataDirs(); })
-            .catch(function(e) { alert('Error: ' + e.message); });
-    }
-
-    // ─── LLM CARD ───
-    function renderLlmModels(models) {
-        var listEl = document.getElementById('llm-models-list');
-        var statusEl = document.getElementById('llm-global-status');
-        var textEl = document.getElementById('llm-global-text');
-        var btnDownload = document.getElementById('btn-download-llm');
-        var btnDelete = document.getElementById('btn-delete-llm');
-
-        statusEl.className = 'global-status';
-
-        if (!models || models.length === 0) {
-            statusEl.classList.add('warn');
-            textEl.textContent = 'No LLM models installed';
-            btnDownload.style.display = 'inline-block';
-            btnDelete.style.display = 'none';
-            listEl.innerHTML = '<p class="info-text info-text-with-margin info-text-size">Search and download a model to get started.</p>';
-            return;
-        }
-
+    if (readyCount === dirs.length) {
         statusEl.classList.add('ok');
-        textEl.textContent = models.length + ' model(s) installed';
-        btnDownload.style.display = 'none';
-        btnDelete.style.display = 'inline-block';
-
-        var html = '<table class="model-table"><tbody>';
-        for (var i = 0; i < models.length; i++) {
-            var m = models[i];
-            html += '<tr>';
-            html += '<td class="model-name" onclick="selectLlmModel(\'' + escHtml(m.repo_id) + '\')">' + escHtml(m.repo_id) + '</td>';
-            html += '<td>' + (m.files ? m.files.length + ' file(s)' : '') + '</td>';
-            html += '</tr>';
-        }
-        html += '</tbody></table>';
-        listEl.innerHTML = html;
-        selectedLlmRepo = models[0].repo_id;
     }
 
-    function checkLlmModels() {
-        fetch(CONFIG.llm.installed)
-            .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
-            .then(function(data) { renderLlmModels(data.models); })
-            .catch(function(e) {
-                console.error(e);
-                var statusEl = document.getElementById('llm-global-status');
-                var textEl = document.getElementById('llm-global-text');
-                statusEl.className = 'global-status critical';
-                textEl.textContent = 'Error loading LLM models';
-            });
+    var dotClass = readyCount === dirs.length ? 'data-dot-ok' : (missingCount > 0 && readyCount === 0 ? 'data-dot-missing' : 'data-dot-warn');
+    var summaryClass = (readyCount === dirs.length) ? 'text-success' : (missingCount > 0 && readyCount === 0 ? 'text-danger' : 'text-warning');
+    var summaryLabel = readyCount === dirs.length ? 'READY' : (missingCount > 0 && readyCount === 0 ? 'ERROR' : 'PARTIAL');
+
+    var fixBtnHtml = readyCount === dirs.length ? '' : '<button class="btn btn-primary btn-sm" onclick="createDataDirs()">Fix</button>';
+    var listEl = document.getElementById('data-dirs-list');
+    listEl.innerHTML =
+        '<div class="data-row">' +
+            '<span class="' + dotClass + ' status-dot"></span>' +
+            '<span class="label">Data folders — ' + readyCount + '/' + dirs.length + ' ready</span>' +
+            '<span class="' + summaryClass + ' data-status-label">' + summaryLabel + '</span>' +
+            '<span class="data-action-buttons">' +
+                fixBtnHtml +
+                '<button class="btn btn-danger btn-sm" onclick="cleanDataDirs()">Clean</button>' +
+                '<button class="btn btn-danger btn-sm" onclick="resetDataDirs()">Hard Reset</button>' +
+            '</span>' +
+        '</div>';
+}
+
+function checkDataDirs() {
+    fetch(CONFIG.data.list)
+        .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
+        .then(function(dirs) { renderDataDirs(dirs); })
+        .catch(function(e) {
+            console.error(e);
+            document.getElementById('data-dirs-list').innerHTML =
+                '<div class="data-row"><span class="label error-text">Error loading data: ' + escHtml(e.message) + '</span></div>';
+        });
+}
+
+// ─── DUCKDB CARD ───
+function renderDuckDbStatus(status) {
+    var el = document.getElementById('duckdb-status');
+    var dotClass, labelClass, summaryLabel;
+
+    console.log('[DuckDB] status received:', status);
+
+    // Normalize null/undefined state to 'healthy' (existing DB)
+    var st = status.state || 'healthy';
+    console.log('[DuckDB] normalized state:', st);
+
+    // NEW STATES: missing, dirty_tables, excess_tables, healthy
+    if (st === 'healthy') {
+        dotClass = 'data-dot-ok'; labelClass = 'text-success'; summaryLabel = 'READY';
+    } else if (st === 'dirty_tables') {
+        dotClass = 'data-dot-warn'; labelClass = 'text-warning'; summaryLabel = 'DIRTY';
+    } else if (st === 'excess_tables') {
+        dotClass = 'data-dot-warn'; labelClass = 'text-warning'; summaryLabel = 'EXCESS';
+    } else if (st === 'missing') {
+        dotClass = 'data-dot-missing'; labelClass = 'text-danger'; summaryLabel = 'MISSING';
+    } else {
+        // Fallback for unknown states
+        console.warn('[DuckDB] unknown state:', st);
+        dotClass = 'data-dot-missing'; labelClass = 'text-danger'; summaryLabel = 'UNKNOWN (' + st + ')';
     }
 
-    function selectLlmModel(repoId) {
-        selectedLlmRepo = repoId;
-        var listEl = document.getElementById('llm-models-list');
-        var rows = listEl.querySelectorAll('.model-name');
-        for (var i = 0; i < rows.length; i++) {
-            rows[i].style.fontWeight = 'normal';
-            rows[i].style.color = '#007bff';
-        }
-        if (rows.length > 0) {
-            for (var j = 0; j < rows.length; j++) {
-                if (rows[j].textContent === repoId) {
-                    rows[j].style.fontWeight = 'bold';
-                    rows[j].style.color = '#0056b3';
-                    break;
-                }
-            }
-        }
-    }
+    var size = status.file_size > 0 ? ' (' + formatBytes(status.file_size) + ')' : '';
+    var fixBtnHtml = status.needs_fix ? '<button class="btn btn-primary btn-sm" onclick="createDuckDb()">Fix</button>' : '<button class="btn btn-primary btn-sm" disabled>Fix</button>';
+    var cleanBtnHtml = status.needs_clean ? '<button class="btn btn-warning btn-sm" onclick="cleanDuckDb()">Clean</button>' : '<button class="btn btn-warning btn-sm" disabled>Clean</button>';
 
-    function searchLlmModel() {
-        var query = document.getElementById('llm-search-input').value.trim();
-        if (!query) return;
-        
-        fetch(CONFIG.llm.search + '?q=' + encodeURIComponent(query) + '&limit=10')
-            .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
-            .then(function(data) {
-                var resultsEl = document.getElementById('llm-search-results');
-                if (!data.models || data.models.length === 0) {
-                    resultsEl.innerHTML = '<p class="info-text info-text-size">No results found.</p>';
-                    return;
-                }
+    el.innerHTML =
+        '<div class="data-row">' +
+            '<span class="' + dotClass + ' status-dot"></span>' +
+            '<span class="label">DuckDB' + size + '</span>' +
+            '<span class="' + labelClass + ' data-status-label">' + summaryLabel + '</span>' +
+            '<span class="data-action-buttons">' +
+                fixBtnHtml + ' ' + cleanBtnHtml + ' ' +
+                '<button class="btn btn-danger btn-sm" onclick="resetDuckDb()">Hard Reset</button>' +
+            '</span>' +
+        '</div>';
+}
 
-                var html = '';
-                for (var i = 0; i < data.models.length; i++) {
-                    var m = data.models[i];
-                    html += '<div class="search-item">';
-                    html += '<span class="result-name">' + escHtml(m.repo_id) + '</span>';
-                    html += '<button class="btn btn-primary btn-sm" onclick="downloadLlmModelDirect(\'' + escHtml(m.repo_id) + '\')">Download</button>';
-                    html += '</div>';
-                }
-                resultsEl.innerHTML = html;
-            })
-            .catch(function(e) {
-                console.error(e);
-                document.getElementById('llm-search-results').innerHTML = '<p class="error-text error-text-size">Search error.</p>';
-            });
-    }
+function formatBytes(bytes) {
+    if (bytes === 0) return '0 B';
+    var k = 1024;
+    var sizes = ['B', 'KB', 'MB', 'GB'];
+    var i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+}
 
-    function downloadLlmModel() {
-        if (!selectedLlmRepo) return;
-        fetch(CONFIG.llm.download + '?repo_id=' + encodeURIComponent(selectedLlmRepo), { method: 'POST' })
-            .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
-            .then(function() {
-                var btn = document.getElementById('btn-download-llm');
-                btn.textContent = 'Downloading...';
-                btn.disabled = true;
-                
-                var checkProgress = setInterval(function() {
-                    fetch(CONFIG.llm.progress + '?repo_id=' + encodeURIComponent(selectedLlmRepo))
-                        .then(function(r) { return r.json(); })
-                        .then(function(data) {
-                            if (data.status === 'completed') {
-                                clearInterval(checkProgress);
-                                btn.textContent = 'Download';
-                                btn.disabled = false;
-                                checkLlmModels();
-                            } else if (data.status && data.status.startsWith('error')) {
-                                clearInterval(checkProgress);
-                                btn.textContent = 'Download';
-                                btn.disabled = false;
-                                alert('Download failed: ' + data.status);
-                            }
-                        })
-                        .catch(function() {});
-                }, 1000);
-            })
-            .catch(function(e) { alert('Error: ' + e.message); });
-    }
-
-    function downloadLlmModelDirect(repoId) {
-        selectedLlmRepo = repoId;
-        downloadLlmModel();
-    }
-
-    function deleteLlmModel() {
-        if (!selectedLlmRepo) return;
-        if (!confirm('Delete model ' + selectedLlmRepo + '?')) return;
-        
-        fetch(CONFIG.llm.delete + '/' + encodeURIComponent(selectedLlmRepo), { method: 'DELETE' })
-            .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
-            .then(function() { 
-                selectedLlmRepo = null;
-                checkLlmModels(); 
-            })
-            .catch(function(e) { alert('Error: ' + e.message); });
-    }
-
-    // ─── EMBEDDING CARD ───
-    function renderEmbModels(models) {
-        var listEl = document.getElementById('emb-models-list');
-        var statusEl = document.getElementById('emb-global-status');
-        var textEl = document.getElementById('emb-global-text');
-        var btnDownload = document.getElementById('btn-download-emb');
-        var btnDelete = document.getElementById('btn-delete-emb');
-
-        statusEl.className = 'global-status';
-
-        if (!models || models.length === 0) {
-            statusEl.classList.add('warn');
-            textEl.textContent = 'No embedding models installed';
-            btnDownload.style.display = 'inline-block';
-            btnDelete.style.display = 'none';
-            listEl.innerHTML = '<p class="info-text info-text-with-margin info-text-size">Search and download a model to get started.</p>';
-            return;
-        }
-
-        statusEl.classList.add('ok');
-        textEl.textContent = models.length + ' model(s) installed';
-        btnDownload.style.display = 'none';
-        btnDelete.style.display = 'inline-block';
-
-        var html = '<table class="model-table"><tbody>';
-        for (var i = 0; i < models.length; i++) {
-            var m = models[i];
-            var repoId = Object.keys(m)[0];
-            html += '<tr>';
-            html += '<td class="model-name" onclick="selectEmbModel(\'' + escHtml(repoId) + '\')">' + escHtml(repoId) + '</td>';
-            html += '</tr>';
-        }
-        html += '</tbody></table>';
-        listEl.innerHTML = html;
-        if (models.length > 0) {
-            selectedEmbRepo = Object.keys(models[0]);
-            selectedEmbRepo = selectedEmbRepo[0];
-        }
-    }
-
-    function checkEmbModels() {
-        fetch(CONFIG.embedding.installed)
-            .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
-            .then(function(data) { renderEmbModels(data.models); })
-            .catch(function(e) {
-                console.error(e);
-                var statusEl = document.getElementById('emb-global-status');
-                var textEl = document.getElementById('emb-global-text');
-                statusEl.className = 'global-status critical';
-                textEl.textContent = 'Error loading embedding models';
-            });
-    }
-
-    function selectEmbModel(repoId) {
-        selectedEmbRepo = repoId;
-        var listEl = document.getElementById('emb-models-list');
-        var rows = listEl.querySelectorAll('.model-name');
-        for (var i = 0; i < rows.length; i++) {
-            rows[i].style.fontWeight = 'normal';
-            rows[i].style.color = '#007bff';
-        }
-        if (rows.length > 0) {
-            for (var j = 0; j < rows.length; j++) {
-                if (rows[j].textContent === repoId) {
-                    rows[j].style.fontWeight = 'bold';
-                    rows[j].style.color = '#0056b3';
-                    break;
-                }
-            }
-        }
-    }
-
-    function searchEmbModel() {
-        var query = document.getElementById('emb-search-input').value.trim();
-        if (!query) return;
-        
-        fetch(CONFIG.embedding.search + '?query=' + encodeURIComponent(query) + '&limit=10')
-            .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
-            .then(function(data) {
-                var resultsEl = document.getElementById('emb-search-results');
-                if (!data.models || data.models.length === 0) {
-                    resultsEl.innerHTML = '<p class="info-text info-text-size">No results found.</p>';
-                    return;
-                }
-
-                var html = '';
-                for (var i = 0; i < data.models.length; i++) {
-                    var m = data.models[i];
-                    html += '<div class="search-item">';
-                    html += '<span class="result-name">' + escHtml(m.repo_id) + '</span>';
-                    html += '<button class="btn btn-primary btn-sm" onclick="downloadEmbModelDirect(\'' + escHtml(m.repo_id) + '\')">Download</button>';
-                    html += '</div>';
-                }
-                resultsEl.innerHTML = html;
-            })
-            .catch(function(e) {
-                console.error(e);
-                document.getElementById('emb-search-results').innerHTML = '<p class="error-text error-text-size">Search error.</p>';
-            });
-    }
-
-    function downloadEmbModel() {
-        if (!selectedEmbRepo) return;
-        fetch(CONFIG.embedding.download + '?repo_id=' + encodeURIComponent(selectedEmbRepo), { method: 'POST' })
-            .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
-            .then(function() {
-                var btn = document.getElementById('btn-download-emb');
-                btn.textContent = 'Downloading...';
-                btn.disabled = true;
-                
-                var checkProgress = setInterval(function() {
-                    fetch(CONFIG.embedding.progress + '?repo_id=' + encodeURIComponent(selectedEmbRepo))
-                        .then(function(r) { return r.json(); })
-                        .then(function(data) {
-                            if (data.status === 'completed') {
-                                clearInterval(checkProgress);
-                                btn.textContent = 'Download';
-                                btn.disabled = false;
-                                checkEmbModels();
-                            } else if (data.status && data.status.startsWith('error')) {
-                                clearInterval(checkProgress);
-                                btn.textContent = 'Download';
-                                btn.disabled = false;
-                                alert('Download failed: ' + data.status);
-                            }
-                        })
-                        .catch(function() {});
-                }, 1000);
-            })
-            .catch(function(e) { alert('Error: ' + e.message); });
-    }
-
-    function downloadEmbModelDirect(repoId) {
-        selectedEmbRepo = repoId;
-        downloadEmbModel();
-    }
-
-    function deleteEmbModel() {
-        if (!selectedEmbRepo) return;
-        if (!confirm('Delete model ' + selectedEmbRepo + '?')) return;
-        
-        fetch(CONFIG.embedding.delete + '/' + encodeURIComponent(selectedEmbRepo), { method: 'DELETE' })
-            .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
-            .then(function() { 
-                selectedEmbRepo = null;
-                checkEmbModels(); 
-            })
-            .catch(function(e) { alert('Error: ' + e.message); });
-    }
-
-    // ─── SYSTEM CARD ───
-    function renderSystemStatus(status, qdrant) {
-        var infoEl = document.getElementById('system-info');
-        var qdrantEl = document.getElementById('qdrant-info');
-        var statusEl = document.getElementById('system-global-status');
-        var textEl = document.getElementById('system-global-text');
-
-        statusEl.className = 'global-status';
-
-        var hasError = false;
-        if (status.error) {
-            statusEl.classList.add('critical');
-            textEl.textContent = 'Error loading system status';
-            hasError = true;
-        }
-
-        if (!hasError) {
-            var llamaOk = status.llama && status.llama.status === 'installed';
-            var baseOk = status.base_dir_exists;
-            
-            if (llamaOk && baseOk) {
-                statusEl.classList.add('ok');
-                textEl.textContent = 'System operational';
-            } else if (baseOk) {
-                statusEl.classList.add('warn');
-                textEl.textContent = 'System ready (LLM missing)';
-            } else {
-                statusEl.classList.add('critical');
-                textEl.textContent = 'Base directory missing';
-            }
-
-            var html = '';
-            html += '<div class="info-row"><span class="info-label">Hostname</span><span class="info-value">' + escHtml(status.hostname) + '</span></div>';
-            html += '<div class="info-row"><span class="info-label">OS</span><span class="info-value">' + escHtml(status.os) + '</span></div>';
-            html += '<div class="info-row"><span class="info-label">Python</span><span class="info-value">' + escHtml(status.python_version) + '</span></div>';
-            html += '<div class="info-row"><span class="info-label">LLM</span><span class="info-value">' + escHtml(status.llama ? status.llama.version : 'N/A') + ' <span class="status-badge ' + (llamaOk ? 'ok' : 'warn') + '">' + (status.llama ? status.llama.status : 'unknown') + '</span></span></div>';
-            infoEl.innerHTML = html;
-
-            if (qdrant) {
-                var qdrantOk = qdrant.connected;
-                var qdrantHtml = '';
-                qdrantHtml += '<div class="info-row"><span class="info-label">Qdrant</span><span class="info-value">' + (qdrant.connected ? 'Connected' : 'Disconnected') + ' <span class="status-badge ' + (qdrantOk ? 'ok' : 'error') + '">' + (qdrant.connected ? 'ok' : 'error') + '</span></span></div>';
-                qdrantHtml += '<div class="info-row"><span class="info-label">Port</span><span class="info-value">' + escHtml(qdrant.port) + '</span></div>';
-                qdrantHtml += '<div class="info-row"><span class="info-label">Storage</span><span class="info-value">' + escHtml(qdrant.storage_path) + '</span></div>';
-                qdrantEl.innerHTML = qdrantHtml;
-            }
-        }
-    }
-
-    function checkSystemStatus() {
-        Promise.all([
-            fetch(CONFIG.system.status).then(function(r) { return r.json(); }),
-            fetch(CONFIG.system.qdrant).then(function(r) { return r.json(); })
-        ])
-        .then(function(data) {
-            renderSystemStatus(data[0], data[1]);
+function checkDuckDbStatus() {
+    fetch(CONFIG.duckdb.status)
+        .then(function(r) {
+            if (!r.ok) return Promise.reject(new Error('HTTP ' + r.status));
+            return r.text().then(function(t) { return JSON.parse(t); });
+        })
+        .then(function(status) {
+            console.log('[DuckDB] raw status object:', status);
+            console.log('[DuckDB] typeof status.state:', typeof status.state);
+            console.log('[DuckDB] status.state value:', JSON.stringify(status.state));
+            renderDuckDbStatus(status);
         })
         .catch(function(e) {
             console.error(e);
-            var statusEl = document.getElementById('system-global-status');
-            var textEl = document.getElementById('system-global-text');
-            statusEl.className = 'global-status critical';
-            textEl.textContent = 'Error loading system status';
+            document.getElementById('duckdb-status').innerHTML =
+                '<span class="label error-text">Error loading DuckDB: ' + escHtml(e.message) + '</span>';
         });
+}
+
+function createDuckDb() {
+    fetch(CONFIG.duckdb.create, { method: 'POST' })
+        .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
+        .then(function() { checkDuckDbStatus(); })
+        .catch(function(e) { alert('Error: ' + e.message); });
+}
+
+function cleanDuckDb() {
+    if (!confirm('⚠️ This will remove excess tables not in the schema. Continue?')) return;
+    fetch(CONFIG.duckdb.clean, { method: 'POST' })
+        .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
+        .then(function() { checkDuckDbStatus(); })
+        .catch(function(e) { alert('Error: ' + e.message); });
+}
+
+function resetDuckDb() {
+    if (!confirm('⚠️ HARD RESET — This will permanently delete the DuckDB database and create a fresh one. Continue?')) return;
+    fetch(CONFIG.duckdb.reset, { method: 'POST' })
+        .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
+        .then(function() { checkDuckDbStatus(); })
+        .catch(function(e) { alert('Error: ' + e.message); });
+}
+
+function createDataDirs() {
+    fetch(CONFIG.data.create, { method: 'POST' })
+        .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
+        .then(function() { checkDataDirs(); })
+        .catch(function(e) { alert('Error: ' + e.message); });
+}
+
+function cleanDataDirs() {
+    if (!confirm('Clean all data directories? Non-official contents will be deleted.')) return;
+    fetch(CONFIG.data.clean, { method: 'POST' })
+        .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
+        .then(function() { checkDataDirs(); })
+        .catch(function(e) { alert('Error: ' + e.message); });
+}
+
+function resetDataDirs() {
+    if (!confirm('⚠️ HARD RESET — This will permanently delete ALL data in the data/ directory. Continue?')) return;
+    fetch(CONFIG.data.reset, { method: 'POST' })
+        .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
+        .then(function() { checkDataDirs(); })
+        .catch(function(e) { alert('Error: ' + e.message); });
+}
+
+// ─── LLM CARD ───
+function renderLlmModels(models) {
+    var listEl = document.getElementById('llm-models-list');
+    var statusEl = document.getElementById('llm-global-status');
+    var textEl = document.getElementById('llm-global-text');
+    var btnDownload = document.getElementById('btn-download-llm');
+    var btnDelete = document.getElementById('btn-delete-llm');
+
+    statusEl.className = 'global-status';
+
+    if (!models || models.length === 0) {
+        statusEl.classList.add('warn');
+        textEl.textContent = 'No LLM models installed';
+        btnDownload.style.display = 'inline-block';
+        btnDelete.style.display = 'none';
+        listEl.innerHTML = '<p class="info-text info-text-with-margin info-text-size">Search and download a model to get started.</p>';
+        return;
     }
 
-   function refreshSystemStatus() {
-        checkSystemStatus();
+    statusEl.classList.add('ok');
+    textEl.textContent = models.length + ' model(s) installed';
+    btnDownload.style.display = 'none';
+    btnDelete.style.display = 'inline-block';
+
+    var html = '<table class="model-table"><tbody>';
+    for (var i = 0; i < models.length; i++) {
+        var m = models[i];
+        html += '<tr>';
+        html += '<td class="model-name" onclick="selectLlmModel(\'' + escHtml(m.repo_id) + '\')">' + escHtml(m.repo_id) + '</td>';
+        html += '<td>' + (m.files ? m.files.length + ' file(s)' : '') + '</td>';
+        html += '</tr>';
+    }
+    html += '</tbody></table>';
+    listEl.innerHTML = html;
+    selectedLlmRepo = models[0].repo_id;
+}
+
+function checkLlmModels() {
+    fetch(CONFIG.llm.installed)
+        .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
+        .then(function(data) { renderLlmModels(data.models); })
+        .catch(function(e) {
+            console.error(e);
+            var statusEl = document.getElementById('llm-global-status');
+            var textEl = document.getElementById('llm-global-text');
+            statusEl.className = 'global-status critical';
+            textEl.textContent = 'Error loading LLM models';
+        });
+}
+
+function selectLlmModel(repoId) {
+    selectedLlmRepo = repoId;
+    var listEl = document.getElementById('llm-models-list');
+    var rows = listEl.querySelectorAll('.model-name');
+    for (var i = 0; i < rows.length; i++) {
+        rows[i].style.fontWeight = 'normal';
+        rows[i].style.color = '#007bff';
+    }
+    if (rows.length > 0) {
+        for (var j = 0; j < rows.length; j++) {
+            if (rows[j].textContent === repoId) {
+                rows[j].style.fontWeight = 'bold';
+                rows[j].style.color = '#0056b3';
+                break;
+            }
+        }
+    }
+}
+
+function searchLlmModel() {
+    var query = document.getElementById('llm-search-input').value.trim();
+    if (!query) return;
+    
+    fetch(CONFIG.llm.search + '?q=' + encodeURIComponent(query) + '&limit=10')
+        .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
+        .then(function(data) {
+            var resultsEl = document.getElementById('llm-search-results');
+            if (!data.models || data.models.length === 0) {
+                resultsEl.innerHTML = '<p class="info-text info-text-size">No results found.</p>';
+                return;
+            }
+
+            var html = '';
+            for (var i = 0; i < data.models.length; i++) {
+                var m = data.models[i];
+                html += '<div class="search-item">';
+                html += '<span class="result-name">' + escHtml(m.repo_id) + '</span>';
+                html += '<button class="btn btn-primary btn-sm" onclick="downloadLlmModelDirect(\'' + escHtml(m.repo_id) + '\')">Download</button>';
+                html += '</div>';
+            }
+            resultsEl.innerHTML = html;
+        })
+        .catch(function(e) {
+            console.error(e);
+            document.getElementById('llm-search-results').innerHTML = '<p class="error-text error-text-size">Search error.</p>';
+        });
+}
+
+function downloadLlmModel() {
+    if (!selectedLlmRepo) return;
+    fetch(CONFIG.llm.download + '?repo_id=' + encodeURIComponent(selectedLlmRepo), { method: 'POST' })
+        .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
+        .then(function() {
+            var btn = document.getElementById('btn-download-llm');
+            btn.textContent = 'Downloading...';
+            btn.disabled = true;
+            
+            var checkProgress = setInterval(function() {
+                fetch(CONFIG.llm.progress + '?repo_id=' + encodeURIComponent(selectedLlmRepo))
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) {
+                        if (data.status === 'completed') {
+                            clearInterval(checkProgress);
+                            btn.textContent = 'Download';
+                            btn.disabled = false;
+                            checkLlmModels();
+                        } else if (data.status && data.status.startsWith('error')) {
+                            clearInterval(checkProgress);
+                            btn.textContent = 'Download';
+                            btn.disabled = false;
+                            alert('Download failed: ' + data.status);
+                        }
+                    })
+                    .catch(function() {});
+            }, 1000);
+        })
+        .catch(function(e) { alert('Error: ' + e.message); });
+}
+
+function downloadLlmModelDirect(repoId) {
+    selectedLlmRepo = repoId;
+    downloadLlmModel();
+}
+
+function deleteLlmModel() {
+    if (!selectedLlmRepo) return;
+    if (!confirm('Delete model ' + selectedLlmRepo + '?')) return;
+    
+    fetch(CONFIG.llm.delete + '/' + encodeURIComponent(selectedLlmRepo), { method: 'DELETE' })
+        .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
+        .then(function() { 
+            selectedLlmRepo = null;
+            checkLlmModels(); 
+        })
+        .catch(function(e) { alert('Error: ' + e.message); });
+}
+
+// ─── EMBEDDING CARD ───
+function renderEmbModels(models) {
+    var listEl = document.getElementById('emb-models-list');
+    var statusEl = document.getElementById('emb-global-status');
+    var textEl = document.getElementById('emb-global-text');
+    var btnDownload = document.getElementById('btn-download-emb');
+    var btnDelete = document.getElementById('btn-delete-emb');
+
+    statusEl.className = 'global-status';
+
+    if (!models || models.length === 0) {
+        statusEl.classList.add('warn');
+        textEl.textContent = 'No embedding models installed';
+        btnDownload.style.display = 'inline-block';
+        btnDelete.style.display = 'none';
+        listEl.innerHTML = '<p class="info-text info-text-with-margin info-text-size">Search and download a model to get started.</p>';
+        return;
     }
 
-    // ─── LOGGING CARD ───
-    function renderLoggingConfig(data) {
-        var statusEl = document.getElementById('logging-status');
-        var textEl = document.getElementById('logging-status-text');
-        var levelSelect = document.getElementById('log-level-select');
-        var maxSizeInput = document.getElementById('log-max-size-input');
-        var maxFileInput = document.getElementById('log-max-file-input');
-        var cleanToggle = document.getElementById('log-clean-at-startup');
+    statusEl.classList.add('ok');
+    textEl.textContent = models.length + ' model(s) installed';
+    btnDownload.style.display = 'none';
+    btnDelete.style.display = 'inline-block';
 
-        statusEl.className = 'global-status ok';
-        textEl.textContent = 'Configuration loaded';
+    var html = '<table class="model-table"><tbody>';
+    for (var i = 0; i < models.length; i++) {
+        var m = models[i];
+        var repoId = Object.keys(m)[0];
+        html += '<tr>';
+        html += '<td class="model-name" onclick="selectEmbModel(\'' + escHtml(repoId) + '\')">' + escHtml(repoId) + '</td>';
+        html += '</tr>';
+    }
+    html += '</tbody></table>';
+    listEl.innerHTML = html;
+    if (models.length > 0) {
+        selectedEmbRepo = Object.keys(models[0]);
+        selectedEmbRepo = selectedEmbRepo[0];
+    }
+}
 
-        if (levelSelect) levelSelect.value = data.level || 'INFO';
-        if (maxSizeInput) maxSizeInput.value = data.log_max_size || '10M';
-        if (maxFileInput) maxFileInput.value = data.log_max_file || 5;
-        if (cleanToggle) cleanToggle.checked = data.clean_at_startup || false;
+function checkEmbModels() {
+    fetch(CONFIG.embedding.installed)
+        .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
+        .then(function(data) { renderEmbModels(data.models); })
+        .catch(function(e) {
+            console.error(e);
+            var statusEl = document.getElementById('emb-global-status');
+            var textEl = document.getElementById('emb-global-text');
+            statusEl.className = 'global-status critical';
+            textEl.textContent = 'Error loading embedding models';
+        });
+}
 
-        var toggleLabel = document.getElementById('log-clean-toggle');
-        if (toggleLabel) {
-            toggleLabel.classList.toggle('ext', !data.clean_at_startup);
+function selectEmbModel(repoId) {
+    selectedEmbRepo = repoId;
+    var listEl = document.getElementById('emb-models-list');
+    var rows = listEl.querySelectorAll('.model-name');
+    for (var i = 0; i < rows.length; i++) {
+        rows[i].style.fontWeight = 'normal';
+        rows[i].style.color = '#007bff';
+    }
+    if (rows.length > 0) {
+        for (var j = 0; j < rows.length; j++) {
+            if (rows[j].textContent === repoId) {
+                rows[j].style.fontWeight = 'bold';
+                rows[j].style.color = '#0056b3';
+                break;
+            }
+        }
+    }
+}
+
+function searchEmbModel() {
+    var query = document.getElementById('emb-search-input').value.trim();
+    if (!query) return;
+    
+    fetch(CONFIG.embedding.search + '?query=' + encodeURIComponent(query) + '&limit=10')
+        .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
+        .then(function(data) {
+            var resultsEl = document.getElementById('emb-search-results');
+            if (!data.models || data.models.length === 0) {
+                resultsEl.innerHTML = '<p class="info-text info-text-size">No results found.</p>';
+                return;
+            }
+
+            var html = '';
+            for (var i = 0; i < data.models.length; i++) {
+                var m = data.models[i];
+                html += '<div class="search-item">';
+                html += '<span class="result-name">' + escHtml(m.repo_id) + '</span>';
+                html += '<button class="btn btn-primary btn-sm" onclick="downloadEmbModelDirect(\'' + escHtml(m.repo_id) + '\')">Download</button>';
+                html += '</div>';
+            }
+            resultsEl.innerHTML = html;
+        })
+        .catch(function(e) {
+            console.error(e);
+            document.getElementById('emb-search-results').innerHTML = '<p class="error-text error-text-size">Search error.</p>';
+        });
+}
+
+function downloadEmbModel() {
+    if (!selectedEmbRepo) return;
+    fetch(CONFIG.embedding.download + '?repo_id=' + encodeURIComponent(selectedEmbRepo), { method: 'POST' })
+        .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
+        .then(function() {
+            var btn = document.getElementById('btn-download-emb');
+            btn.textContent = 'Downloading...';
+            btn.disabled = true;
+            
+            var checkProgress = setInterval(function() {
+                fetch(CONFIG.embedding.progress + '?repo_id=' + encodeURIComponent(selectedEmbRepo))
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) {
+                        if (data.status === 'completed') {
+                            clearInterval(checkProgress);
+                            btn.textContent = 'Download';
+                            btn.disabled = false;
+                            checkEmbModels();
+                        } else if (data.status && data.status.startsWith('error')) {
+                            clearInterval(checkProgress);
+                            btn.textContent = 'Download';
+                            btn.disabled = false;
+                            alert('Download failed: ' + data.status);
+                        }
+                    })
+                    .catch(function() {});
+            }, 1000);
+        })
+        .catch(function(e) { alert('Error: ' + e.message); });
+}
+
+function downloadEmbModelDirect(repoId) {
+    selectedEmbRepo = repoId;
+    downloadEmbModel();
+}
+
+function deleteEmbModel() {
+    if (!selectedEmbRepo) return;
+    if (!confirm('Delete model ' + selectedEmbRepo + '?')) return;
+    
+    fetch(CONFIG.embedding.delete + '/' + encodeURIComponent(selectedEmbRepo), { method: 'DELETE' })
+        .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
+        .then(function() { 
+            selectedEmbRepo = null;
+            checkEmbModels(); 
+        })
+        .catch(function(e) { alert('Error: ' + e.message); });
+}
+
+// ─── SYSTEM CARD ───
+function renderSystemStatus(status, qdrant) {
+    var infoEl = document.getElementById('system-info');
+    var qdrantEl = document.getElementById('qdrant-info');
+    var statusEl = document.getElementById('system-global-status');
+    var textEl = document.getElementById('system-global-text');
+
+    statusEl.className = 'global-status';
+
+    var hasError = false;
+    if (status.error) {
+        statusEl.classList.add('critical');
+        textEl.textContent = 'Error loading system status';
+        hasError = true;
+    }
+
+    if (!hasError) {
+        var llamaOk = status.llama && status.llama.status === 'installed';
+        var baseOk = status.base_dir_exists;
+        
+        if (llamaOk && baseOk) {
+            statusEl.classList.add('ok');
+            textEl.textContent = 'System operational';
+        } else if (baseOk) {
+            statusEl.classList.add('warn');
+            textEl.textContent = 'System ready (LLM missing)';
+        } else {
+            statusEl.classList.add('critical');
+            textEl.textContent = 'Base directory missing';
+        }
+
+        var html = '';
+        html += '<div class="info-row"><span class="info-label">Hostname</span><span class="info-value">' + escHtml(status.hostname) + '</span></div>';
+        html += '<div class="info-row"><span class="info-label">OS</span><span class="info-value">' + escHtml(status.os) + '</span></div>';
+        html += '<div class="info-row"><span class="info-label">Python</span><span class="info-value">' + escHtml(status.python_version) + '</span></div>';
+        html += '<div class="info-row"><span class="info-label">LLM</span><span class="info-value">' + escHtml(status.llama ? status.llama.version : 'N/A') + ' <span class="status-badge ' + (llamaOk ? 'ok' : 'warn') + '">' + (status.llama ? status.llama.status : 'unknown') + '</span></span></div>';
+        infoEl.innerHTML = html;
+
+        if (qdrant) {
+            var qdrantOk = qdrant.connected;
+            var qdrantHtml = '';
+            qdrantHtml += '<div class="info-row"><span class="info-label">Qdrant</span><span class="info-value">' + (qdrant.connected ? 'Connected' : 'Disconnected') + ' <span class="status-badge ' + (qdrantOk ? 'ok' : 'error') + '">' + (qdrant.connected ? 'ok' : 'error') + '</span></span></div>';
+            qdrantHtml += '<div class="info-row"><span class="info-label">Port</span><span class="info-value">' + escHtml(qdrant.port) + '</span></div>';
+            qdrantHtml += '<div class="info-row"><span class="info-label">Storage</span><span class="info-value">' + escHtml(qdrant.storage_path) + '</span></div>';
+            qdrantEl.innerHTML = qdrantHtml;
+        }
+    }
+}
+
+function checkSystemStatus() {
+    Promise.all([
+        fetch(CONFIG.system.status).then(function(r) { return r.json(); }),
+        fetch(CONFIG.system.qdrant).then(function(r) { return r.json(); })
+    ])
+    .then(function(data) {
+        renderSystemStatus(data[0], data[1]);
+    })
+    .catch(function(e) {
+        console.error(e);
+        var statusEl = document.getElementById('system-global-status');
+        var textEl = document.getElementById('system-global-text');
+        statusEl.className = 'global-status critical';
+        textEl.textContent = 'Error loading system status';
+    });
+}
+
+function refreshSystemStatus() {
+    checkSystemStatus();
+}
+
+// ─── LOGGING CARD ───
+function renderLoggingConfig(data) {
+    var statusEl = document.getElementById('logging-status');
+    var textEl = document.getElementById('logging-status-text');
+    var levelSelect = document.getElementById('log-level-select');
+    var maxSizeInput = document.getElementById('log-max-size-input');
+    var maxFileInput = document.getElementById('log-max-file-input');
+    var cleanToggle = document.getElementById('log-clean-at-startup');
+
+    statusEl.className = 'global-status ok';
+    textEl.textContent = 'Configuration loaded';
+
+    if (levelSelect) levelSelect.value = data.level || 'INFO';
+    if (maxSizeInput) maxSizeInput.value = data.log_max_size || '10M';
+    if (maxFileInput) maxFileInput.value = data.log_max_file || 5;
+    if (cleanToggle) cleanToggle.checked = data.clean_at_startup || false;
+
+    var toggleLabel = document.getElementById('log-clean-toggle');
+    if (toggleLabel) {
+        toggleLabel.classList.toggle('ext', !data.clean_at_startup);
+    }
+}
+
+function checkLoggingConfig() {
+    fetch(CONFIG.logging.get)
+        .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
+        .then(function(data) {
+            if (data.status === 'success') {
+                renderLoggingConfig(data.data);
+            } else {
+                document.getElementById('logging-status').className = 'global-status critical';
+                document.getElementById('logging-status-text').textContent = 'Error loading logging config';
+            }
+        })
+        .catch(function(e) {
+            console.error(e);
+            document.getElementById('logging-status').className = 'global-status critical';
+            document.getElementById('logging-status-text').textContent = 'Error loading logging: ' + e.message;
+        });
+}
+
+function saveLoggingConfig() {
+    var statusEl = document.getElementById('logging-config-status');
+    var payload = {
+        level: document.getElementById('log-level-select').value,
+        log_max_size: document.getElementById('log-max-size-input').value,
+        log_max_file: parseInt(document.getElementById('log-max-file-input').value, 10),
+        clean_at_startup: document.getElementById('log-clean-at-startup').checked
+    };
+    statusEl.textContent = 'Saving...';
+    statusEl.className = 'status-message';
+    fetch(CONFIG.logging.save, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.status === 'success') {
+            statusEl.textContent = data.message || 'Logging configuration saved';
+            statusEl.className = 'status-message success';
+        } else {
+            statusEl.textContent = data.error || 'Save failed';
+            statusEl.className = 'status-message error';
+        }
+    })
+    .catch(function(err) {
+        statusEl.textContent = 'Error: ' + err.message;
+        statusEl.className = 'status-message error';
+    });
+}
+
+// ─── Utilities ───
+function escHtml(s) {
+    if (s == null) return '';
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// ─── Sidebar active state on scroll ───
+function updateSidebarActive() {
+    var sections = ['data-section', 'llm-section', 'embedding-section', 'system-section', 'logging-section'];
+    var navLinks = document.querySelectorAll('.setup-sidebar-nav a, .sidebar-nav a');
+    var scrollPos = window.scrollY + 100;
+
+    var currentSection = sections[0];
+    for (var i = 0; i < sections.length; i++) {
+        var el = document.getElementById(sections[i]);
+        if (el && el.offsetTop <= scrollPos) {
+            currentSection = sections[i];
         }
     }
 
-    function checkLoggingConfig() {
-        fetch(CONFIG.logging.get)
-            .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
-            .then(function(data) {
-                if (data.status === 'success') {
-                    renderLoggingConfig(data.data);
-                } else {
-                    document.getElementById('logging-status').className = 'global-status critical';
-                    document.getElementById('logging-status-text').textContent = 'Error loading logging config';
-                }
-            })
-            .catch(function(e) {
-                console.error(e);
-                document.getElementById('logging-status').className = 'global-status critical';
-                document.getElementById('logging-status-text').textContent = 'Error loading logging: ' + e.message;
-            });
+    for (var j = 0; j < navLinks.length; j++) {
+        navLinks[j].classList.remove('active');
+        if (navLinks[j].getAttribute('href') === '#' + currentSection) {
+            navLinks[j].classList.add('active');
+        }
     }
+}
 
-    function saveLoggingConfig() {
-        var statusEl = document.getElementById('logging-config-status');
-        var payload = {
-            level: document.getElementById('log-level-select').value,
-            log_max_size: document.getElementById('log-max-size-input').value,
-            log_max_file: parseInt(document.getElementById('log-max-file-input').value, 10),
-            clean_at_startup: document.getElementById('log-clean-at-startup').checked
-        };
-        statusEl.textContent = 'Saving...';
-        statusEl.className = 'status-message';
-        fetch(CONFIG.logging.save, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        })
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-            if (data.status === 'success') {
-                statusEl.textContent = data.message || 'Logging configuration saved';
-                statusEl.className = 'status-message success';
-            } else {
-                statusEl.textContent = data.error || 'Save failed';
-                statusEl.className = 'status-message error';
-            }
-        })
-        .catch(function(err) {
-            statusEl.textContent = 'Error: ' + err.message;
-            statusEl.className = 'status-message error';
-        });
-    }
+window.addEventListener('scroll', updateSidebarActive);
 
-    // ─── Utilities ───
-    function escHtml(s) {
-        if (s == null) return '';
-        return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-    }
-
-    document.addEventListener('DOMContentLoaded', function() {
-        checkDataDirs();
-        checkDuckDbStatus();
-        checkLlmModels();
-        checkEmbModels();
-        checkSystemStatus();
-        checkLoggingConfig();
-    });
-    </script>
-</body>
-</html>
+document.addEventListener('DOMContentLoaded', function() {
+    checkDataDirs();
+    checkDuckDbStatus();
+    checkLlmModels();
+    checkEmbModels();
+    checkSystemStatus();
+    checkLoggingConfig();
+});
+</script>
+{% endblock %}

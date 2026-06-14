@@ -1,12 +1,12 @@
 /* Shared Directory Browser — tree and flat modes */
 
 .dir-browser {
-    background: #ffffff;
-    border: 1px solid #ddd;
+    background: var(--layout-card-bg, #ffffff);
+    border: 1px solid var(--layout-input-border, #ddd);
     border-radius: 6px;
     padding: 1rem;
     margin-top: 1rem;
-    color: #1a1a1a;
+    color: var(--layout-content-text, #1a1a1a);
 }
 .dir-browser-header {
     display: flex;
@@ -14,12 +14,12 @@
     align-items: center;
     margin-bottom: 0.75rem;
     padding-bottom: 0.5rem;
-    border-bottom: 1px solid #eee;
+    border-bottom: 1px solid var(--layout-border, #eee);
 }
 .dir-browser-header h3 {
     margin: 0;
     font-size: 1rem;
-    color: #1a1a1a;
+    color: var(--layout-content-text, #1a1a1a);
 }
 .dir-browser-actions {
     display: flex;
@@ -32,13 +32,13 @@
 .dir-browser-count {
     margin-top: 0.5rem;
     padding: 0.5rem;
-    background: #e8f4f8;
+    background: var(--layout-badge-bg-info, #e8f4f8);
     border-radius: 4px;
     font-size: 0.85rem;
-    color: #1a1a1a;
+    color: var(--layout-content-text, #1a1a1a);
 }
 .dir-browser-empty {
-    color: #999;
+    color: var(--layout-text-muted, #999);
     padding: 1rem;
     text-align: center;
 }
@@ -66,12 +66,12 @@
     cursor: pointer;
     padding: 0;
     width: 1.25rem;
-    color: #666;
+    color: var(--layout-text-muted, #666);
     font-size: 0.75rem;
     flex-shrink: 0;
 }
 .tree-toggle:hover {
-    color: #1a1a1a;
+    color: var(--layout-content-text, #1a1a1a);
 }
 .tree-spacer {
     width: 1.25rem;
@@ -89,7 +89,7 @@
     cursor: pointer;
 }
 .tree-folder-name:hover {
-    color: #2c3e50;
+    color: var(--layout-body-bg, #2c3e50);
 }
 
 /* Flat mode */
@@ -97,15 +97,15 @@
     display: inline-block;
     margin: 0.25rem 0.5rem;
     padding: 0.25rem 0.5rem;
-    border: 1px solid #ccc;
+    border: 1px solid var(--layout-input-border, #ccc);
     border-radius: 4px;
     cursor: pointer;
     font-size: 0.9rem;
-    color: #1a1a1a;
+    color: var(--layout-content-text, #1a1a1a);
 }
 .dir-checkbox:hover {
-    border-color: #3498db;
-    background: #f7fbff;
+    border-color: var(--layout-btn-primary-bg, #3498db);
+    background: var(--layout-search-hover, #f7fbff);
 }
 .dir-checkbox input {
     margin-right: 0.25rem;
