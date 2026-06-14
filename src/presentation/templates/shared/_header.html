@@ -8,6 +8,7 @@
                 <li><a href="/data" {% if '/data' in request.url.path %}class="active"{% endif %}>Data</a></li>
                 <li><a href="/admin" {% if '/admin' in request.url.path %}class="active"{% endif %}>Admin</a></li>
                 <li><a href="/duckdb" {% if '/duckdb' in request.url.path %}class="active"{% endif %}>DuckDB</a></li>
+                <li><a href="/config/system" {% if '/config/' in request.url.path %}class="active"{% endif %}>Config</a></li>
                 <li><a href="/logs" {% if '/logs' in request.url.path %}class="active"{% endif %}>Logs</a></li>
             </ul>
         </nav>

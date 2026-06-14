@@ -1,0 +1,404 @@
+{# LLM Config — LLM + Embedding #}
+{% extends "shared/layout.html" %}
+
+{% block title %}Config - LLM - SigmaHQ RAG{% endblock %}
+
+{% block sidebar_title %}LLM & Embedding{% endblock %}
+{% block sidebar_subtitle %}Model Management{% endblock %}
+
+{% block sidebar_nav %}
+<a href="/config/system">System</a>
+<a href="/config/backend">Backend</a>
+<a href="#llm-section" class="active"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg> LLM</a>
+<a href="#embedding-section"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg> Embedding</a>
+{% endblock %}
+
+{% block content %}
+<div class="setup-container">
+    <div class="setup-header">
+        <h1>LLM & Embedding Management</h1>
+        <p>Download, delete, and manage language & embedding models</p>
+    </div>
+
+    <div class="setup-grid">
+        <!-- LLM Management -->
+        <div class="card" id="llm-section">
+            <div class="card-header">
+                <h2>LLM</h2>
+            </div>
+            <div class="card-body">
+                <div id="llm-global-status" class="global-status">
+                    <span class="status-dot"></span>
+                    <span id="llm-global-text">Loading...</span>
+                </div>
+                <div id="llm-models-list"></div>
+                <div class="search-row">
+                    <input type="text" id="llm-search-input" placeholder="Search HuggingFace...">
+                    <button class="btn btn-primary btn-sm" onclick="searchLlmModel()">Search</button>
+                </div>
+                <div id="llm-search-results" class="search-results"></div>
+                <div class="form-actions">
+                    <button class="btn btn-primary btn-sm" onclick="downloadLlmModel()" id="btn-download-llm">Download</button>
+                    <button class="btn btn-danger btn-sm" onclick="deleteLlmModel()" id="btn-delete-llm">Delete</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Embedding Management -->
+        <div class="card" id="embedding-section">
+            <div class="card-header">
+                <h2>Embedding</h2>
+            </div>
+            <div class="card-body">
+                <div id="emb-global-status" class="global-status">
+                    <span class="status-dot"></span>
+                    <span id="emb-global-text">Loading...</span>
+                </div>
+                <div id="emb-models-list"></div>
+                <div class="search-row">
+                    <input type="text" id="emb-search-input" placeholder="Search HuggingFace...">
+                    <button class="btn btn-primary btn-sm" onclick="searchEmbModel()">Search</button>
+                </div>
+                <div id="emb-search-results" class="search-results"></div>
+                <div class="form-actions">
+                    <button class="btn btn-primary btn-sm" onclick="downloadEmbModel()" id="btn-download-emb">Download</button>
+                    <button class="btn btn-danger btn-sm" onclick="deleteEmbModel()" id="btn-delete-emb">Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ─── LLM MANAGEMENT ───
+var CONFIG = {
+    llm: {
+        installed: '/api/v1/models/llm/installed',
+        download: '/api/v1/models/llm/download',
+        search: '/api/v1/models/llm/search',
+        delete: '/api/v1/models/llm',
+        progress: '/api/v1/models/llm/progress'
+    },
+    embedding: {
+        installed: '/api/v1/models/embedding/installed',
+        search: '/api/v1/models/embeddings/search',
+        download: '/api/v1/models/embedding/download',
+        delete: '/api/v1/models/embedding',
+        progress: '/api/v1/models/embedding/progress'
+    }
+};
+
+var selectedLlmRepo = null;
+var selectedEmbRepo = null;
+
+function renderLlmModels(models) {
+    var listEl = document.getElementById('llm-models-list');
+    var statusEl = document.getElementById('llm-global-status');
+    var textEl = document.getElementById('llm-global-text');
+    var btnDownload = document.getElementById('btn-download-llm');
+    var btnDelete = document.getElementById('btn-delete-llm');
+
+    statusEl.className = 'global-status';
+
+    if (!models || models.length === 0) {
+        statusEl.classList.add('warn');
+        textEl.textContent = 'No LLM models installed';
+        btnDownload.style.display = 'inline-block';
+        btnDelete.style.display = 'none';
+        listEl.innerHTML = '<p class="info-text info-text-with-margin">Search and download a model to get started.</p>';
+        return;
+    }
+
+    statusEl.classList.add('ok');
+    textEl.textContent = models.length + ' model(s) installed';
+    btnDownload.style.display = 'none';
+    btnDelete.style.display = 'inline-block';
+
+    var html = '<table class="model-table"><tbody>';
+    for (var i = 0; i < models.length; i++) {
+        var m = models[i];
+        html += '<tr>';
+        html += '<td class="model-name" onclick="selectLlmModel(\'' + escHtml(m.repo_id) + '\')">' + escHtml(m.repo_id) + '</td>';
+        html += '<td>' + (m.files ? m.files.length + ' file(s)' : '') + '</td>';
+        html += '</tr>';
+    }
+    html += '</tbody></table>';
+    listEl.innerHTML = html;
+    selectedLlmRepo = models[0].repo_id;
+}
+
+function checkLlmModels() {
+    fetch(CONFIG.llm.instirmed)
+        .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
+        .then(function(data) { renderLlmModels(data.models); })
+        .catch(function(e) {
+            console.error(e);
+            var statusEl = document.getElementById('llm-global-status');
+            var textEl = document.getElementById('llm-global-text');
+            statusEl.className = 'global-status critical';
+            textEl.textContent = 'Error loading LLM models';
+        });
+}
+
+function selectLlmModel(repoId) {
+    selectedLlmRepo = repoId;
+    var listEl = document.getElementById('llm-models-list');
+    var rows = listEl.querySelectorAll('.model-name');
+    for (var i = 0; i < rows.length; i++) {
+        rows[i].style.fontWeight = 'normal';
+        rows[i].style.color = '#007bff';
+    }
+    if (rows.length > 0) {
+        for (var j = 0; j < rows.length; j++) {
+            if (rows[j].textContent === repoId) {
+                rows[j].style.fontWeight = 'bold';
+                rows[j].style.color = '#0056b3';
+                break;
+            }
+        }
+    }
+}
+
+function searchLlmModel() {
+    var query = document.getElementById('llm-search-input').value.trim();
+    if (!query) return;
+    
+    fetch(CONFIG.llm.search + '?q=' + encodeURIComponent(query) + '&limit=10')
+        .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
+        .then(function(data) {
+            var resultsEl = document.getElementById('llm-search-results');
+            if (!data.models || data.models.length === 0) {
+                resultsEl.innerHTML = '<p class="info-text">No results found.</p>';
+                return;
+            }
+
+            var html = '';
+            for (var i = 0; i < data.models.length; i++) {
+                var m = data.models[i];
+                html += '<div class="search-item">';
+                html += '<span class="result-name">' + escHtml(m.repo_id) + '</span>';
+                html += '<button class="btn btn-primary btn-sm" onclick="downloadLlmModelDirect(\'' + escHtml(m.repo_id) + '\')">Download</button>';
+                html += '</div>';
+            }
+            resultsEl.innerHTML = html;
+        })
+        .catch(function(e) {
+            console.error(e);
+            document.getElementById('llm-search-results').innerHTML = '<p class="error-text">Search error.</p>';
+        });
+}
+
+function downloadLlmModel() {
+    if (!selectedLlmRepo) return;
+    fetch(CONFIG.llm.download + '?repo_id=' + encodeURIComponent(selectedLlmRepo), { method: 'POST' })
+        .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
+        .then(function() {
+            var btn = document.getElementById('btn-download-llm');
+            var progressBtn = document.getElementById('btn-download-llm');
+            progressBtn.textContent = 'Downloading...';
+            progressBtn.disabled = true;
+            
+            var checkProgress = setInterval(function() {
+                fetch(CONFIG.llm.progress + '?repo_id=' + encodeURIComponent(selectedLlmRepo))
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) {
+                        if (data.status === 'completed') {
+                            clearInterval(checkProgress);
+                            btn.textContent = 'Download';
+                            btn.disabled = false;
+                            checkLlmModels();
+                        } else if (data.status && data.status.startsWith('error')) {
+                            clearInterval(checkProgress);
+                            btn.textContent = 'Download';
+                            btn.disabled = false;
+                            alert('Download failed: ' + data.status);
+                        }
+                    })
+                    .catch(function() {});
+            }, 1000);
+        })
+        .catch(function(e) { alert('Error: ' + e.message); });
+}
+
+function downloadLlmModelDirect(repoId) {
+    selectedLlmRepo = repoId;
+    downloadLlmModel();
+}
+
+function deleteLlmModel() {
+    if (!selectedLlmRepo) return;
+    if (!confirm('Delete model ' + selectedLlmRepo + '?')) return;
+    
+    fetch(CONFIG.llm.delete + '/' + encodeURIComponent(selectedLlmRepo), { method: 'DELETE' })
+        .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
+        .then(function() { 
+            selectedLlmRepo = null;
+            checkLlmModels(); 
+        })
+        .catch(function(e) { alert('Error: ' + e.message); });
+}
+
+// ─── EMBEDDING MANAGEMENT ───
+function renderEmbModels(models) {
+    var listEl = document.getElementById('emb-models-list');
+    var statusEl = document.getElementById('emb-global-status');
+    var textEl = document.getElementById('emb-global-text');
+    var btnDownload = document.getElementById('btn-download-emb');
+    var btnDelete = document.getElementById('btn-delete-emb');
+
+    statusEl.className = 'global-status';
+
+    if (!models || models.length === 0) {
+        statusEl.classList.add('warn');
+        textEl.textContent = 'No embedding models installed';
+        btnDownload.style.display = 'inline-block';
+        btnDelete.style.display = 'none';
+        listEl.innerHTML = '<p class="info-text">Search and download a model to get started.</p>';
+        return;
+    }
+
+    statusEl.classList.add('ok');
+    textEl.textContent = models.length + ' model(s) installed';
+    btnDownload.style.display = 'none';
+    btnDelete.style.display = 'inline-block';
+
+    var html = '<table class="model-table"><tbody>';
+    for (var i = 0; i < models.length; i++) {
+        var m = models[i];
+        var repoId = Object.keys(m)[0];
+        html += '<tr>';
+        html += '<td class="model-name" onclick="selectEmbModel(\'' + escHtml(repoId) + '\')">' + escHtml(repoId) + '</td>';
+        html += '</tr>';
+    }
+    html += '</tbody></table>';
+    listEl.innerHTML = html;
+    if (models.length > 0) {
+        selectedEmbRepo = Object.keys(models[0]);
+        selectedEmbRepo = selectedEmbRepo[0];
+    }
+}
+
+function checkEmbModels() {
+    fetch(CONFIG.embedding.installed)
+        .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
+        .then(function(data) { renderEmbModels(data.models); })
+        .catch(function(e) {
+            console.error(e);
+            var statusEl = document.getElementById('emb-global-status');
+            var textEl = document.getElementById('emb-global-text');
+            statusEl.className = 'global-status critical';
+            textEl.textContent = 'Error loading embedding models';
+        });
+}
+
+function selectEmbModel(repoId) {
+    selectedEmbRepo = repoId;
+    var listEl = document.getElementById('emb-models-list');
+    var rows = listEl.querySelectorAll('.model-name');
+    for (var i = 0; i < rows.length; i++) {
+        rows[i].style.fontWeight = 'normal';
+        rows[i].style.color = '#007bff';
+    }
+    if (rows.length > 0) {
+        for (var j = 0; j < rows.length; j++) {
+            if (rows[j].textContent === repoId) {
+                rows[j].style.fontWeight = 'bold';
+                rows[j].style.color = '#0056b3';
+                break;
+            }
+        }
+    }
+}
+
+function searchEmbModel() {
+    var query = document.getElementById('emb-search-input').value.trim();
+    if (!query) return;
+    
+    fetch(CONFIG.embedding.search + '?query=' + encodeURIComponent(query) + '&limit=10')
+        .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
+        .then(function(data) {
+            var resultsEl = document.getElementById('emb-search-results');
+            if (!data.models || data.models.length === 0) {
+                resultsEl.innerHTML = '<p class="info-text">No results found.</p>';
+                return;
+            }
+
+            var html = '';
+            for (var i = 0; i < data.models.length; i++) {
+                var m = data.models[i];
+                html += '<div class="search-item">';
+                html += '<span class="result-name">' + escHtml(m.repo_id) + '</span>';
+                html += '<button class="btn btn-primary btn-sm" onclick="downloadEmbModelDirect(\'' + escHtml(m.repo_id) + '\')">Download</button>';
+                html += '</div>';
+            }
+            resultsEl.innerHTML = html;
+        })
+        .catch(function(e) {
+            console.error(e);
+            document.getElementById('emb-search-results').innerHTML = '<p class="error-text">Search error.</p>';
+        });
+}
+
+function downloadEmbModel() {
+    if (!selectedEmbRepo) return;
+    fetch(CONFIG.embedding.download + '?repo_id=' + encodeURIComponent(selectedEmbRepo), { method: 'POST' })
+        .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
+        .then(function() {
+            var btn = document.getElementById('btn-download-emb');
+            btn.textContent = 'Downloading...';
+            btn.disabled = true;
+            
+            var checkProgress = setInterval(function() {
+                fetch(CONFIG.embedding.progress + '?repo_id=' + encodeURIComponent(selectedEmbRepo))
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) {
+                        if (data.status === 'completed') {
+                            clearInterval(checkProgress);
+                            btn.textContent = 'Download';
+                            btn.disabled = false;
+                            checkEmbModels();
+                        } else if (data.status && data.status.startsWith('error')) {
+                            clearInterval(checkProgress);
+                            btn.textContent = 'Download';
+                            btn.disabled = false;
+                            alert('Download failed: ' + data.status);
+                        }
+                    })
+                    .catch(function() {});
+            }, 1000);
+        })
+        .catch(function(e) { alert('Error: ' + e.message); });
+}
+
+function downloadEmbModelDirect(repoId) {
+    selectedEmbRepo = repoId;
+    downloadEmbModel();
+}
+
+function deleteEmbModel() {
+    if (!selectedEmbRepo) return;
+    if (!confirm('Delete model ' + selectedEmbRepo + '?')) return;
+    
+    fetch(CONFIG.embedding.delete + '/' + encodeURIComponent(selectedEmbRepo), { method: 'DELETE' })
+        .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
+        .then(function() { 
+            selectedEmbRepo = null;
+            checkEmbModels(); 
+        })
+        .catch(function(e) { alert('Error: ' + e.message); });
+}
+
+// ─── Utilities ───
+function escHtml(s) {
+    if (s == null) return '';
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    checkLlmModels();
+    checkEmbModels();
+});
+</script>
+{% endblock %}

@@ -29,10 +29,7 @@
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
     Embedding
 </a>
-<a href="#system-section">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-    System
-</a>
+
 <a href="#logging-section">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg>
     Logging
@@ -278,25 +275,7 @@
             </div>
         </div>
 
-        <!-- Card 4: System -->
-        <div class="card" id="system-section">
-            <div class="card-header">
-                <h2>System</h2>
-            </div>
-            <div class="card-body">
-                <div id="system-global-status" class="global-status">
-                    <span class="status-dot"></span>
-                    <span id="system-global-text">Loading...</span>
-                </div>
-                <div id="system-info" class="system-info"></div>
-                <div id="qdrant-info" class="system-info qdrant-info-extra"></div>
-                <div class="form-actions">
-                    <button class="btn btn-primary btn-sm" onclick="refreshSystemStatus()">Refresh</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Card 5: Logging -->
+         <!-- Card 5: Logging -->
         <div class="card" id="logging-section">
             <div class="card-header">
                 <h2>Logging</h2>
@@ -374,10 +353,7 @@ var CONFIG = {
         clean: '/api/v1/system/duckdb/clean',
         reset: '/api/v1/system/duckdb/hard-reset'
     },
-    system: {
-        status: '/api/v1/system/system/status',
-        qdrant: '/api/v1/system/qdrant/status'
-    },
+ 
     logging: {
         get: '/api/v1/config/logging',
         save: '/api/v1/config/logging'
@@ -849,76 +825,6 @@ function deleteEmbModel() {
         .catch(function(e) { alert('Error: ' + e.message); });
 }
 
-// ─── SYSTEM CARD ───
-function renderSystemStatus(status, qdrant) {
-    var infoEl = document.getElementById('system-info');
-    var qdrantEl = document.getElementById('qdrant-info');
-    var statusEl = document.getElementById('system-global-status');
-    var textEl = document.getElementById('system-global-text');
-
-    statusEl.className = 'global-status';
-
-    var hasError = false;
-    if (status.error) {
-        statusEl.classList.add('critical');
-        textEl.textContent = 'Error loading system status';
-        hasError = true;
-    }
-
-    if (!hasError) {
-        var llamaOk = status.llama && status.llama.status === 'installed';
-        var baseOk = status.base_dir_exists;
-        
-        if (llamaOk && baseOk) {
-            statusEl.classList.add('ok');
-            textEl.textContent = 'System operational';
-        } else if (baseOk) {
-            statusEl.classList.add('warn');
-            textEl.textContent = 'System ready (LLM missing)';
-        } else {
-            statusEl.classList.add('critical');
-            textEl.textContent = 'Base directory missing';
-        }
-
-        var html = '';
-        html += '<div class="info-row"><span class="info-label">Hostname</span><span class="info-value">' + escHtml(status.hostname) + '</span></div>';
-        html += '<div class="info-row"><span class="info-label">OS</span><span class="info-value">' + escHtml(status.os) + '</span></div>';
-        html += '<div class="info-row"><span class="info-label">Python</span><span class="info-value">' + escHtml(status.python_version) + '</span></div>';
-        html += '<div class="info-row"><span class="info-label">LLM</span><span class="info-value">' + escHtml(status.llama ? status.llama.version : 'N/A') + ' <span class="status-badge ' + (llamaOk ? 'ok' : 'warn') + '">' + (status.llama ? status.llama.status : 'unknown') + '</span></span></div>';
-        infoEl.innerHTML = html;
-
-        if (qdrant) {
-            var qdrantOk = qdrant.connected;
-            var qdrantHtml = '';
-            qdrantHtml += '<div class="info-row"><span class="info-label">Qdrant</span><span class="info-value">' + (qdrant.connected ? 'Connected' : 'Disconnected') + ' <span class="status-badge ' + (qdrantOk ? 'ok' : 'error') + '">' + (qdrant.connected ? 'ok' : 'error') + '</span></span></div>';
-            qdrantHtml += '<div class="info-row"><span class="info-label">Port</span><span class="info-value">' + escHtml(qdrant.port) + '</span></div>';
-            qdrantHtml += '<div class="info-row"><span class="info-label">Storage</span><span class="info-value">' + escHtml(qdrant.storage_path) + '</span></div>';
-            qdrantEl.innerHTML = qdrantHtml;
-        }
-    }
-}
-
-function checkSystemStatus() {
-    Promise.all([
-        fetch(CONFIG.system.status).then(function(r) { return r.json(); }),
-        fetch(CONFIG.system.qdrant).then(function(r) { return r.json(); })
-    ])
-    .then(function(data) {
-        renderSystemStatus(data[0], data[1]);
-    })
-    .catch(function(e) {
-        console.error(e);
-        var statusEl = document.getElementById('system-global-status');
-        var textEl = document.getElementById('system-global-text');
-        statusEl.className = 'global-status critical';
-        textEl.textContent = 'Error loading system status';
-    });
-}
-
-function refreshSystemStatus() {
-    checkSystemStatus();
-}
-
 // ─── LOGGING CARD ───
 function renderLoggingConfig(data) {
     var statusEl = document.getElementById('logging-status');
@@ -997,29 +903,6 @@ function escHtml(s) {
     return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-// ─── Sidebar active state on scroll ───
-function updateSidebarActive() {
-    var sections = ['backend-section', 'data-section', 'prompts-section', 'llm-section', 'embedding-section', 'system-section', 'logging-section'];
-    var navLinks = document.querySelectorAll('.setup-sidebar-nav a, .sidebar-nav a');
-    var scrollPos = window.scrollY + 100;
-
-    var currentSection = sections[0];
-    for (var i = 0; i < sections.length; i++) {
-        var el = document.getElementById(sections[i]);
-        if (el && el.offsetTop <= scrollPos) {
-            currentSection = sections[i];
-        }
-    }
-
-    for (var j = 0; j < navLinks.length; j++) {
-        navLinks[j].classList.remove('active');
-        if (navLinks[j].getAttribute('href') === '#' + currentSection) {
-            navLinks[j].classList.add('active');
-        }
-    }
-}
-
-window.addEventListener('scroll', updateSidebarActive);
 
 document.addEventListener('DOMContentLoaded', function() {
     applyBackendConfig(_BACKEND_CONFIG);
@@ -1027,7 +910,6 @@ document.addEventListener('DOMContentLoaded', function() {
     checkDuckDbStatus();
     checkLlmModels();
     checkEmbModels();
-    checkSystemStatus();
     checkLoggingConfig();
     loadBackendStatus();
     loadPrompts();

@@ -1,5 +1,4 @@
 import logging
-import os
 import re
 import sys
 
@@ -7,12 +6,14 @@ from src.config.constants import SCHEMA_VERSION
 
 
 class _Filter2xx(logging.Filter):
+    """Filter out HTTP 2xx access log lines from uvicorn."""
+
     def filter(self, record: logging.LogRecord) -> bool:
         if record.levelname != "INFO":
             return True
         msg = record.getMessage()
-        # Uvicorn access log format: '127.0.0.1 - "GET /path HTTP/1.1" 200 OK'
-        return not bool(re.search(r'"\s+2\d{2}\s+\d{3}', msg))
+        # Uvicorn format: '127.0.0.1 - "GET /path HTTP/1.1" 200 OK'
+        return not bool(re.search(r'" 2\d{2} ', msg))
 
 
 def _validate_schema_version() -> None:
@@ -52,16 +53,8 @@ if __name__ == "__main__":
     import uvicorn
     from uvicorn.config import LOGGING_CONFIG
 
-    # Parse CLI arguments
-    setup_mode = "--setup" in sys.argv
-
-    if setup_mode:
-        os.environ["_SIGMA_SETUP_MODE"] = "1"
-        print("Running in setup mode...")
-
     # Check schema version in DuckDB
-    if not setup_mode:
-        _validate_schema_version()
+    _validate_schema_version()
 
     if sys.platform == "win32":
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
