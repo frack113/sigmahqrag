@@ -1,0 +1,191 @@
+/* Dark theme — CSS variables (default) */
+
+:root {
+    /* ── Base ────────────────── */
+    --layout-body-bg: #1a1a1a;
+    --layout-body-text: #ffffff;
+    --layout-content-bg: #f5f5f5;
+    --layout-content-text: #1a1a1a;
+    --layout-card-bg: #ffffff;
+    --layout-card-text: #1a1a1a;
+    --layout-border: #e9ecef;
+    --layout-text-muted: #999;
+    --layout-error-text: #dc3545;
+
+    /* ── Input ───────────────── */
+    --layout-input-bg: #ffffff;
+    --layout-input-text: #1a1a1a;
+    --layout-input-border: #ddd;
+
+    /* ── Sidebar ─────────────── */
+    --layout-sidebar-bg: #2c3e50;
+    --layout-sidebar-border: #4a6280;
+    --layout-sidebar-text: #d5d5d5;
+    --layout-sidebar-hover-bg: #3d566e;
+    --layout-sidebar-active-bg: #3498db;
+    --layout-sidebar-header-text: #ffffff;
+    --layout-sidebar-subtitle-text: #bdc3c7;
+    --layout-sidebar-link-active-text: #ffffff;
+    --layout-sidebar-disabled-text: #7f8c8d;
+
+    /* ── Buttons ─────────────── */
+    --layout-btn-primary-bg: #3498db;
+    --layout-btn-primary-hover: #2980b9;
+    --layout-btn-success-bg: #27ae60;
+    --layout-btn-success-hover: #219a52;
+    --layout-btn-danger-bg: #e74c3c;
+    --layout-btn-danger-hover: #c0392b;
+    --layout-btn-secondary-bg: #7f8c8d;
+    --layout-btn-secondary-hover: #6c7a7d;
+
+    /* ── Status dots ─────────── */
+    --layout-status-idle: #7f8c8d;
+    --layout-status-ok: #27ae60;
+    --layout-status-error: #e74c3c;
+    --layout-status-warning: #f39c12;
+
+    /* ── Status badges (solid) ── */
+    --layout-status-badge-ok-bg: #27ae60;
+    --layout-status-badge-ok-text: #ffffff;
+    --layout-status-badge-warn-bg: #f39c12;
+    --layout-status-badge-warn-text: #1a1a1a;
+    --layout-status-badge-error-bg: #e74c3c;
+    --layout-status-badge-error-text: #ffffff;
+    --layout-status-badge-info-bg: #3498db;
+    --layout-status-badge-info-text: #ffffff;
+
+    /* ── Pastel badges ───────── */
+    --layout-badge-bg-ok: #d4edda;
+    --layout-badge-text-ok: #155724;
+    --layout-badge-bg-warn: #fff3cd;
+    --layout-badge-text-warn: #856404;
+    --layout-badge-bg-error: #f8d7da;
+    --layout-badge-text-error: #721c24;
+    --layout-badge-bg-info: #d1ecf1;
+    --layout-badge-text-info: #0c5460;
+
+    /* ── Toast ───────────────── */
+    --layout-toast-text: #ffffff;
+    --layout-toast-success-bg: #27ae60;
+    --layout-toast-error-bg: #e74c3c;
+    --layout-toast-info-bg: #3498db;
+
+    /* ── Progress ────────────── */
+    --layout-progress-bg: #e9ecef;
+    --layout-progress-fill: #3498db;
+    --layout-progress-text: #1a1a1a;
+    --layout-progress-label: #333;
+
+    /* ── Tables ──────────────── */
+    --layout-table-border: #dee2e6;
+    --layout-table-th-text: #1a1a1a;
+    --layout-table-th-bg: #f8f9fa;
+    --layout-row-bg: #f8f9fa;
+    --layout-row-text: #1a1a1a;
+
+    /* ── Alert ───────────────── */
+    --layout-alert-bg: #fff3cd;
+    --layout-alert-border: #ffc107;
+    --layout-alert-text: #856404;
+
+    /* ── Text utilities ──────── */
+    --layout-text-success: #28a745;
+    --layout-text-danger: #dc3545;
+    --layout-text-info: #17a2b8;
+
+    /* ── Focus ───────────────── */
+    --layout-focus-ring: #3498db;
+
+    /* ── Info ────────────────── */
+    --layout-info-border: #f0f0f0;
+    --layout-info-label: #555;
+    --layout-info-value: #1a1a1a;
+
+    /* ── Search ──────────────── */
+    --layout-search-hover: #f8f9fa;
+    --layout-search-item-border: #f0f0f0;
+    --layout-search-text: #1a1a1a;
+    --layout-search-input-border: #ddd;
+    --layout-link-primary: #3498db;
+
+    /* ── Setup ───────────────── */
+    --layout-setup-bg: #f5f5f5;
+    --layout-setup-header-text: #1a1a1a;
+    --layout-setup-subtitle: #555;
+    --layout-setup-row-bg: #f8f9fa;
+    --layout-setup-row-text: #333;
+    --layout-setup-border: #e9ecef;
+    --layout-setup-input-bg: #ffffff;
+    --layout-setup-input-text: #1a1a1a;
+    --layout-setup-input-border: #ddd;
+    --layout-setup-badge-bg-ok: #d4edda;
+    --layout-setup-badge-text-ok: #155724;
+    --layout-setup-badge-bg-warn: #fff3cd;
+    --layout-setup-badge-text-warn: #856404;
+    --layout-setup-badge-bg-error: #f8d7da;
+    --layout-setup-badge-text-error: #721c24;
+    --layout-setup-badge-bg-info: #d1ecf1;
+    --layout-setup-badge-text-info: #0c5460;
+    --layout-setup-info-row-border: #f0f0f0;
+    --layout-setup-info-label: #555;
+    --layout-setup-info-value: #1a1a1a;
+    --layout-setup-search-hover: #f8f9fa;
+    --layout-setup-search-item-border: #f0f0f0;
+    --layout-setup-search-result-text: #1a1a1a;
+    --layout-setup-empty-text: #999;
+    --layout-setup-error-text: #dc3545;
+    --layout-setup-text-muted: #999;
+
+    /* ── Data-row helpers ────── */
+    --layout-data-row-label: #333;
+    --layout-data-status-char: #666;
+    --layout-search-result-border: #eee;
+    --layout-model-table-border: #eee;
+
+    /* ── Chat theme (dark default) ── */
+    --layout-chat-bg: #212121;
+    --layout-chat-text: #e0e0e0;
+    --layout-chat-sidebar-bg: #1a1a1a;
+    --layout-chat-sidebar-border: #333;
+    --layout-chat-sidebar-text: #999;
+    --layout-chat-sidebar-active-bg: #2b5278;
+    --layout-chat-sidebar-hover-bg: #2a2a2a;
+    --layout-chat-header-bg: #2a2a2a;
+    --layout-chat-header-border: #333;
+    --layout-chat-header-text: #ccc;
+    --layout-chat-input-bg: #2a2a2a;
+    --layout-chat-input-border: #444;
+    --layout-chat-input-text: #e0e0e0;
+    --layout-chat-ai-bubble-bg: #2a2a2a;
+    --layout-chat-ai-bubble-border: #333;
+    --layout-chat-ai-text: #e0e0e0;
+    --layout-chat-user-bubble-bg: #2b5278;
+    --layout-chat-user-text: #ffffff;
+    --layout-chat-error-bg: #3a1a1a;
+    --layout-chat-error-border: #5a2a2a;
+    --layout-chat-error-text: #ff8888;
+    --layout-chat-typing-bg: #2a2a2a;
+    --layout-chat-typing-border: #333;
+    --layout-chat-typing-text: #999;
+    --layout-chat-code-bg: #1e1e1e;
+    --layout-chat-code-text: #d4d4d4;
+    --layout-chat-keyword: #569cd6;
+    --layout-chat-string: #ce9178;
+    --layout-chat-comment: #6a9955;
+    --layout-chat-cursor: #d4d4d4;
+    --layout-chat-divider-bg: #444;
+    --layout-chat-divider-text: #888;
+
+    /* ── DuckDB sidebar ──────── */
+    --layout-duckdb-sidebar-bg: #2c3e50;
+    --layout-duckdb-sidebar-text: #ecf0f1;
+    --layout-duckdb-sidebar-active-bg: #3498db;
+    --layout-duckdb-sidebar-hover-bg: #34495e;
+    --layout-duckdb-sidebar-border: #4a6280;
+
+    /* ── Data page ───────────── */
+    --layout-data-card-bg: #ffffff;
+    --layout-data-card-text: #1a1a1a;
+    --layout-data-card-border: #e9ecef;
+    --layout-data-info-text: #666;
+}
