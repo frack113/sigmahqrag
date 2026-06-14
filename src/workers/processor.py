@@ -26,6 +26,7 @@ class TaskDispatcher:
         WorkerName.SIGMAREF_DISCOVERY: SigmaRefProcessor,
         WorkerName.GITHUB_DISCOVERY: GenericDiscoveryWorker,
         WorkerName.LOCAL_DISCOVERY: GenericDiscoveryWorker,
+        WorkerName.SPEC_DISCOVERY: GenericDiscoveryWorker,
         WorkerName.LOCAL_REPO_SYNC: LocalRepoSyncWorker,
         WorkerName.MODEL_SYNC: ModelSyncWorker,
     }
@@ -138,6 +139,8 @@ class TaskDispatcher:
             name: (
                 cls(self._db, self, source_type=SourceType.GITHUB)
                 if name == WorkerName.GITHUB_DISCOVERY and cls is GenericDiscoveryWorker
+                else cls(self._db, self, source_type=SourceType.SPEC)
+                if name == WorkerName.SPEC_DISCOVERY and cls is GenericDiscoveryWorker
                 else cls(self._db, self)
             )
             for name, cls in self._WORKER_TYPES.items()

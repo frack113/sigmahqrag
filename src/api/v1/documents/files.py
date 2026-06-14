@@ -59,6 +59,7 @@ async def file_list(
         [
             (WorkerName.GITHUB_DISCOVERY, "all"),
             (WorkerName.LOCAL_DISCOVERY, "local"),
+            (WorkerName.SPEC_DISCOVERY, "spec"),
         ],
     )
     # SIGMAREF_DISCOVERY is chained automatically after GITHUB_DISCOVERY

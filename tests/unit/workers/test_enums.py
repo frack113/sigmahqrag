@@ -27,6 +27,9 @@ class TestWorkerName:
     def test_local_discovery(self) -> None:
         assert WorkerName.LOCAL_DISCOVERY.value == "local_discovery"
 
+    def test_spec_discovery(self) -> None:
+        assert WorkerName.SPEC_DISCOVERY.value == "spec_discovery"
+
     def test_model_sync(self) -> None:
         assert WorkerName.MODEL_SYNC.value == "model_sync"
 
@@ -38,5 +41,6 @@ class TestWorkerName:
         assert "sigmaref_discovery" in names
         assert "github_discovery" in names
         assert "local_discovery" in names
+        assert "spec_discovery" in names
         assert "model_sync" in names
         assert "local_repo_sync" in names

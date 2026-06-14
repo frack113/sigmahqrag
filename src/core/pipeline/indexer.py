@@ -163,6 +163,10 @@ class UnifiedIndexer:
         file_name: str = row.get("file_name", "") or ""
 
         if table_name == "sigma_spec":
+            org: str = row.get("org", "") or ""
+            repo: str = row.get("repo", "") or ""
+            if org and repo:
+                return Path(cfg.paths_spec_repos_dir).resolve() / org / repo / file_name
             return Path(cfg.paths_sigma_spec_dir).resolve() / file_name
 
         org: str = row.get("org", "") or ""

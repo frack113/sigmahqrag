@@ -234,9 +234,51 @@
                         </div>
                         <div id="system-info" class="system-info"></div>
                         <div id="qdrant-info" class="system-info qdrant-info-extra"></div>
-                        <div class="form-actions">
+                      <div class="form-actions">
                             <button class="btn btn-primary btn-sm" onclick="refreshSystemStatus()">Refresh</button>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Card 5: Logging -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Logging</h2>
+                    </div>
+                    <div class="card-body">
+                        <div id="logging-status" class="global-status">
+                            <span class="status-dot"></span>
+                            <span id="logging-status-text">Loading...</span>
+                        </div>
+                        <div class="form-group" style="margin-top:12px;">
+                            <label for="log-level-select">Log Level</label>
+                            <select id="log-level-select">
+                                <option value="DEBUG">DEBUG</option>
+                                <option value="INFO" selected>INFO</option>
+                                <option value="WARNING">WARNING</option>
+                                <option value="ERROR">ERROR</option>
+                                <option value="CRITICAL">CRITICAL</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="log-max-size-input">Log Max Size</label>
+                            <input type="text" id="log-max-size-input" value="10M" placeholder="e.g. 10M, 50M, 100M">
+                        </div>
+                        <div class="form-group">
+                            <label for="log-max-file-input">Log Max Files</label>
+                            <input type="number" id="log-max-file-input" value="5" min="1" max="99">
+                        </div>
+                        <div class="form-group">
+                            <div class="mode-toggle" id="log-clean-toggle">
+                                <span class="mode-label">Clean at Startup</span>
+                                <input type="checkbox" id="log-clean-at-startup">
+                                <label for="log-clean-at-startup" class="toggle-track"></label>
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button class="btn btn-primary btn-sm" onclick="saveLoggingConfig()">Save Logging Config</button>
+                        </div>
+                        <div id="logging-config-status" class="status-message"></div>
                     </div>
                 </div>
             </div>
@@ -272,9 +314,13 @@
             clean: '/api/v1/system/duckdb/clean',
             reset: '/api/v1/system/duckdb/hard-reset'
         },
-        system: {
+     system: {
             status: '/api/v1/system/system/status',
             qdrant: '/api/v1/system/qdrant/status'
+        },
+        logging: {
+            get: '/api/v1/config/logging',
+            save: '/api/v1/config/logging'
         }
     };
 
@@ -809,8 +855,80 @@
         });
     }
 
-    function refreshSystemStatus() {
+   function refreshSystemStatus() {
         checkSystemStatus();
+    }
+
+    // ─── LOGGING CARD ───
+    function renderLoggingConfig(data) {
+        var statusEl = document.getElementById('logging-status');
+        var textEl = document.getElementById('logging-status-text');
+        var levelSelect = document.getElementById('log-level-select');
+        var maxSizeInput = document.getElementById('log-max-size-input');
+        var maxFileInput = document.getElementById('log-max-file-input');
+        var cleanToggle = document.getElementById('log-clean-at-startup');
+
+        statusEl.className = 'global-status ok';
+        textEl.textContent = 'Configuration loaded';
+
+        if (levelSelect) levelSelect.value = data.level || 'INFO';
+        if (maxSizeInput) maxSizeInput.value = data.log_max_size || '10M';
+        if (maxFileInput) maxFileInput.value = data.log_max_file || 5;
+        if (cleanToggle) cleanToggle.checked = data.clean_at_startup || false;
+
+        var toggleLabel = document.getElementById('log-clean-toggle');
+        if (toggleLabel) {
+            toggleLabel.classList.toggle('ext', !data.clean_at_startup);
+        }
+    }
+
+    function checkLoggingConfig() {
+        fetch(CONFIG.logging.get)
+            .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
+            .then(function(data) {
+                if (data.status === 'success') {
+                    renderLoggingConfig(data.data);
+                } else {
+                    document.getElementById('logging-status').className = 'global-status critical';
+                    document.getElementById('logging-status-text').textContent = 'Error loading logging config';
+                }
+            })
+            .catch(function(e) {
+                console.error(e);
+                document.getElementById('logging-status').className = 'global-status critical';
+                document.getElementById('logging-status-text').textContent = 'Error loading logging: ' + e.message;
+            });
+    }
+
+    function saveLoggingConfig() {
+        var statusEl = document.getElementById('logging-config-status');
+        var payload = {
+            level: document.getElementById('log-level-select').value,
+            log_max_size: document.getElementById('log-max-size-input').value,
+            log_max_file: parseInt(document.getElementById('log-max-file-input').value, 10),
+            clean_at_startup: document.getElementById('log-clean-at-startup').checked
+        };
+        statusEl.textContent = 'Saving...';
+        statusEl.className = 'status-message';
+        fetch(CONFIG.logging.save, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.status === 'success') {
+                statusEl.textContent = data.message || 'Logging configuration saved';
+                statusEl.className = 'status-message success';
+            } else {
+                statusEl.textContent = data.error || 'Save failed';
+                statusEl.className = 'status-message error';
+            }
+        })
+        .catch(function(err) {
+            statusEl.textContent = 'Error: ' + err.message;
+            statusEl.className = 'status-message error';
+        });
     }
 
     // ─── Utilities ───
@@ -825,6 +943,7 @@
         checkLlmModels();
         checkEmbModels();
         checkSystemStatus();
+        checkLoggingConfig();
     });
     </script>
 </body>

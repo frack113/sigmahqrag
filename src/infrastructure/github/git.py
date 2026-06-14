@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 LOCKFILE = ".cloning"
 
 # Valid org/name pattern: alphanumeric, hyphens, underscores, dots (no path separators)
-_VALID_ORG_NAME_RE = re.compile(r"^[\w.-]+$")
+_VALID_ORG_NAME_RE = re.compile(r"^(?!\.\.?$)[\w.-]+$")
 
 
 def _validate_org_name(org: str, name: str) -> None:
@@ -271,14 +271,23 @@ def delete_repo(org: str, name: str, repos_dir: Path | None = None) -> dict[str,
         return {"success": False, "error": str(e)}
 
 
-def list_repos(repos_dir: Path | None = None) -> list[dict[str, Any]]:
-    """List all cloned repositories with their metadata."""
+def list_repos(
+    repos_dir: Path | None = None, org_filter: str | None = None
+) -> list[dict[str, Any]]:
+    """List all cloned repositories with their metadata.
+
+    Args:
+        repos_dir: Base directory for cloned repos.
+        org_filter: If provided, only list repos under this org directory.
+    """
     repos_dir = Path(repos_dir or get_config().paths_github_dir).resolve()
     repos_dir.mkdir(parents=True, exist_ok=True)
 
     repos = []
     for org_dir in repos_dir.iterdir():
         if not org_dir.is_dir():
+            continue
+        if org_filter and org_dir.name != org_filter:
             continue
         for repo_dir in org_dir.iterdir():
             repo = _get_or_create_repo(repo_dir)
@@ -302,7 +311,8 @@ def list_repos(repos_dir: Path | None = None) -> list[dict[str, Any]]:
                         repo.refs[remote_ref].commit.hexsha if remote_ref in repo.refs else ""
                     )
                     info["remote_head"] = remote_head
-                except Exception:
+                except Exception as e:
+                    logger.warning("Fetch failed for %s/%s: %s", org_dir.name, repo_dir.name, e)
                     info["remote_head"] = ""
                 repos.append(info)
 

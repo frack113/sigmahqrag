@@ -1,4 +1,4 @@
-"""Central configuration module — TOML (models, services, paths, logging) + DuckDB (backend)."""
+"""Central configuration module — DuckDB (backend, logging) + defaults."""
 
 from __future__ import annotations
 
@@ -11,7 +11,6 @@ logger = logging.getLogger(__name__)
 
 
 BASE_DIR = Path("data").resolve()
-CONFIG_FILE = Path("sigmarag.toml").resolve()
 BIN_DIR = BASE_DIR / "bin"
 MODELS_DIR = BASE_DIR / "models"
 LLM_DIR = MODELS_DIR / "llm"
@@ -54,7 +53,8 @@ class Config:
     paths_rag_cache_dir: str = "data/rag_cache"
     paths_model_registry: str = "data/models/registry.json"
     paths_sigma_ref_docs_dir: str = "data/documents/sigmaref"
-    paths_sigma_spec_dir: str = "data/sigma-specification"
+    paths_spec_repos_dir: str = "data/specification"
+    paths_sigma_spec_dir: str = "data/specification/sigmahq/sigma-specification"
 
     local_documents_path: str = "data/documents/local"
     sigmaref_documents_path: str = "data/documents/sigmaref"
@@ -65,63 +65,7 @@ class Config:
     logging_clean_at_startup: bool = False
 
     def __post_init__(self) -> None:
-        self._load_from_toml()
-
-    def _load_from_toml(self) -> None:
-        if not CONFIG_FILE.exists():
-            return
-        try:
-            from src.shared.toml_service import TOMLService
-
-            toml_service = TOMLService(CONFIG_FILE)
-            file_config = toml_service.load()
-            if file_config:
-                self._apply_nested_config(file_config)
-                logger.info(f"Loaded config from {CONFIG_FILE}")
-        except Exception as e:
-            logger.warning(f"Failed to load config from {CONFIG_FILE}: {e}")
-
-    def _apply_nested_config(self, nested: dict[str, Any]) -> None:
-        """Apply nested config dict to dataclass fields."""
-        if "Hardware" in nested:
-            hw = nested["Hardware"]
-            if "os" in hw:
-                self.os = hw["os"]
-            if "gpu" in hw:
-                self.gpu_type = hw["gpu"]
-
-        if "services" in nested:
-            services = nested["services"]
-            if "llama" in services:
-                llama = services["llama"]
-                if "base_url" in llama:
-                    self.llama_base_url = llama["base_url"]
-                if "manage_internally" in llama:
-                    self.llama_manage_internally = bool(llama["manage_internally"])
-            if "qdrant" in services:
-                qdrant = services["qdrant"]
-                if "base_url" in qdrant:
-                    self.qdrant_base_url = qdrant["base_url"]
-                    from urllib.parse import urlparse
-
-                    parsed = urlparse(qdrant["base_url"])
-                    if parsed.hostname:
-                        self.qdrant_host = parsed.hostname
-                    if parsed.port:
-                        self.qdrant_port = parsed.port
-                if "manage_internally" in qdrant:
-                    self.qdrant_manage_internally = bool(qdrant["manage_internally"])
-
-        if "logging" in nested:
-            logging_cfg = nested["logging"]
-            if "level" in logging_cfg:
-                self.logging_level = logging_cfg["level"]
-            if "log_max_size" in logging_cfg:
-                self.logging_log_max_size = logging_cfg["log_max_size"]
-            if "log_max_file" in logging_cfg:
-                self.logging_log_max_file = logging_cfg["log_max_file"]
-            if "clean_at_startup" in logging_cfg:
-                self.logging_clean_at_startup = logging_cfg["clean_at_startup"]
+        pass
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -154,7 +98,6 @@ class Config:
     @classmethod
     def init_app(cls) -> Config:
         global _config
-        cls.ensure_config_file()
         cls.ensure_qdrant_config()
         cfg = cls()
         _config = cfg
@@ -173,19 +116,6 @@ class Config:
             )
             return old_path
         return path
-
-    @staticmethod
-    def ensure_config_file() -> None:
-        if not CONFIG_FILE.exists():
-            default_config = Config()
-            try:
-                from src.shared.toml_service import TOMLService
-
-                toml_service = TOMLService(CONFIG_FILE)
-                toml_service.save(default_config.to_dict())
-                logger.info(f"Created default config at {CONFIG_FILE}")
-            except Exception as e:
-                logger.error(f"Failed to create config: {e}")
 
     @staticmethod
     def ensure_qdrant_config() -> None:

@@ -154,6 +154,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             ("llamacpp_version", "llamacpp_version"),
             ("qdrant_version", "qdrant_version"),
             ("qdrant_webui_version", "qdrant_webui_version"),
+            ("logging.level", "logging_level"),
+            ("logging.log_max_size", "logging_log_max_size"),
+            ("logging.log_max_file", "logging_log_max_file"),
+            ("logging.clean_at_startup", "logging_clean_at_startup"),
         ):
             val = db.get_config(key)
             if val is not None and isinstance(val, dict):

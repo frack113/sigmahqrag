@@ -62,3 +62,33 @@ class DiscoveryWorker(BaseWorker):
             "last_seen": now,
             "embed_status": "discovery",
         }
+
+    def _make_sigma_spec_entry(
+        self,
+        org: str,
+        repo: str,
+        file_rel_path: str,
+        content_type: str,
+        content_hash: str,
+        file_size: int,
+        original_url: str,
+        normalized_url: str,
+        title: str,
+    ) -> dict:
+        url_hash = hashlib.sha256(normalized_url.encode()).hexdigest()
+        now = iso_now()
+        return {
+            "url_hash": url_hash,
+            "org": org,
+            "repo": repo,
+            "content_type": content_type,
+            "file_name": file_rel_path,
+            "content_sha256": content_hash,
+            "file_size": file_size,
+            "original_url": original_url,
+            "normalized_url": normalized_url,
+            "title": title,
+            "timestamp": now,
+            "last_seen": now,
+            "embed_status": "discovery",
+        }

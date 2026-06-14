@@ -67,7 +67,7 @@ class DataDirManager:
             "logs",
             "pids",
             "temp",
-            "sigma-specification",
+            "specification",
         ]:
             path = b / name
             leaves[name] = path

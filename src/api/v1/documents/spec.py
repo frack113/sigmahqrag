@@ -1,23 +1,50 @@
-"""Sigma Specification API v1 — scan and embed spec files."""
+"""Sigma Specification Repository Management API v1."""
 
-from __future__ import annotations
-
-import asyncio
-import hashlib
 import logging
+import re
+from datetime import datetime
 from pathlib import Path
+from threading import Lock
 from typing import Any
 
-from fastapi import APIRouter
-from pydantic import BaseModel
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, Field
 
-from src.config.constants import SIGMA_SPEC_REF, SIGMA_SPEC_REPO
 from src.config.settings import get_config
 from src.infrastructure.database import DatabaseService
+from src.infrastructure.github.git import (
+    clone_repo,
+    delete_repo,
+    get_last_commit_date,
+    get_metadata,
+    list_directory_tree,
+    list_repos,
+    save_metadata,
+    save_selected_dirs,
+    update_repo,
+)
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/spec", tags=["v1-spec"])
+
+_sync_lock = Lock()
+
+# Valid org/name pattern: alphanumeric, hyphens, underscores, dots (no path separators)
+_VALID_ORG_NAME_RE = re.compile(r"^(?!\.\.?$)[\w.-]+$")
+
+
+def _spec_repos_dir() -> Path:
+    return Path(get_config().paths_spec_repos_dir).resolve()
+
+
+def _validate_org_name(org: str, name: str) -> None:
+    """Validate org/name to prevent path traversal. Raises HTTPException if invalid."""
+    if not _VALID_ORG_NAME_RE.match(org) or not _VALID_ORG_NAME_RE.match(name):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid org/name: '{org}/{name}' contains path traversal characters",
+        )
 
 
 class SpecResponse(BaseModel):
@@ -27,200 +54,325 @@ class SpecResponse(BaseModel):
     error: str | None = None
 
 
-_SELECTED_DIRS_KEY = "sigma_spec_selected_dirs"
-_SUPPORTED_EXTS = frozenset({".md", ".pdf", ".docx", ".doc", ".pptx", ".ppt"})
+class RepositoryAddRequest(BaseModel):
+    """Request to add a new specification repository."""
+
+    url: str = Field(..., description="Git repository URL")
+    branch: str = Field(default="main", description="Branch to clone")
 
 
-def _spec_dir() -> Path:
-    return Path(get_config().paths_sigma_spec_dir).resolve()
+class RepositoryStatus(BaseModel):
+    """Repository status information."""
+
+    org: str
+    name: str
+    repo_status: str | None = None
+    last_synced: datetime | str | None = None
+    url: str | None = None
+    branch: str | None = None
+    last_commit: str | None = None
+    sync_class: str = Field(
+        default="btn-success", description="btn-success|btn-warning|btn-unknown"
+    )
 
 
-def _get_selected() -> list[str]:
-    db = DatabaseService.get_instance()
-    raw = db.get_config(_SELECTED_DIRS_KEY)
-    if isinstance(raw, list):
-        return [str(x) for x in raw]
-    return []
+class DirectoryTreeResponse(BaseModel):
+    """Response for directory tree listing."""
+
+    success: bool
+    tree: list[dict[str, Any]] = Field(default_factory=list)
+    error: str | None = None
 
 
-def _set_selected(dirs: list[str]) -> None:
-    db = DatabaseService.get_instance()
-    db.set_config(_SELECTED_DIRS_KEY, dirs)
+class SelectDirsRequest(BaseModel):
+    """Request to save selected directories."""
+
+    selected: list[str] = Field(default_factory=list, description="List of folder paths")
 
 
-def _walk_selected(spec_dir: Path) -> list[Path]:
-    """Walk files only from selected directories. Returns empty if none selected."""
-    selected = _get_selected()
-    logger.debug("_walk_selected: selected=%s", selected)
-    if not selected:
-        logger.debug("_walk_selected: no selection, returning empty")
-        return []
+class SelectDirsResponse(BaseModel):
+    """Response for saving selected directories."""
 
-    files: list[Path] = []
-    for entry in spec_dir.iterdir():
-        if entry.is_dir() and entry.name in selected:
-            logger.debug("_walk_selected: walking dir %s", entry.name)
-            for f in entry.rglob("*"):
-                if f.is_file() and f.suffix.lower() in _SUPPORTED_EXTS:
-                    files.append(f)
-        else:
-            logger.debug("_walk_selected: skipping dir %s (not in %s)", entry.name, selected)
-
-    logger.debug("_walk_selected: found %d files", len(files))
-    return sorted(set(files))
+    success: bool
+    message: str | None = None
+    error: str | None = None
 
 
-@router.post("/sync", response_model=SpecResponse)
-async def sync_spec_repo() -> SpecResponse:
-    """Clone or git pull the sigma-specification repository."""
-    spec_dir = _spec_dir()
+def _extract_org_name(url: str) -> tuple[str, str]:
+    """Extract org and name from URL."""
+    url = url.rstrip("/")
+    if url.endswith(".git"):
+        url = url[:-4]
+    parts = url.split("/")
+    if len(parts) < 2:
+        raise ValueError("Invalid URL format")
+    return parts[-2].lower(), parts[-1].lower()
 
-    if not spec_dir.exists():
-        spec_dir.parent.mkdir(parents=True, exist_ok=True)
-        proc = await asyncio.create_subprocess_exec(
-            "git",
-            "clone",
-            "--depth",
-            "1",
-            "-b",
-            SIGMA_SPEC_REF,
-            SIGMA_SPEC_REPO,
-            str(spec_dir),
+
+def _sync_single_repo(org: str, name: str, branch: str | None = None) -> dict[str, Any]:
+    """Sync a single spec repository and save metadata. Runs under _sync_lock."""
+    with _sync_lock:
+        meta = get_metadata(org, name) or {}
+        resolved_branch = branch or meta.get("branch", "main")
+        result = update_repo(
+            org=org, name=name, branch=resolved_branch, repos_dir=_spec_repos_dir()
         )
-        await proc.wait()
-        if proc.returncode != 0:
-            return SpecResponse(
-                success=False, error="Failed to clone sigma-specification repository"
+        if result.get("success"):
+            merged = {
+                **meta,
+                "org": org,
+                "name": name,
+                "branch": resolved_branch,
+                "status": "synced",
+                "last_synced": datetime.now().isoformat(),
+                "remote_head": result.get("remote_head"),
+            }
+            save_metadata(org, name, merged, repos_dir=_spec_repos_dir())
+    return result
+
+
+@router.get("/repos", response_model=list[RepositoryStatus])
+async def list_repos_handler() -> list[RepositoryStatus]:
+    """List all spec repositories."""
+    repos = list_repos(repos_dir=_spec_repos_dir())
+    result = []
+    for repo in repos:
+        metadata = get_metadata(repo["org"], repo["name"]) or {}
+        stored_status = metadata.get("status", "synced")
+
+        if stored_status == "cloning" or stored_status == "syncing":
+            sync_class = "btn-warning"
+        elif stored_status == "error":
+            sync_class = "btn-unknown"
+        else:
+            sync_class = "btn-success"
+
+        last_commit = get_last_commit_date(repo["org"], repo["name"], repos_dir=_spec_repos_dir())
+        result.append(
+            RepositoryStatus(
+                org=repo["org"],
+                name=repo["name"],
+                repo_status=metadata.get("status", "synced"),
+                last_synced=metadata.get("last_synced"),
+                url=metadata.get("url"),
+                branch=metadata.get("branch"),
+                last_commit=last_commit,
+                sync_class=sync_class,
             )
-        return SpecResponse(success=True, message="Repository cloned successfully")
-
-    proc = await asyncio.create_subprocess_exec(
-        "git",
-        "-C",
-        str(spec_dir),
-        "pull",
-        "origin",
-        SIGMA_SPEC_REF,
-    )
-    await proc.wait()
-    if proc.returncode != 0:
-        return SpecResponse(success=False, error="Failed to pull sigma-specification repository")
-    return SpecResponse(success=True, message="Repository synced successfully")
-
-
-@router.get("/dirs", response_model=SpecResponse)
-async def list_spec_dirs() -> SpecResponse:
-    """List top-level subdirectories of the sigma-specification repo."""
-    spec_dir = _spec_dir()
-    if not spec_dir.exists():
-        return SpecResponse(success=False, error=f"Spec directory not found: {spec_dir}")
-    dirs = sorted(d.name for d in spec_dir.iterdir() if d.is_dir() and not d.name.startswith("."))
-    return SpecResponse(success=True, data={"dirs": dirs, "count": len(dirs)})
-
-
-@router.get("/selected-dirs", response_model=SpecResponse)
-async def get_selected_dirs() -> SpecResponse:
-    """Get currently selected directories for scanning."""
-    return SpecResponse(success=True, data={"selected": _get_selected()})
-
-
-class SelectedDirsRequest(BaseModel):
-    selected: list[str]
-
-
-@router.put("/selected-dirs", response_model=SpecResponse)
-async def set_selected_dirs(req: SelectedDirsRequest) -> SpecResponse:
-    """Set which directories to include when scanning."""
-    spec_dir = _spec_dir()
-    valid = {d.name for d in spec_dir.iterdir() if d.is_dir() and not d.name.startswith(".")}
-    for d in req.selected:
-        if d not in valid:
-            return SpecResponse(success=False, error=f"Invalid directory: {d}")
-    _set_selected(req.selected)
-    return SpecResponse(success=True, message=f"Selected {len(req.selected)} directories.")
-
-
-@router.get("/files", response_model=SpecResponse)
-async def list_spec_files() -> SpecResponse:
-    """List spec files on disk, filtered by selected directories."""
-    spec_dir = _spec_dir()
-    if not spec_dir.exists():
-        return SpecResponse(success=False, error=f"Spec directory not found: {spec_dir}")
-
-    files = []
-    for f in _walk_selected(spec_dir):
-        files.append(
-            {
-                "name": str(f.relative_to(spec_dir)),
-                "size": f.stat().st_size,
-                "type": f.suffix.lower().lstrip("."),
-            }
         )
+    return result
+
+
+@router.post("/repos", response_model=SpecResponse)
+async def add_repo(
+    request: RepositoryAddRequest,
+    background_tasks=None,
+):
+    """Add a new specification repository."""
+    try:
+        org, name = _extract_org_name(request.url)
+    except ValueError:
+        return SpecResponse(success=False, error="Invalid URL format")
+
+    existing = list_repos(repos_dir=_spec_repos_dir())
+    if any(r["org"] == org and r["name"] == name for r in existing):
+        return SpecResponse(success=False, error=f"Repository '{org}/{name}' already exists")
+
+    def clone_with_status() -> None:
+        with _sync_lock:
+            result = clone_repo(url=request.url, repos_dir=_spec_repos_dir(), branch=request.branch)
+            if result.get("success"):
+                save_metadata(
+                    org,
+                    name,
+                    {
+                        "org": org,
+                        "name": name,
+                        "url": request.url,
+                        "branch": request.branch,
+                        "status": "synced",
+                        "last_synced": datetime.now().isoformat(),
+                        "created_at": datetime.now().isoformat(),
+                        "remote_head": result.get("remote_head"),
+                    },
+                    repos_dir=_spec_repos_dir(),
+                )
+                save_selected_dirs(org, name, [], repos_dir=_spec_repos_dir())
+            else:
+                save_metadata(
+                    org,
+                    name,
+                    {
+                        "org": org,
+                        "name": name,
+                        "url": request.url,
+                        "branch": request.branch,
+                        "status": "error",
+                        "error": result.get("error"),
+                    },
+                    repos_dir=_spec_repos_dir(),
+                )
+
+    if background_tasks is not None:
+        background_tasks.add_task(clone_with_status)
 
     return SpecResponse(
         success=True,
-        data={"files": files, "count": len(files)},
+        message=f"Cloning repository '{org}/{name}' in background",
+        data={"org": org, "name": name, "status": "cloning"},
     )
 
 
-@router.post("/scan", response_model=SpecResponse)
-async def scan_spec_files() -> SpecResponse:
-    """Scan sigma-specification directory and register files in doc_registry."""
-    spec_dir = _spec_dir()
-    if not spec_dir.exists():
-        return SpecResponse(success=False, error=f"Spec directory not found: {spec_dir}")
+@router.post("/repos/sync-all", response_model=SpecResponse)
+async def sync_all_repos(
+    background_tasks=None,
+):
+    """Sync all registered specification repositories."""
+    repos = list_repos(repos_dir=_spec_repos_dir())
+    if not repos:
+        return SpecResponse(success=True, message="No repositories to sync")
 
-    db = DatabaseService.get_instance()
+    def sync_all_task() -> None:
+        for repo_data in list(repos):
+            try:
+                _sync_single_repo(repo_data["org"], repo_data["name"])
+            except Exception as e:
+                logger.error(f"Failed to sync {repo_data['org']}/{repo_data['name']}: {e}")
 
-    # Mark stale pending entries as skipped so they are not picked up
-    # by the indexer after the user changes directory selection.
-    db.mark_spec_stale_entries_skipped()
-    logger.info("Marked stale sigma_spec entries as skipped")
+    if background_tasks is not None:
+        background_tasks.add_task(sync_all_task)
 
-    entries: list[dict[str, Any]] = []
+    return SpecResponse(success=True, message="Sync started for all repositories")
 
-    for f in _walk_selected(spec_dir):
-        rel = f.relative_to(spec_dir).as_posix()
-        url = f"spec://sigma-specification/{rel}"
-        url_hash = hashlib.sha256(url.encode()).hexdigest()
 
-        content_hash = hashlib.sha256(f.read_bytes()).hexdigest()
-        file_size = f.stat().st_size
-
-        ext = f.suffix.lower()
-        if ext == ".md":
-            ct = "markdown"
-        elif ext in (".pdf",):
-            ct = "pdf"
-        elif ext in (".docx", ".doc"):
-            ct = "docx"
-        elif ext in (".pptx", ".ppt"):
-            ct = "pptx"
-        else:
-            ct = ext.lstrip(".")
-
-        entries.append(
-            {
-                "url_hash": url_hash,
-                "file_name": rel,
-                "content_type": ct,
-                "content_sha256": content_hash,
-                "file_size": file_size,
-                "original_url": url,
-                "title": f.stem,
-                "embed_status": "discovery",
-            }
-        )
-
-    if entries:
+@router.delete("/repos/{org}/{name}", response_model=SpecResponse)
+async def delete_repo_handler(
+    org: str,
+    name: str,
+) -> SpecResponse:
+    """Delete a specification repository."""
+    try:
+        _validate_org_name(org, name)
+    except HTTPException as e:
+        return SpecResponse(success=False, error=e.detail)
+    result = delete_repo(org, name, repos_dir=_spec_repos_dir())
+    if result.get("success"):
         try:
-            db.batch_upsert_sigma_spec(entries)
+            db = DatabaseService.get_instance()
+            db.delete_sigma_spec_by_org_repo(org, name)
+            logger.info("Cleaned up sigma_spec entries for %s/%s", org, name)
         except Exception as e:
-            logger.error(f"Failed to batch upsert spec entries: {e}")
-            return SpecResponse(success=False, error=str(e))
+            logger.error("Failed to clean up sigma_spec for %s/%s: %s", org, name, e)
+        return SpecResponse(
+            success=True,
+            message=f"Repository '{org}/{name}' deleted and sigma_spec entries cleaned up",
+        )
+    return SpecResponse(success=False, error=result.get("error", "Delete failed"))
 
-    return SpecResponse(
-        success=True,
-        message=f"Scanned {len(entries)} specification files.",
-        data={"count": len(entries)},
+
+@router.get("/repos/{org}/{name}/sync", response_model=SpecResponse)
+async def sync_repo(
+    org: str,
+    name: str,
+    branch: str | None = None,
+    background_tasks=None,
+):
+    """Sync a specification repository."""
+    _validate_org_name(org, name)
+    metadata = get_metadata(org, name)
+    if branch is None:
+        branch = (metadata or {}).get("branch", "main")
+
+    if branch and (".." in branch or branch.startswith("/") or branch.endswith("/")):
+        return SpecResponse(success=False, error="Invalid branch name")
+    if len(branch) > 255:
+        return SpecResponse(success=False, error="Branch name too long")
+
+    repos = list_repos(repos_dir=_spec_repos_dir())
+    if not any(r["org"] == org and r["name"] == name for r in repos):
+        return SpecResponse(success=False, error=f"Repository '{org}/{name}' not found")
+
+    if background_tasks is not None:
+        background_tasks.add_task(_sync_single_repo, org, name, branch)
+
+    return SpecResponse(success=True, message="Sync started in background")
+
+
+@router.get("/repos/{org}/{name}/tree", response_model=DirectoryTreeResponse)
+async def get_repo_tree(
+    org: str,
+    name: str,
+    max_depth: int = 5,
+) -> DirectoryTreeResponse:
+    """Get directory tree for a specification repository."""
+    try:
+        _validate_org_name(org, name)
+    except HTTPException as e:
+        return DirectoryTreeResponse(success=False, error=e.detail)
+    try:
+        repo_path = Path(_get_repo_path(_spec_repos_dir(), org, name))
+        if not repo_path.exists():
+            metadata = get_metadata(org, name, repos_dir=_spec_repos_dir())
+            if metadata:
+                return DirectoryTreeResponse(
+                    success=False,
+                    error=f"Repository '{org}/{name}' not cloned yet",
+                )
+            return DirectoryTreeResponse(
+                success=False,
+                error=f"Repository '{org}/{name}' not found or not cloned yet",
+            )
+
+        tree = list_directory_tree(org, name, repos_dir=_spec_repos_dir(), max_depth=max_depth)
+
+        return DirectoryTreeResponse(
+            success=True,
+            tree=tree,
+        )
+    except PermissionError as e:
+        logger.error(f"Permission denied accessing repo dir for {org}/{name}: {e}")
+        return DirectoryTreeResponse(
+            success=False,
+            error="Permission denied accessing repository directory",
+        )
+    except Exception as e:
+        logger.error(f"Failed to get tree for {org}/{name}: {type(e).__name__}: {e}")
+        return DirectoryTreeResponse(
+            success=False,
+            error=f"Error loading directory structure: {type(e).__name__}",
+        )
+
+
+@router.post("/repos/{org}/{name}/select-dirs", response_model=SelectDirsResponse)
+async def select_dirs(
+    org: str,
+    name: str,
+    request: SelectDirsRequest,
+) -> SelectDirsResponse:
+    """Save selected directories for a specification repository."""
+    try:
+        _validate_org_name(org, name)
+    except HTTPException as e:
+        return SelectDirsResponse(success=False, error=e.detail)
+    try:
+        repo_path = Path(_get_repo_path(_spec_repos_dir(), org, name))
+        if not repo_path.exists():
+            return SelectDirsResponse(success=False, error=f"Repository '{org}/{name}' not found")
+    except Exception as e:
+        return SelectDirsResponse(success=False, error=str(e))
+    result = save_selected_dirs(org, name, request.selected, repos_dir=_spec_repos_dir())
+    if result.get("success"):
+        return SelectDirsResponse(
+            success=True,
+            message=f"Saved {len(request.selected)} selected directories for {org}/{name}",
+        )
+    return SelectDirsResponse(
+        success=False,
+        error=result.get("error", "Failed to save selections"),
     )
+
+
+def _get_repo_path(repos_dir: Path, org: str, name: str) -> Path:
+    """Get the full path for a repository."""
+    _validate_org_name(org, name)
+    return repos_dir / org / name

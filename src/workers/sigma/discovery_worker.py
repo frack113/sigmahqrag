@@ -23,6 +23,7 @@ SUPPORTED_EXTENSIONS = frozenset(SUPPORTED_DOC_EXTENSION_MAP.keys()) | SIGMA_RUL
 class SourceType(str, Enum):
     LOCAL = "local"
     GITHUB = "github"
+    SPEC = "spec"
 
 
 class GenericDiscoveryWorker(DiscoveryWorker):
@@ -40,6 +41,12 @@ class GenericDiscoveryWorker(DiscoveryWorker):
             base_dir=Path("/repos"),
             github_base_dir=Path("/data/github"),
         )
+
+        # Specification repositories
+        GenericDiscoveryWorker(
+            source_type=SourceType.SPEC,
+            spec_repos_dir=Path("data/specification"),
+        )
     """
 
     def __init__(
@@ -50,12 +57,14 @@ class GenericDiscoveryWorker(DiscoveryWorker):
         source_type: SourceType = SourceType.LOCAL,
         base_dir: Optional[Path] = None,
         github_base_dir: Optional[Path] = None,
+        spec_repos_dir: Optional[Path] = None,
         selected_dirs: Optional[list[str]] = None,
     ) -> None:
         super().__init__(db or DatabaseService.get_instance(), dispatcher)
         self.source_type = source_type
         self.base_dir = (base_dir or Path("/tmp")).resolve()
         self.github_base_dir = github_base_dir
+        self.spec_repos_dir = spec_repos_dir
         self.selected_dirs = selected_dirs or []
 
     # ------------------------------------------------------------------
@@ -67,6 +76,8 @@ class GenericDiscoveryWorker(DiscoveryWorker):
             self._process_local(task, WorkerName.LOCAL_DISCOVERY)
         elif self.source_type == SourceType.GITHUB:
             self._process_github(task, WorkerName.GITHUB_DISCOVERY)
+        elif self.source_type == SourceType.SPEC:
+            self._process_spec(task, WorkerName.SPEC_DISCOVERY)
         else:
             logger.error(f"[GenericDiscoveryWorker] Unknown source type: {self.source_type!r}")
 
@@ -169,6 +180,172 @@ class GenericDiscoveryWorker(DiscoveryWorker):
             self._write_entries(
                 entries, worker_name, len(all_files), processed_count, skipped_count
             )
+
+    # ------------------------------------------------------------------
+    # Specification repository source
+    # ------------------------------------------------------------------
+
+    def _process_spec(self, task: dict, worker_name: WorkerName) -> None:
+        from src.config.settings import get_config
+        from src.infrastructure.github.git import list_repos
+
+        cfg = get_config()
+        spec_base = self.spec_repos_dir or Path(cfg.paths_spec_repos_dir)
+        spec_base = spec_base.resolve()
+
+        # List all cloned spec repos on disk
+        try:
+            repos = list_repos(repos_dir=spec_base)
+        except Exception as e:
+            logger.error(f"[GenericDiscoveryWorker] Failed to list spec repos: {e}")
+            return
+
+        if not repos:
+            self._update_progress(worker_name, 100, "")
+            logger.info("[GenericDiscoveryWorker] No spec repos found")
+            return
+
+        all_files: list[tuple[Path, Path, str, str]] = []
+        for repo_info in repos:
+            org = repo_info.get("org", "")
+            repo_name = repo_info.get("name", "")
+            if not org or not repo_name:
+                continue
+
+            repo_path = spec_base / org / repo_name
+            if not repo_path.exists():
+                logger.warning(f"[GenericDiscoveryWorker] Repo path not found: {repo_path}")
+                continue
+
+            repo_key = f"{org}/{repo_name}"
+            selected = self.selected_dirs or self._get_selected_dirs(repo_key)
+
+            try:
+                for found_file in repo_path.rglob("*"):
+                    if (
+                        not found_file.is_file()
+                        or found_file.suffix.lower() not in SUPPORTED_EXTENSIONS
+                    ):
+                        continue
+
+                    if selected:
+                        rel_to_repo = found_file.relative_to(repo_path).as_posix()
+                        if not any(
+                            rel_to_repo == sd.lstrip("./")
+                            or rel_to_repo.startswith(sd.lstrip("./") + "/")
+                            for sd in selected
+                            if sd
+                        ):
+                            continue
+
+                    all_files.append((found_file, repo_path, org, repo_name))
+            except PermissionError as e:
+                logger.warning(
+                    "[GenericDiscoveryWorker] Permission denied scanning %s: %s",
+                    repo_path,
+                    e,
+                )
+                continue
+
+        if self.dispatcher:
+            self._update_progress(worker_name, 1, f"{len(all_files)} files found")
+
+        logger.info(
+            f"[GenericDiscoveryWorker] Found {len(all_files)} spec files across {len(repos)} repos"
+        )
+
+        if all_files:
+            entries, processed_count, skipped_count = self._scan_all_spec(all_files, worker_name)
+            self._write_spec_entries(
+                entries, worker_name, len(all_files), processed_count, skipped_count
+            )
+
+    def _scan_all_spec(
+        self,
+        files: list[tuple[Path, Path, str, str]],
+        worker_name: WorkerName,
+    ) -> tuple[list[dict], int, int]:
+        entries: list[dict] = []
+        processed_count = 0
+        skipped_count = 0
+
+        for idx, (file_path, base_path, org, repo) in enumerate(files):
+            try:
+                entry = self._prepare_spec_entry(file_path, base_path, org, repo)
+                if entry is not None:
+                    entries.append(entry)
+                    processed_count += 1
+                else:
+                    skipped_count += 1
+            except Exception as e:
+                logger.error(f"[GenericDiscoveryWorker] Unexpected error on {file_path}: {e}")
+                skipped_count += 1
+
+            if idx % 50 == 0 and self.dispatcher:
+                pct = int((idx + 1) / len(files) * 100) if files else 0
+                self._update_progress(worker_name, pct, str(file_path))
+
+        return entries, processed_count, skipped_count
+
+    def _prepare_spec_entry(
+        self,
+        file_path: Path,
+        base_path: Path,
+        org: str,
+        repo: str,
+    ) -> dict | None:
+        try:
+            file_rel_path = file_path.relative_to(base_path).as_posix()
+            branch = "main"
+            try:
+                metadata = self.db.get_git_metadata(f"{org}/{repo}")
+                if metadata and metadata.get("branch"):
+                    branch = metadata["branch"]
+            except Exception:
+                pass
+            original_url = f"spec://{org}/{repo}/blob/{branch}/{file_rel_path}"
+            normalized_url = (
+                f"https://raw.githubusercontent.com/{org}/{repo}/{branch}/{file_rel_path}"
+            )
+
+            content_hash, file_size = self._compute_sha256(file_path)
+            content_type = self._identify_content_type(file_path)
+            title = file_path.stem
+
+            return self._make_sigma_spec_entry(
+                org=org,
+                repo=repo,
+                file_rel_path=file_rel_path,
+                content_type=content_type,
+                content_hash=content_hash,
+                file_size=file_size,
+                original_url=original_url,
+                normalized_url=normalized_url,
+                title=title,
+            )
+        except Exception as e:
+            logger.error(f"[GenericDiscoveryWorker] Cannot prepare spec entry for {file_path}: {e}")
+            return None
+
+    def _write_spec_entries(
+        self, entries: list[dict], worker_name: WorkerName, total: int, processed: int, skipped: int
+    ) -> None:
+        if not entries:
+            self._update_progress(worker_name, 100, "")
+            return
+
+        try:
+            self.db.batch_upsert_sigma_spec(entries)
+        except Exception as e:
+            logger.error(
+                f"[GenericDiscoveryWorker] Batch upsert sigma_spec failed: {e}", exc_info=True
+            )
+
+        if total > 0 and self.dispatcher:
+            pct = int((processed + skipped) / total * 100)
+            self._update_progress(worker_name, pct, "")
+
+        self._update_progress(worker_name, 100, "")
 
     # ------------------------------------------------------------------
     # Shared scanning logic

@@ -74,8 +74,12 @@ def test_full_init_e2e_creates_all_structure(temp_project_dir):
     assert "[backend]" not in config_content
 
     # Verify sigma-specification cloned
-    assert (temp_project_dir / "data" / "sigma-specification").exists()
-    assert (temp_project_dir / "data" / "sigma-specification" / ".git").exists()
+    assert (
+        temp_project_dir / "data" / "specification" / "sigmahq" / "sigma-specification"
+    ).exists()
+    assert (
+        temp_project_dir / "data" / "specification" / "sigmahq" / "sigma-specification" / ".git"
+    ).exists()
 
     # Verify DuckDB initialized with schema_version
     from src.infrastructure.database import DatabaseService
@@ -139,7 +143,9 @@ def test_init_idempotent_second_run(temp_project_dir):
 
     # Verify structure still intact
     assert (temp_project_dir / "sigmarag.toml").exists()
-    assert (temp_project_dir / "data" / "sigma-specification").exists()
+    assert (
+        temp_project_dir / "data" / "specification" / "sigmahq" / "sigma-specification"
+    ).exists()
 
     from src.infrastructure.database import DatabaseService
 
