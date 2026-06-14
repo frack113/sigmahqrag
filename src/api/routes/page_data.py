@@ -41,3 +41,9 @@ async def data_vectordb_page(request: Request):
 async def data_local_page(request: Request):
     """Serve the Local Files management page."""
     return templates.TemplateResponse(request=request, name="data/local.html")
+
+
+@router.get("/data/prompts")
+async def data_prompts_page(request: Request):
+    """Serve the Prompts management page."""
+    return templates.TemplateResponse(request=request, name="data/prompts.html")

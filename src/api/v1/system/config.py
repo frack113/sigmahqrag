@@ -118,23 +118,65 @@ async def update_logging_config(request: LoggingConfigUpdateRequest) -> JSONResp
 
 @router.post("/config")
 async def update_config(request: ConfigUpdateRequest) -> JSONResponse:
-    """POST /api/v1/config — Update backend config (os, gpu_type) persisted to DuckDB."""
+    """POST /api/v1/config — Update backend config persisted to DuckDB."""
     try:
         config = get_config()
         if request.backend:
             os_val = request.backend.get("os")
             gpu_val = request.backend.get("gpu_type")
+            llama_base_url = request.backend.get("llama_base_url") or request.backend.get(
+                "services", {}
+            ).get("llama", {}).get("base_url")
+            llama_manage = request.backend.get("llama_manage_internally") or request.backend.get(
+                "services", {}
+            ).get("llama", {}).get("manage_internally")
+            llama_autorun = request.backend.get("llama_autorun_at_startup") or request.backend.get(
+                "services", {}
+            ).get("llama", {}).get("autorun_at_startup")
+            qdrant_base_url = request.backend.get("qdrant_base_url") or request.backend.get(
+                "services", {}
+            ).get("qdrant", {}).get("base_url")
+            qdrant_manage = request.backend.get("qdrant_manage_internally") or request.backend.get(
+                "services", {}
+            ).get("qdrant", {}).get("manage_internally")
+            qdrant_autorun = request.backend.get(
+                "qdrant_autorun_at_startup"
+            ) or request.backend.get("services", {}).get("qdrant", {}).get("autorun_at_startup")
 
             if os_val:
                 config.os = os_val
             if gpu_val:
                 config.gpu_type = gpu_val
+            if llama_base_url is not None:
+                config.llama_base_url = str(llama_base_url)
+            if llama_manage is not None:
+                config.llama_manage_internally = bool(llama_manage)
+            if llama_autorun is not None:
+                config.llama_autorun_at_startup = bool(llama_autorun)
+            if qdrant_base_url is not None:
+                config.qdrant_base_url = str(qdrant_base_url)
+            if qdrant_manage is not None:
+                config.qdrant_manage_internally = bool(qdrant_manage)
+            if qdrant_autorun is not None:
+                config.qdrant_autorun_at_startup = bool(qdrant_autorun)
 
             db = DatabaseService.get_instance()
             if os_val is not None:
                 db.set_config("backend.os", os_val)
             if gpu_val is not None:
                 db.set_config("backend.gpu_type", gpu_val)
+            if llama_base_url is not None:
+                db.set_config("services.llama.base_url", llama_base_url)
+            if llama_manage is not None:
+                db.set_config("services.llama.manage_internally", llama_manage)
+            if llama_autorun is not None:
+                db.set_config("services.llama.autorun_at_startup", llama_autorun)
+            if qdrant_base_url is not None:
+                db.set_config("services.qdrant.base_url", qdrant_base_url)
+            if qdrant_manage is not None:
+                db.set_config("services.qdrant.manage_internally", qdrant_manage)
+            if qdrant_autorun is not None:
+                db.set_config("services.qdrant.autorun_at_startup", qdrant_autorun)
 
         return JSONResponse(
             content={

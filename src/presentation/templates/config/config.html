@@ -1,0 +1,330 @@
+{# Config Dashboard — sections with side-by-side cards #}
+{% extends "config/layout.html" %}
+
+{% block title %}Config - SigmaHQ RAG{% endblock %}
+
+{% block styles %}
+<link rel="stylesheet" href="{{ url_for('static', path='/css/config.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="config-dashboard">
+    <!-- Status Banner -->
+    <div class="config-hero-banner" id="status-banner">
+        <div class="hero-content">
+            <h1>System Status</h1>
+            <p>Real-time overview of all services</p>
+            <div class="status-grid" id="status-grid">
+                <div class="status-card status-card-loading" data-service="llama">
+                    <div class="status-dot"></div>
+                    <span class="status-label">llama.cpp</span>
+                    <span class="status-text">Loading...</span>
+                </div>
+                <div class="status-card status-card-loading" data-service="qdrant">
+                    <div class="status-dot"></div>
+                    <span class="status-label">Qdrant</span>
+                    <span class="status-text">Loading...</span>
+                </div>
+                <div class="status-card status-card-loading" data-service="duckdb">
+                    <div class="status-dot"></div>
+                    <span class="status-label">DuckDB</span>
+                    <span class="status-text">Loading...</span>
+                </div>
+                <div class="status-card status-card-loading" data-service="logging">
+                    <div class="status-dot"></div>
+                    <span class="status-label">Logging</span>
+                    <span class="status-text">Loading...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="config-dashboard">
+            <!-- Section: General -->
+            <details class="config-group" id="general-section" open>
+                <summary class="config-group-summary">General</summary>
+                <div class="config-cards">
+                    <!-- Configuration Card -->
+                    <div class="card">
+                        <div class="card-header"><h2>Configuration</h2></div>
+                        <div class="card-body">
+                            <form id="config-form">
+                                <div class="config-row">
+                                    <div class="form-group inline">
+                                        <label for="os-select">OS:</label>
+                                        <select id="os-select" name="os">
+                                            <option value="windows">Windows</option>
+                                            <option value="linux">Linux</option>
+                                            <option value="macos">macOS</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group inline">
+                                        <label for="gpu-select">GPU Backend:</label>
+                                        <select id="gpu-select" name="gpu">
+                                            <option value="cpu">CPU</option>
+                                            <option value="cuda">CUDA</option>
+                                            <option value="hip">HIP (AMD)</option>
+                                            <option value="vulkan">Vulkan</option>
+                                        </select>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary btn-sm">Save</button>
+                                </div>
+                            </form>
+                            <div id="config-status" class="status-message"></div>
+                        </div>
+                    </div>
+                    <!-- Logging Card -->
+                    <div class="card">
+                        <div class="card-header"><h2>Logging</h2></div>
+                        <div class="card-body">
+                            <div id="logging-status" class="global-status">
+                                <span class="status-dot"></span>
+                                <span id="logging-status-text">Loading...</span>
+                            </div>
+                            <div class="form-group" style="margin-top:12px;">
+                                <label for="log-level-select">Log Level</label>
+                                <select id="log-level-select">
+                                    <option value="DEBUG">DEBUG</option>
+                                    <option value="INFO" selected>INFO</option>
+                                    <option value="WARNING">WARNING</option>
+                                    <option value="ERROR">ERROR</option>
+                                    <option value="CRITICAL">CRITICAL</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="log-max-size-input">Log Max Size</label>
+                                <input type="text" id="log-max-size-input" value="10M" placeholder="e.g. 10M, 50M, 100M">
+                            </div>
+                            <div class="form-group">
+                                <label for="log-max-file-input">Log Max Files</label>
+                                <input type="number" id="log-max-file-input" value="5" min="1" max="99">
+                            </div>
+                            <div class="form-group">
+                                <div class="mode-toggle" id="log-clean-toggle">
+                                    <span class="mode-label">Clean at Startup</span>
+                                    <input type="checkbox" id="log-clean-at-startup">
+                                    <label for="log-clean-at-startup" class="toggle-track"></label>
+                                </div>
+                            </div>
+                            <div class="form-actions">
+                                <button class="btn btn-primary btn-sm" onclick="Config.saveLoggingConfig()">Save Logging Config</button>
+                            </div>
+                            <div id="logging-config-status" class="status-message"></div>
+                        </div>
+                    </div>
+                </div>
+            </details>
+
+            <!-- Section: Data -->
+            <details class="config-group" id="data-section" open>
+                <summary class="config-group-summary">Data</summary>
+                <div class="config-cards">
+                    <!-- Data Card -->
+                    <div class="card" style="flex:2;">
+                        <div class="card-header"><h2>Data Folders</h2></div>
+                        <div class="card-body">
+                            <div id="data-global-status" class="global-status"></div>
+                            <div id="data-dirs-list" style="margin-top:12px;"></div>
+                            <div class="section-divider"></div>
+                            <div class="section-subtitle">DuckDB</div>
+                            <div id="duckdb-status" style="margin-top:8px;"></div>
+                        </div>
+                    </div>
+                    <!-- Specifications Card -->
+                    <div class="card" style="flex:1;">
+                        <div class="card-header"><h2>Spécifications</h2></div>
+                        <div class="card-body">
+                            <div id="specs-status" class="global-status">
+                                <span class="status-dot"></span>
+                                <span id="specs-status-text">Loading...</span>
+                            </div>
+                            <div id="specs-repos-list" style="margin-top:12px;"></div>
+                            <div class="form-actions" style="margin-top:12px;">
+                                <button id="specs-fix-btn" class="btn btn-primary btn-sm" onclick="Config.fixSpecRepo()">Fix</button>
+                            </div>
+                            <div id="specs-config-status" class="status-message"></div>
+                            <div class="section-divider"></div>
+                            <div class="section-subtitle">Git Information</div>
+                            <div id="git-info-section" style="margin-top:8px;">
+                                <p class="info-text" style="margin:0;">Git integration will be displayed here.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </details>
+
+            <!-- Section: Backend -->
+            <details class="config-group" id="backend-section" open>
+                <summary class="config-group-summary">Backend</summary>
+                <div class="config-cards">
+                    <!-- llama.cpp Card -->
+                    <div class="card">
+                        <div class="card-header"><h2>llama.cpp</h2></div>
+                        <div class="card-body">
+                            <div id="llama-status" class="status-row" style="margin-bottom:16px;">
+                                <span class="status-dot status-unknown"></span>
+                                <span id="llama-status-text">Loading...</span>
+                                <button class="btn btn-secondary btn-sm" onclick="Config.loadBackendStatus()">Refresh</button>
+                            </div>
+
+                            <div class="form-group" style="margin-bottom:16px;">
+                                <label for="llama-base-url">Base URL</label>
+                                <input type="text" id="llama-base-url" value="http://127.0.0.1:8080" placeholder="http://127.0.0.1:8080">
+                            </div>
+
+                            <div class="form-group" style="margin-bottom:16px;">
+                                <div class="slider-row" id="llama-mode-toggle">
+                                    <span class="slider-label left">Internal</span>
+                                    <input type="range" id="llama-manage-internally" min="0" max="1" value="1" data-onval="1" data-offval="0" onchange="Config.onLlamaModeChange()">
+                                    <span class="slider-label right">External</span>
+                                </div>
+                            </div>
+
+                            <div class="form-group" style="margin-bottom:16px;">
+                                <label style="display:block; font-size:13px; color:var(--layout-card-text); margin-bottom:4px;">Auto start</label>
+                                <div class="slider-row" id="llama-autostart-toggle">
+                                    <span class="slider-label left">Off</span>
+                                    <input type="range" id="llama-autorun-at-startup" min="0" max="1" value="1" data-onval="1" data-offval="0" onchange="Config.onLlamaAutostartChange()">
+                                    <span class="slider-label right">On</span>
+                                </div>
+                            </div>
+
+                            <div class="config-row" style="margin-bottom:16px;">
+                                <div class="form-group inline">
+                                    <label>Release:</label>
+                                    <select id="llama-release-select" style="min-width:200px"></select>
+                                </div>
+                                <button id="llama-download-btn" class="btn btn-primary btn-sm" onclick="Config.downloadLlama()">Update</button>
+                            </div>
+
+                            <div class="form-actions" style="margin-bottom:16px;">
+                                <button id="llama-start-btn" class="btn btn-success btn-sm" onclick="Config.startService('llama')">Start</button>
+                                <button id="llama-stop-btn" class="btn btn-danger btn-sm" onclick="Config.stopService('llama')">Stop</button>
+                            </div>
+
+                            <div id="llama-download-status" class="status-message"></div>
+                            <div id="llama-progress-container" style="display:none;">
+                                <div class="progress-bar"><div class="progress-fill" id="llama-progress-fill"></div></div>
+                                <p id="llama-progress-text">Downloading...</p>
+                            </div>
+
+                            <div style="margin-top:16px;">
+                                <button class="btn btn-secondary btn-sm" onclick="Config.refreshReleases()">Refresh GitHub Releases</button>
+                            </div>
+
+                            <div id="llama-info" style="margin-top:16px; font-size:13px;"></div>
+                        </div>
+                    </div>
+                    <!-- Qdrant Card -->
+                    <div class="card">
+                        <div class="card-header"><h2>Qdrant</h2></div>
+                        <div class="card-body">
+                            <div id="qdrant-status" class="status-row" style="margin-bottom:16px;">
+                                <span class="status-dot status-unknown"></span>
+                                <span id="qdrant-status-text">Loading...</span>
+                                <button class="btn btn-secondary btn-sm" onclick="Config.loadBackendStatus()">Refresh</button>
+                            </div>
+
+                            <div class="form-group" style="margin-bottom:16px;">
+                                <label for="qdrant-base-url">Base URL</label>
+                                <input type="text" id="qdrant-base-url" value="http://127.0.0.1:6333" placeholder="http://127.0.0.1:6333">
+                            </div>
+
+                            <div class="form-group" style="margin-bottom:16px;">
+                                <div class="slider-row" id="qdrant-mode-toggle">
+                                    <span class="slider-label left">Internal</span>
+                                    <input type="range" id="qdrant-manage-internally" min="0" max="1" value="1" data-onval="1" data-offval="0" onchange="Config.onQdrantModeChange()">
+                                    <span class="slider-label right">External</span>
+                                </div>
+                            </div>
+
+                            <div class="form-group" style="margin-bottom:16px;">
+                                <label style="display:block; font-size:13px; color:var(--layout-card-text); margin-bottom:4px;">Auto start</label>
+                                <div class="slider-row" id="qdrant-autostart-toggle">
+                                    <span class="slider-label left">Off</span>
+                                    <input type="range" id="qdrant-autorun-at-startup" min="0" max="1" value="1" data-onval="1" data-offval="0" onchange="Config.onQdrantAutostartChange()">
+                                    <span class="slider-label right">On</span>
+                                </div>
+                            </div>
+
+                            <div class="config-row" style="margin-bottom:16px;">
+                                <div class="form-group inline">
+                                    <label>Binary:</label>
+                                    <select id="qdrant-release-select" style="min-width:200px"></select>
+                                </div>
+                                <button id="qdrant-download-btn" class="btn btn-primary btn-sm" onclick="Config.downloadQdrantBinary()">Update</button>
+                            </div>
+
+                            <div class="form-actions" style="margin-bottom:16px;">
+                                <button id="qdrant-start-btn" class="btn btn-success btn-sm" onclick="Config.startService('qdrant')">Start</button>
+                                <button id="qdrant-stop-btn" class="btn btn-danger btn-sm" onclick="Config.stopService('qdrant')">Stop</button>
+                            </div>
+
+                            <div id="qdrant-download-status" class="status-message"></div>
+                            <div id="qdrant-progress-container" style="display:none;">
+                                <div class="progress-bar"><div class="progress-fill" id="qdrant-progress-fill"></div></div>
+                                <p id="qdrant-progress-text">Downloading...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </details>
+
+            <!-- Section: Model -->
+            <details class="config-group" id="model-section" open>
+                <summary class="config-group-summary">Model</summary>
+                <div class="config-cards">
+                    <!-- Embedding Card -->
+                    <div class="card">
+                        <div class="card-header"><h2>Embedding</h2></div>
+                        <div class="card-body">
+                            <div id="emb-global-status" class="global-status">
+                                <span class="status-dot"></span>
+                                <span id="emb-global-text">Loading...</span>
+                            </div>
+                            <div id="emb-models-list" style="margin-top:12px;"></div>
+                            <div class="search-row" style="margin-top:12px;">
+                                <input type="text" id="emb-search-input" placeholder="Search HuggingFace...">
+                                <button class="btn btn-primary btn-sm" onclick="Config.searchEmbModel()">Search</button>
+                            </div>
+                            <div id="emb-search-results" class="search-results" style="margin-top:12px;"></div>
+                            <div class="form-actions" style="margin-top:12px;">
+                                <button class="btn btn-primary btn-sm" onclick="Config.downloadEmbModel()" id="btn-download-emb">Download</button>
+                                <button class="btn btn-danger btn-sm" onclick="Config.deleteEmbModel()" id="btn-delete-emb">Delete</button>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- LLM Card -->
+                    <div class="card">
+                        <div class="card-header"><h2>LLM</h2></div>
+                        <div class="card-body">
+                            <div id="llm-global-status" class="global-status">
+                                <span class="status-dot"></span>
+                                <span id="llm-global-text">Loading...</span>
+                            </div>
+                            <div id="llm-models-list" style="margin-top:12px;"></div>
+                            <div class="search-row" style="margin-top:12px;">
+                                <input type="text" id="llm-search-input" placeholder="Search HuggingFace...">
+                                <button class="btn btn-primary btn-sm" onclick="Config.searchLlmModel()">Search</button>
+                            </div>
+                            <div id="llm-search-results" class="search-results" style="margin-top:12px;"></div>
+                            <div class="form-actions" style="margin-top:12px;">
+                                <button class="btn btn-primary btn-sm" onclick="Config.downloadLlmModel()" id="btn-download-llm">Download</button>
+                                <button class="btn btn-danger btn-sm" onclick="Config.deleteLlmModel()" id="btn-delete-llm">Delete</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </details>
+
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script id="backend-config-data" type="application/json">{{ config_json | safe }}</script>
+<script src="{{ url_for('static', path='/js/release-selector.js') }}"></script>
+<script src="{{ url_for('static', path='/js/progress-bar.js') }}"></script>
+<script src="{{ url_for('static', path='/js/config.js') }}"></script>
+{% endblock %}

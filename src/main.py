@@ -17,7 +17,6 @@ from src.api.routes.page_data import router as data_page_router
 from src.api.routes.page_duckdb import router as duckdb_page_router
 from src.api.routes.page_logs import router as logs_page_router
 from src.api.routes.page_setup import router as setup_page_router
-from src.api.v1.admin import router as admin_v1_router
 from src.api.v1.models.admin_models import router as admin_models_router
 from src.api.v1.chat.chat import router as chat_v1_router
 from src.api.v1.system.config import router as config_v1_router
@@ -52,6 +51,36 @@ from src.workers.processor import TaskDispatcher
 
 logger = logging.getLogger(__name__)
 setup_mode = os.environ.get("_SIGMA_SETUP_MODE", "").lower() in ("1", "true", "yes")
+
+
+def apply_db_config_overrides(db) -> object:
+    """Apply DuckDB config overrides to the singleton Config."""
+    from src.config.settings import get_config
+
+    config = get_config()
+    for key, attr in (
+        ("backend.os", "os"),
+        ("backend.gpu_type", "gpu_type"),
+        ("llamacpp_version", "llamacpp_version"),
+        ("qdrant_version", "qdrant_version"),
+        ("qdrant_webui_version", "qdrant_webui_version"),
+        ("logging.level", "logging_level"),
+        ("logging.log_max_size", "logging_log_max_size"),
+        ("logging.log_max_file", "logging_log_max_file"),
+        ("logging.clean_at_startup", "logging_clean_at_startup"),
+    ):
+        val = db.get_config(key)
+        if val is not None and isinstance(val, dict):
+            val = val.get("value")
+        if val is not None:
+            current = getattr(config, attr, None)
+            if isinstance(current, int) and isinstance(val, str):
+                try:
+                    val = int(val)
+                except (ValueError, TypeError):
+                    pass
+            setattr(config, attr, val)
+    return config
 
 
 def _parse_log_size(size_str: str) -> int:
@@ -143,33 +172,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
         sync_prompts_from_files()
 
-        from src.config.settings import Config, get_config
+        from src.config.settings import Config
 
         Config.init_app()
-        config = get_config()
-        # Apply DuckDB overrides (replaces removed Config.apply_db_overrides)
-        for key, attr in (
-            ("backend.os", "os"),
-            ("backend.gpu_type", "gpu_type"),
-            ("llamacpp_version", "llamacpp_version"),
-            ("qdrant_version", "qdrant_version"),
-            ("qdrant_webui_version", "qdrant_webui_version"),
-            ("logging.level", "logging_level"),
-            ("logging.log_max_size", "logging_log_max_size"),
-            ("logging.log_max_file", "logging_log_max_file"),
-            ("logging.clean_at_startup", "logging_clean_at_startup"),
-        ):
-            val = db.get_config(key)
-            if val is not None and isinstance(val, dict):
-                val = val.get("value")
-            if val is not None:
-                current = getattr(config, attr, None)
-                if isinstance(current, int) and isinstance(val, str):
-                    try:
-                        val = int(val)
-                    except (ValueError, TypeError):
-                        pass
-                setattr(config, attr, val)
+        config = apply_db_config_overrides(db)
         logger.info("DuckDB config overrides applied.")
 
         if config.logging_clean_at_startup:
@@ -269,7 +275,6 @@ def create_app() -> FastAPI:
 
     app.include_router(setup_page_router)
     app.include_router(admin_pages_router)
-    app.include_router(admin_v1_router)
     app.include_router(admin_models_router)
     app.include_router(duckdb_page_router)
     app.include_router(logs_page_router)

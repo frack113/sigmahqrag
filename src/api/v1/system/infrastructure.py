@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 import platform
-import shutil
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
@@ -236,90 +235,6 @@ def hard_reset_data_dirs():
             "removed_dirs": result["removed"],
             "created_dirs": result["created"],
         }
-    )
-
-
-# ────────────────────────────────────────────────────────────────
-# Generic directory endpoints (legacy)
-# ────────────────────────────────────────────────────────────────
-
-
-class DirStatus(BaseModel):
-    exists: bool
-    path: str
-
-
-class DirCreateRequest(BaseModel):
-    path: str = "/"
-
-
-def _clean_dir(p: Path) -> int:
-    """Remove all contents from a directory, returning count of removed items."""
-    count = 0
-    if p.exists() and p.is_dir():
-        for item in p.iterdir():
-            try:
-                if item.is_dir():
-                    shutil.rmtree(item)
-                else:
-                    item.unlink()
-                count += 1
-            except Exception:
-                pass
-    return count
-
-
-@router.get("/directory", response_model=DirStatus)
-def get_directory_status(path: str = "/"):
-    """Check if a directory exists under BASE_DIR."""
-    target = (BASE_DIR / Path(path).lstrip("/")).resolve()
-    return DirStatus(exists=target.exists() and target.is_dir(), path=str(target))
-
-
-@router.post("/directory", response_model=DirStatus)
-def create_directory(req: DirCreateRequest):
-    """Create a directory under BASE_DIR."""
-    target = (BASE_DIR / Path(req.path).lstrip("/")).resolve()
-    if not str(target).startswith(str(BASE_DIR)):
-        raise HTTPException(status_code=400, detail="Invalid path")
-    target.mkdir(parents=True, exist_ok=True)
-    return DirStatus(exists=True, path=str(target))
-
-
-@router.post("/directory/clean")
-def clean_directory(req: DirCreateRequest):
-    """Delete all contents inside a directory (except the directory itself)."""
-    target = (BASE_DIR / Path(req.path).lstrip("/")).resolve()
-    if not str(target).startswith(str(BASE_DIR)):
-        raise HTTPException(status_code=400, detail="Invalid path")
-    if not (target.exists() and target.is_dir()):
-        return JSONResponse(content={"status": "ok", "message": "Directory does not exist"})
-    removed = _clean_dir(target)
-    return JSONResponse(
-        content={"status": "ok", "message": "Directory cleaned", "items_removed": removed}
-    )
-
-
-@router.get("/data-folder", response_model=DirStatus)
-def get_data_folder_status():
-    """Check if the data folder exists."""
-    return get_directory_status(path="/")
-
-
-@router.post("/data-folder", response_model=DirStatus)
-def create_data_folder():
-    """Create the data folder if it doesn't exist."""
-    return create_directory(DirCreateRequest(path="/"))
-
-
-@router.post("/data-folder/clean")
-def clean_data_folder():
-    """Delete all contents inside BASE_DIR (except the folder itself)."""
-    if not BASE_DIR.exists():
-        return JSONResponse(content={"status": "ok", "message": "Data folder does not exist"})
-    removed = _clean_dir(BASE_DIR)
-    return JSONResponse(
-        content={"status": "ok", "message": "Data folder cleaned", "items_removed": removed}
     )
 
 

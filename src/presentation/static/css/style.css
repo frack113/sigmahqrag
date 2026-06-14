@@ -69,13 +69,13 @@ body {
     color: var(--layout-sidebar-subtitle-text);
 }
 
-.sidebar-nav {
+.setup-sidebar-nav {
     display: flex;
     flex-direction: column;
     flex: 1;
 }
 
-.sidebar-nav a {
+.setup-sidebar-nav a {
     color: var(--layout-sidebar-text);
     text-decoration: none;
     padding: 14px 20px;
@@ -86,24 +86,22 @@ body {
     font-size: 0.95em;
 }
 
-.sidebar-nav a:hover {
+.setup-sidebar-nav a:hover {
     background: var(--layout-sidebar-hover-bg);
     color: var(--layout-sidebar-link-active-text);
 }
 
-.sidebar-nav a.active {
+.setup-sidebar-nav a.active {
     background: var(--layout-sidebar-active-bg);
     color: var(--layout-sidebar-link-active-text);
     font-weight: 500;
 }
 
-.sidebar-nav a.disabled {
+.setup-sidebar-nav a.disabled {
     color: var(--layout-sidebar-disabled-text);
     pointer-events: none;
     opacity: 0.6;
 }
-
-/* ── Cards ───────────────────────────────────────────────────── */
 
 .card {
     background: var(--layout-card-bg);
@@ -798,26 +796,6 @@ p.error-text {
 
 .system-info .info-value {
     color: var(--layout-setup-info-value);
-    font-weight: 500;
-}
-
-.setup-sidebar-nav a {
-    color: var(--layout-sidebar-text);
-    text-decoration: none;
-    padding: 10px 20px;
-    display: block;
-    font-size: 13px;
-    transition: background 0.2s;
-}
-
-.setup-sidebar-nav a:hover {
-    background: var(--layout-sidebar-hover-bg);
-    color: var(--layout-sidebar-link-active-text);
-}
-
-.setup-sidebar-nav a.active {
-    background: var(--layout-sidebar-active-bg);
-    color: var(--layout-sidebar-link-active-text);
     font-weight: 500;
 }
 
