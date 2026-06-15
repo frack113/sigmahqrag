@@ -167,6 +167,22 @@ async def post_backend(request: dict) -> JSONResponse:
 
         result: dict[str, Any]
 
+        if action in ("start", "stop"):
+            if not isinstance(service, str) or service not in ("llama", "qdrant"):
+                return JSONResponse(
+                    status_code=400,
+                    content={"status": "error", "error": f"Unknown service: {service}"},
+                )
+            cfg = get_config()
+            if not cfg.service_is_internal(service):
+                return JSONResponse(
+                    status_code=400,
+                    content={
+                        "status": "error",
+                        "error": f"{service} is in external mode — start/stop not available",
+                    },
+                )
+
         if action == "start" and service == "llama":
             from pathlib import Path
 
@@ -264,8 +280,23 @@ async def update_service_config(
             db.set_config(f"{service}_base_url", url)
 
         if request.manage_internally is not None:
+            was_internal = config.service_is_internal(service)
             db.set_config(f"{service}_manage_internally", request.manage_internally)
             setattr(config, f"{service}_manage_internally", request.manage_internally)
+            if was_internal and not request.manage_internally:
+                try:
+                    if service == "llama":
+                        from src.infrastructure.llm.llamacpp.service import get_llama_service
+
+                        await asyncio.wait_for(get_llama_service().stop(), timeout=10.0)
+                    else:
+                        from src.infrastructure.vectorstore.service import get_qdrant_service
+
+                        await asyncio.wait_for(get_qdrant_service().stop(), timeout=10.0)
+                except asyncio.TimeoutError:
+                    logger.warning("Timed out stopping %s after 10s", service)
+                except Exception as e:
+                    logger.warning("Failed to stop %s after config switch: %s", service, e)
 
         return JSONResponse(
             content={

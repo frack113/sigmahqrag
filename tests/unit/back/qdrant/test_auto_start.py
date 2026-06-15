@@ -53,8 +53,17 @@ class FakeConfig:
     """Simulated config matching the fields used by auto_start."""
 
     qdrant_manage_internally: bool = True
+    qdrant_autorun_at_startup: bool = True
     qdrant_port: int = 6333
     qdrant_binary_path: str = "data/bin/qdrant"
+
+    def service_is_internal(self, service: str) -> bool:
+        return bool(getattr(self, f"{service}_manage_internally", False))
+
+    def service_is_autostart(self, service: str) -> bool:
+        return self.service_is_internal(service) and bool(
+            getattr(self, f"{service}_autorun_at_startup", False)
+        )
 
 
 @pytest.fixture(autouse=True)

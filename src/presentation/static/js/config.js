@@ -496,7 +496,8 @@ function loadBackendStatus() {
         var llamaManageSlider = document.getElementById('llama-manage-internally');
         if (llamaManageSlider) llamaManageSlider.checked = llamaSvc.manage_internally !== false;
         var llamaModeLabel = document.getElementById('llama-mode-label');
-        if (llamaModeLabel) llamaModeLabel.textContent = llamaSvc.manage_internally !== false ? 'External' : 'Internal';
+        if (llamaModeLabel) llamaModeLabel.textContent = llamaSvc.manage_internally !== false ? 'Internal' : 'External';
+        updateServiceControls('llama', llamaSvc.manage_internally !== false);
 
         var llamaAutostartSlider = document.getElementById('llama-autorun-at-startup');
         if (llamaAutostartSlider) llamaAutostartSlider.checked = llamaSvc.autorun_at_startup !== false;
@@ -509,7 +510,8 @@ function loadBackendStatus() {
         var qdrantManageSlider = document.getElementById('qdrant-manage-internally');
         if (qdrantManageSlider) qdrantManageSlider.checked = qdrantSvc.manage_internally !== false;
         var qdrantModeLabel = document.getElementById('qdrant-mode-label');
-        if (qdrantModeLabel) qdrantModeLabel.textContent = qdrantSvc.manage_internally !== false ? 'External' : 'Internal';
+        if (qdrantModeLabel) qdrantModeLabel.textContent = qdrantSvc.manage_internally !== false ? 'Internal' : 'External';
+        updateServiceControls('qdrant', qdrantSvc.manage_internally !== false);
 
         var qdrantAutostartSlider = document.getElementById('qdrant-autorun-at-startup');
         if (qdrantAutostartSlider) qdrantAutostartSlider.checked = qdrantSvc.autorun_at_startup !== false;
@@ -560,12 +562,44 @@ function updateBackendServiceConfig(service, field, value) {
     });
 }
 
+function updateServiceControls(service, isInternal) {
+    var startBtn = document.getElementById(service + '-start-btn');
+    var stopBtn = document.getElementById(service + '-stop-btn');
+    var downloadBtn = document.getElementById(service + '-download-btn');
+    var releaseSelect = document.getElementById(service + '-release-select');
+    var autostartSlider = document.getElementById(service + '-autorun-at-startup');
+    var autostartToggle = document.getElementById(service + '-autostart-toggle');
+
+    if (isInternal) {
+        if (startBtn) startBtn.disabled = false;
+        if (stopBtn) stopBtn.disabled = false;
+        if (downloadBtn) downloadBtn.disabled = false;
+        if (releaseSelect) releaseSelect.disabled = false;
+        if (autostartSlider) autostartSlider.disabled = false;
+        if (autostartToggle) autostartToggle.style.opacity = '1';
+    } else {
+        if (startBtn) startBtn.disabled = true;
+        if (stopBtn) stopBtn.disabled = true;
+        if (downloadBtn) downloadBtn.disabled = true;
+        if (releaseSelect) releaseSelect.disabled = true;
+        if (autostartSlider) {
+            autostartSlider.disabled = true;
+            autostartSlider.checked = false;
+            updateBackendServiceConfig(service, 'autorun_at_startup', false);
+        }
+        if (autostartToggle) autostartToggle.style.opacity = '0.5';
+        var label = document.getElementById(service + '-autostart-label');
+        if (label) label.textContent = 'Off';
+    }
+}
+
 function onLlamaModeChange() {
     var cb = document.getElementById('llama-manage-internally');
     var checked = cb.checked;
     updateBackendServiceConfig('llama', 'manage_internally', checked);
     var label = document.getElementById('llama-mode-label');
-    if (label) label.textContent = checked ? 'External' : 'Internal';
+    if (label) label.textContent = checked ? 'Internal' : 'External';
+    updateServiceControls('llama', checked);
 }
 
 function onLlamaAutostartChange() {
@@ -581,7 +615,8 @@ function onQdrantModeChange() {
     var checked = cb.checked;
     updateBackendServiceConfig('qdrant', 'manage_internally', checked);
     var label = document.getElementById('qdrant-mode-label');
-    if (label) label.textContent = checked ? 'External' : 'Internal';
+    if (label) label.textContent = checked ? 'Internal' : 'External';
+    updateServiceControls('qdrant', checked);
 }
 
 function onQdrantAutostartChange() {

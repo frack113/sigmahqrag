@@ -69,6 +69,22 @@ class Config:
     def __post_init__(self) -> None:
         pass
 
+    def service_is_internal(self, service: str) -> bool:
+        attr = f"{service}_manage_internally"
+        if not hasattr(self, attr):
+            logger.warning("Config has no attribute '%s' — assuming external", attr)
+            return False
+        return bool(getattr(self, attr))
+
+    def service_is_autostart(self, service: str) -> bool:
+        if not self.service_is_internal(service):
+            return False
+        attr = f"{service}_autorun_at_startup"
+        if not hasattr(self, attr):
+            logger.warning("Config has no attribute '%s' — assuming no autostart", attr)
+            return False
+        return bool(getattr(self, attr))
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "services": {

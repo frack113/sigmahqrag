@@ -1,5 +1,7 @@
 """Main application entry point."""
 
+from __future__ import annotations
+
 import logging
 import os
 from collections.abc import AsyncGenerator
@@ -18,6 +20,7 @@ from src.api.routes.page_duckdb import router as duckdb_page_router
 from src.api.routes.page_logs import router as logs_page_router
 from src.api.routes.page_setup import router as setup_page_router
 from src.api.v1.models.admin_models import router as admin_models_router
+from src.config.settings import Config
 from src.api.v1.chat.chat import router as chat_v1_router
 from src.api.v1.system.config import router as config_v1_router
 from src.api.v1.sigma.coverage import router as coverage_v1_router
@@ -53,7 +56,7 @@ logger = logging.getLogger(__name__)
 setup_mode = os.environ.get("_SIGMA_SETUP_MODE", "").lower() in ("1", "true", "yes")
 
 
-def apply_db_config_overrides(db) -> object:
+def apply_db_config_overrides(db) -> Config:
     """Apply DuckDB config overrides to the singleton Config."""
     from src.config.settings import get_config
 
@@ -172,8 +175,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
         sync_prompts_from_files()
 
-        from src.config.settings import Config
-
         Config.init_app()
         config = apply_db_config_overrides(db)
         logger.info("DuckDB config overrides applied.")
@@ -200,13 +201,25 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         logger.info("Services validated.")
 
         if not setup_mode:
-            await start_llamacpp()
-            logger.info("llama.cpp started.")
-            await start_qdrant()
-            logger.info("Qdrant started.")
+            try:
+                await start_llamacpp()
+            except Exception as e:
+                logger.warning("llama.cpp auto-start skipped: %s", e)
+            else:
+                logger.info("llama.cpp started.")
 
-            await _init_qdrant_collections()
-            logger.info("Qdrant collections initialized.")
+            qdrant_started = False
+            try:
+                await start_qdrant()
+            except Exception as e:
+                logger.warning("Qdrant auto-start skipped: %s", e)
+            else:
+                qdrant_started = True
+                logger.info("Qdrant started.")
+
+            if qdrant_started:
+                await _init_qdrant_collections()
+                logger.info("Qdrant collections initialized.")
         else:
             logger.info("Setup mode: skipping service startup.")
 

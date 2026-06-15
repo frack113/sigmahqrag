@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import sys
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Any
@@ -23,8 +24,8 @@ async def start_qdrant(
 
     config = get_config()
 
-    if not config.qdrant_manage_internally:
-        logger.info("Qdrant manage_internally=false -- skipping auto-start")
+    if not config.service_is_autostart("qdrant"):
+        logger.info("Qdrant auto-start disabled (not internal or autorun=false) -- skipping")
         return
 
     if health_check is None:
@@ -40,9 +41,18 @@ async def start_qdrant(
         logger.warning("Qdrant health check failed -- will attempt start anyway")
 
     qdrant_bin = Path(config.qdrant_binary_path).resolve()
-    qdrant_exe = qdrant_bin / "qdrant.exe"
+    if sys.platform == "win32":
+        qdrant_candidates = ("qdrant.exe", "qdrant")
+    else:
+        qdrant_candidates = ("qdrant", "qdrant.exe")
+    qdrant_exe: Path | None = None
+    for name in qdrant_candidates:
+        candidate = qdrant_bin / name
+        if candidate.exists():
+            qdrant_exe = candidate
+            break
 
-    if not qdrant_exe.exists():
+    if qdrant_exe is None:
         logger.info("Qdrant binary not found, downloading...")
         if installer_service is None:
             from src.infrastructure.vectorstore.downloader import QdrantInstallerService
