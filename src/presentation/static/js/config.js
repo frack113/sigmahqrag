@@ -524,18 +524,10 @@ function loadBackendStatus() {
         var qdrantAutostartLabel = document.getElementById('qdrant-autostart-label');
         if (qdrantAutostartLabel) qdrantAutostartLabel.textContent = qdrantSvc.autorun_at_startup !== false ? 'Yes' : 'No';
 
-        // Show version info
-        var llamaVer = llamaInfo.current_version || 'N/A';
-        var qdrantVer = qdrantInfo.current_version || 'N/A';
-        document.getElementById('llama-info').innerHTML =
-            '<span>llama.cpp: ' + (llamaVer === 'N/A' ? 'Not installed' : 'v' + llamaVer) + ' | ' + (llamaInfo.mode === 'external' ? 'External' : 'Local') + '</span> ' +
-            '<span style="margin-left: 24px;">Qdrant: ' + (qdrantVer === 'N/A' ? 'Not installed' : 'v' + qdrantVer) + ' | ' + (qdrantInfo.mode === 'external' ? 'External' : 'Local') + '</span>';
-
         // Build summary
         var summaryHtml = '';
         summaryHtml += '<div class="data-row"><span class="status-dot ' + (llama.status === 'active' ? 'data-dot-ok' : 'data-dot-warn') + '"></span><span class="label">llama.cpp</span><span>' + (llama.status || 'unknown') + '</span></div>';
         summaryHtml += '<div class="data-row" style="margin-top: 4px;"><span class="status-dot ' + (qdrant.status === 'active' ? 'data-dot-ok' : 'data-dot-warn') + '"></span><span class="label">Qdrant</span><span>' + (qdrant.status || 'unknown') + '</span></div>';
-        document.getElementById('llama-info').innerHTML += summaryHtml;
     })
     .catch(function() {
         document.getElementById('llama-status').innerHTML = '<p class="error">Failed to load status</p>';
