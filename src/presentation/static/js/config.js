@@ -228,18 +228,18 @@ var renderDataDirs = function (dirs) {
         : (missingCount > 0 && readyCount === 0 ? 'ERROR' : 'PARTIAL');
 
     var fixBtnHtml = readyCount === dirs.length
-        ? ''
+        ? '<button class="btn btn-primary btn-sm" disabled>Fix</button>'
         : '<button class="btn btn-primary btn-sm" onclick="Config.createDataDirs()">Fix</button>';
 
     var listEl = document.getElementById('data-dirs-list');
     listEl.innerHTML =
         '<div class="data-row">' +
         '  <span class="' + dotClass + ' status-dot"></span>' +
-        '  <span class="label">Data folders — ' + readyCount + '/' + dirs.length + ' ready</span>' +
+        '  <span class="label">Data Folders (' + readyCount + '/' + dirs.length + ' ready)</span>' +
         '  <span class="' + summaryClass + ' data-status-label">' + summaryLabel + '</span>' +
         '  <span class="data-action-buttons">' +
         fixBtnHtml +
-        '  <button class="btn btn-danger btn-sm" onclick="Config.cleanDataDirs()">Clean</button>' +
+        '  <button class="btn btn-warning btn-sm" disabled>Clean</button>' +
         '  <button class="btn btn-danger btn-sm" onclick="Config.resetDataDirs()">Hard Reset</button>' +
         '  </span>' +
         '</div>';
@@ -372,10 +372,14 @@ function renderLoggingConfig(data) {
     if (maxFileInput) maxFileInput.value = data.log_max_file || 5;
     if (cleanToggle) {
         cleanToggle.checked = data.clean_at_startup || false;
+        cleanToggle.onchange = function () {
+            var lbl = document.getElementById('log-clean-label');
+            if (lbl) lbl.textContent = cleanToggle.checked ? 'Yes' : 'No';
+        };
     }
     var cleanLabel = document.getElementById('log-clean-label');
     if (cleanLabel) {
-        cleanLabel.textContent = data.clean_at_startup ? 'On' : 'Off';
+        cleanLabel.textContent = data.clean_at_startup ? 'Yes' : 'No';
     }
 }
 
@@ -468,10 +472,12 @@ function loadBackendStatus() {
         document.getElementById('llama-download-btn').disabled = isLlamaExternal;
 
         var isQdrantExternal = qdrantInfo.mode === 'external';
-        document.getElementById('qdrant-start-btn').disabled = isQdrantExternal;
-        document.getElementById('qdrant-stop-btn').disabled = isQdrantExternal;
-        document.getElementById('qdrant-download-btn').disabled = isQdrantExternal;
-        document.getElementById('qdrant-ui-download-btn').disabled = isQdrantExternal;
+        var qdrantStartBtn = document.getElementById('qdrant-start-btn');
+        var qdrantStopBtn = document.getElementById('qdrant-stop-btn');
+        var qdrantDownloadBtn = document.getElementById('qdrant-download-btn');
+        if (qdrantStartBtn) qdrantStartBtn.disabled = isQdrantExternal;
+        if (qdrantStopBtn) qdrantStopBtn.disabled = isQdrantExternal;
+        if (qdrantDownloadBtn) qdrantDownloadBtn.disabled = isQdrantExternal;
 
         var lv = (llamaInfo.current_version || '').replace(/^0$/, '');
         loadReleaseTags('llama-release-select', 'llama.cpp', { value: lv });
@@ -502,7 +508,7 @@ function loadBackendStatus() {
         var llamaAutostartSlider = document.getElementById('llama-autorun-at-startup');
         if (llamaAutostartSlider) llamaAutostartSlider.checked = llamaSvc.autorun_at_startup !== false;
         var llamaAutostartLabel = document.getElementById('llama-autostart-label');
-        if (llamaAutostartLabel) llamaAutostartLabel.textContent = llamaSvc.autorun_at_startup !== false ? 'On' : 'Off';
+        if (llamaAutostartLabel) llamaAutostartLabel.textContent = llamaSvc.autorun_at_startup !== false ? 'Yes' : 'No';
 
         var qdrantUrlInput = document.getElementById('qdrant-base-url');
         if (qdrantUrlInput) qdrantUrlInput.value = qdrantSvc.base_url || 'http://127.0.0.1:6333';
@@ -516,7 +522,7 @@ function loadBackendStatus() {
         var qdrantAutostartSlider = document.getElementById('qdrant-autorun-at-startup');
         if (qdrantAutostartSlider) qdrantAutostartSlider.checked = qdrantSvc.autorun_at_startup !== false;
         var qdrantAutostartLabel = document.getElementById('qdrant-autostart-label');
-        if (qdrantAutostartLabel) qdrantAutostartLabel.textContent = qdrantSvc.autorun_at_startup !== false ? 'On' : 'Off';
+        if (qdrantAutostartLabel) qdrantAutostartLabel.textContent = qdrantSvc.autorun_at_startup !== false ? 'Yes' : 'No';
 
         // Show version info
         var llamaVer = llamaInfo.current_version || 'N/A';
@@ -607,7 +613,7 @@ function onLlamaAutostartChange() {
     var checked = cb.checked;
     updateBackendServiceConfig('llama', 'autorun_at_startup', checked);
     var label = document.getElementById('llama-autostart-label');
-    if (label) label.textContent = checked ? 'On' : 'Off';
+    if (label) label.textContent = checked ? 'Yes' : 'No';
 }
 
 function onQdrantModeChange() {
@@ -624,7 +630,7 @@ function onQdrantAutostartChange() {
     var checked = cb.checked;
     updateBackendServiceConfig('qdrant', 'autorun_at_startup', checked);
     var label = document.getElementById('qdrant-autostart-label');
-    if (label) label.textContent = checked ? 'On' : 'Off';
+    if (label) label.textContent = checked ? 'Yes' : 'No';
 }
 
 function downloadLlama() {
@@ -768,7 +774,75 @@ function openQdrantUI() {
     window.open('http://127.0.0.1:6333/dashboard', '_blank');
 }
 
+function loadReleaseTimestamps() {
+    fetch('/api/v1/releases/status/timestamps')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var ts = data.timestamps || {};
+            var latest = '';
+            for (var key in ts) {
+                if (ts[key] && (!latest || ts[key] > latest)) latest = ts[key];
+            }
+            var el = document.getElementById('releases-last-update');
+            if (el) {
+                if (latest) {
+                    var d = new Date(latest);
+                    el.textContent = d.toLocaleDateString() + ' ' + d.toLocaleTimeString();
+                } else {
+                    el.textContent = 'Never';
+                }
+            }
+        })
+        .catch(function() {
+            var el = document.getElementById('releases-last-update');
+            if (el) el.textContent = '—';
+        });
+}
+
+function loadReleasesTable() {
+    fetch('/api/v1/releases/all-releases')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var tableEl = document.getElementById('releases-table');
+            if (!tableEl) return;
+            
+            var releases = data.releases || [];
+            
+            if (releases.length === 0) {
+                tableEl.innerHTML = '<p style="font-style:italic;color:var(--text-card-body);"><i>undef</i></p>';
+                return;
+            }
+            
+            var html = '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;">';
+            html += '<thead><tr style="border-bottom:1px solid var(--layout-card-border);">' +
+                    '<th style="padding:8px;text-align:left;">Service</th>' +
+                    '<th style="padding:8px;text-align:left;">Last Tag Name</th>' +
+                    '<th style="padding:8px;text-align:left;">Published At</th>' +
+                    '<th style="padding:8px;text-align:left;">Fetched At</th>' +
+                    '</tr></thead>';
+            html += '<tbody>';
+            for (var i = 0; i < releases.length; i++) {
+                var r = releases[i];
+                html += '<tr style="border-bottom:1px solid var(--layout-card-border);">' +
+                        '<td style="padding:8px;">' + (r.service || '—') + '</td>' +
+                        '<td style="padding:8px;">' + (r.last_tag_name || '—') + '</td>' +
+                        '<td style="padding:8px;">' + (r.published_at || '—') + '</td>' +
+                        '<td style="padding:8px;">' + (r.fetched_at || '—') + '</td>' +
+                        '</tr>';
+            }
+            html += '</tbody></table></div>';
+            
+            tableEl.innerHTML = html;
+        })
+        .catch(function(err) {
+            var tableEl = document.getElementById('releases-table');
+            if (tableEl) tableEl.innerHTML = '<p class="error">Failed to load releases</p>';
+        });
+}
+
 function refreshReleases() {
+    var statusEl = document.getElementById('releases-refresh-status');
+    if (statusEl) { statusEl.textContent = 'Refreshing...'; statusEl.className = 'status-message'; }
     fetch('/api/v1/releases/refresh', { method: 'POST' })
         .then(function(r) { return r.json(); })
         .then(function(data) {
@@ -780,9 +854,13 @@ function refreshReleases() {
                 }
             }
             loadBackendStatus();
+            loadReleaseTimestamps();
+            loadReleasesTable();
+            if (statusEl) { statusEl.textContent = 'Done'; statusEl.className = 'status-message success'; }
         })
         .catch(function() {
             alert('Failed to refresh releases. Check your connection.');
+            if (statusEl) { statusEl.textContent = 'Failed'; statusEl.className = 'status-message error'; }
         });
 }
 
@@ -1094,11 +1172,9 @@ function deleteEmbModel() {
 function renderSpecsStatus(repos, defaultOrg, defaultName) {
     var statusEl = document.getElementById('specs-status');
     var listEl = document.getElementById('specs-repos-list');
-    var fixBtn = document.getElementById('specs-fix-btn');
 
     if (!repos || repos.length === 0) {
         setStatusText(statusEl, 'Default repository missing', false);
-        fixBtn.disabled = false;
         listEl.innerHTML =
             '<div class="data-row">' +
             '  <span class="status-dot data-dot-missing"></span>' +
@@ -1123,18 +1199,19 @@ function renderSpecsStatus(repos, defaultOrg, defaultName) {
 
     if (found) {
         setStatusText(statusEl, 'Default repository configured', true);
-        fixBtn.disabled = true;
-        fixBtn.style.opacity = '0.5';
-        fixBtn.style.cursor = 'not-allowed';
         var statusClass = foundRepo.repo_status === 'error' ? 'text-danger' : 'text-success';
         var statusLabel = foundRepo.repo_status === 'error' ? 'ERROR' : (foundRepo.repo_status === 'cloning' || foundRepo.repo_status === 'syncing' ? 'SYNCING' : 'READY');
         var dotClass = foundRepo.repo_status === 'error' ? 'data-dot-missing' : (foundRepo.repo_status === 'cloning' || foundRepo.repo_status === 'syncing' ? 'data-dot-warn' : 'data-dot-ok');
+        var fixBtnHtml = foundRepo.repo_status === 'error'
+            ? '<button class="btn btn-primary btn-sm" onclick="Config.fixSpecRepo()">Fix</button>'
+            : '<button class="btn btn-primary btn-sm" disabled>Fix</button>';
         listEl.innerHTML =
             '<div class="data-row">' +
             '  <span class="' + dotClass + ' status-dot"></span>' +
             '  <span class="label">' + escHtml(defaultOrg) + '/' + escHtml(defaultName) + '</span>' +
-            '  <span class="' + statusClass + '">' + statusLabel + '</span>' +
+            '  <span class="' + statusClass + ' data-status-label">' + statusLabel + '</span>' +
             '  <span class="data-action-buttons">' +
+            fixBtnHtml +
             '  </span>' +
             '</div>';
         if (foundRepo.last_synced) {
@@ -1144,9 +1221,6 @@ function renderSpecsStatus(repos, defaultOrg, defaultName) {
     }
 
     setStatusText(statusEl, 'Default repository missing', false);
-    fixBtn.disabled = false;
-    fixBtn.style.opacity = '1';
-    fixBtn.style.cursor = 'pointer';
     listEl.innerHTML =
         '<div class="data-row">' +
         '  <span class="status-dot data-dot-missing"></span>' +
@@ -1297,6 +1371,8 @@ document.addEventListener('DOMContentLoaded', function () {
     checkLoggingConfig();
     loadSpecs();
     loadBackendStatus();
+    loadReleaseTimestamps();
+    loadReleasesTable();
     checkLlmModels();
     checkEmbModels();
     loadSystemStatus();

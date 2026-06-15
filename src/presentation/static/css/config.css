@@ -4,10 +4,72 @@
     width: 100%;
 }
 
+/* Inline config row: OS + GPU + Save on one line */
+.config-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    flex-wrap: wrap;
+}
+
+.config-row .form-group {
+    margin-bottom: 0;
+}
+
+.config-row select {
+    min-width: auto;
+}
+
+/* Toggle slider (logging clean-at-startup) */
+.theme-slider {
+    position: relative;
+    display: inline-block;
+    width: 42px;
+    height: 22px;
+    background: #94a3b8;
+    border-radius: 11px;
+    transition: background 0.3s ease;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
+    vertical-align: middle;
+    cursor: pointer;
+}
+
+.theme-slider::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 18px;
+    height: 18px;
+    background: #ffffff;
+    border-radius: 50%;
+    transition: transform 0.3s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+}
+
+.theme-toggle input:checked ~ .theme-slider {
+    background: var(--color-accent);
+}
+
+.theme-toggle input:checked ~ .theme-slider::after {
+    transform: translateX(20px);
+}
+
+.theme-toggle input:focus ~ .theme-slider {
+    box-shadow: 0 0 0 2px var(--color-focus);
+}
+
+.theme-text-label {
+    font-size: var(--text-sm);
+    color: var(--text-body);
+    margin-left: var(--space-2);
+    vertical-align: middle;
+}
+
 /* Hero Banner */
 .config-hero-banner {
-    background: linear-gradient(135deg, var(--bg-header) 0%, var(--color-primary) 100%);
-    color: var(--text-header);
+    background: linear-gradient(135deg, var(--hero-gradient-start) 0%, var(--hero-gradient-end) 100%);
+    color: var(--hero-text);
     padding: var(--space-8) var(--space-6);
     margin-bottom: var(--space-6);
     border-radius: 8px;
@@ -17,14 +79,14 @@
 .hero-content h1 {
     margin: 0 0 var(--space-2);
     font-size: var(--text-2xl);
-    color: var(--text-header);
+    color: var(--hero-text);
 }
 
 .hero-content p {
     margin: 0 0 var(--space-6);
     font-size: var(--text-sm);
     opacity: 0.85;
-    color: var(--text-header);
+    color: var(--hero-text);
 }
 
 /* Status Grid */
@@ -79,6 +141,25 @@
 .status-text {
     font-size: var(--text-xs);
     opacity: 0.85;
+}
+
+/* Status cards inside hero — light text on blue gradient */
+.config-hero-banner .status-card {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.2);
+    color: #ffffff;
+}
+
+.config-hero-banner .status-card:hover {
+    background: rgba(255, 255, 255, 0.22);
+}
+
+.config-hero-banner .status-label {
+    color: #ffffff;
+}
+
+.config-hero-banner .status-text {
+    color: rgba(255, 255, 255, 0.85);
 }
 
 /* ── Section: <details> / <summary> ── */

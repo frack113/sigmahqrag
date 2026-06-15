@@ -206,6 +206,14 @@ class DatabaseServiceCore:
                 return None
         return None
 
+    def get_release_cache_timestamps(self) -> dict[str, str]:
+        with self._lock:
+            conn = self._get_reader_connection()
+            if conn is None:
+                return {}
+            rows = conn.execute("SELECT service, fetched_at FROM release_cache", ()).fetchall()
+        return {row[0]: row[1] for row in rows} if rows else {}
+
     def set_release_cache(self, service: str, releases: list[dict[str, Any]]) -> None:
         from datetime import datetime, timezone
 

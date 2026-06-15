@@ -81,32 +81,33 @@
                                 <span class="status-dot"></span>
                                 <span id="logging-status-text">Loading...</span>
                             </div>
-                            <div class="form-group" style="margin-top:12px;">
-                                <label for="log-level-select">Log Level</label>
-                                <select id="log-level-select">
-                                    <option value="DEBUG">DEBUG</option>
-                                    <option value="INFO" selected>INFO</option>
-                                    <option value="WARNING">WARNING</option>
-                                    <option value="ERROR">ERROR</option>
-                                    <option value="CRITICAL">CRITICAL</option>
-                                </select>
+                            <div class="config-row" style="margin-top:12px;">
+                                <div class="form-group inline">
+                                    <label for="log-level-select">Log Level</label>
+                                    <select id="log-level-select">
+                                        <option value="DEBUG">DEBUG</option>
+                                        <option value="INFO" selected>INFO</option>
+                                        <option value="WARNING">WARNING</option>
+                                        <option value="ERROR">ERROR</option>
+                                        <option value="CRITICAL">CRITICAL</option>
+                                    </select>
+                                </div>
+                                <div class="form-group inline">
+                                    <label for="log-max-size-input">Max Size</label>
+                                    <input type="text" id="log-max-size-input" value="10M" placeholder="10M" maxlength="5" style="width:80px;">
+                                </div>
+                                <div class="form-group inline">
+                                    <label for="log-max-file-input">Max Files</label>
+                                    <input type="number" id="log-max-file-input" value="5" min="1" max="99" style="width:70px;">
+                                </div>
                             </div>
-                            <div class="form-group">
-                                <label for="log-max-size-input">Log Max Size</label>
-                                <input type="text" id="log-max-size-input" value="10M" placeholder="e.g. 10M, 50M, 100M">
-                            </div>
-                            <div class="form-group">
-                                <label for="log-max-file-input">Log Max Files</label>
-                                <input type="number" id="log-max-file-input" value="5" min="1" max="99">
-                            </div>
-                            <div class="form-group">
+                                <div class="config-row">
+                                <span style="font-size:var(--text-sm);color:var(--text-body);margin-right:var(--space-2);">Clean at startup</span>
                                 <label class="theme-toggle" id="log-clean-toggle">
                                     <input type="checkbox" id="log-clean-at-startup">
                                     <span class="theme-slider"></span>
-                                    <span class="theme-text-label" id="log-clean-label">Off</span>
+                                    <span class="theme-text-label" id="log-clean-label">No</span>
                                 </label>
-                            </div>
-                            <div class="form-actions">
                                 <button class="btn btn-primary btn-sm" onclick="Config.saveLoggingConfig()">Save Logging Config</button>
                             </div>
                             <div id="logging-config-status" class="status-message"></div>
@@ -125,9 +126,7 @@
                         <div class="card-body">
                             <div id="data-global-status" class="global-status"></div>
                             <div id="data-dirs-list" style="margin-top:12px;"></div>
-                            <div class="section-divider"></div>
-                            <div class="section-subtitle">DuckDB</div>
-                            <div id="duckdb-status" style="margin-top:8px;"></div>
+                            <div id="duckdb-status" style="margin-top:12px;"></div>
                         </div>
                     </div>
                     <!-- Specifications Card -->
@@ -139,15 +138,7 @@
                                 <span id="specs-status-text">Loading...</span>
                             </div>
                             <div id="specs-repos-list" style="margin-top:12px;"></div>
-                            <div class="form-actions" style="margin-top:12px;">
-                                <button id="specs-fix-btn" class="btn btn-primary btn-sm" onclick="Config.fixSpecRepo()">Fix</button>
-                            </div>
                             <div id="specs-config-status" class="status-message"></div>
-                            <div class="section-divider"></div>
-                            <div class="section-subtitle">Git Information</div>
-                            <div id="git-info-section" style="margin-top:8px;">
-                                <p class="info-text" style="margin:0;">Git integration will be displayed here.</p>
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -209,10 +200,6 @@
                                 <p id="llama-progress-text">Downloading...</p>
                             </div>
 
-                            <div style="margin-top:16px;">
-                                <button class="btn btn-secondary btn-sm" onclick="Config.refreshReleases()">Refresh GitHub Releases</button>
-                            </div>
-
                             <div id="llama-info" style="margin-top:16px; font-size:13px;"></div>
                         </div>
                     </div>
@@ -257,6 +244,14 @@
                                 <button id="qdrant-download-btn" class="btn btn-primary btn-sm" onclick="Config.downloadQdrantBinary()">Update</button>
                             </div>
 
+                            <div class="config-row" style="margin-bottom:16px;">
+                                <div class="form-group inline">
+                                    <label>UI Version:</label>
+                                    <select id="qdrant-ui-release-select" style="min-width:200px"></select>
+                                </div>
+                                <button id="qdrant-ui-download-btn" class="btn btn-primary btn-sm" onclick="Config.downloadQdrantUI()">Download Web UI</button>
+                            </div>
+
                             <div class="form-actions" style="margin-bottom:16px;">
                                 <button id="qdrant-start-btn" class="btn btn-success btn-sm" onclick="Config.startService('qdrant')">Start</button>
                                 <button id="qdrant-stop-btn" class="btn btn-danger btn-sm" onclick="Config.stopService('qdrant')">Stop</button>
@@ -267,6 +262,24 @@
                                 <div class="progress-bar"><div class="progress-fill" id="qdrant-progress-fill"></div></div>
                                 <p id="qdrant-progress-text">Downloading...</p>
                             </div>
+
+                            <div style="margin-top:16px;">
+                                <a href="http://127.0.0.1:6333/dashboard" target="_blank" class="btn btn-secondary btn-sm">Qdrant Web UI</a>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Releases Management Card -->
+                    <div class="card">
+                        <div class="card-header"><h2>Releases Management</h2></div>
+                        <div class="card-body">
+                        <div id="releases-timestamp" style="font-size:var(--text-sm);color:var(--text-card-body);margin-bottom:16px;">
+                            Last update: <span id="releases-last-update">—</span>
+                        </div>
+                        <div id="releases-table" style="margin-top:8px;">
+                            <!-- Releases table will be populated here -->
+                        </div>
+                        <button class="btn btn-primary btn-sm" onclick="Config.refreshReleases()">Refresh GitHub Releases</button>
+                            <div id="releases-refresh-status" class="status-message" style="margin-top:8px;"></div>
                         </div>
                     </div>
                 </div>
