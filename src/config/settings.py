@@ -1,4 +1,4 @@
-"""Central configuration module — TOML (models, services, paths, logging) + DuckDB (backend)."""
+"""Central configuration module — DuckDB (backend, logging) + defaults."""
 
 from __future__ import annotations
 
@@ -11,7 +11,6 @@ logger = logging.getLogger(__name__)
 
 
 BASE_DIR = Path("data").resolve()
-CONFIG_FILE = Path("sigmarag.toml").resolve()
 BIN_DIR = BASE_DIR / "bin"
 MODELS_DIR = BASE_DIR / "models"
 LLM_DIR = MODELS_DIR / "llm"
@@ -34,6 +33,7 @@ class Config:
 
     llama_base_url: str = "http://127.0.0.1:8080"
     llama_manage_internally: bool = True
+    llama_autorun_at_startup: bool = True
     llama_model_name: str | None = None
     llama_binary_path: str = "data/bin/llamacpp"
 
@@ -41,6 +41,7 @@ class Config:
     qdrant_host: str = "127.0.0.1"
     qdrant_port: int = 6333
     qdrant_manage_internally: bool = True
+    qdrant_autorun_at_startup: bool = True
     qdrant_collection_name: str = "sigma_docs"
     qdrant_vector_size: int = 384
     qdrant_binary_path: str = "data/bin/qdrant"
@@ -54,7 +55,8 @@ class Config:
     paths_rag_cache_dir: str = "data/rag_cache"
     paths_model_registry: str = "data/models/registry.json"
     paths_sigma_ref_docs_dir: str = "data/documents/sigmaref"
-    paths_sigma_spec_dir: str = "data/sigma-specification"
+    paths_spec_repos_dir: str = "data/specification"
+    paths_sigma_spec_dir: str = "data/specification/sigmahq/sigma-specification"
 
     local_documents_path: str = "data/documents/local"
     sigmaref_documents_path: str = "data/documents/sigmaref"
@@ -65,63 +67,23 @@ class Config:
     logging_clean_at_startup: bool = False
 
     def __post_init__(self) -> None:
-        self._load_from_toml()
+        pass
 
-    def _load_from_toml(self) -> None:
-        if not CONFIG_FILE.exists():
-            return
-        try:
-            from src.shared.toml_service import TOMLService
+    def service_is_internal(self, service: str) -> bool:
+        attr = f"{service}_manage_internally"
+        if not hasattr(self, attr):
+            logger.warning("Config has no attribute '%s' — assuming external", attr)
+            return False
+        return bool(getattr(self, attr))
 
-            toml_service = TOMLService(CONFIG_FILE)
-            file_config = toml_service.load()
-            if file_config:
-                self._apply_nested_config(file_config)
-                logger.info(f"Loaded config from {CONFIG_FILE}")
-        except Exception as e:
-            logger.warning(f"Failed to load config from {CONFIG_FILE}: {e}")
-
-    def _apply_nested_config(self, nested: dict[str, Any]) -> None:
-        """Apply nested config dict to dataclass fields."""
-        if "Hardware" in nested:
-            hw = nested["Hardware"]
-            if "os" in hw:
-                self.os = hw["os"]
-            if "gpu" in hw:
-                self.gpu_type = hw["gpu"]
-
-        if "services" in nested:
-            services = nested["services"]
-            if "llama" in services:
-                llama = services["llama"]
-                if "base_url" in llama:
-                    self.llama_base_url = llama["base_url"]
-                if "manage_internally" in llama:
-                    self.llama_manage_internally = bool(llama["manage_internally"])
-            if "qdrant" in services:
-                qdrant = services["qdrant"]
-                if "base_url" in qdrant:
-                    self.qdrant_base_url = qdrant["base_url"]
-                    from urllib.parse import urlparse
-
-                    parsed = urlparse(qdrant["base_url"])
-                    if parsed.hostname:
-                        self.qdrant_host = parsed.hostname
-                    if parsed.port:
-                        self.qdrant_port = parsed.port
-                if "manage_internally" in qdrant:
-                    self.qdrant_manage_internally = bool(qdrant["manage_internally"])
-
-        if "logging" in nested:
-            logging_cfg = nested["logging"]
-            if "level" in logging_cfg:
-                self.logging_level = logging_cfg["level"]
-            if "log_max_size" in logging_cfg:
-                self.logging_log_max_size = logging_cfg["log_max_size"]
-            if "log_max_file" in logging_cfg:
-                self.logging_log_max_file = logging_cfg["log_max_file"]
-            if "clean_at_startup" in logging_cfg:
-                self.logging_clean_at_startup = logging_cfg["clean_at_startup"]
+    def service_is_autostart(self, service: str) -> bool:
+        if not self.service_is_internal(service):
+            return False
+        attr = f"{service}_autorun_at_startup"
+        if not hasattr(self, attr):
+            logger.warning("Config has no attribute '%s' — assuming no autostart", attr)
+            return False
+        return bool(getattr(self, attr))
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -129,10 +91,12 @@ class Config:
                 "llama": {
                     "base_url": self.llama_base_url,
                     "manage_internally": self.llama_manage_internally,
+                    "autorun_at_startup": self.llama_autorun_at_startup,
                 },
                 "qdrant": {
                     "base_url": self.qdrant_base_url,
                     "manage_internally": self.qdrant_manage_internally,
+                    "autorun_at_startup": self.qdrant_autorun_at_startup,
                 },
             },
             "Hardware": {
@@ -154,11 +118,101 @@ class Config:
     @classmethod
     def init_app(cls) -> Config:
         global _config
-        cls.ensure_config_file()
         cls.ensure_qdrant_config()
         cfg = cls()
+        try:
+            from src.infrastructure.database.service import DatabaseService
+
+            db = DatabaseService.get_instance()
+            backend_os = db.get_config("backend.os")
+            if backend_os is not None:
+                cfg.os = str(backend_os)
+            backend_gpu = db.get_config("backend.gpu_type")
+            if backend_gpu is not None:
+                cfg.gpu_type = str(backend_gpu)
+            logging_level = db.get_config("logging.level")
+            if logging_level is not None:
+                cfg.logging_level = str(logging_level)
+            logging_log_max_size = db.get_config("logging.log_max_size")
+            if logging_log_max_size is not None:
+                cfg.logging_log_max_size = str(logging_log_max_size)
+            logging_log_max_file = db.get_config("logging.log_max_file")
+            if logging_log_max_file is not None:
+                cfg.logging_log_max_file = int(logging_log_max_file)
+            logging_clean_at_startup = db.get_config("logging.clean_at_startup")
+            if logging_clean_at_startup is not None:
+                cfg.logging_clean_at_startup = bool(logging_clean_at_startup)
+            llama_base_url = db.get_config("services.llama.base_url")
+            if llama_base_url is not None:
+                cfg.llama_base_url = str(llama_base_url)
+            llama_manage = db.get_config("services.llama.manage_internally")
+            if llama_manage is not None:
+                cfg.llama_manage_internally = bool(llama_manage)
+            llama_autorun = db.get_config("services.llama.autorun_at_startup")
+            if llama_autorun is not None:
+                cfg.llama_autorun_at_startup = bool(llama_autorun)
+            qdrant_base_url = db.get_config("services.qdrant.base_url")
+            if qdrant_base_url is not None:
+                cfg.qdrant_base_url = str(qdrant_base_url)
+            qdrant_manage = db.get_config("services.qdrant.manage_internally")
+            if qdrant_manage is not None:
+                cfg.qdrant_manage_internally = bool(qdrant_manage)
+            qdrant_autorun = db.get_config("services.qdrant.autorun_at_startup")
+            if qdrant_autorun is not None:
+                cfg.qdrant_autorun_at_startup = bool(qdrant_autorun)
+        except RuntimeError:
+            pass
+        except Exception as e:
+            logger.warning("Failed to load persisted config from database: %s", e)
         _config = cfg
         return cfg
+
+    @classmethod
+    def apply_db_overrides(cls, db) -> Config:
+        """Re-apply config overrides from DB (called once during lifespan init)."""
+        global _config
+        if _config is None:
+            _config = cls()
+        try:
+            backend_os = db.get_config("backend.os")
+            if backend_os is not None:
+                _config.os = str(backend_os)
+            backend_gpu = db.get_config("backend.gpu_type")
+            if backend_gpu is not None:
+                _config.gpu_type = str(backend_gpu)
+            logging_level = db.get_config("logging.level")
+            if logging_level is not None:
+                _config.logging_level = str(logging_level)
+            logging_log_max_size = db.get_config("logging.log_max_size")
+            if logging_log_max_size is not None:
+                _config.logging_log_max_size = str(logging_log_max_size)
+            logging_log_max_file = db.get_config("logging.log_max_file")
+            if logging_log_max_file is not None:
+                _config.logging_log_max_file = int(logging_log_max_file)
+            logging_clean_at_startup = db.get_config("logging.clean_at_startup")
+            if logging_clean_at_startup is not None:
+                _config.logging_clean_at_startup = bool(logging_clean_at_startup)
+            llama_base_url = db.get_config("services.llama.base_url")
+            if llama_base_url is not None:
+                _config.llama_base_url = str(llama_base_url)
+            llama_manage = db.get_config("services.llama.manage_internally")
+            if llama_manage is not None:
+                _config.llama_manage_internally = bool(llama_manage)
+            llama_autorun = db.get_config("services.llama.autorun_at_startup")
+            if llama_autorun is not None:
+                _config.llama_autorun_at_startup = bool(llama_autorun)
+            qdrant_base_url = db.get_config("services.qdrant.base_url")
+            if qdrant_base_url is not None:
+                _config.qdrant_base_url = str(qdrant_base_url)
+            qdrant_manage = db.get_config("services.qdrant.manage_internally")
+            if qdrant_manage is not None:
+                _config.qdrant_manage_internally = bool(qdrant_manage)
+            qdrant_autorun = db.get_config("services.qdrant.autorun_at_startup")
+            if qdrant_autorun is not None:
+                _config.qdrant_autorun_at_startup = bool(qdrant_autorun)
+        except Exception as e:
+            logger.warning("Failed to apply DB config overrides: %s", e)
+        return _config
 
     def resolve_llamacpp_bin_path(self) -> Path:
         """Resolve llama binary path with fallback to old location."""
@@ -173,19 +227,6 @@ class Config:
             )
             return old_path
         return path
-
-    @staticmethod
-    def ensure_config_file() -> None:
-        if not CONFIG_FILE.exists():
-            default_config = Config()
-            try:
-                from src.shared.toml_service import TOMLService
-
-                toml_service = TOMLService(CONFIG_FILE)
-                toml_service.save(default_config.to_dict())
-                logger.info(f"Created default config at {CONFIG_FILE}")
-            except Exception as e:
-                logger.error(f"Failed to create config: {e}")
 
     @staticmethod
     def ensure_qdrant_config() -> None:

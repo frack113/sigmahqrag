@@ -75,17 +75,25 @@ CREATE TABLE IF NOT EXISTS git_selected_dirs (
     PRIMARY KEY (repo_key, dir_path)
 );
 
--- sigma_spec (dedicated spec document table — markdown, PDF, Office, etc.)
+-- sigma_spec (dedicated spec document table — multi-repo, org/repo aware)
 CREATE TABLE IF NOT EXISTS sigma_spec (
     url_hash TEXT PRIMARY KEY,
-    file_name TEXT NOT NULL,
+    org TEXT,
+    repo TEXT,
     content_type TEXT,
+    file_name TEXT NOT NULL,
     content_sha256 TEXT,
     file_size BIGINT,
     original_url TEXT NOT NULL,
+    normalized_url TEXT,
     title TEXT,
+    timestamp TEXT,
+    last_seen TEXT,
     embed_status TEXT DEFAULT 'discovery'
 );
+
+CREATE INDEX IF NOT EXISTS idx_sigma_spec_embed ON sigma_spec(embed_status);
+CREATE INDEX IF NOT EXISTS idx_sigma_spec_org_repo ON sigma_spec(org, repo);
 
 -- doc_error (failed URLs — 30x/40x errors to skip on retry)
 CREATE TABLE IF NOT EXISTS doc_error (

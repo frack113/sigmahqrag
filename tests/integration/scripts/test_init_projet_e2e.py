@@ -1,4 +1,4 @@
-"""End-to-end integration test for init_projet.py full initialization."""
+"""End-to-end integration test for setup.py full initialization."""
 
 import subprocess
 import tempfile
@@ -21,25 +21,25 @@ def temp_project_dir():
 
 
 def test_full_init_e2e_creates_all_structure(temp_project_dir):
-    """Test that running init_projet.py creates all required structure."""
+    """Test that running setup.py creates all required structure."""
     project_root = Path(__file__).parent.parent.parent.parent
 
-    # Copy init_projet.py to temp dir
-    shutil.copy(project_root / "init_projet.py", temp_project_dir / "init_projet.py")
+    # Copy required files to temp dir
+    shutil.copy(project_root / "setup.py", temp_project_dir / "setup.py")
     shutil.copytree(project_root / "src", temp_project_dir / "src")
     shutil.copytree(project_root / "templates", temp_project_dir / "templates")
     shutil.copy(project_root / "pyproject.toml", temp_project_dir / "pyproject.toml")
 
-    # Run init_projet.py
+    # Run in non-interactive mode
     result = subprocess.run(
-        [sys.executable, "init_projet.py"],
+        [sys.executable, "setup.py", "--defaults"],
         cwd=temp_project_dir,
         capture_output=True,
         text=True,
         timeout=120,
     )
 
-    assert result.returncode == 0, f"init_projet.py failed: {result.stderr}"
+    assert result.returncode == 0, f"setup.py failed: {result.stderr}"
 
     # Verify all data directories created
     data_dirs = [
@@ -74,8 +74,12 @@ def test_full_init_e2e_creates_all_structure(temp_project_dir):
     assert "[backend]" not in config_content
 
     # Verify sigma-specification cloned
-    assert (temp_project_dir / "data" / "sigma-specification").exists()
-    assert (temp_project_dir / "data" / "sigma-specification" / ".git").exists()
+    assert (
+        temp_project_dir / "data" / "specification" / "sigmahq" / "sigma-specification"
+    ).exists()
+    assert (
+        temp_project_dir / "data" / "specification" / "sigmahq" / "sigma-specification" / ".git"
+    ).exists()
 
     # Verify DuckDB initialized with schema_version
     from src.infrastructure.database import DatabaseService
@@ -98,6 +102,7 @@ def test_full_init_e2e_creates_all_structure(temp_project_dir):
         "git_selected_dirs",
         "sigma_spec",
         "doc_error",
+        "release_cache",
     }
     db = DatabaseService()
     db.initialize()
@@ -107,28 +112,28 @@ def test_full_init_e2e_creates_all_structure(temp_project_dir):
 
 
 def test_init_idempotent_second_run(temp_project_dir):
-    """Test that running init_projet.py twice works (idempotent)."""
+    """Test that running setup.py twice works (idempotent)."""
     project_root = Path(__file__).parent.parent.parent.parent
 
     # Copy required files
-    shutil.copy(project_root / "init_projet.py", temp_project_dir / "init_projet.py")
+    shutil.copy(project_root / "setup.py", temp_project_dir / "setup.py")
     shutil.copytree(project_root / "src", temp_project_dir / "src")
     shutil.copytree(project_root / "templates", temp_project_dir / "templates")
     shutil.copy(project_root / "pyproject.toml", temp_project_dir / "pyproject.toml")
 
     # First run
     result1 = subprocess.run(
-        [sys.executable, "init_projet.py"],
+        [sys.executable, "setup.py", "--defaults"],
         cwd=temp_project_dir,
         capture_output=True,
         text=True,
         timeout=120,
     )
-    assert result1.returncode == 0
+    assert result1.returncode == 0, f"First run failed: {result1.stderr}"
 
-    # Second run
+    # Second run (should succeed: dirs/config already exist)
     result2 = subprocess.run(
-        [sys.executable, "init_projet.py"],
+        [sys.executable, "setup.py", "--defaults"],
         cwd=temp_project_dir,
         capture_output=True,
         text=True,
@@ -138,7 +143,9 @@ def test_init_idempotent_second_run(temp_project_dir):
 
     # Verify structure still intact
     assert (temp_project_dir / "sigmarag.toml").exists()
-    assert (temp_project_dir / "data" / "sigma-specification").exists()
+    assert (
+        temp_project_dir / "data" / "specification" / "sigmahq" / "sigma-specification"
+    ).exists()
 
     from src.infrastructure.database import DatabaseService
 

@@ -38,7 +38,9 @@ class TestRoutes:
 class TestResolvePath:
     def test_sigma_spec_path(self, indexer):
         with patch("src.core.pipeline.indexer.get_config") as mock_cfg:
-            mock_cfg.return_value.paths_sigma_spec_dir = "data/sigma-specification"
+            mock_cfg.return_value.paths_sigma_spec_dir = (
+                "data/specification/sigmahq/sigma-specification"
+            )
             row = {"file_name": "specification/test.md"}
             result = indexer._resolve_path("sigma_spec", row)
             assert result is not None

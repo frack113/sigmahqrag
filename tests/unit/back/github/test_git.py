@@ -1,5 +1,8 @@
 """Tests for git repository management utilities."""
 
+from pathlib import Path
+from unittest.mock import patch
+
 import pytest
 
 from src.infrastructure.github.git import _validate_git_url, _validate_org_name
@@ -44,3 +47,56 @@ class TestValidateGitUrl:
         # NOTE: The except ValueError: pass in _validate_git_url catches the
         # intentional raise for private/reserved IPs, so they are NOT blocked.
         _validate_git_url("https://10.0.0.1/repo.git")
+
+
+class TestListReposOrgFilter:
+    def test_list_repos_with_org_filter(self) -> None:
+        """Test that org_filter limits repos to a specific org directory."""
+        mock_repos_dir = Path("/tmp/mock_repos")
+        mock_test_org = mock_repos_dir / "test-org"
+        mock_other_org = mock_repos_dir / "other-org"
+
+        mock_test_repo = mock_test_org / "repo-a"
+        mock_other_repo = mock_other_org / "repo-b"
+
+        mock_repo_a = {"active_branch": None}
+        mock_repo_b = {"active_branch": None}
+
+        with (
+            patch(
+                "os.path.isdir",
+                side_effect=lambda x: (
+                    x in (str(mock_repos_dir), str(mock_test_org), str(mock_other_org))
+                ),
+            ),
+            patch("os.path.isfile", return_value=False),
+            patch.object(
+                Path,
+                "iterdir",
+                side_effect=[
+                    [mock_test_org, mock_other_org],
+                    [mock_test_repo, mock_other_repo],
+                    [mock_test_repo],
+                ],
+            ),
+            patch(
+                "src.infrastructure.github.git.Repo",
+                side_effect=[
+                    mock_repo_a,
+                    mock_repo_b,
+                    mock_repo_a,
+                    mock_repo_b,
+                ],
+            ),
+            patch(
+                "src.infrastructure.github.git.get_config",
+                return_value=type("Config", (), {"paths_github_dir": str(mock_repos_dir)})(),
+            ),
+        ):
+            from src.infrastructure.github.git import list_repos
+
+            result = list_repos(repos_dir=mock_repos_dir, org_filter="test-org")
+
+        # Should only include repos from test-org
+        for repo in result:
+            assert repo["org"] == "test-org"

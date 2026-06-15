@@ -19,7 +19,7 @@ This project is under active development. Some features may be incomplete.
 
 ```bash
 # First-time setup
-uv run python init_projet.py
+uv run python setup.py
 
 # Start server
 uv run main.py

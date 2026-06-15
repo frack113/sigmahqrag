@@ -29,14 +29,14 @@
 
     {# Page-specific sidebar layout #}
     <div class="app-layout">
-        {# Page sidebar (defaut: override in child templates) #}
+        {# Page sidebar (default: override in child templates) #}
         <aside class="app-sidebar">
             {% block sidebar %}
             <div class="sidebar-header">
                 <h2>{% block sidebar_title %}Menu{% endblock %}</h2>
                 <p>{% block sidebar_subtitle %}{% endblock %}</p>
             </div>
-            <nav class="sidebar-nav">
+            <nav class="setup-sidebar-nav">
                 {% block sidebar_nav %}{% endblock %}
             </nav>
             {% endblock %}

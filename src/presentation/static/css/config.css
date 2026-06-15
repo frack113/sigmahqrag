@@ -1,0 +1,196 @@
+/* Config Dashboard — sections with side-by-side cards */
+
+.config-dashboard {
+    width: 100%;
+}
+
+/* Hero Banner */
+.config-hero-banner {
+    background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
+    color: #ffffff;
+    padding: 32px 24px;
+    margin-bottom: 24px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.hero-content h1 {
+    margin: 0 0 8px;
+    font-size: 28px;
+    color: #ffffff;
+}
+
+.hero-content p {
+    margin: 0 0 24px;
+    font-size: 14px;
+    opacity: 0.85;
+}
+
+/* Status Grid */
+.status-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+}
+
+.status-card {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    transition: background 0.2s;
+}
+
+.status-card:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.status-card .status-dot {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--layout-status-idle);
+    transition: background 0.3s;
+}
+
+.status-card.status-card-ok .status-dot {
+    background: var(--layout-status-ok);
+}
+
+.status-card.status-card-error .status-dot {
+    background: var(--layout-status-error);
+}
+
+.status-card.status-card-warning .status-dot {
+    background: var(--layout-status-warning);
+}
+
+.status-label {
+    font-weight: 600;
+    font-size: 14px;
+    flex: 1;
+}
+
+.status-text {
+    font-size: 12px;
+    opacity: 0.85;
+}
+
+/* ── Section: <details> / <summary> ── */
+.config-group {
+    margin-bottom: 16px;
+    border: 1px solid var(--layout-border);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.config-group:last-child {
+    margin-bottom: 0;
+}
+
+.config-group-summary {
+    list-style: none;
+    padding: 14px 20px;
+    margin: 0;
+    background: var(--layout-row-bg);
+    font-weight: 600;
+    font-size: 16px;
+    color: var(--layout-content-text);
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid transparent;
+    transition: background 0.2s;
+}
+
+.config-group-summary:hover {
+    background: var(--layout-border);
+}
+
+.config-group[open] .config-group-summary {
+    border-bottom-color: var(--layout-border);
+}
+
+.config-group-summary::-webkit-details-marker {
+    display: none;
+}
+
+.config-group-summary::before {
+    content: '\25B6';
+    display: inline-block;
+    margin-right: 10px;
+    font-size: 12px;
+    transition: transform 0.2s;
+}
+
+.config-group[open] .config-group-summary::before {
+    transform: rotate(90deg);
+}
+
+/* ── Cards side-by-side inside section ── */
+.config-cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    padding: 16px;
+}
+
+.config-cards > .card {
+    margin-bottom: 0;
+}
+
+/* ── Sub-section dividers ── */
+.section-subtitle {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--layout-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 16px 0 8px;
+}
+
+.section-subtitle:first-child {
+    margin-top: 0;
+}
+
+.section-divider {
+    border: none;
+    border-top: 1px dashed var(--layout-border);
+    margin: 16px 0;
+}
+
+/* ── Setup padding ── */
+.setup-padding-sm {
+    padding-top: 8px;
+}
+
+/* ── Responsive ── */
+@media (max-width: 1200px) {
+    .status-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    .config-cards {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+    .config-hero-banner {
+        padding: 24px 16px;
+    }
+    .hero-content h1 {
+        font-size: 24px;
+    }
+    .status-grid {
+        grid-template-columns: 1fr;
+    }
+    .setup-grid {
+        grid-template-columns: 1fr;
+    }
+}

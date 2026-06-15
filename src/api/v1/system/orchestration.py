@@ -1,4 +1,4 @@
-"""Admin API v1 routes (Story 3.1 - GREEN phase)."""
+"""Orchestration API v1 routes — backend service management."""
 
 from __future__ import annotations
 
@@ -13,10 +13,11 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from src.config.settings import get_config
+from src.infrastructure.database.service import DatabaseService
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/v1/admin", tags=["admin-v1"])
+router = APIRouter(prefix="/api/v1/orchestration", tags=["v1-orchestration"])
 
 # In-memory store for idempotency keys (ephemeral for MVP)
 # Format: {key: (response_content, timestamp, endpoint)}
@@ -141,7 +142,7 @@ async def check_service_health() -> dict[str, Any]:
 
 @router.get("/backend")
 async def get_backend() -> JSONResponse:
-    """GET /api/v1/admin/backend - Return backend status and config."""
+    """GET /api/v1/orchestration/backend - Return backend status and config."""
     try:
         health = await check_service_health()
         config = get_config()
@@ -159,12 +160,28 @@ async def get_backend() -> JSONResponse:
 
 @router.post("/backend")
 async def post_backend(request: dict) -> JSONResponse:
-    """POST /api/v1/admin/backend - Start/stop services."""
+    """POST /api/v1/orchestration/backend - Start/stop services."""
     try:
         action = request.get("action")
         service = request.get("service")
 
         result: dict[str, Any]
+
+        if action in ("start", "stop"):
+            if not isinstance(service, str) or service not in ("llama", "qdrant"):
+                return JSONResponse(
+                    status_code=400,
+                    content={"status": "error", "error": f"Unknown service: {service}"},
+                )
+            cfg = get_config()
+            if not cfg.service_is_internal(service):
+                return JSONResponse(
+                    status_code=400,
+                    content={
+                        "status": "error",
+                        "error": f"{service} is in external mode — start/stop not available",
+                    },
+                )
 
         if action == "start" and service == "llama":
             from pathlib import Path
@@ -218,6 +235,78 @@ async def post_backend(request: dict) -> JSONResponse:
         )
     except Exception as e:
         logger.error(f"Backend action error: {e}")
+        return JSONResponse(status_code=500, content={"error": "An internal error occurred"})
+
+
+class ServiceConfigUpdate(BaseModel):
+    """Request model for updating service mode and URL."""
+
+    manage_internally: bool | None = None
+    base_url: str | None = None
+
+
+@router.post("/services/{service}")
+async def update_service_config(
+    service: str,
+    request: ServiceConfigUpdate,
+) -> JSONResponse:
+    """POST /api/v1/orchestration/services/{service} - Update service mode/URL persisted to DuckDB."""
+    if service not in ("llama", "qdrant"):
+        return JSONResponse(
+            status_code=400,
+            content={"status": "error", "error": f"Unknown service: {service}"},
+        )
+
+    try:
+        config = get_config()
+        db = DatabaseService.get_instance()
+
+        if request.base_url is not None:
+            url = request.base_url.strip()
+            if not url:
+                return JSONResponse(
+                    status_code=400,
+                    content={"status": "error", "error": "URL cannot be empty"},
+                )
+            if service == "llama":
+                config.llama_base_url = url
+            else:
+                config.qdrant_base_url = url
+                parsed = urlparse(url)
+                if parsed.hostname:
+                    config.qdrant_host = parsed.hostname
+                if parsed.port:
+                    config.qdrant_port = parsed.port
+            db.set_config(f"{service}_base_url", url)
+
+        if request.manage_internally is not None:
+            was_internal = config.service_is_internal(service)
+            db.set_config(f"{service}_manage_internally", request.manage_internally)
+            setattr(config, f"{service}_manage_internally", request.manage_internally)
+            if was_internal and not request.manage_internally:
+                try:
+                    if service == "llama":
+                        from src.infrastructure.llm.llamacpp.service import get_llama_service
+
+                        await asyncio.wait_for(get_llama_service().stop(), timeout=10.0)
+                    else:
+                        from src.infrastructure.vectorstore.service import get_qdrant_service
+
+                        await asyncio.wait_for(get_qdrant_service().stop(), timeout=10.0)
+                except asyncio.TimeoutError:
+                    logger.warning("Timed out stopping %s after 10s", service)
+                except Exception as e:
+                    logger.warning("Failed to stop %s after config switch: %s", service, e)
+
+        return JSONResponse(
+            content={
+                "status": "success",
+                "message": f"{service} configuration updated",
+                "data": config.to_dict(),
+            }
+        )
+    except Exception as e:
+        logger.error(f"Service config update error: {e}")
         return JSONResponse(status_code=500, content={"error": "An internal error occurred"})
 
 
@@ -388,7 +477,7 @@ async def download_action(
     request: DownloadRequest | None = None,
     x_idempotency_key: str | None = Header(default=None, alias="X-Idempotency-Key"),
 ) -> JSONResponse:
-    """POST /api/v1/admin/download - Download/update services."""
+    """POST /api/v1/orchestration/download - Download/update services."""
     import uuid
 
     service = request.service if request else "qdrant"
@@ -454,7 +543,7 @@ async def download_action(
 
 @router.get("/download/{job_id}/progress")
 async def get_download_progress(job_id: str) -> JSONResponse:
-    """GET /api/v1/admin/download/{job_id}/progress - Get download progress."""
+    """GET /api/v1/orchestration/download/{job_id}/progress - Get download progress."""
     async with _download_lock:
         entry = _download_progress.get(job_id)
     if entry is None:
@@ -469,7 +558,7 @@ async def get_download_progress(job_id: str) -> JSONResponse:
 async def get_status(
     x_idempotency_key: str | None = Header(default=None, alias="X-Idempotency-Key"),
 ) -> JSONResponse:
-    """GET /api/v1/admin/status - Return component statuses (FR18).
+    """GET /api/v1/orchestration/status - Return component statuses (FR18).
 
     Note: Idempotency removed from GET (Patch 8: GET doesn't need idempotency).
     """
@@ -485,7 +574,7 @@ async def cancel_action(
     request: CancelRequest,
     x_idempotency_key: str | None = Header(default=None, alias="X-Idempotency-Key"),
 ) -> JSONResponse:
-    """POST /api/v1/admin/cancel - Cancel a running job (FR16).
+    """POST /api/v1/orchestration/cancel - Cancel a running job (FR16).
 
     Note: Only checks Qdrant health (Patch 9: no need for llama.cpp in cancel).
     """
@@ -535,8 +624,8 @@ async def cancel_action(
 
 
 @router.get("/config")
-async def admin_get_config() -> JSONResponse:
-    """GET /api/v1/admin/config - Return app config."""
+async def orchestration_get_config() -> JSONResponse:
+    """GET /api/v1/orchestration/config - Return app config."""
     try:
         config = get_config()
         return JSONResponse(content={"status": "success", "data": config.to_dict()})

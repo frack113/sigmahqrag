@@ -33,7 +33,7 @@ router = APIRouter(prefix="/api/v1/github", tags=["v1-github"])
 _sync_lock = Lock()
 
 # Valid org/name pattern: alphanumeric, hyphens, underscores, dots (no path separators)
-_VALID_ORG_NAME_RE = re.compile(r"^[\w.-]+$")
+_VALID_ORG_NAME_RE = re.compile(r"^(?!\.\.?$)[\w.-]+$")
 
 
 def _validate_org_name(org: str, name: str) -> None:

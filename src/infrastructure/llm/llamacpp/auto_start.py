@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import sys
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -29,8 +30,8 @@ async def start_llamacpp() -> None:
 
     config = get_config()
 
-    if not config.llama_manage_internally:
-        logger.info("llama.cpp manage_internally=false -- skipping auto-start")
+    if not config.service_is_autostart("llama"):
+        logger.info("llama.cpp auto-start disabled (not internal or autorun=false) -- skipping")
         return
 
     from src.infrastructure.llm.llamacpp.health import check_health
@@ -44,10 +45,19 @@ async def start_llamacpp() -> None:
         logger.warning("llama.cpp health check failed -- will attempt start")
 
     llama_bin = Path(config.llama_binary_path).resolve()
-    llama_exe = llama_bin / "llama-server.exe"
+    if sys.platform == "win32":
+        candidates = ("llama-server.exe", "llama-server")
+    else:
+        candidates = ("llama-server", "llama-server.exe")
+    llama_exe: Path | None = None
+    for name in candidates:
+        candidate = llama_bin / name
+        if candidate.exists():
+            llama_exe = candidate
+            break
 
-    if not llama_exe.exists():
-        logger.info("llama.cpp server binary not found at %s, will attempt download", llama_exe)
+    if llama_exe is None:
+        logger.info("llama.cpp server binary not found in %s, will attempt download", llama_bin)
         try:
             from src.shared.download_manager import DownloadManager
 

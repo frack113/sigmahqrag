@@ -1,8 +1,6 @@
-{% extends "admin/base.html" %}
+{% extends "data/base.html" %}
 
-{% block title %}System Prompts | Admin | SigmaHQ RAG{% endblock %}
-
-{% block header %}System Prompts{% endblock %}
+{% block title %}Prompts | Data Sources | SigmaHQ RAG{% endblock %}
 
 {% block content %}
 <div class="card">
@@ -71,7 +69,7 @@ function escapeHtml(str) {
 
 async function loadPrompts() {
     try {
-        const res = await fetch('/api/v1/admin/prompts');
+        const res = await fetch('/api/v1/prompts');
         if (!res.ok) throw new Error('Failed to load prompts');
         const promptsRes = await res.json();
         
@@ -105,7 +103,7 @@ async function loadPrompts() {
 async function syncFromFiles() {
     showStatus('Syncing prompts from files...', 'info');
     try {
-        const res = await fetch('/api/v1/admin/prompts/sync', { method: 'POST' });
+        const res = await fetch('/api/v1/prompts/sync', { method: 'POST' });
         const data = await res.json();
         if (res.ok) {
             showStatus(data.message || 'Sync complete', 'success');
@@ -169,7 +167,7 @@ function EnableEditForm() {
 
 async function editPrompt(id) {
     try {
-        const res = await fetch(`/api/v1/admin/prompts/${encodeURIComponent(id)}`);
+        const res = await fetch(`/api/v1/prompts/${encodeURIComponent(id)}`);
         const data = await res.json();
         
         if (!res.ok || data.error) throw new Error(data.error || 'Failed to load prompt');
@@ -205,7 +203,7 @@ async function savePrompt() {
     }
 
     const isNewPrompt = !currentPrompts.some(p => p.id === id);
-    const url = isNewPrompt ? '/api/v1/admin/prompts' : `/api/v1/admin/prompts/${id}`;
+    const url = isNewPrompt ? '/api/v1/prompts' : `/api/v1/prompts/${id}`;
     const method = isNewPrompt ? 'POST' : 'PUT';
     const body = JSON.stringify({ name: valName, description: valDesc, content: valContent });
 
@@ -238,7 +236,7 @@ async function savePrompt() {
 async function deletePrompt(id, name) {
     if (!confirm(`Delete prompt "${name}"?\n\nThis action cannot be undone.`)) return;
     try {
-        const res = await fetch(`/api/v1/admin/prompts/${encodeURIComponent(id)}`, { method: 'DELETE' });
+        const res = await fetch(`/api/v1/prompts/${encodeURIComponent(id)}`, { method: 'DELETE' });
         const data = await res.json();
         if (res.ok) {
             showStatus('Prompt deleted', 'success');
