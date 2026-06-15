@@ -65,8 +65,9 @@ class TestListReposOrgFilter:
         with (
             patch(
                 "os.path.isdir",
-                side_effect=lambda x: x
-                in (str(mock_repos_dir), str(mock_test_org), str(mock_other_org)),
+                side_effect=lambda x: (
+                    x in (str(mock_repos_dir), str(mock_test_org), str(mock_other_org))
+                ),
             ),
             patch("os.path.isfile", return_value=False),
             patch.object(
