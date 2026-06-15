@@ -5,9 +5,10 @@ button {
     background: var(--color-secondary);
     color: #ffffff;
     border: none;
-    padding: 8px 16px;
+    padding: 10px 20px;
     cursor: pointer;
-    font-size: 14px;
+    font-size: var(--text-sm);
+    border-radius: 4px;
 }
 
 button:hover {
@@ -19,13 +20,20 @@ button:focus {
     outline-offset: 2px;
 }
 
+button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
 /* Class-based buttons */
 .btn {
+    background: var(--color-secondary);
+    color: #ffffff;
     padding: 10px 20px;
     border: none;
     border-radius: 4px;
     cursor: pointer;
-    font-size: 14px;
+    font-size: var(--text-sm);
     transition: background 0.2s;
 }
 .btn:disabled {
@@ -35,7 +43,7 @@ button:focus {
 
 .btn-sm {
     padding: 6px 12px;
-    font-size: 12px;
+    font-size: var(--text-xs);
 }
 
 .btn-primary {

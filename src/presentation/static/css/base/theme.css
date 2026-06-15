@@ -1,4 +1,31 @@
 :root {
+    /* Typographic scale (base 16px, ratio 1.25) */
+    --text-xs: 12px;
+    --text-sm: 14px;
+    --text-base: 16px;
+    --text-lg: 20px;
+    --text-xl: 24px;
+    --text-2xl: 32px;
+
+    /* Spacing scale (base 8px) */
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 20px;
+    --space-6: 24px;
+    --space-8: 32px;
+
+    /* Badge / alert backgrounds (light theme) */
+    --badge-bg-success: #d4edda;
+    --badge-text-success: #155724;
+    --badge-bg-error: #f8d7da;
+    --badge-text-error: #721c24;
+    --badge-bg-warning: #fff3cd;
+    --badge-text-warning: #856404;
+    --badge-bg-info: #d1ecf1;
+    --badge-text-info: #0c5460;
+
     --bg-body: #f5f5f5;
     --bg-card: #ffffff;
     --bg-input: #ffffff;
@@ -148,6 +175,16 @@
     --shadow-modal-overlay: rgba(0,0,0,0.8);
 
     --color-focus: #5dade2;
+
+    /* Badge / alert backgrounds (dark theme) */
+    --badge-bg-success: #1a3a2a;
+    --badge-text-success: #6fcf97;
+    --badge-bg-error: #3a1a1a;
+    --badge-text-error: #ff8888;
+    --badge-bg-warning: #3a2a1a;
+    --badge-text-warning: #f0b27a;
+    --badge-bg-info: #1a2a3a;
+    --badge-text-info: #85c1e9;
 
     --chat-bg: #212121;
     --chat-sidebar-bg: #1a1a1a;

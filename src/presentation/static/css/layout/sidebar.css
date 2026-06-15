@@ -3,26 +3,26 @@
 .app-sidebar {
     width: 240px;
     background: var(--bg-sidebar);
-    padding: 20px 0;
+    padding: var(--space-5) 0;
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
 }
 
 .sidebar-header {
-    padding: 0 20px 20px;
+    padding: 0 var(--space-5) var(--space-5);
     border-bottom: 1px solid var(--border-sidebar);
-    margin-bottom: 20px;
+    margin-bottom: var(--space-5);
 }
 
 .sidebar-header h2 {
-    font-size: 1.2em;
-    margin-bottom: 4px;
+    font-size: var(--text-lg);
+    margin-bottom: var(--space-1);
     color: var(--text-header);
 }
 
 .sidebar-header p {
-    font-size: 0.85em;
+    font-size: var(--text-sm);
     color: var(--text-sidebar);
 }
 
@@ -35,12 +35,12 @@
 .sidebar-nav a {
     color: var(--text-sidebar);
     text-decoration: none;
-    padding: 14px 20px;
-    transition: all 0.2s;
+    padding: var(--space-4) var(--space-5);
+    transition: background 0.2s, color 0.2s;
     display: flex;
     align-items: center;
-    gap: 12px;
-    font-size: 0.95em;
+    gap: var(--space-3);
+    font-size: var(--text-base);
 }
 
 .sidebar-nav a:hover {

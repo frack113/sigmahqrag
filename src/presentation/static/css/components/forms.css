@@ -1,20 +1,20 @@
 /* Forms */
 
 form div {
-    margin-bottom: 16px;
+    margin-bottom: var(--space-4);
 }
 
 label {
     display: block;
-    margin-bottom: 8px;
+    margin-bottom: var(--space-2);
 }
 
 input[type="file"] {
-    font-size: 16px;
+    font-size: var(--text-base);
 }
 
 .form-group {
-    margin-bottom: 16px;
+    margin-bottom: var(--space-4);
 }
 
 .form-group label {
@@ -29,7 +29,7 @@ input[type="file"] {
     padding: 10px;
     border: 1px solid var(--border-input);
     border-radius: 4px;
-    font-size: 14px;
+    font-size: var(--text-sm);
     background: var(--bg-input);
     color: var(--text-input);
 }
@@ -42,14 +42,14 @@ input[type="file"] {
 
 .form-actions {
     display: flex;
-    gap: 12px;
+    gap: var(--space-3);
     justify-content: flex-end;
-    margin-top: 20px;
+    margin-top: var(--space-5);
 }
 
 /* Shared form select styles (matches form-group input) */
 .form-group select {
-    padding: 8px;
+    padding: var(--space-2);
     border: 1px solid var(--border-input);
     border-radius: 4px;
     min-width: 150px;
@@ -61,7 +61,7 @@ input[type="file"] {
 .form-group.inline {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-2);
 }
 .form-group.inline label {
     display: inline-block;
@@ -82,7 +82,7 @@ input[type="file"] {
     font-weight: bold;
 }
 .form-group.admin input {
-    padding: 8px;
+    padding: var(--space-2);
     border: 1px solid var(--border-input);
     border-radius: 4px;
     min-width: 200px;
@@ -91,10 +91,10 @@ input[type="file"] {
 /* Compact form controls */
 .form-control-sm,
 .input-sm {
-    padding: 4px 8px;
+    padding: var(--space-1) var(--space-2);
     border: 1px solid var(--border-input);
     border-radius: 4px;
-    font-size: 12px;
+    font-size: var(--text-xs);
 }
 .form-control-sm:focus,
 .input-sm:focus {

@@ -1,7 +1,7 @@
 /* Header and navigation */
 
 header {
-    padding: 16px;
+    padding: var(--space-4);
     border-bottom: 2px solid var(--border-header);
     background: var(--bg-header);
     display: flex;
@@ -12,7 +12,7 @@ header {
 .header-left {
     display: flex;
     align-items: center;
-    gap: 24px;
+    gap: var(--space-6);
 }
 
 .header-right {
@@ -28,13 +28,13 @@ header h1 {
 nav ul {
     list-style: none;
     display: flex;
-    gap: 16px;
+    gap: var(--space-4);
 }
 
 nav a {
     color: var(--text-header);
     text-decoration: none;
-    padding: 8px 16px;
+    padding: var(--space-2) var(--space-4);
 }
 
 nav a.active {
