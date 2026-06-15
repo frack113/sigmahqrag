@@ -27,7 +27,7 @@ async def chat_page(request: Request):
     prompts = _get_prompts()
     return templates.TemplateResponse(
         request=request,
-        name="chat.html",
+        name="chat/index.html",
         context={
             "prompts": prompts,
         },
