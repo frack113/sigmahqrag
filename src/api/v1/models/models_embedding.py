@@ -18,7 +18,9 @@ from src.api.v1.models._models_shared import (
     _delete_embedding_model as _shared_delete_embedding,
 )
 from src.application.models import EmbeddingManager
+from src.config.settings import EMBEDDINGS_DIR, get_config
 from src.infrastructure.database import DatabaseService
+from src.infrastructure.vectorstore.collections import list_collections
 
 logger = logging.getLogger(__name__)
 
@@ -105,7 +107,7 @@ async def search_embedding_models(
     """Search for embedding models on HuggingFace."""
     try:
         results = await manager.search_models(query, limit=limit)
-        return JSONResponse(content={"models": results})
+        return JSONResponse(content={"models": [{"repo_id": r.full_id} for r in results]})
     except Exception as e:
         logger.error(f"Search failed: {e}")
         return JSONResponse(status_code=500, content={"error": "An internal error occurred"})
@@ -123,6 +125,7 @@ async def update_embedding_config(body: dict) -> JSONResponse:
     """Update the global embedding model.
 
     Sending model="" resets to default.
+    Probes the model dimension and detects Qdrant collection mismatch.
     """
     if "model" not in body:
         return JSONResponse(status_code=400, content={"error": "model is required"})
@@ -135,12 +138,128 @@ async def update_embedding_config(body: dict) -> JSONResponse:
         )
 
     db = DatabaseService.get_instance()
-    if model:
-        db.set_embedding_config(model)
-    else:
+
+    if not model:
         db.delete_embedding_config()
-    config = db.get_embedding_config()
-    return JSONResponse(content=json.loads(json.dumps(config, default=str)))
+        result = json.loads(json.dumps(db.get_embedding_config(), default=str))
+        result["dim_mismatch"] = False
+        result["model_dimension"] = None
+        result["collection_dimension"] = None
+        result["mismatched_collections"] = []
+        return JSONResponse(content=result)
+
+    # --- probe dimension first ---
+    model_dir = EMBEDDINGS_DIR / model
+    if not model_dir.exists():
+        return JSONResponse(
+            status_code=200,
+            content={
+                "model": model,
+                "dim_mismatch": False,
+                "model_dimension": None,
+                "collection_dimension": None,
+                "mismatched_collections": [],
+                "warning": f"Model {model} not found on disk. Download it first to enable dimension detection.",
+            },
+        )
+
+    try:
+        dim = await EmbeddingManager._detect_model_dimension(model_dir)
+    except Exception as e:
+        logger.warning("Could not probe dimension for %s: %s", model, e)
+        return JSONResponse(
+            status_code=200,
+            content={
+                "model": model,
+                "dim_mismatch": False,
+                "model_dimension": None,
+                "collection_dimension": None,
+                "mismatched_collections": [],
+                "warning": f"Failed to detect dimension: {e}",
+            },
+        )
+
+    # --- check collections ---
+    cfg = get_config()
+    try:
+        collections = await list_collections(cfg.qdrant_host, cfg.qdrant_port)
+    except Exception as e:
+        logger.warning("Could not list Qdrant collections: %s", e)
+        return JSONResponse(
+            status_code=200,
+            content={
+                "model": model,
+                "dim_mismatch": False,
+                "model_dimension": dim,
+                "collection_dimension": None,
+                "mismatched_collections": [],
+                "warning": f"Qdrant unreachable: {e}",
+            },
+        )
+
+    # --- everything succeeded, write config ---
+    db.set_embedding_config(model)
+    cfg.qdrant_vector_size = dim
+    cfg.save()
+
+    result = json.loads(json.dumps(db.get_embedding_config(), default=str))
+    result["model_dimension"] = dim
+    result["collection_dimension"] = collections[0].get("vector_size") if collections else None
+    mismatched = [c for c in collections if c.get("vector_size") and c["vector_size"] != dim]
+    result["mismatched_collections"] = [c.get("name") for c in mismatched]
+    result["dim_mismatch"] = bool(mismatched)
+
+    return JSONResponse(content=result)
+
+
+@router.get("/embeddings/dimension-status")
+async def embedding_dimension_status() -> JSONResponse:
+    """Check if the active embedding model dimension matches all Qdrant collections."""
+    try:
+        db = DatabaseService.get_instance()
+        config = db.get_embedding_config()
+        model = config.get("model", "")
+
+        if not model:
+            return JSONResponse(
+                content={
+                    "model_dimension": None,
+                    "collection_dimension": None,
+                    "mismatch": False,
+                    "mismatched_collections": [],
+                    "error": "No active embedding model",
+                }
+            )
+
+        cfg = get_config()
+        model_dim = cfg.qdrant_vector_size
+        collections = await list_collections(cfg.qdrant_host, cfg.qdrant_port)
+        coll_dim = collections[0].get("vector_size") if collections else None
+        mismatched = [
+            c.get("name")
+            for c in collections
+            if c.get("vector_size") and c["vector_size"] != model_dim
+        ]
+
+        return JSONResponse(
+            content={
+                "model_dimension": model_dim,
+                "collection_dimension": coll_dim,
+                "mismatch": bool(mismatched),
+                "mismatched_collections": mismatched,
+            }
+        )
+    except Exception as e:
+        logger.error("Dimension status check failed: %s", e)
+        return JSONResponse(
+            content={
+                "model_dimension": None,
+                "collection_dimension": None,
+                "mismatch": False,
+                "mismatched_collections": [],
+                "error": str(e),
+            }
+        )
 
 
 @router.get("/embeddings/{repo_id}/files")

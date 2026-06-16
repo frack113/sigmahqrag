@@ -296,6 +296,12 @@
                     <!-- Embedding Card -->
                     <div class="card">
                         <div class="card-header"><h2>Embedding</h2></div>
+                        <div id="emb-dim-banner" class="alert alert-warning" style="display:none; margin:8px 16px; padding:10px; background:#fff3cd; border:1px solid #ffc107; border-radius:6px;">
+                            <strong>Dimension mismatch</strong> ??? The active embedding model dimension (<span id="emb-model-dim"></span>) differs from the Qdrant collection (<span id="emb-coll-dim"></span>). Vectors will be rejected until the collection is recreated.
+                            <div style="margin-top:8px;">
+                                <button class="btn btn-primary btn-sm" onclick="Config.recreateAndReindex()">Recreate collection &amp; Reindex</button>
+                            </div>
+                        </div>
                         <div class="card-body">
                             <div id="emb-global-status" class="global-status">
                                 <span class="status-dot"></span>

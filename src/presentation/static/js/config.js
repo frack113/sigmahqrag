@@ -1236,6 +1236,62 @@ function downloadEmbModelDirect(repoId) {
     downloadEmbModel();
 }
 
+function checkDimensionStatus() {
+    fetch('/api/v1/models/embeddings/dimension-status')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var banner = document.getElementById('emb-dim-banner');
+            if (!banner) return;
+            if (data.mismatch) {
+                document.getElementById('emb-model-dim').textContent = data.model_dimension || 'unknown';
+                document.getElementById('emb-coll-dim').textContent = data.collection_dimension || 'unknown';
+                banner.style.display = 'block';
+            } else {
+                banner.style.display = 'none';
+            }
+        })
+        .catch(function() {
+            var banner = document.getElementById('emb-dim-banner');
+            if (banner) banner.style.display = 'none';
+        });
+}
+
+function recreateAndReindex() {
+    if (!confirm('Recreate Qdrant collection(s) and reindex all documents? This will delete existing vectors.')) return;
+    var btn = document.querySelector('#emb-dim-banner .btn');
+    if (btn) { btn.textContent = 'Recreating...'; btn.disabled = true; }
+    var statusEl = document.getElementById('emb-download-status') || document.getElementById('qdrant-download-status');
+    if (statusEl) { statusEl.textContent = 'Reindexing...'; statusEl.className = 'status-message'; }
+
+    fetch('/api/v1/models/embeddings/dimension-status')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var collections = data.mismatched_collections || ['sigma_docs'];
+            var chain = Promise.resolve();
+            collections.forEach(function(name) {
+                chain = chain.then(function() {
+                    return fetch('/api/v1/qdrant', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'reindex', payload: { action: 'reindex', collection_name: name } })
+                    }).then(function(r) { return r.json(); });
+                });
+            });
+            return chain;
+        })
+        .then(function() {
+            checkDimensionStatus();
+            if (statusEl) { statusEl.textContent = 'Reindex completed'; statusEl.className = 'status-message success'; }
+        })
+        .catch(function(e) {
+            alert('Reindex failed: ' + (e.message || 'Unknown error'));
+            if (statusEl) { statusEl.textContent = 'Reindex failed'; statusEl.className = 'status-message error'; }
+        })
+        .finally(function() {
+            if (btn) { btn.textContent = 'Recreate collection & Reindex'; btn.disabled = false; }
+        });
+}
+
 function deleteEmbModel() {
     if (!selectedEmbRepo) return;
     if (!confirm('Delete model ' + selectedEmbRepo + '?')) return;
@@ -1412,6 +1468,10 @@ var Config = {
     onQdrantModeChange: onQdrantModeChange,
     onQdrantAutostartChange: onQdrantAutostartChange,
     
+    // Embedding dimension
+    checkDimensionStatus: checkDimensionStatus,
+    recreateAndReindex: recreateAndReindex,
+
     // LLM
     selectLlmModel: selectLlmModel,
     searchLlmModel: searchLlmModel,
@@ -1460,6 +1520,7 @@ document.addEventListener('DOMContentLoaded', function () {
     loadReleasesTable();
     checkLlmModels();
     checkEmbModels();
+    checkDimensionStatus();
     loadSystemStatus();
     
     // Bind form submit
