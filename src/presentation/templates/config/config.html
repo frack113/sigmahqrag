@@ -277,8 +277,11 @@
                         <div id="releases-table" style="margin-top:8px;">
                             <!-- Releases table will be populated here -->
                         </div>
-                        <button class="btn btn-primary btn-sm" onclick="Config.refreshReleases()">Refresh GitHub Releases</button>
-                            <div id="releases-refresh-status" class="status-message" style="margin-top:8px;"></div>
+                        <div style="margin-top:12px; display:flex; gap:8px;">
+                            <button class="btn btn-primary btn-sm" onclick="Config.refreshReleases()">Refresh GitHub Releases</button>
+                            <button class="btn btn-secondary btn-sm" onclick="Config.scanLocalVersions()">Scan Local Versions</button>
+                        </div>
+                        <div id="releases-refresh-status" class="status-message" style="margin-top:8px;"></div>
                         </div>
                     </div>
                 </div>

@@ -489,7 +489,7 @@ function loadBackendStatus() {
             loadReleaseTags('qdrant-release-select', 'qdrant');
         }
 
-        loadCustomReleaseTags('qdrant-ui-release-select', 'qdrant', 'qdrant-web-ui');
+        loadReleaseTags('qdrant-ui-release-select', 'qdrant-web-ui');
 
         // Populate new backend service controls from config
         var services = configData.services || (configData.backend && configData.backend.services) || _BACKEND_CONFIG.services || {};
@@ -799,8 +799,9 @@ function loadReleasesTable() {
             if (!tableEl) return;
             
             var releases = data.releases || [];
+            var versions = data.installed_versions || {};
             
-            if (releases.length === 0) {
+            if (releases.length === 0 && Object.keys(versions).length === 0) {
                 tableEl.innerHTML = '<p style="font-style:italic;color:var(--text-card-body);"><i>undef</i></p>';
                 return;
             }
@@ -808,20 +809,51 @@ function loadReleasesTable() {
             var html = '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;">';
             html += '<thead><tr style="border-bottom:1px solid var(--layout-card-border);">' +
                     '<th style="padding:8px;text-align:left;">Service</th>' +
-                    '<th style="padding:8px;text-align:left;">Last Tag Name</th>' +
+                    '<th style="padding:8px;text-align:left;">Latest Tag</th>' +
+                    '<th style="padding:8px;text-align:left;">Installed Version</th>' +
+                    '<th style="padding:8px;text-align:left;">Last Scanned</th>' +
                     '<th style="padding:8px;text-align:left;">Published At</th>' +
                     '<th style="padding:8px;text-align:left;">Fetched At</th>' +
                     '</tr></thead>';
             html += '<tbody>';
-            for (var i = 0; i < releases.length; i++) {
-                var r = releases[i];
+
+            // Define known services in desired order
+            var knownServices = ['llama.cpp', 'qdrant', 'qdrant-web-ui'];
+            
+            for (var si = 0; si < knownServices.length; si++) {
+                var svc = knownServices[si];
+                var release = null;
+                for (var ri = 0; ri < releases.length; ri++) {
+                    if (releases[ri].service === svc) { release = releases[ri]; break; }
+                }
+                var installed = versions[svc] || null;
+                
                 html += '<tr style="border-bottom:1px solid var(--layout-card-border);">' +
-                        '<td style="padding:8px;">' + (r.service || '—') + '</td>' +
-                        '<td style="padding:8px;">' + (r.last_tag_name || '—') + '</td>' +
-                        '<td style="padding:8px;">' + (r.published_at || '—') + '</td>' +
-                        '<td style="padding:8px;">' + (r.fetched_at || '—') + '</td>' +
+                        '<td style="padding:8px;">' + svc + '</td>' +
+                        '<td style="padding:8px;">' + (release ? (release.last_tag_name || '—') : '—') + '</td>' +
+                        '<td style="padding:8px;">' + (installed ? installed.version : '—') + '</td>' +
+                        '<td style="padding:8px;">' + (installed ? (installed.scanned_at ? new Date(installed.scanned_at).toLocaleString() : '—') : '—') + '</td>' +
+                        '<td style="padding:8px;">' + (release ? (release.published_at || '—') : '—') + '</td>' +
+                        '<td style="padding:8px;">' + (release ? (release.fetched_at || '—') : '—') + '</td>' +
                         '</tr>';
             }
+            
+            // Add any extra releases not in knownServices
+            for (var ri = 0; ri < releases.length; ri++) {
+                var r = releases[ri];
+                if (knownServices.indexOf(r.service) === -1) {
+                    var extInstalled = versions[r.service] || null;
+                    html += '<tr style="border-bottom:1px solid var(--layout-card-border);">' +
+                            '<td style="padding:8px;">' + (r.service || '—') + '</td>' +
+                            '<td style="padding:8px;">' + (r.last_tag_name || '—') + '</td>' +
+                            '<td style="padding:8px;">' + (extInstalled ? extInstalled.version : '—') + '</td>' +
+                            '<td style="padding:8px;">' + (extInstalled ? (extInstalled.scanned_at ? new Date(extInstalled.scanned_at).toLocaleString() : '—') : '—') + '</td>' +
+                            '<td style="padding:8px;">' + (r.published_at || '—') + '</td>' +
+                            '<td style="padding:8px;">' + (r.fetched_at || '—') + '</td>' +
+                            '</tr>';
+                }
+            }
+            
             html += '</tbody></table></div>';
             
             tableEl.innerHTML = html;
@@ -853,6 +885,24 @@ function refreshReleases() {
         .catch(function() {
             alert('Failed to refresh releases. Check your connection.');
             if (statusEl) { statusEl.textContent = 'Failed'; statusEl.className = 'status-message error'; }
+        });
+}
+
+function scanLocalVersions() {
+    var statusEl = document.getElementById('releases-refresh-status');
+    if (statusEl) { statusEl.textContent = 'Scanning local versions...'; statusEl.className = 'status-message'; }
+    fetch('/api/v1/releases/scan-versions', { method: 'POST' })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.status === 'success') {
+                loadReleasesTable();
+                if (statusEl) { statusEl.textContent = 'Versions scanned successfully'; statusEl.className = 'status-message success'; }
+            } else {
+                if (statusEl) { statusEl.textContent = 'Scan failed: ' + (data.error || 'Unknown error'); statusEl.className = 'status-message error'; }
+            }
+        })
+        .catch(function(err) {
+            if (statusEl) { statusEl.textContent = 'Scan failed: ' + err.message; statusEl.className = 'status-message error'; }
         });
 }
 
@@ -1314,6 +1364,7 @@ var Config = {
     stopService: stopService,
     openQdrantUI: openQdrantUI,
     refreshReleases: refreshReleases,
+    scanLocalVersions: scanLocalVersions,
     onLlamaModeChange: onLlamaModeChange,
     onLlamaAutostartChange: onLlamaAutostartChange,
     onQdrantModeChange: onQdrantModeChange,

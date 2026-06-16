@@ -32,6 +32,7 @@ _VALID_TABLES = frozenset(
         "git_selected_dirs",
         "worker_state",
         "release_cache",
+        "installed_versions",
     }
 )
 
@@ -222,5 +223,33 @@ class DatabaseServiceCore:
                 "INSERT INTO release_cache (service, data, fetched_at) VALUES (?, ?, ?) "
                 "ON CONFLICT (service) DO UPDATE SET data = EXCLUDED.data, fetched_at = EXCLUDED.fetched_at",
                 (service, json.dumps(releases), datetime.now(timezone.utc).isoformat()),
+            )
+            self._writer_conn.commit()
+
+    # ------------------------------------------------------------------
+    # Installed versions
+    # ------------------------------------------------------------------
+
+    def get_installed_versions(self) -> dict[str, dict[str, str]]:
+        """Return all installed versions stored in DuckDB."""
+        with self._lock:
+            conn = self._get_reader_connection()
+            if conn is None:
+                return {}
+            rows = conn.execute(
+                "SELECT service, version, scanned_at FROM installed_versions",
+                (),
+            ).fetchall()
+        return {row[0]: {"version": row[1], "scanned_at": row[2]} for row in rows} if rows else {}
+
+    def set_installed_version(self, service: str, version: str) -> None:
+        """Store or update an installed version in DuckDB."""
+        from datetime import datetime, timezone
+
+        with self._lock:
+            self._writer_conn.execute(
+                "INSERT INTO installed_versions (service, version, scanned_at) VALUES (?, ?, ?) "
+                "ON CONFLICT (service) DO UPDATE SET version = EXCLUDED.version, scanned_at = EXCLUDED.scanned_at",
+                (service, version, datetime.now(timezone.utc).isoformat()),
             )
             self._writer_conn.commit()

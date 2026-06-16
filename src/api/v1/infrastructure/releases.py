@@ -7,6 +7,7 @@ import logging
 from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
 
+from src.application.system.health import HealthCheckService
 from src.infrastructure.database import DatabaseService
 from src.shared.release_selector import SERVICE_REPOS_EXTENDED, create_release_selector
 
@@ -29,13 +30,15 @@ async def get_release_timestamps():
 
 @router.get("/all-releases")
 async def get_all_releases():
-    """Return all cached releases for display in UI."""
+    """Return all cached releases and installed versions for display in UI."""
     try:
         db = DatabaseService.get_instance()
+        versions = db.get_installed_versions()
+
         with db._lock:
             conn = db._get_reader_connection()
             if conn is None:
-                return JSONResponse(content={"releases": []})
+                return JSONResponse(content={"releases": [], "installed_versions": versions})
 
             rows = conn.execute("""
                 SELECT 
@@ -58,9 +61,39 @@ async def get_all_releases():
                 }
             )
 
-        return JSONResponse(content={"releases": releases})
+        return JSONResponse(content={"releases": releases, "installed_versions": versions})
     except Exception as e:
         logger.error(f"Failed to read all releases: {e}")
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+
+@router.post("/scan-versions")
+async def scan_installed_versions():
+    """Scan locally installed service versions and store in DuckDB."""
+    try:
+        db = DatabaseService.get_instance()
+        health = HealthCheckService()
+        results: dict[str, str] = {}
+
+        services = [
+            ("llama.cpp", "llama"),
+            ("qdrant", "qdrant"),
+            ("qdrant-web-ui", "qdrant"),
+        ]
+
+        for name, hc_key in services:
+            version = health.get_current_version(hc_key) or "unknown"
+            db.set_installed_version(name, version)
+            results[name] = version
+
+        try:
+            db.persist()
+        except Exception:
+            logger.warning("Auto-persist after scan-versions failed (non-fatal)")
+
+        return JSONResponse(content={"status": "success", "versions": results})
+    except Exception as e:
+        logger.error(f"Failed to scan versions: {e}")
         return JSONResponse(status_code=500, content={"error": str(e)})
 
 

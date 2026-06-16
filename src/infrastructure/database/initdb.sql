@@ -124,6 +124,13 @@ CREATE TABLE IF NOT EXISTS release_cache (
     fetched_at TEXT NOT NULL
 );
 
+-- installed_versions (local binary versions — scanned on demand)
+CREATE TABLE IF NOT EXISTS installed_versions (
+    service TEXT PRIMARY KEY,
+    version TEXT NOT NULL,
+    scanned_at TEXT NOT NULL
+);
+
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_models_type ON models(model_type);
 CREATE INDEX IF NOT EXISTS idx_prompts_name ON system_prompts(name);
