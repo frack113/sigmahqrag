@@ -46,7 +46,7 @@
                 <div class="config-cards">
                     <!-- Configuration Card -->
                     <div class="card">
-                        <div class="card-header"><h2>Configuration</h2></div>
+                        <div class="card-header"><h2>Configuration</h2><button type="submit" form="config-form" class="btn btn-primary btn-sm">Save</button></div>
                         <div class="card-body">
                             <form id="config-form">
                                 <div class="config-row">
@@ -67,7 +67,6 @@
                                             <option value="vulkan">Vulkan</option>
                                         </select>
                                     </div>
-                                    <button type="submit" class="btn btn-primary btn-sm">Save</button>
                                 </div>
                             </form>
                             <div id="config-status" class="status-message"></div>
@@ -75,7 +74,7 @@
                     </div>
                     <!-- Logging Card -->
                     <div class="card">
-                        <div class="card-header"><h2>Logging</h2></div>
+                        <div class="card-header"><h2>Logging</h2><button class="btn btn-primary btn-sm" onclick="Config.saveLoggingConfig()">Save</button></div>
                         <div class="card-body">
                             <div id="logging-status" class="global-status">
                                 <span class="status-dot"></span>
@@ -108,7 +107,6 @@
                                     <span class="theme-slider"></span>
                                     <span class="theme-text-label" id="log-clean-label">No</span>
                                 </label>
-                                <button class="btn btn-primary btn-sm" onclick="Config.saveLoggingConfig()">Save Logging Config</button>
                             </div>
                             <div id="logging-config-status" class="status-message"></div>
                         </div>
@@ -148,91 +146,63 @@
             <details class="config-group" id="backend-section" open>
                 <summary class="config-group-summary">Backend</summary>
                 <div class="config-cards">
-                    <!-- llama.cpp Card -->
-                    <div class="card">
-                        <div class="card-header"><h2>llama.cpp</h2></div>
+                    <!-- Releases Management Card -->
+                    <div class="card" style="grid-column:1/-1">
+                        <div class="card-header"><h2>Releases Management</h2></div>
                         <div class="card-body">
-                            <div id="llama-status" class="status-row" style="margin-bottom:16px;">
-                                <span class="status-dot status-unknown"></span>
-                                <span id="llama-status-text">Loading...</span>
-                                <button class="btn btn-secondary btn-sm" onclick="Config.loadBackendStatus()">Refresh</button>
-                            </div>
-
-                            <div class="form-group" style="margin-bottom:16px;">
-                                <label for="llama-base-url">Base URL</label>
-                                <input type="text" id="llama-base-url" value="http://127.0.0.1:8080" placeholder="http://127.0.0.1:8080">
-                            </div>
-
-                            <div class="form-group" style="margin-bottom:16px;">
-                                <label>Manage internally</label>
-                                <label class="theme-toggle" id="llama-mode-toggle" onchange="Config.onLlamaModeChange()">
-                                    <input type="checkbox" id="llama-manage-internally" checked>
-                                    <span class="theme-slider"></span>
-                                    <span class="theme-text-label" id="llama-mode-label">Internal</span>
-                                </label>
-                            </div>
-
-                            <div class="form-group" style="margin-bottom:16px;">
-                                <label style="display:block; font-size:13px; color:var(--layout-card-text); margin-bottom:4px;">Auto start</label>
-                                <label class="theme-toggle" id="llama-autostart-toggle" onchange="Config.onLlamaAutostartChange()">
-                                    <input type="checkbox" id="llama-autorun-at-startup" checked>
-                                    <span class="theme-slider"></span>
-                                    <span class="theme-text-label" id="llama-autostart-label">Off</span>
-                                </label>
-                            </div>
-
-                            <div class="config-row" style="margin-bottom:16px;">
-                                <div class="form-group inline">
-                                    <label>Release:</label>
-                                    <select id="llama-release-select" style="min-width:200px"></select>
-                                </div>
-                                <button id="llama-download-btn" class="btn btn-primary btn-sm" onclick="Config.downloadLlama()">Update</button>
-                            </div>
-
-                            <div class="form-actions" style="margin-bottom:16px;">
-                                <button id="llama-start-btn" class="btn btn-success btn-sm" onclick="Config.startService('llama')">Start</button>
-                                <button id="llama-stop-btn" class="btn btn-danger btn-sm" onclick="Config.stopService('llama')">Stop</button>
-                            </div>
-
-                            <div id="llama-download-status" class="status-message"></div>
-                            <div id="llama-progress-container" style="display:none;">
-                                <div class="progress-bar"><div class="progress-fill" id="llama-progress-fill"></div></div>
-                                <p id="llama-progress-text">Downloading...</p>
-                            </div>
-
+                        <div id="releases-timestamp" style="font-size:var(--text-sm);color:var(--text-card-body);margin-bottom:16px;">
+                            Last update: <span id="releases-last-update">—</span>
+                        </div>
+                        <div id="releases-table" style="margin-top:8px;">
+                            <!-- Releases table will be populated here -->
+                        </div>
+                        <div style="margin-top:12px; display:flex; gap:8px;">
+                            <button class="btn btn-primary btn-sm" onclick="Config.refreshReleases()">Refresh GitHub Releases</button>
+                            <button class="btn btn-secondary btn-sm" onclick="Config.scanLocalVersions()">Scan Local Versions</button>
+                        </div>
+                        <div id="releases-refresh-status" class="status-message" style="margin-top:8px;"></div>
                         </div>
                     </div>
                     <!-- Qdrant Card -->
                     <div class="card">
-                        <div class="card-header"><h2>Qdrant</h2></div>
+                        <div class="card-header"><h2>Qdrant</h2><button class="btn btn-primary btn-sm" onclick="Config.saveBackendServiceConfig('qdrant')">Save</button></div>
                         <div class="card-body">
+                            <div class="config-row" style="margin-bottom:12px;">
+                                <div class="form-group inline">
+                                    <label for="qdrant-base-url">Base URL</label>
+                                    <input type="text" id="qdrant-base-url" value="http://127.0.0.1:6333" placeholder="http://127.0.0.1:6333">
+                                </div>
+                            </div>
+
+                            <div class="config-row" style="margin-bottom:12px;">
+                                <div class="form-group inline">
+                                    <label>Manage</label>
+                                    <label class="theme-toggle" id="qdrant-mode-toggle" style="width:auto" onchange="Config.onQdrantModeChange()">
+                                        <input type="checkbox" id="qdrant-manage-internally" checked>
+                                        <span class="theme-slider"></span>
+                                        <span class="theme-text-label" id="qdrant-mode-label">Internal</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="config-row" style="margin-bottom:12px;">
+                                <div class="form-group inline">
+                                    <label>Auto start</label>
+                                    <label class="theme-toggle" id="qdrant-autostart-toggle" style="width:auto" onchange="Config.onQdrantAutostartChange()">
+                                        <input type="checkbox" id="qdrant-autorun-at-startup" checked>
+                                        <span class="theme-slider"></span>
+                                        <span class="theme-text-label" id="qdrant-autostart-label">Off</span>
+                                    </label>
+                                </div>
+                            </div>
+
                             <div id="qdrant-status" class="status-row" style="margin-bottom:16px;">
                                 <span class="status-dot status-unknown"></span>
-                                <span id="qdrant-status-text">Loading...</span>
+                                <span id="qdrant-status-text">Inactive</span>
                                 <button class="btn btn-secondary btn-sm" onclick="Config.loadBackendStatus()">Refresh</button>
-                            </div>
-
-                            <div class="form-group" style="margin-bottom:16px;">
-                                <label for="qdrant-base-url">Base URL</label>
-                                <input type="text" id="qdrant-base-url" value="http://127.0.0.1:6333" placeholder="http://127.0.0.1:6333">
-                            </div>
-
-                            <div class="form-group" style="margin-bottom:16px;">
-                                <label>Manage internally</label>
-                                <label class="theme-toggle" id="qdrant-mode-toggle" onchange="Config.onQdrantModeChange()">
-                                    <input type="checkbox" id="qdrant-manage-internally" checked>
-                                    <span class="theme-slider"></span>
-                                    <span class="theme-text-label" id="qdrant-mode-label">Internal</span>
-                                </label>
-                            </div>
-
-                            <div class="form-group" style="margin-bottom:16px;">
-                                <label style="display:block; font-size:13px; color:var(--layout-card-text); margin-bottom:4px;">Auto start</label>
-                                <label class="theme-toggle" id="qdrant-autostart-toggle" onchange="Config.onQdrantAutostartChange()">
-                                    <input type="checkbox" id="qdrant-autorun-at-startup" checked>
-                                    <span class="theme-slider"></span>
-                                    <span class="theme-text-label" id="qdrant-autostart-label">Off</span>
-                                </label>
+                                <button id="qdrant-start-btn" class="btn btn-success btn-sm" onclick="Config.startService('qdrant')">Start</button>
+                                <button id="qdrant-stop-btn" class="btn btn-danger btn-sm" onclick="Config.stopService('qdrant')">Stop</button>
+                                <a id="qdrant-webui-link" href="http://127.0.0.1:6333/dashboard" target="_blank" class="btn btn-secondary btn-sm">Web UI</a>
                             </div>
 
                             <div class="config-row" style="margin-bottom:16px;">
@@ -251,37 +221,69 @@
                                 <button id="qdrant-ui-download-btn" class="btn btn-primary btn-sm" onclick="Config.downloadQdrantUI()">Download Web UI</button>
                             </div>
 
-                            <div class="form-actions" style="margin-bottom:16px;">
-                                <button id="qdrant-start-btn" class="btn btn-success btn-sm" onclick="Config.startService('qdrant')">Start</button>
-                                <button id="qdrant-stop-btn" class="btn btn-danger btn-sm" onclick="Config.stopService('qdrant')">Stop</button>
-                            </div>
-
                             <div id="qdrant-download-status" class="status-message"></div>
                             <div id="qdrant-progress-container" style="display:none;">
                                 <div class="progress-bar"><div class="progress-fill" id="qdrant-progress-fill"></div></div>
                                 <p id="qdrant-progress-text">Downloading...</p>
                             </div>
 
-                            <div style="margin-top:16px;">
-                                <a href="http://127.0.0.1:6333/dashboard" target="_blank" class="btn btn-secondary btn-sm">Qdrant Web UI</a>
-                            </div>
                         </div>
                     </div>
-                    <!-- Releases Management Card -->
+                    <!-- llama.cpp Card -->
                     <div class="card">
-                        <div class="card-header"><h2>Releases Management</h2></div>
+                        <div class="card-header"><h2>llama.cpp</h2><button class="btn btn-primary btn-sm" onclick="Config.saveBackendServiceConfig('llama')">Save</button></div>
                         <div class="card-body">
-                        <div id="releases-timestamp" style="font-size:var(--text-sm);color:var(--text-card-body);margin-bottom:16px;">
-                            Last update: <span id="releases-last-update">—</span>
-                        </div>
-                        <div id="releases-table" style="margin-top:8px;">
-                            <!-- Releases table will be populated here -->
-                        </div>
-                        <div style="margin-top:12px; display:flex; gap:8px;">
-                            <button class="btn btn-primary btn-sm" onclick="Config.refreshReleases()">Refresh GitHub Releases</button>
-                            <button class="btn btn-secondary btn-sm" onclick="Config.scanLocalVersions()">Scan Local Versions</button>
-                        </div>
-                        <div id="releases-refresh-status" class="status-message" style="margin-top:8px;"></div>
+                            <div class="config-row" style="margin-bottom:12px;">
+                                <div class="form-group inline">
+                                    <label for="llama-base-url">Base URL</label>
+                                    <input type="text" id="llama-base-url" value="http://127.0.0.1:8080" placeholder="http://127.0.0.1:8080">
+                                </div>
+                            </div>
+
+                            <div class="config-row" style="margin-bottom:12px;">
+                                <div class="form-group inline">
+                                    <label>Manage</label>
+                                    <label class="theme-toggle" id="llama-mode-toggle" style="width:auto" onchange="Config.onLlamaModeChange()">
+                                        <input type="checkbox" id="llama-manage-internally" checked>
+                                        <span class="theme-slider"></span>
+                                        <span class="theme-text-label" id="llama-mode-label">Internal</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="config-row" style="margin-bottom:12px;">
+                                <div class="form-group inline">
+                                    <label>Auto start</label>
+                                    <label class="theme-toggle" id="llama-autostart-toggle" style="width:auto" onchange="Config.onLlamaAutostartChange()">
+                                        <input type="checkbox" id="llama-autorun-at-startup" checked>
+                                        <span class="theme-slider"></span>
+                                        <span class="theme-text-label" id="llama-autostart-label">Off</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div id="llama-status" class="status-row" style="margin-bottom:16px;">
+                                <span class="status-dot status-unknown"></span>
+                                <span id="llama-status-text">Inactive</span>
+                                <button class="btn btn-secondary btn-sm" onclick="Config.loadBackendStatus()">Refresh</button>
+                                <button id="llama-start-btn" class="btn btn-success btn-sm" onclick="Config.startService('llama')">Start</button>
+                                <button id="llama-stop-btn" class="btn btn-danger btn-sm" onclick="Config.stopService('llama')">Stop</button>
+                            </div>
+
+                            <div class="config-row" style="margin-bottom:16px;">
+                                <div class="form-group inline">
+                                    <label>Release:</label>
+                                    <select id="llama-release-select" style="min-width:200px"></select>
+                                </div>
+                                <button id="llama-download-btn" class="btn btn-primary btn-sm" onclick="Config.downloadLlama()">Update</button>
+                            </div>
+
+                            <div id="llama-download-status" class="status-message"></div>
+                            <div id="llama-progress-container" style="display:none;">
+                                <div class="progress-bar"><div class="progress-fill" id="llama-progress-fill"></div></div>
+                                <p id="llama-progress-text">Downloading...</p>
+                            </div>
+
                         </div>
                     </div>
                 </div>

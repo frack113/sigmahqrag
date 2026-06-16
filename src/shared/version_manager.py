@@ -40,6 +40,7 @@ class VersionManager:
     SERVICE_REPOS = {
         "llama.cpp": ("ggml-org", "llama.cpp"),
         "qdrant": ("qdrant", "qdrant"),
+        "qdrant-web-ui": ("qdrant", "qdrant-web-ui"),
     }
 
     BINARY_PATTERNS = {
@@ -59,6 +60,7 @@ class VersionManager:
             r"aarch64-unknown-linux-musl",
             r"x86_64-pc-windows-msvc",
         ],
+        "qdrant-web-ui": [],
     }
 
     def __init__(self, github_token: str | None = None) -> None:
@@ -186,6 +188,10 @@ class VersionManager:
 
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.get(url, headers=self._get_headers())
+            if response.status_code == 404 and version and version != "latest":
+                logger.warning(f"Version {version} not found for {service}, falling back to latest")
+                fallback_url = f"{self.GITHUB_API_URL}/{owner}/{repo}/releases/latest"
+                response = await client.get(fallback_url, headers=self._get_headers())
             response.raise_for_status()
             data = response.json()
 
@@ -272,6 +278,9 @@ class VersionManager:
                     return asset
                 elif os_name == "macos" and "macos" in asset_name and arch in asset_name:
                     return asset
+
+            elif service == "qdrant-web-ui":
+                return release.assets[0] if release.assets else None
 
             elif service == "qdrant":
                 # For Qdrant, prioritize OS-specific match

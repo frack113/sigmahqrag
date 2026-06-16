@@ -489,7 +489,12 @@ function loadBackendStatus() {
             loadReleaseTags('qdrant-release-select', 'qdrant');
         }
 
-        loadReleaseTags('qdrant-ui-release-select', 'qdrant-web-ui');
+        var uv = (qdrantInfo.webui_version || '').replace(/^0$/, '');
+        if (uv && uv !== 'unknown' && uv !== 'Not installed') {
+            loadReleaseTags('qdrant-ui-release-select', 'qdrant-web-ui', { value: uv });
+        } else {
+            loadReleaseTags('qdrant-ui-release-select', 'qdrant-web-ui');
+        }
 
         // Populate new backend service controls from config
         var services = configData.services || (configData.backend && configData.backend.services) || _BACKEND_CONFIG.services || {};
@@ -539,14 +544,15 @@ function loadBackendStatus() {
 // Backend Service Config Toggles
 // ──────────────────────────────────────────────────────────────
 function updateBackendServiceConfig(service, field, value) {
-    var dynamicKey = 'services.' + service + '.' + field;
-    var payload = {};
-    payload[dynamicKey] = value;
+    var nested = {};
+    nested[field] = value;
+    var svc = {};
+    svc[service] = nested;
     fetch('/api/v1/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-            backend: payload
+            backend: { services: svc }
         })
     })
     .then(function(r) { return r.json(); })
@@ -557,6 +563,41 @@ function updateBackendServiceConfig(service, field, value) {
     })
     .catch(function(err) {
         console.error('Error updating ' + service + '.' + field + ':', err);
+    });
+}
+
+function saveBackendServiceConfig(service) {
+    var baseUrl = document.getElementById(service + '-base-url');
+    var manage = document.getElementById(service + '-manage-internally');
+    var autorun = document.getElementById(service + '-autorun-at-startup');
+    var payload = {
+        backend: {
+            services: {}
+        }
+    };
+    payload.backend.services[service] = {};
+    if (baseUrl) payload.backend.services[service].base_url = baseUrl.value;
+    if (manage) payload.backend.services[service].manage_internally = manage.checked;
+    if (autorun) payload.backend.services[service].autorun_at_startup = autorun.checked;
+
+    var statusEl = document.getElementById(service + '-status-text');
+    if (statusEl) statusEl.textContent = 'Saving...';
+
+    fetch('/api/v1/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (statusEl) {
+            statusEl.textContent = data.status === 'success'
+                ? (data.message || 'Configuration saved')
+                : (data.error || 'Save failed');
+        }
+    })
+    .catch(function(err) {
+        if (statusEl) statusEl.textContent = 'Error: ' + err.message;
     });
 }
 
@@ -647,7 +688,7 @@ function downloadLlama() {
                     endpoint: '/api/v1/llamacpp/status',
                     downloadId: data.download_id,
                     onUpdate: function(pct, text) { pb.setProgress(pct); pb.setText(text); },
-                    onComplete: function() { pb.hide(); statusEl.textContent = 'Download completed!'; if (btn) btn.disabled = false; loadBackendStatus(); },
+                    onComplete: function() { pb.hide(); statusEl.textContent = 'Download completed!'; if (btn) btn.disabled = false; scanLocalVersions(); loadBackendStatus(); },
                     onError: function(msg) { pb.hide(); statusEl.textContent = 'Download failed: ' + msg; statusEl.className = 'status-message error'; if (btn) btn.disabled = false; }
                 });
             } else {
@@ -680,19 +721,19 @@ function downloadQdrantBinary() {
     })
     .then(function(r) { return r.json(); })
     .then(function(data) {
-        if (data.status === 'started' && data.download_id) {
+        if (data.data && data.data.download_id) {
             statusEl.textContent = 'Download started';
             statusEl.className = 'status-message success';
             ProgressBar.pollDownload({
                 endpoint: '/api/v1/qdrant/status',
-                downloadId: data.download_id,
+                downloadId: data.data.download_id,
                 onUpdate: function(pct, text) { pb.setProgress(pct); pb.setText(text); },
-                onComplete: function() { pb.hide(); statusEl.textContent = 'Download completed!'; loadBackendStatus(); },
+                onComplete: function() { pb.hide(); statusEl.textContent = 'Download completed!'; scanLocalVersions(); loadBackendStatus(); },
                 onError: function(msg) { pb.hide(); statusEl.textContent = 'Download failed: ' + msg; statusEl.className = 'status-message error'; }
             });
         } else {
             statusEl.textContent = data.message || data.error || 'Download failed';
-            statusEl.className = 'status-message ' + (data.status === 'started' ? 'success' : 'error');
+            statusEl.className = 'status-message error';
             pb.hide();
             loadBackendStatus();
         }
@@ -715,23 +756,23 @@ function downloadQdrantUI() {
     fetch('/api/v1/qdrant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'download_update', payload: { action: 'download_update', version: version, force: false } })
+        body: JSON.stringify({ action: 'download_update', payload: { action: 'download_update', version: version, force: false, service: 'qdrant-web-ui' } })
     })
     .then(function(r) { return r.json(); })
     .then(function(data) {
-        if (data.status === 'started' && data.download_id) {
+        if (data.data && data.data.download_id) {
             statusEl.textContent = 'Download started';
             statusEl.className = 'status-message success';
             ProgressBar.pollDownload({
                 endpoint: '/api/v1/qdrant/status',
-                downloadId: data.download_id,
+                downloadId: data.data.download_id,
                 onUpdate: function(pct, text) { pb.setProgress(pct); pb.setText(text); },
-                onComplete: function() { pb.hide(); statusEl.textContent = 'Web UI downloaded!'; loadBackendStatus(); },
+                onComplete: function() { pb.hide(); statusEl.textContent = 'Web UI downloaded!'; scanLocalVersions(); loadBackendStatus(); },
                 onError: function(msg) { pb.hide(); statusEl.textContent = 'Download failed: ' + msg; statusEl.className = 'status-message error'; }
             });
         } else {
             statusEl.textContent = data.message || data.error || 'Download failed';
-            statusEl.className = 'status-message ' + (data.status === 'started' ? 'success' : 'error');
+            statusEl.className = 'status-message error';
             pb.hide();
             loadBackendStatus();
         }
@@ -1357,6 +1398,7 @@ var Config = {
     
     // Backend
     loadBackendStatus: loadBackendStatus,
+    saveBackendServiceConfig: saveBackendServiceConfig,
     downloadLlama: downloadLlama,
     downloadQdrantBinary: downloadQdrantBinary,
     downloadQdrantUI: downloadQdrantUI,
@@ -1424,6 +1466,18 @@ document.addEventListener('DOMContentLoaded', function () {
     var form = document.getElementById('config-form');
     if (form) form.addEventListener('submit', function (e) { e.preventDefault(); saveBackendConfig(); });
     
+    // Update Qdrant Web UI link when Base URL changes
+    var qdrantUrlInput = document.getElementById('qdrant-base-url');
+    var qdrantWebLink = document.getElementById('qdrant-webui-link');
+    if (qdrantUrlInput && qdrantWebLink) {
+        function updateQdrantWebLink() {
+            var base = qdrantUrlInput.value.replace(/\/+$/, '');
+            qdrantWebLink.href = base ? base + '/dashboard' : 'http://127.0.0.1:6333/dashboard';
+        }
+        qdrantUrlInput.addEventListener('change', updateQdrantWebLink);
+        qdrantUrlInput.addEventListener('input', updateQdrantWebLink);
+    }
+
     // Setup sidebar nav clicks
     var navLinks = document.querySelectorAll('.config-nav-link');
     navLinks.forEach(function(link) {

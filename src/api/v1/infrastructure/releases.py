@@ -82,7 +82,12 @@ async def scan_installed_versions():
         ]
 
         for name, hc_key in services:
-            version = health.get_current_version(hc_key) or "unknown"
+            if name == "qdrant-web-ui":
+                from src.config.settings import get_config
+
+                version = get_config().qdrant_webui_version or "unknown"
+            else:
+                version = health.get_current_version(hc_key) or "unknown"
             db.set_installed_version(name, version)
             results[name] = version
 
