@@ -58,7 +58,8 @@ async function loadTableListCount() {
         const res = await fetch('/api/v1/duckdb/tables');
         const data = await res.json();
         summary.textContent = `${data.tables.length} tables available: ${data.tables.join(', ')}`;
-    } catch {
+    } catch (err) {
+        console.error('Failed to load table list:', err);
     }
 }
 
@@ -166,14 +167,17 @@ function showCellModal(content) {
 }
 
 function esc(s) {
+    if (s == null) return '';
     const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
     return s.replace(/[&<>"']/g, c => map[c]);
 }
 
 function escAttr(s) {
+    if (s == null) return '';
     return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 function truncate(s, max) {
+    if (s == null) return '';
     return s.length > max ? s.substring(0, max) + '…' : s;
 }

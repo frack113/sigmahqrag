@@ -141,6 +141,11 @@
     --log-stat-text: #6b7280;
 }
 
+.log-level-error { color: var(--log-level-error); font-weight: 600; }
+.log-level-warning { color: var(--log-level-warning); font-weight: 600; }
+.log-level-info { color: var(--log-level-info); }
+.log-level-debug { color: var(--log-level-debug); }
+
 [data-theme="dark"] {
     --bg-body: #121212;
     --bg-card: #1e1e1e;

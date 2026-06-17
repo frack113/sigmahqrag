@@ -5,6 +5,10 @@
 
 {% block styles %}
 {{ super() }}
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
 <script src="{{ url_for('static', path='/js/dir_browser.js') }}"></script>
 {% endblock %}
 

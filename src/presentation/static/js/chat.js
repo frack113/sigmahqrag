@@ -1,6 +1,17 @@
 (function () {
     "use strict";
 
+    function showToast(message, type) {
+        if (!type) type = 'info';
+        const container = document.getElementById('toast-container');
+        if (!container) return;
+        const toast = document.createElement('div');
+        toast.className = 'toast ' + type;
+        toast.textContent = message;
+        container.appendChild(toast);
+        setTimeout(function() { toast.remove(); }, 3000);
+    }
+
     function init() {
         var messagesEl = document.getElementById("chat-messages");
         var chatForm = document.getElementById("chat-form");

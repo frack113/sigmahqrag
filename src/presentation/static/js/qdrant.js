@@ -34,7 +34,7 @@ async function qdrantAction(action, payload = {}) {
  */
 async function getQdrantStatus() {
     const response = await fetch(`${API_BASE}/status`);
-    if (!response.ok) throw new Error('Failed to fetch Q/drant status');
+    if (!response.ok) throw new Error('Failed to fetch Qdrant status');
     return await response.json();
 }
 

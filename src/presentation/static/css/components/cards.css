@@ -85,3 +85,67 @@
     color: var(--text-card-label);
     margin-top: var(--space-1);
 }
+
+/* VectorDB card styles */
+.vectordb-loading,
+.vectordb-error {
+    padding: var(--space-4);
+    text-align: center;
+    border-radius: 4px;
+    margin-bottom: var(--space-4);
+}
+.vectordb-loading {
+    background: var(--badge-bg-info);
+    color: var(--badge-text-info);
+}
+.vectordb-error {
+    background: var(--badge-bg-error);
+    color: var(--badge-text-error);
+}
+.vectordb-content {
+    display: block;
+}
+.vectordb-message {
+    padding: var(--space-3);
+    background: var(--bg-status-row);
+    border-radius: 4px;
+    margin-bottom: var(--space-3);
+}
+.vectordb-card-actions {
+    display: flex;
+    gap: var(--space-2);
+    margin-top: var(--space-3);
+}
+
+/* Repo grid/card styles */
+.repos-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: var(--space-4);
+    margin-top: var(--space-4);
+}
+.repo-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-card);
+    border-radius: 8px;
+    padding: var(--space-4);
+    transition: box-shadow 0.2s, transform 0.2s;
+}
+.repo-card:hover {
+    box-shadow: 0 4px 12px var(--shadow-card);
+    transform: translateY(-2px);
+}
+.repo-card h3 {
+    margin: 0 0 var(--space-2);
+    font-size: var(--text-lg);
+}
+.repo-card p {
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+    margin: 0 0 var(--space-3);
+}
+.repo-actions {
+    display: flex;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+}

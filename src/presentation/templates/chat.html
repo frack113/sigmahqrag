@@ -1,11 +1,12 @@
-{% extends "base.html" %}
+{% extends "shared/layout.html" %}
 
 {% block title %}Chat - SigmaHQ RAG{% endblock %}
 
 {% block body_class %}chat-page{% endblock %}
 
+{% block sidebar %}{% endblock %}
+
 {% block content %}
-{% include 'shared/_header.html' %}
 <div class="chat-page-layout">
     <aside class="chat-sidebar">
         <div class="chat-sidebar-actions">

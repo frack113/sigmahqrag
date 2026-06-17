@@ -241,3 +241,62 @@
 .error-text-size {
     font-size: var(--text-sm);
 }
+
+/* Notification banner */
+.notification {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--space-3);
+    background: var(--badge-bg-info);
+    border: 1px solid var(--color-primary);
+    border-radius: 4px;
+    color: var(--badge-text-info);
+    margin-bottom: var(--space-4);
+}
+
+.notification .close-btn {
+    background: none;
+    border: none;
+    font-size: var(--text-xl);
+    cursor: pointer;
+    color: inherit;
+    opacity: 0.7;
+    padding: 0;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+}
+.notification .close-btn:hover {
+    opacity: 1;
+}
+
+/* Alert classes */
+.alert {
+    padding: var(--space-3);
+    border-radius: 4px;
+    margin-bottom: var(--space-4);
+}
+.alert-warning {
+    background: var(--badge-bg-warning);
+    border: 1px solid var(--color-warning);
+    color: var(--badge-text-warning);
+}
+.alert-error {
+    background: var(--badge-bg-error);
+    border: 1px solid var(--color-danger);
+    color: var(--badge-text-error);
+}
+.alert-success {
+    background: var(--badge-bg-success);
+    border: 1px solid var(--color-success);
+    color: var(--badge-text-success);
+}
+.alert-info {
+    background: var(--badge-bg-info);
+    border: 1px solid var(--color-primary);
+    color: var(--badge-text-info);
+}

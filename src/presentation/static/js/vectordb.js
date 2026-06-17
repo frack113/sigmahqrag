@@ -29,7 +29,7 @@ async function loadVectorDB() {
         var status = await getQdrantStatus();
 
         if (!status.healthy) {
-            throw new Error('Qdrint is unhealthy: ' + status.service + ' version ' + status.current_version);
+            throw new Error('Qdrant is unhealthy: ' + status.service + ' version ' + status.current_version);
         }
 
         var collectionNames = await listCollections();
@@ -52,7 +52,7 @@ async function loadVectorDB() {
                     + '<td class="num">' + esc(col.shards || 1) + '</td>'
                     + '<td class="num">' + esc(config.vector_size || 384) + '-dim</td>'
                     + '<td>'
-                    + '<button class="btn btn-danger btn-sm" onclick="recreateCollection(\x27' + nameAttr + '\x27)">'
+                    + '<button class="btn btn-danger btn-sm" onclick="recreateCollection(\x27' + nameAttr + '\x27, event)">'
                     + '[Re Create]'
                     + '</button>'
                     + '</td>';
@@ -74,7 +74,7 @@ async function loadVectorDB() {
     }
 }
 
-async function recreateCollection(name) {
+async function recreateCollection(name, event) {
     if (!confirm('Are you sure you want to RE-CREATE the collection "' + name + '"? This will DELETE all existing data.')) {
         return;
     }
@@ -82,7 +82,7 @@ async function recreateCollection(name) {
     if (window.isProcessing) return;
     window.isProcessing = true;
 
-    var btn = event?.target || event?.srcElement;
+    var btn = event?.target || event?.srcElement || document.activeElement;
     if (btn) btn.disabled = true;
 
     try {
