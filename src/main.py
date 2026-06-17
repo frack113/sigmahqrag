@@ -204,19 +204,17 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         if not setup_mode:
             try:
                 await start_llamacpp()
+                logger.info("llama.cpp started.")
             except Exception as e:
                 logger.warning("llama.cpp auto-start skipped: %s", e)
-            else:
-                logger.info("llama.cpp started.")
 
             qdrant_started = False
             try:
                 await start_qdrant()
-            except Exception as e:
-                logger.warning("Qdrant auto-start skipped: %s", e)
-            else:
                 qdrant_started = True
                 logger.info("Qdrant started.")
+            except Exception as e:
+                logger.warning("Qdrant auto-start skipped: %s", e)
 
             if qdrant_started:
                 await _init_qdrant_collections()

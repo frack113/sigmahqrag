@@ -9,6 +9,7 @@ import pytest
 
 import src.infrastructure.vectorstore.auto_start as _auto_start_mod
 from src.infrastructure.vectorstore.auto_start import start_qdrant, stop_qdrant
+from src.shared.exceptions import ServiceStartError
 
 
 @pytest.fixture(autouse=True)
@@ -85,16 +86,17 @@ class TestStartQdrant:
         await start_qdrant()
         assert not _auto_start_mod._qdrant_started_by_us
 
-    async def test_handles_health_exception_gracefully(
+    async def test_raises_on_health_timeout_after_start(
         self, mock_health, mock_installer, mock_binary_service, mock_config
     ):
         mock_health.side_effect = RuntimeError("connection failed")
         with patch.object(Path, "exists", return_value=True):
-            await start_qdrant(
-                health_check=mock_health,
-                installer_service=mock_installer,
-                binary_service=mock_binary_service,
-            )
+            with pytest.raises(ServiceStartError, match="health check timed out"):
+                await start_qdrant(
+                    health_check=mock_health,
+                    installer_service=mock_installer,
+                    binary_service=mock_binary_service,
+                )
         assert mock_binary_service.start.awaited
 
     async def test_downloads_and_starts_qdrant(
@@ -128,45 +130,43 @@ class TestStartQdrant:
         mock_binary_service.start.assert_awaited_once()
         assert _auto_start_mod._qdrant_started_by_us
 
-    async def test_logs_warning_on_download_failure(
-        self, mock_health, mock_installer, mock_config, caplog
-    ):
+    async def test_raises_on_download_failure(self, mock_health, mock_installer, mock_config):
         mock_installer.download_binary = AsyncMock(
             return_value={"success": False, "error": "Network error"}
         )
         mock_health.return_value = {"status": "inactive"}
-        await start_qdrant(
-            health_check=mock_health,
-            installer_service=mock_installer,
-        )
-        assert "Failed to download" in caplog.text
+        with pytest.raises(ServiceStartError, match="Failed to download Qdrant"):
+            await start_qdrant(
+                health_check=mock_health,
+                installer_service=mock_installer,
+            )
         assert not _auto_start_mod._qdrant_started_by_us
 
-    async def test_logs_warning_on_start_failure(
-        self, mock_health, mock_installer, mock_binary_service, mock_config, caplog
+    async def test_raises_on_start_failure(
+        self, mock_health, mock_installer, mock_binary_service, mock_config
     ):
         mock_binary_service.start = AsyncMock(
             return_value={"success": False, "error": "Port in use"}
         )
         mock_health.return_value = {"status": "inactive"}
-        await start_qdrant(
-            health_check=mock_health,
-            installer_service=mock_installer,
-            binary_service=mock_binary_service,
-        )
-        assert "Failed to start" in caplog.text
+        with pytest.raises(ServiceStartError, match="Failed to start Qdrant"):
+            await start_qdrant(
+                health_check=mock_health,
+                installer_service=mock_installer,
+                binary_service=mock_binary_service,
+            )
         assert not _auto_start_mod._qdrant_started_by_us
 
-    async def test_sets_flag_on_health_timeout(
+    async def test_raises_on_health_timeout(
         self, mock_health, mock_installer, mock_binary_service, mock_config
     ):
         mock_health.return_value = {"status": "inactive"}
-        await start_qdrant(
-            health_check=mock_health,
-            installer_service=mock_installer,
-            binary_service=mock_binary_service,
-        )
-        assert _auto_start_mod._qdrant_started_by_us
+        with pytest.raises(ServiceStartError, match="health check timed out"):
+            await start_qdrant(
+                health_check=mock_health,
+                installer_service=mock_installer,
+                binary_service=mock_binary_service,
+            )
         assert _auto_start_mod._started_binary_service is mock_binary_service
 
 

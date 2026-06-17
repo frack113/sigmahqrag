@@ -9,6 +9,8 @@ from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Any
 
+from src.shared.exceptions import ServiceStartError
+
 logger = logging.getLogger(__name__)
 
 _qdrant_started_by_us: bool = False
@@ -71,14 +73,11 @@ async def start_qdrant(
         try:
             result = await asyncio.wait_for(installer_service.download_binary(), timeout=120.0)
             if not result.get("success"):
-                logger.warning(f"Failed to download Qdrant: {result.get('error')}")
-                return
-        except TimeoutError:
-            logger.warning("Qdrant download timed out after 120s")
-            return
+                raise ServiceStartError(f"Failed to download Qdrant: {result.get('error')}")
+        except TimeoutError as e:
+            raise ServiceStartError("Qdrant download timed out after 120s") from e
         except Exception as e:
-            logger.warning(f"Qdrant download failed: {e}")
-            return
+            raise ServiceStartError(f"Qdrant download failed: {e}") from e
 
     if binary_service is None:
         from src.infrastructure.vectorstore.service import QdrantBinaryService
@@ -88,11 +87,11 @@ async def start_qdrant(
     try:
         result = await binary_service.start()
         if not result.get("success"):
-            logger.warning(f"Failed to start Qdrant: {result.get('error')}")
-            return
+            raise ServiceStartError(f"Failed to start Qdrant: {result.get('error')}")
+    except ServiceStartError:
+        raise
     except Exception as e:
-        logger.warning(f"Qdrant start raised an exception: {e}")
-        return
+        raise ServiceStartError(f"Qdrant start raised an exception: {e}") from e
 
     global _qdrant_started_by_us, _started_binary_service
     _started_binary_service = binary_service
@@ -110,7 +109,7 @@ async def start_qdrant(
         await asyncio.sleep(1)
 
     _qdrant_started_by_us = True
-    logger.warning("Qdrant process started but health check timed out after 10s")
+    raise ServiceStartError("Qdrant process started but health check timed out after 10s")
 
 
 async def stop_qdrant() -> None:

@@ -5,7 +5,9 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import platform
 import shutil
+import sys
 import zipfile
 from collections.abc import Callable
 from pathlib import Path
@@ -49,7 +51,8 @@ class QdrantInstallerService:
         return self._client
 
     def get_binary_path(self) -> Path:
-        return self.bin_dir / "qdrant.exe"
+        binary_name = "qdrant.exe" if sys.platform == "win32" else "qdrant"
+        return self.bin_dir / binary_name
 
     def get_ui_dist_path(self) -> Path:
         return self.static_dir / "dist"
@@ -105,11 +108,27 @@ class QdrantInstallerService:
 
         raise last_error  # type: ignore[misc]
 
+    @staticmethod
+    def _platform_asset_name() -> str:
+        system = platform.system().lower()
+        machine = platform.machine().lower()
+
+        if system == "windows":
+            return "x86_64-pc-windows-msvc"
+        if system == "linux":
+            arch = "aarch64" if machine in ("aarch64", "arm64") else "x86_64"
+            return f"{arch}-unknown-linux-musl"
+        if system == "darwin":
+            arch = "aarch64" if machine in ("aarch64", "arm64") else "x86_64"
+            return f"{arch}-apple-darwin"
+        return "x86_64-pc-windows-msvc"
+
     async def download_binary(self, progress_callback: ProgressCallback = None) -> dict[str, Any]:
-        """Download Qdrant binary for Windows x86_64."""
+        """Download Qdrant binary for the current platform."""
         self.bin_dir.mkdir(parents=True, exist_ok=True)
 
-        binary_url = f"{QDRANT_DOWNLOAD_BASE}/qdrant-x86_64-pc-windows-msvc.zip"
+        asset_name = self._platform_asset_name()
+        binary_url = f"{QDRANT_DOWNLOAD_BASE}/qdrant-{asset_name}.zip"
         zip_path = self.bin_dir / "qdrant.zip"
         binary_path = self.get_binary_path()
 
@@ -117,7 +136,7 @@ class QdrantInstallerService:
         for f in list(self.bin_dir.iterdir()):
             if f.name == "qdrant.zip" or f.is_dir():
                 continue
-            if f.suffix == ".exe":
+            if f.suffix == ".exe" or f.name == "qdrant":
                 try:
                     f.unlink()
                 except OSError:
@@ -141,7 +160,8 @@ class QdrantInstallerService:
 
             zip_path.unlink()
 
-            for f in self.bin_dir.glob("qdrant.exe"):
+            qdrant_exe_name = "qdrant.exe" if sys.platform == "win32" else "qdrant"
+            for f in self.bin_dir.glob(qdrant_exe_name):
                 if f != binary_path:
                     shutil.move(str(f), str(binary_path))
 

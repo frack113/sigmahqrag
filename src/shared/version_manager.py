@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import platform
 import re
 from dataclasses import dataclass
@@ -66,10 +67,42 @@ class VersionManager:
     def __init__(self, github_token: str | None = None) -> None:
         """Initialize version manager.
 
+        If no token is provided, automatically discovers one from the
+        ``GITHUB_TOKEN`` environment variable, then from a ``.env`` file
+        in the project root.  If none is found a warning is logged once.
+
         Args:
             github_token: Optional GitHub token for API requests
         """
+        if github_token is None:
+            github_token = self._discover_github_token()
         self.github_token = github_token
+
+    @staticmethod
+    def _discover_github_token() -> str | None:
+        token = os.environ.get("GITHUB_TOKEN")
+        if token:
+            logger.info("GitHub token discovered from GITHUB_TOKEN env var")
+            return token
+        try:
+            dotenv_path = Path(".env")
+            if dotenv_path.is_file():
+                for line in dotenv_path.read_text(encoding="utf-8").splitlines():
+                    stripped = line.strip()
+                    if stripped.startswith("#") or "=" not in stripped:
+                        continue
+                    key, _, value = stripped.partition("=")
+                    if key.strip() == "GITHUB_TOKEN":
+                        token = value.strip().strip("\"'")
+                        if token:
+                            logger.info("GitHub token discovered from .env file")
+                            return token
+        except OSError:
+            pass
+        logger.warning(
+            "No GitHub token found. Set GITHUB_TOKEN env var or create a .env file with GITHUB_TOKEN=your_token to avoid API rate limits (60 req/h without token vs 5000 with token)."
+        )
+        return None
 
     def _get_headers(self) -> dict[str, str]:
         """Get headers for GitHub API requests."""
