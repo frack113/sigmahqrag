@@ -60,8 +60,6 @@ $null
 .dcignore
 # AI agent guidance (local only, not tracked)
 AGENTS.md
-sigmarag.toml
-
 # Internal architecture documentation (local only, not tracked)
 DOCUMENTATION_ARCHITECTURE.md
 refractor.md

@@ -20,7 +20,7 @@ def validate_schema_version() -> None:
         if schema_version is None:
             print(
                 "\u2717 Project not initialized (schema_version not found). "
-                "Run 'uv run python setup.py' first.",
+                "Run the application with `uv run python main.py` to initialize.",
                 file=sys.stderr,
             )
             sys.exit(1)
@@ -28,7 +28,7 @@ def validate_schema_version() -> None:
         if schema_version != SCHEMA_VERSION:
             print(
                 f"\u2717 Schema version mismatch: expected {SCHEMA_VERSION}, got {schema_version}. "
-                "Run 'uv run python setup.py' to reinitialize.",
+                "Run the application to reinitialize.",
                 file=sys.stderr,
             )
             sys.exit(1)
