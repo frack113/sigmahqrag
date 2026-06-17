@@ -9,8 +9,8 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-
-BASE_DIR = Path("data").resolve()
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+BASE_DIR = PROJECT_ROOT / "data"
 BIN_DIR = BASE_DIR / "bin"
 MODELS_DIR = BASE_DIR / "models"
 LLM_DIR = MODELS_DIR / "llm"
@@ -118,7 +118,6 @@ class Config:
     @classmethod
     def init_app(cls) -> Config:
         global _config
-        cls.ensure_qdrant_config()
         cfg = cls()
         try:
             from src.infrastructure.database.service import DatabaseService
@@ -161,9 +160,10 @@ class Config:
             if qdrant_autorun is not None:
                 cfg.qdrant_autorun_at_startup = bool(qdrant_autorun)
         except RuntimeError:
-            pass
+            logger.debug("DatabaseService not ready yet — using default config")
         except Exception as e:
             logger.warning("Failed to load persisted config from database: %s", e)
+        cls.ensure_qdrant_config(config=cfg)
         _config = cfg
         return cfg
 
@@ -229,23 +229,23 @@ class Config:
         return path
 
     @staticmethod
-    def ensure_qdrant_config() -> None:
+    def ensure_qdrant_config(config: Config | None = None) -> None:
         """Generate qdrant config.yaml if not exists."""
-        qdrant_dir = Path(Config().qdrant_binary_path).resolve()
+        cfg = config or Config()
+        qdrant_dir = Path(cfg.qdrant_binary_path).resolve()
         config_file = qdrant_dir / "config" / "config.yaml"
 
         if config_file.exists():
             return
 
         try:
-            template_path = Path("templates/qdrant/config.yaml.j2")
+            template_path = PROJECT_ROOT / "templates" / "qdrant" / "config.yaml.j2"
             if template_path.exists():
                 import jinja2
 
                 template = jinja2.Template(template_path.read_text(), autoescape=True)
-                config = Config()
-                storage_path = Path(config.qdrant_storage_path).resolve().as_posix()
-                snapshots_path = Path(config.qdrant_snapshots_path).resolve().as_posix()
+                storage_path = Path(cfg.qdrant_storage_path).resolve().as_posix()
+                snapshots_path = Path(cfg.qdrant_snapshots_path).resolve().as_posix()
                 rendered = template.render(
                     storage_path=storage_path,
                     snapshots_path=snapshots_path,

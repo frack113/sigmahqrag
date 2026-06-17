@@ -1157,16 +1157,13 @@ class TestSafeQueryNoConn:
 
 
 class TestDefaultDbPathFunction:
-    def test_calls_get_config(self) -> None:
-        from unittest.mock import MagicMock, patch
-
+    def test_returns_default_from_config(self) -> None:
         from src.infrastructure.database.service import _default_db_path
+        from src.config.settings import Config
 
-        mock_cfg = MagicMock()
-        mock_cfg.paths_duckdb_path = "test/path.db"
-        with patch("src.config.settings.get_config", return_value=mock_cfg):
-            result = _default_db_path()
-        assert result == "test/path.db"
+        result = _default_db_path()
+        assert result == Config().paths_duckdb_path
+        assert isinstance(result, str)
 
 
 class TestGetTables:
