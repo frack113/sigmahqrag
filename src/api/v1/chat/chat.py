@@ -15,19 +15,26 @@ from src.api.v1.chat.schemas import ChatMessageRequest, ChatMessageResponse
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/chat", tags=["v1-chat"])
-chat_service = ChatService()
+_chat_service: ChatService | None = None
+
+
+def _get_chat_service() -> ChatService:
+    global _chat_service
+    if _chat_service is None:
+        _chat_service = ChatService()
+    return _chat_service
 
 
 @router.get("/history")
 async def get_chat_history() -> list[dict]:
     """Get chat message history."""
-    return chat_service.get_history()
+    return _get_chat_service().get_history()
 
 
 @router.delete("/history", status_code=status.HTTP_204_NO_CONTENT)
 async def clear_chat_history() -> None:
     """Clear chat history and llama.cpp KV cache."""
-    await chat_service.clear_history()
+    await _get_chat_service().clear_history()
 
 
 @router.post("/message", response_model=ChatMessageResponse)
@@ -40,10 +47,11 @@ async def send_chat_message(req: ChatMessageRequest) -> ChatMessageResponse:
         )
 
     try:
-        response_text = await chat_service.process_message(
+        svc = _get_chat_service()
+        response_text = await svc.process_message(
             req.message, req.mode, req.model, prompt_id=req.prompt_id
         )
-        citations = chat_service.get_last_citations()
+        citations = svc.get_last_citations()
 
         # Format citations as [sigma:rule_id] in response
         if citations and response_text:
@@ -74,6 +82,11 @@ async def upload_sigma_rule(file: UploadFile) -> dict:
         )
 
     valid_extensions = (".yaml", ".yml")
+    if "." not in file.filename:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid file type. Expected {valid_extensions}, got no extension",
+        )
     ext = file.filename[file.filename.rfind(".") :]
     if ext.lower() not in valid_extensions:
         raise HTTPException(
@@ -89,7 +102,7 @@ async def upload_sigma_rule(file: UploadFile) -> dict:
             content.decode("utf-8")
         except UnicodeDecodeError:
             raise HTTPException(status_code=400, detail="File is not valid UTF-8 text")
-        rule_data = await chat_service.validate_and_store_yaml(content)
+        rule_data = await _get_chat_service().validate_and_store_yaml(content)
 
         return {
             "rule_name": rule_data.get("name", "Unknown"),
@@ -98,7 +111,7 @@ async def upload_sigma_rule(file: UploadFile) -> dict:
         }
     except ValidationError as e:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=e.message,
         ) from None
     except Exception as e:
@@ -121,7 +134,7 @@ async def send_chat_message_stream(req: ChatMessageRequest):
     async def generate():
         """Generate SSE events from LLM stream."""
         try:
-            async for token in chat_service.process_message_stream(
+            async for token in _get_chat_service().process_message_stream(
                 req.message, req.mode, req.model, prompt_id=req.prompt_id
             ):
                 yield f"data: {token}\n\n"

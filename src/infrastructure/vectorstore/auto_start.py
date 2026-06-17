@@ -15,6 +15,16 @@ _qdrant_started_by_us: bool = False
 _started_binary_service: Any = None
 
 
+def is_qdrant_running() -> bool:
+    """Return whether Qdrant was started by the app and is still running."""
+    if not _qdrant_started_by_us or _started_binary_service is None:
+        return False
+    process = getattr(_started_binary_service, "process", None)
+    if process is None:
+        return False
+    return process.poll() is None
+
+
 async def start_qdrant(
     installer_service: Any | None = None,
     binary_service: Any | None = None,

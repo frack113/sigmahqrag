@@ -29,7 +29,7 @@ class TestSearchAPI:
         """Test search returns empty data when no results."""
         mock_search.return_value = []
 
-        response = client.post("/api/v1/search?query=test")
+        response = client.post("/api/v1/search", json={"query": "test"})
 
         assert response.status_code == 200
         data = response.json()
@@ -40,7 +40,7 @@ class TestSearchAPI:
         """Test search returns results."""
         mock_search.return_value = [{"id": "rule-001"}, {"id": "rule-002"}]
 
-        response = client.post("/api/v1/search?query=test&limit=10")
+        response = client.post("/api/v1/search", json={"query": "test", "limit": 10})
 
         assert response.status_code == 200
         data = response.json()
@@ -49,7 +49,7 @@ class TestSearchAPI:
 
     def test_search_empty_query(self, client: TestClient) -> None:
         """Test search with empty query returns 400."""
-        response = client.post("/api/v1/search?query=")
+        response = client.post("/api/v1/search", json={"query": ""})
 
         assert response.status_code == 400
 
@@ -58,7 +58,7 @@ class TestSearchAPI:
         """Test search failure returns 500."""
         mock_search.side_effect = Exception("Search failed")
 
-        response = client.post("/api/v1/search?query=test")
+        response = client.post("/api/v1/search", json={"query": "test"})
 
         assert response.status_code == 500
         assert "detail" in response.json()

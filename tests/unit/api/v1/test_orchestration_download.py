@@ -35,8 +35,8 @@ class TestPostOrchestrationDownload:
         self, mock_dm: AsyncMock, client: TestClient
     ) -> None:
         """Given frontend needs to download repos, when POST /api/v1/qdrant called, then returns 200 with job_id (FR16)."""
-        # Mocking the download manager to return a dummy stream
         mock_manager = AsyncMock()
+        mock_manager.start_download.return_value = {"download_id": "job-123", "status": "started"}
         mock_dm.return_value = mock_manager
 
         payload = {

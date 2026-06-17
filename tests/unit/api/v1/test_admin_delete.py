@@ -118,7 +118,7 @@ class TestModelsDelete:
             json={"repo_id": "org/m"},
         )
 
-        assert response.status_code == 400
+        assert response.status_code == 422
 
 
 # ── POST /api/v1/admin/models/delete-embedding ────────────────────────────
@@ -175,4 +175,4 @@ class TestModelsDeleteEmbedding:
             json={},
         )
 
-        assert response.status_code == 400
+        assert response.status_code == 422

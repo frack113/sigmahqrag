@@ -44,7 +44,7 @@ class SearchRequest(BaseModel):
 
     query: str
     limit: int = Field(default=10, ge=1, le=100)
-    mode: str = Field(default="search")
+    use_router: bool = Field(default=False, description="Enable LLM query routing")
 
 
 class SearchResponse(BaseModel):

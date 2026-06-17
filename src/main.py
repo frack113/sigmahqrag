@@ -35,6 +35,7 @@ from src.api.v1.documents.files import router as files_v1_router
 from src.api.v1.infrastructure.github import router as github_v1_router
 from src.api.v1.infrastructure.llamacpp import router as llama_router
 from src.api.v1.system.logs import router as logs_v1_router
+from src.api.v1.system.orchestration import router as orchestration_v1_router
 from src.api.v1.models.models_embedding import router as models_embedding_router
 from src.api.v1.models.models_llm import router as models_llm_router
 from src.api.v1.infrastructure.qdrant import router as qdrant_router
@@ -300,6 +301,7 @@ def create_app() -> FastAPI:
     app.include_router(github_v1_router)
     app.include_router(llama_router)
     app.include_router(logs_v1_router)
+    app.include_router(orchestration_v1_router)
     app.include_router(system_infra_v1_router)
     app.include_router(models_llm_router)
     app.include_router(models_embedding_router)

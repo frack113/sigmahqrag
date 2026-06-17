@@ -182,7 +182,8 @@ async def get_logs(
         all_lines = read_log_file(log_path)
 
         if level:
-            filtered = [line for line in all_lines if f" {level}:" in line]
+            pattern = f" {level.upper()} "
+            filtered = [line for line in all_lines if pattern in line.upper()]
         else:
             filtered = all_lines
 

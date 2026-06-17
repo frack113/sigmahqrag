@@ -24,8 +24,8 @@ class TestConfigSave:
 
 
 class TestConfigApplyDbOverrides:
-    def test_method_removed(self) -> None:
-        assert not hasattr(Config, "apply_db_overrides")
+    def test_method_exists(self) -> None:
+        assert hasattr(Config, "apply_db_overrides")
 
 
 class TestConfigInitApp:

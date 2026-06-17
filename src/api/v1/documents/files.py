@@ -100,11 +100,10 @@ async def add_local_file(
             data={"supported_extensions": list(SUPPORTED_DOC_EXTENSION_MAP.keys())},
         )
 
-    resolved_filename = Path(file.filename).resolve()
     dest_path = (base_path / file.filename).resolve()
     try:
         rel = dest_path.relative_to(base_path.resolve())
-        if ".." in rel.parts or str(dest_path) != str(resolved_filename):
+        if ".." in rel.parts:
             return FileResponse(success=False, error="Path traversal detected")
     except ValueError:
         return FileResponse(success=False, error="Path traversal detected")
@@ -210,8 +209,10 @@ async def list_local_files(
 
 
 @router.post("/local/resync", response_model=FileResponse)
-def resync_local_file_sizes() -> FileResponse:
-    """Synchronous endpoint for resync — runs in FastAPI thread pool to avoid blocking event loop."""
+async def resync_local_file_sizes() -> FileResponse:
+    """Resync local file sizes — runs blocking DB call in executor to avoid blocking event loop."""
+    import asyncio
+
     cfg = get_config()
     base_path = cfg.local_documents_path
 
@@ -222,7 +223,7 @@ def resync_local_file_sizes() -> FileResponse:
         )
 
     db = DatabaseService.get_instance()
-    result = db.resync_local_file_sizes(base_path)
+    result = await asyncio.to_thread(db.resync_local_file_sizes, base_path)
 
     has_errors = result["error"] > 0
     has_incomplete = result.get("incomplete", 0) > 0

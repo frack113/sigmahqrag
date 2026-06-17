@@ -42,6 +42,7 @@ _EXPECTED_TABLES = [
     "doc_error",
     "worker_state",
     "release_cache",
+    "installed_versions",
 ]
 
 

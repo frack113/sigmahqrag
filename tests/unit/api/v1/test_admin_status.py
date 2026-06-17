@@ -6,15 +6,13 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from src.api.v1 import admin
 from src.api.v1.infrastructure import qdrant
 
 
 @pytest.fixture
 def app() -> FastAPI:
-    """Create FastAPI test app with admin and qdrant routers."""
+    """Create FastAPI test app with qdrant router."""
     test_app = FastAPI()
-    test_app.include_router(admin.router)
     test_app.include_router(qdrant.router)
     return test_app
 

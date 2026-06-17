@@ -6,6 +6,7 @@ import logging
 
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
 
 from src.api.dependencies import get_database_service, get_unified_registry
 from src.api.v1.models._models_shared import _delete_embedding_model, _delete_llm_model_file
@@ -16,34 +17,37 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/admin", tags=["admin-models"])
 
 
+class DeleteModelRequest(BaseModel):
+    """Request model for deleting an LLM model."""
+
+    repo_id: str = Field(..., description="Model repository ID")
+    filename: str = Field(..., min_length=1, description="Model filename")
+
+
+class DeleteEmbeddingRequest(BaseModel):
+    """Request model for deleting an embedding model."""
+
+    repo_id: str = Field(..., description="Embedding model repository ID")
+
+
 @router.get("/status")
 async def get_status():
     """GET /api/v1/admin/status - Return combined service status (legacy endpoint)."""
     llama_state = "inactive"
     try:
-        from src.infrastructure.llm.llamacpp.auto_start import (
-            _llamacpp_started_by_us,
-            _started_binary_service,
-        )
+        from src.infrastructure.llm.llamacpp.auto_start import is_llamacpp_running
 
-        if _llamacpp_started_by_us and _started_binary_service is not None:
-            if getattr(_started_binary_service, "process", None):
-                if _started_binary_service.process.poll() is None:
-                    llama_state = "active"
+        if is_llamacpp_running():
+            llama_state = "active"
     except Exception:
         pass
 
     qdrant_state = "inactive"
     try:
-        from src.infrastructure.vectorstore.auto_start import (
-            _qdrant_started_by_us,
-            _started_binary_service as _qdrant_svc,
-        )
+        from src.infrastructure.vectorstore.auto_start import is_qdrant_running
 
-        if _qdrant_started_by_us and _qdrant_svc is not None:
-            if getattr(_qdrant_svc, "process", None):
-                if _qdrant_svc.process.poll() is None:
-                    qdrant_state = "active"
+        if is_qdrant_running():
+            qdrant_state = "active"
     except Exception:
         pass
 
@@ -87,16 +91,10 @@ async def get_models() -> JSONResponse:
 
 
 @router.post("/models/delete")
-async def delete_model(request: dict) -> JSONResponse:
+async def delete_model(request: DeleteModelRequest) -> JSONResponse:
     """POST /api/v1/admin/models/delete - Delete a model."""
-    repo_id = request.get("repo_id")
-    filename = request.get("filename")
-
-    if not repo_id or not filename:
-        return JSONResponse(
-            status_code=400,
-            content={"status": "error", "error": "repo_id and filename required"},
-        )
+    repo_id = request.repo_id
+    filename = request.filename
 
     result = _delete_llm_model_file(repo_id, filename)
     if result.get("success"):
@@ -110,15 +108,9 @@ async def delete_model(request: dict) -> JSONResponse:
 
 
 @router.post("/models/delete-embedding")
-async def delete_embedding_model(request: dict) -> JSONResponse:
+async def delete_embedding_model(request: DeleteEmbeddingRequest) -> JSONResponse:
     """POST /api/v1/admin/models/delete-embedding - Delete an embedding model."""
-    repo_id = request.get("repo_id")
-
-    if not repo_id:
-        return JSONResponse(
-            status_code=400,
-            content={"status": "error", "error": "repo_id required"},
-        )
+    repo_id = request.repo_id
 
     result = _delete_embedding_model(repo_id)
     if result.get("success"):

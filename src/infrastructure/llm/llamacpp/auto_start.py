@@ -13,6 +13,16 @@ _llamacpp_started_by_us: bool = False
 _started_binary_service = None
 
 
+def is_llamacpp_running() -> bool:
+    """Return whether llama.cpp was started by the app and is still running."""
+    if not _llamacpp_started_by_us or _started_binary_service is None:
+        return False
+    process = getattr(_started_binary_service, "process", None)
+    if process is None:
+        return False
+    return process.poll() is None
+
+
 def _find_first_model() -> str | None:
     """Find the first available GGUF model in the LLM directory."""
     from src.config.settings import LLM_DIR

@@ -7,7 +7,7 @@ from pathlib import Path
 from threading import Lock
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel, Field
 
 from src.config.settings import get_config
@@ -143,8 +143,8 @@ async def list_repos_handler() -> list[RepositoryStatus]:
 @router.post("/repos", response_model=RepositoryResponse)
 async def add_repo(
     request: RepositoryAddRequest,
-    background_tasks=None,
-):
+    background_tasks: BackgroundTasks,
+) -> RepositoryResponse:
     """Add a new repository."""
     try:
         org, name = _extract_org_name(request.url)
@@ -188,8 +188,7 @@ async def add_repo(
                     },
                 )
 
-    if background_tasks is not None:
-        background_tasks.add_task(clone_with_status)
+    background_tasks.add_task(clone_with_status)
 
     return RepositoryResponse(
         success=True,
@@ -223,8 +222,8 @@ async def get_repo(org: str, name: str) -> RepositoryStatus:
 async def sync_repo(
     org: str,
     name: str,
+    background_tasks: BackgroundTasks,
     branch: str | None = None,
-    background_tasks=None,
 ):
     """Sync a repository."""
     _validate_org_name(org, name)
@@ -241,16 +240,15 @@ async def sync_repo(
     if not any(r["org"] == org and r["name"] == name for r in repos):
         return RepositoryResponse(success=False, error=f"Repository '{org}/{name}' not found")
 
-    if background_tasks is not None:
-        background_tasks.add_task(_sync_single_repo, org, name, branch)
+    background_tasks.add_task(_sync_single_repo, org, name, branch)
 
     return RepositoryResponse(success=True, message="Sync started in background")
 
 
 @router.post("/repos/sync-all", response_model=RepositoryResponse)
 async def sync_all_repos(
-    background_tasks=None,
-):
+    background_tasks: BackgroundTasks,
+) -> RepositoryResponse:
     """Sync all registered repositories."""
     repos = list_repos()
     if not repos:
@@ -263,8 +261,7 @@ async def sync_all_repos(
             except Exception as e:
                 logger.error(f"Failed to sync {repo_data['org']}/{repo_data['name']}: {e}")
 
-    if background_tasks is not None:
-        background_tasks.add_task(sync_all_task)
+    background_tasks.add_task(sync_all_task)
 
     return RepositoryResponse(success=True, message="Sync started for all repositories")
 
