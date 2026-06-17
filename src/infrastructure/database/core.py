@@ -175,9 +175,12 @@ class DatabaseServiceCore:
         result = self._safe_query("SELECT value FROM config WHERE key = ?", (key,))
         if result:
             try:
-                return json.loads(result[0])
+                value = json.loads(result[0])
             except (json.JSONDecodeError, TypeError):
-                return result[0]
+                value = result[0]
+            if key == "schema_version":
+                return int(value) if value is not None else None
+            return value
         return None
 
     def set_config(
