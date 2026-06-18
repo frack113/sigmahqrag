@@ -7,12 +7,15 @@
 {% block sidebar_title %}Logs{% endblock %}
 {% block sidebar_subtitle %}Viewer{% endblock %}
 
+{% block styles %}
+<link rel="stylesheet" href="{{ url_for('static', path='/css/logs.css') }}">
+{% endblock %}
 {% block sidebar_nav %}
 <div class="sidebar-section">
     <div class="sidebar-section-title">Config</div>
     <div class="sidebar-config">
         <label class="config-toggle">
-            <input type="checkbox" id="tail-mode" checked onchange="toggleTail()">
+            <input type="checkbox" id="tail-mode" checked onchange="_toggleTail()">
             <span>Tail mode</span>
         </label>
         <label class="config-row">

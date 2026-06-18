@@ -4,7 +4,19 @@ let isTailMode = true;
 let scrollLocked = true;
 let allLines = [];
 let allLinesLower = [];
-const MAX_LINES = 10000; // Hard cap on in-memory buffer
+let generation = 1;
+let connecting = false;
+let searchDebounce = null;
+const MAX_LINES = 10000;
+
+const LEVEL_CLASS = {
+	ERROR: "error",
+	CRITICAL: "error",
+	WARNING: "warning",
+	WARN: "warning",
+	INFO: "info",
+	DEBUG: "debug",
+};
 
 document.addEventListener("DOMContentLoaded", () => {
 	const output = document.getElementById("logs-output");
@@ -22,13 +34,12 @@ document.addEventListener("DOMContentLoaded", () => {
 		});
 	});
 
-	// Search input - filter displayed lines
 	const searchInput = document.getElementById("log-search");
 	searchInput.addEventListener("input", () => {
-		renderFilteredLogs();
+		if (searchDebounce) clearTimeout(searchDebounce);
+		searchDebounce = setTimeout(renderFilteredLogs, 200);
 	});
 
-	// Scroll lock - unlock when user scrolls up
 	output.addEventListener("scroll", () => {
 		const atBottom =
 			output.scrollHeight - output.scrollTop - output.clientHeight < 100;
@@ -65,7 +76,8 @@ function selectSource(source) {
 }
 
 function getLines() {
-	return parseInt(document.getElementById("log-lines").value, 10) || 50;
+	const val = parseInt(document.getElementById("log-lines").value, 10);
+	return Number.isFinite(val) && val > 0 ? val : 50;
 }
 
 function _toggleTail() {
@@ -85,22 +97,29 @@ function _toggleTail() {
 
 function stopTail() {
 	if (eventSource) {
-		eventSource.close();
+		const old = eventSource;
 		eventSource = null;
+		old.close();
 	}
 }
 
 function startTail() {
-	if (!isTailMode) return;
+	if (!isTailMode || connecting) return;
+	connecting = true;
 	stopTail();
 	allLines = [];
+	allLinesLower = [];
+	const myGen = ++generation;
 	const lines = getLines();
 	const url = `/api/v1/logs/stream?source=${encodeURIComponent(currentSource)}&lines=${lines}`;
 	eventSource = new EventSource(url);
+	connecting = false;
 
 	eventSource.addEventListener("log", (event) => {
 		try {
+			if (myGen !== generation) return;
 			const data = JSON.parse(event.data);
+
 			if (data.type === "init") {
 				allLines = data.lines || [];
 				allLinesLower = allLines.map((l) => l.toLowerCase());
@@ -122,11 +141,20 @@ function startTail() {
 		}
 	});
 
-	eventSource.onerror = () => {
-		console.error("SSE connection error, retrying in 3s...");
-		eventSource.close();
-		eventSource = null;
+	eventSource.onerror = (errEvent) => {
+		const dead = errEvent.target ? errEvent.target : eventSource;
+		dead.close();
+		if (eventSource === dead) eventSource = null;
+		const output = document.getElementById("logs-output");
+		if (output && output.querySelector(".logs-error") === null) {
+			const el = document.createElement("div");
+			el.className = "logs-error";
+			el.textContent = "Connection lost, retrying in 3s...";
+			output.prepend(el);
+		}
 		setTimeout(() => {
+			const errEl = document.querySelector(".logs-error");
+			if (errEl) errEl.remove();
 			if (isTailMode) startTail();
 		}, 3000);
 	};
@@ -146,59 +174,45 @@ function renderFilteredLogs() {
 	const statsEl = document.getElementById("log-stats");
 	const count = getLines();
 
-	// Get recent lines based on config
 	const startIdx = allLines.length > count ? allLines.length - count : 0;
 	const displayedLines = allLines.slice(startIdx);
 	const displayedLower = allLinesLower.slice(startIdx);
 
-	// Filter by search term — use cached lowercase
 	const searchIdx = displayedLower.findIndex((l) => l.includes(searchTerm));
 	const filtered =
 		searchTerm && searchIdx >= 0
 			? displayedLines.filter((_, i) => displayedLower[i].includes(searchTerm))
 			: displayedLines;
 
-	// Colorize log levels
 	const html = filtered.map((line) => colorizeLine(line)).join("\n");
 
 	output.innerHTML = html || "No logs found";
 
-	// Auto-scroll in tail mode when at bottom
 	if (scrollLocked && isTailMode && !searchTerm) {
 		requestAnimationFrame(() => {
 			output.scrollTop = output.scrollHeight;
 		});
 	}
 
-	// Update stats
 	if (statsEl) {
-		statsEl.textContent =
-			`${filtered.length} lines` +
-			(allLines.length !== displayedLines.length
-				? ` / ${allLines.length} total`
-				: "") +
-			(searchTerm ? ` (filtered)` : "");
+		let text = `${filtered.length} lines`;
+		if (allLines.length !== displayedLines.length)
+			text += ` / ${allLines.length} total`;
+		if (searchTerm) text += " (filtered)";
+		statsEl.textContent = text;
 	}
 }
 
 function colorizeLine(line) {
-	// Escape HTML entities
 	const escaped = line
 		.replace(/&/g, "&amp;")
 		.replace(/</g, "&lt;")
 		.replace(/>/g, "&gt;");
-
-	// Color by log level — single regex pass for both date and level
 	const m = escaped.match(
 		/^\d{4}-\d{2}-\d{2}.*?(ERROR|CRITICAL|WARNING|WARN|DEBUG|INFO)/,
 	);
 	if (m) {
-		const cls =
-			m[1] === "WARN"
-				? "warning"
-				: m[1] === "CRITICAL"
-					? "error"
-					: m[1].toLowerCase();
+		const cls = LEVEL_CLASS[m[1]] || m[1].toLowerCase();
 		return `<span class="log-level-${cls}">${escaped}</span>`;
 	}
 	return `<span class="log-line">${escaped}</span>`;
@@ -211,6 +225,9 @@ async function loadLogs() {
 
 	try {
 		const response = await fetch(`/api/v1/logs?${params}`);
+		if (!response.ok) {
+			throw new Error(`Server returned ${response.status}`);
+		}
 		const data = await response.json();
 		allLines = data.logs.map((l) => l.text);
 		allLinesLower = allLines.map((l) => l.toLowerCase());
@@ -218,6 +235,8 @@ async function loadLogs() {
 		renderFilteredLogs();
 	} catch (error) {
 		console.error("Failed to load logs:", error);
+		const output = document.getElementById("logs-output");
+		output.innerHTML = `<div class="logs-error">Failed to load logs: ${error.message}</div>`;
 	}
 }
 

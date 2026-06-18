@@ -1,0 +1,187 @@
+/* Logs page — header, output, and sidebar controls */
+
+/* Header */
+#logs-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: var(--space-4);
+	gap: var(--space-3);
+	flex-wrap: wrap;
+}
+
+#logs-header h2 {
+	margin: 0;
+	font-size: var(--text-lg);
+	color: var(--text-header);
+}
+
+/* Search input */
+#log-search {
+	padding: var(--space-2) var(--space-3);
+	border: 1px solid var(--border-input);
+	border-radius: 4px;
+	background: var(--bg-input);
+	color: var(--text-input);
+	font-family: "Cascadia Code", "Fira Code", "Consolas", monospace;
+	font-size: var(--text-xs);
+	width: 240px;
+	transition: border-color 0.2s;
+}
+
+#log-search:focus {
+	outline: none;
+	border-color: var(--color-focus);
+}
+
+/* Log output area */
+.logs-output {
+	background: #1e1e1e;
+	color: #d4d4d4;
+	font-family: "Cascadia Code", "Fira Code", "Consolas", monospace;
+	font-size: var(--text-xs);
+	line-height: 1.6;
+	padding: var(--space-4);
+	border-radius: 4px;
+	min-height: 300px;
+	max-height: calc(100vh - 180px);
+	overflow-y: auto;
+	white-space: pre-wrap;
+	word-break: break-all;
+}
+
+.logs-output:empty::before {
+	content: "No logs loaded";
+	color: #666;
+	font-style: italic;
+}
+
+/* Colorized log levels */
+.log-level-error {
+	color: #f87171;
+	font-weight: 600;
+}
+
+.log-level-warning {
+	color: #facc15;
+	font-weight: 500;
+}
+
+.log-level-info {
+	color: #93c5fd;
+}
+
+.log-level-debug {
+	color: #6b7280;
+}
+
+.log-line {
+	color: #d4d4d4;
+}
+
+/* Error banner */
+.logs-error {
+	color: #f87171;
+	background: rgba(248, 113, 113, 0.1);
+	border: 1px solid rgba(248, 113, 113, 0.3);
+	border-radius: 4px;
+	padding: var(--space-2) var(--space-3);
+	margin-bottom: var(--space-2);
+	font-size: var(--text-xs);
+	font-weight: 500;
+}
+
+/* Stats line */
+.log-stats {
+	font-size: var(--text-xs);
+	color: var(--text-muted);
+	margin-top: var(--space-2);
+	text-align: right;
+}
+
+/* Sidebar sections */
+.sidebar-section {
+	border-bottom: 1px solid var(--border-sidebar);
+	padding: var(--space-3) 0;
+}
+
+.sidebar-section-title {
+	font-size: var(--text-xs);
+	text-transform: uppercase;
+	letter-spacing: 1px;
+	color: var(--text-muted);
+	padding: 0 var(--space-5) var(--space-2);
+	font-weight: 600;
+}
+
+/* Config controls in sidebar */
+.sidebar-config {
+	padding: 0 var(--space-5);
+}
+
+.config-toggle {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+	padding: var(--space-2) 0;
+	cursor: pointer;
+	color: var(--text-sidebar);
+	font-size: var(--text-sm);
+}
+
+.config-toggle input[type="checkbox"] {
+	accent-color: var(--color-focus);
+}
+
+.config-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: var(--space-2) 0;
+	color: var(--text-sidebar);
+	font-size: var(--text-sm);
+}
+
+/* Form controls in sidebar */
+.sidebar-config select {
+	padding: var(--space-1) var(--space-2);
+	border: 1px solid var(--border-input);
+	border-radius: 3px;
+	background: var(--bg-input);
+	color: var(--text-input);
+	font-size: var(--text-xs);
+	width: 70px;
+	transition: border-color 0.2s;
+}
+
+.sidebar-config select:focus {
+	outline: none;
+	border-color: var(--color-focus);
+}
+
+.level-value {
+	font-family: "Cascadia Code", "Fira Code", "Consolas", monospace;
+	font-size: var(--text-xs);
+	color: var(--color-focus);
+	font-weight: 600;
+}
+
+/* Source links in sidebar */
+#log-sources a {
+	display: block;
+	padding: var(--space-3) var(--space-5);
+	color: var(--text-sidebar);
+	text-decoration: none;
+	transition: background 0.2s;
+	font-size: var(--text-sm);
+}
+
+#log-sources a:hover {
+	background: var(--bg-sidebar-hover);
+}
+
+#log-sources a.active {
+	background: var(--bg-sidebar-active);
+	color: var(--text-sidebar-active);
+	font-weight: 500;
+}
