@@ -243,6 +243,23 @@ class DatabaseServiceTableOps:
             )
             self._writer_conn.commit()
 
+    def get_all_workers(self) -> list[dict]:
+        with self._lock:
+            results = self._writer_conn.execute(
+                "SELECT worker_type, status, current_task_id, progress_percent, current_file, last_heartbeat FROM worker_state ORDER BY worker_type"
+            ).fetchall()
+        return [
+            {
+                "worker_type": r[0],
+                "status": r[1],
+                "current_task_id": r[2],
+                "progress_percent": r[3],
+                "current_file": r[4],
+                "last_heartbeat": r[5],
+            }
+            for r in results
+        ]
+
     def get_worker_progress(self, worker_type: str) -> dict | None:
         result = self._safe_query(
             "SELECT worker_type, status, current_task_id, progress_percent, current_file, last_heartbeat FROM worker_state WHERE worker_type = ?",

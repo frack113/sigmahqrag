@@ -8,9 +8,9 @@ from src.presentation import TEMPLATES_DIR
 
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
-router = APIRouter(prefix="", tags=["page-duckdb"])
+router = APIRouter(prefix="", tags=["page-dashboard"])
 
 
-@router.get("/duckdb", response_class=HTMLResponse)
-async def duckdb_explorer(request: Request):
-    return templates.TemplateResponse(request=request, name="duckdb/explorer.html")
+@router.get("/dashboard", response_class=HTMLResponse)
+async def dashboard_page(request: Request):
+    return templates.TemplateResponse(request=request, name="dashboard/index.html")

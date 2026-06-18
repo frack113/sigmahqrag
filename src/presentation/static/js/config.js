@@ -21,10 +21,10 @@ var CONFIG = {
 		reset: "/api/v1/system/data-dirs/hard-reset",
 	},
 	duckdb: {
-		status: "/api/v1/system/duckdb",
-		create: "/api/v1/system/duckdb",
-		clean: "/api/v1/system/duckdb/clean",
-		reset: "/api/v1/system/duckdb/hard-reset",
+		status: "/api/v1/system/dashboard",
+		create: "/api/v1/system/dashboard",
+		clean: "/api/v1/system/dashboard/clean",
+		reset: "/api/v1/system/dashboard/hard-reset",
 	},
 	logging: {
 		get: "/api/v1/config/logging",
@@ -113,7 +113,7 @@ function loadSystemStatus() {
 		fetch("/api/v1/qdrant/status")
 			.then((r) => r.json())
 			.catch(() => ({})),
-		fetch("/api/v1/system/duckdb")
+		fetch("/api/v1/system/dashboard")
 			.then((r) =>
 				r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)),
 			)

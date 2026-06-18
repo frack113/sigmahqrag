@@ -1,0 +1,19 @@
+{% extends "shared/layout.html" %}
+
+{% block title %}Dashboard - Sigmahqrag{% endblock %}
+
+{% block sidebar_title %}Dashboard{% endblock %}
+{% block sidebar_subtitle %}Database overview &amp; debug{% endblock %}
+
+{% block sidebar_nav %}
+<a href="#" id="sidebar-home" class="sidebar-link active" onclick="event.preventDefault();Dashboard.showHome()" style="cursor:pointer;user-select:none">🏠 Home</a>
+<div id="table-list">
+    <p class="sidebar-loading">Loading tables...</p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', path='/js/dashboard.js') }}"></script>
+{% endblock %}
+
+{% block content %}{% endblock %}

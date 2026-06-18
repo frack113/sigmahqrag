@@ -16,7 +16,7 @@ from starlette.datastructures import URL
 from src.api.routes.page_admin import router as admin_pages_router
 from src.api.routes.page_chat import router as chat_page_router
 from src.api.routes.page_data import router as data_page_router
-from src.api.routes.page_duckdb import router as duckdb_page_router
+from src.api.routes.page_dashboard import router as dashboard_page_router
 from src.api.routes.page_logs import router as logs_page_router
 from src.api.routes.page_setup import router as setup_page_router
 from src.api.v1.models.admin_models import router as admin_models_router
@@ -27,7 +27,7 @@ from src.api.v1.sigma.coverage import router as coverage_v1_router
 from src.api.v1.system.dispatcher import router as dispatcher_v1_router
 from src.api.v1.system.infrastructure import router as system_infra_v1_router
 from src.api.v1.documents.documents import router as documents_v1_router
-from src.api.v1.system.duckdb import router as duckdb_v1_router
+from src.api.v1.system.dashboard import router as dashboard_v1_router
 from src.api.v1.infrastructure.embeddings import router as embeddings_v1_router
 from src.api.v1.sigma.explain import router as explain_v1_router
 from src.api.v1.infrastructure.feedback import router as feedback_v1_router
@@ -288,9 +288,9 @@ def create_app() -> FastAPI:
     app.include_router(setup_page_router)
     app.include_router(admin_pages_router)
     app.include_router(admin_models_router)
-    app.include_router(duckdb_page_router)
+    app.include_router(dashboard_page_router)
     app.include_router(logs_page_router)
-    app.include_router(duckdb_v1_router)
+    app.include_router(dashboard_v1_router)
     app.include_router(config_v1_router)
     app.include_router(coverage_v1_router)
     app.include_router(dispatcher_v1_router)
