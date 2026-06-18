@@ -18,13 +18,18 @@ _started_binary_service: Any = None
 
 
 def is_qdrant_running() -> bool:
-    """Return whether Qdrant was started by the app and is still running."""
-    if not _qdrant_started_by_us or _started_binary_service is None:
+    """Return whether Qdrant is running (HTTP health check)."""
+    import httpx
+
+    try:
+        from src.config.settings import get_config
+
+        config = get_config()
+        port = config.qdrant_port
+        response = httpx.get(f"http://127.0.0.1:{port}/healthz", timeout=2.0)
+        return response.status_code == 200
+    except Exception:
         return False
-    process = getattr(_started_binary_service, "process", None)
-    if process is None:
-        return False
-    return process.poll() is None
 
 
 async def start_qdrant(

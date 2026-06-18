@@ -112,7 +112,18 @@ class Config:
         }
 
     def save(self) -> bool:
-        """Persist config — no-op since shared must not depend on back."""
+        """Persist version fields to DuckDB (best-effort, in-memory state is already set)."""
+        try:
+            from src.infrastructure.database.service import DatabaseService
+
+            db = DatabaseService.get_instance()
+            db.set_config("services.llama.version", self.llamacpp_version)
+            db.set_config("services.qdrant.version", self.qdrant_version)
+            db.set_config("services.qdrant.webui_version", self.qdrant_webui_version)
+        except RuntimeError:
+            logger.debug("Cannot persist config — DatabaseService not ready")
+        except Exception as e:
+            logger.warning("Failed to persist config: %s", e)
         return True
 
     @classmethod
@@ -159,6 +170,15 @@ class Config:
             qdrant_autorun = db.get_config("services.qdrant.autorun_at_startup")
             if qdrant_autorun is not None:
                 cfg.qdrant_autorun_at_startup = bool(qdrant_autorun)
+            llama_ver = db.get_config("services.llama.version")
+            if llama_ver is not None:
+                cfg.llamacpp_version = str(llama_ver)
+            qdrant_ver = db.get_config("services.qdrant.version")
+            if qdrant_ver is not None:
+                cfg.qdrant_version = str(qdrant_ver)
+            qdrant_webui_ver = db.get_config("services.qdrant.webui_version")
+            if qdrant_webui_ver is not None:
+                cfg.qdrant_webui_version = str(qdrant_webui_ver)
         except RuntimeError:
             logger.debug("DatabaseService not ready yet — using default config")
         except Exception as e:
@@ -210,6 +230,15 @@ class Config:
             qdrant_autorun = db.get_config("services.qdrant.autorun_at_startup")
             if qdrant_autorun is not None:
                 _config.qdrant_autorun_at_startup = bool(qdrant_autorun)
+            llama_ver = db.get_config("services.llama.version")
+            if llama_ver is not None:
+                _config.llamacpp_version = str(llama_ver)
+            qdrant_ver = db.get_config("services.qdrant.version")
+            if qdrant_ver is not None:
+                _config.qdrant_version = str(qdrant_ver)
+            qdrant_webui_ver = db.get_config("services.qdrant.webui_version")
+            if qdrant_webui_ver is not None:
+                _config.qdrant_webui_version = str(qdrant_webui_ver)
         except Exception as e:
             logger.warning("Failed to apply DB config overrides: %s", e)
         return _config

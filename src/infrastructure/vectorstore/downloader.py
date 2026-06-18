@@ -65,13 +65,37 @@ class QdrantInstallerService:
         ``ValueError`` on the first offending entry.
         """
         dest_resolved = dest_dir.resolve()
+        dest_resolved.mkdir(parents=True, exist_ok=True)
         with zipfile.ZipFile(zip_path, "r") as z:
             for name in z.namelist():
                 if os.path.isabs(name) or ".." in name:
                     raise ValueError(
                         f"Zip entry '{name}' would extract outside destination directory"
                     )
-            z.extractall(dest_resolved)
+            # Extract to a temporary directory first, then move contents
+            import tempfile
+
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                z.extractall(tmp_dir)
+                tmp_path = Path(tmp_dir)
+                items = list(tmp_path.iterdir())
+                if len(items) == 1 and items[0].is_dir():
+                    # Single root directory — copy its contents up one level
+                    extracted_dir = items[0]
+                    for f in extracted_dir.iterdir():
+                        dst = dest_resolved / f.name
+                        if f.is_file():
+                            shutil.copy2(f, dst)
+                        elif f.is_dir():
+                            shutil.copytree(f, dst, dirs_exist_ok=True)
+                else:
+                    # Multiple items — copy directly
+                    for f in items:
+                        dst = dest_resolved / f.name
+                        if f.is_file():
+                            shutil.copy2(f, dst)
+                        elif f.is_dir():
+                            shutil.copytree(f, dst, dirs_exist_ok=True)
 
     async def _stream_to_file(
         self,

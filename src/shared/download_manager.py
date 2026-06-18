@@ -315,9 +315,12 @@ class DownloadManager:
             service: Service name (llama.cpp, qdrant)
         """
 
-        service_dir = BIN_DIR / (
-            "llamacpp" if service == "llama.cpp" else service.replace(".", "-")
-        )
+        if service == "qdrant-web-ui":
+            service_dir = BIN_DIR / "qdrant" / "static"
+        else:
+            service_dir = BIN_DIR / (
+                "llamacpp" if service == "llama.cpp" else service.replace(".", "-")
+            )
 
         # Clean up existing service directory
         if service_dir.exists():

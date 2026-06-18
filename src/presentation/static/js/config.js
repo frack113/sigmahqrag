@@ -21,10 +21,10 @@ var CONFIG = {
 		reset: "/api/v1/system/data-dirs/hard-reset",
 	},
 	duckdb: {
-		status: "/api/v1/system/dashboard",
-		create: "/api/v1/system/dashboard",
-		clean: "/api/v1/system/dashboard/clean",
-		reset: "/api/v1/system/dashboard/hard-reset",
+		status: "/api/v1/system/duckdb",
+		create: "/api/v1/system/duckdb",
+		clean: "/api/v1/system/duckdb/clean",
+		reset: "/api/v1/system/duckdb/hard-reset",
 	},
 	logging: {
 		get: "/api/v1/config/logging",
@@ -33,7 +33,6 @@ var CONFIG = {
 	llm: {
 		installed: "/api/v1/models/llm/installed",
 		download: "/api/v1/models/llm/download",
-		search: "/api/v1/models/llm/search",
 		delete: "/api/v1/models/llm",
 		progress: "/api/v1/models/llm/progress",
 	},
@@ -113,7 +112,7 @@ function loadSystemStatus() {
 		fetch("/api/v1/qdrant/status")
 			.then((r) => r.json())
 			.catch(() => ({})),
-		fetch("/api/v1/system/dashboard")
+		fetch("/api/v1/system/duckdb")
 			.then((r) =>
 				r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)),
 			)
@@ -1073,28 +1072,32 @@ function downloadQdrantUI() {
 }
 
 function startService(service) {
-	fetch("/api/v1/admin/backend", {
+	fetch("/api/v1/orchestration/backend", {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
 		body: JSON.stringify({ action: "start", service: service }),
 	})
 		.then((r) => r.json())
 		.then((data) => {
-			alert(data.message || data.error || "Started");
+			var msg =
+				data.data?.message || data.data?.error || data.error || "Started";
+			alert(msg);
 			loadBackendStatus();
 		});
 }
 
 function stopService(service) {
 	if (!confirm(`Stop ${service}?`)) return;
-	fetch("/api/v1/admin/backend", {
+	fetch("/api/v1/orchestration/backend", {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
 		body: JSON.stringify({ action: "stop", service: service }),
 	})
 		.then((r) => r.json())
 		.then((data) => {
-			alert(data.message || data.error || "Stopped");
+			var msg =
+				data.data?.message || data.data?.error || data.error || "Stopped";
+			alert(msg);
 			loadBackendStatus();
 		});
 }
@@ -1386,41 +1389,6 @@ function selectLlmModel(repoId) {
 			}
 		}
 	}
-}
-
-function searchLlmModel() {
-	var query = document.getElementById("llm-search-input").value.trim();
-	if (!query) return;
-
-	fetch(`${CONFIG.llm.search}?q=${encodeURIComponent(query)}&limit=10`)
-		.then((r) =>
-			r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)),
-		)
-		.then((data) => {
-			var resultsEl = document.getElementById("llm-search-results");
-			if (!data.models || data.models.length === 0) {
-				resultsEl.innerHTML = '<p class="info-text">No results found.</p>';
-				return;
-			}
-
-			var html = "";
-			for (var i = 0; i < data.models.length; i++) {
-				var m = data.models[i];
-				html += '<div class="search-item">';
-				html += `<span class="result-name">${escHtml(m.repo_id)}</span>`;
-				html +=
-					'<button class="btn btn-primary btn-sm" onclick="Config.downloadLlmModelDirect(\'' +
-					escHtml(m.repo_id) +
-					"')\">Download</button>";
-				html += "</div>";
-			}
-			resultsEl.innerHTML = html;
-		})
-		.catch((e) => {
-			console.error(e);
-			document.getElementById("llm-search-results").innerHTML =
-				'<p class="error-text">Search error.</p>';
-		});
 }
 
 function downloadLlmModel() {
@@ -1986,7 +1954,6 @@ var _Config = {
 
 	// LLM
 	selectLlmModel: selectLlmModel,
-	searchLlmModel: searchLlmModel,
 	downloadLlmModel: downloadLlmModel,
 	downloadLlmModelDirect: downloadLlmModelDirect,
 	deleteLlmModel: deleteLlmModel,
@@ -2004,6 +1971,7 @@ var _Config = {
 	// Status
 	loadSystemStatus: loadSystemStatus,
 };
+window.Config = _Config;
 
 // Expose for backward compatibility with inline onclick=
 window._cfg = {

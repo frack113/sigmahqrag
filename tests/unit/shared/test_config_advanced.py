@@ -19,7 +19,8 @@ class TestConfigToDict:
 class TestConfigSave:
     def test_save_returns_true(self) -> None:
         cfg = Config()
-        result = cfg.save()
+        with patch("src.infrastructure.database.service.DatabaseService.get_instance"):
+            result = cfg.save()
         assert result is True
 
 

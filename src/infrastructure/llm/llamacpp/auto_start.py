@@ -16,13 +16,20 @@ _started_binary_service = None
 
 
 def is_llamacpp_running() -> bool:
-    """Return whether llama.cpp was started by the app and is still running."""
-    if not _llamacpp_started_by_us or _started_binary_service is None:
+    """Return whether llama.cpp is running (HTTP health check)."""
+    import httpx
+    from urllib.parse import urlparse
+
+    try:
+        from src.config.settings import get_config
+
+        config = get_config()
+        base_url = config.llama_base_url or "http://127.0.0.1:8080"
+        port = urlparse(base_url).port or 8080
+        response = httpx.get(f"http://127.0.0.1:{port}/health", timeout=2.0)
+        return response.status_code == 200
+    except Exception:
         return False
-    process = getattr(_started_binary_service, "process", None)
-    if process is None:
-        return False
-    return process.poll() is None
 
 
 def _find_first_model() -> str | None:
