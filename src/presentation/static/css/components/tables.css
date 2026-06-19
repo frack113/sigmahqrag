@@ -1,52 +1,119 @@
 /* Tables */
 
 table {
-    border-collapse: collapse;
-    width: 100%;
+	border-collapse: collapse;
+	width: 100%;
 }
 
-table, th, td {
-    border: 1px solid var(--border-table);
+table,
+th,
+td {
+	border: 1px solid var(--border-table);
 }
 
 th {
-    text-align: center;
-    font-weight: 600;
-    background: var(--bg-table-th);
-    color: var(--text-table-th);
-    padding: 10px 12px;
-    font-size: 13px;
-    white-space: nowrap;
+	text-align: center;
+	font-weight: 600;
+	background: var(--bg-table-th);
+	color: var(--text-table-th);
+	padding: 10px 12px;
+	font-size: 13px;
+	white-space: nowrap;
 }
 
 td {
-    text-align: left;
-    padding: 8px 12px;
-    border-bottom: 1px solid var(--border-table-inner);
-    font-size: 13px;
+	text-align: left;
+	padding: 8px 12px;
+	border-bottom: 1px solid var(--border-table-inner);
+	font-size: 13px;
 }
 
 tr:hover td {
-    background: var(--bg-status-row);
+	background: var(--bg-status-row);
 }
 
 /* Scrollable table wrapper */
 .table-container {
-    overflow-x: auto;
+	overflow-x: auto;
 }
 
 /* Alignment utilities for table cells */
 .text-center {
-    text-align: center;
+	text-align: center;
 }
 
 /* Automatically center buttons in cells if possible */
 td:has(button),
 td:has(.btn) {
-    text-align: center;
+	text-align: center;
 }
 
 /* For numbers, use .num or .text-center class */
 .num {
-    text-align: center;
+	text-align: center;
+}
+
+/* Responsive table wrapper */
+.table-responsive {
+	overflow-x: auto;
+	-webkit-overflow-scrolling: touch;
+}
+@media (min-width: 600px) {
+	.table-responsive table {
+		min-width: 600px;
+	}
+}
+
+/* Model table specific styles */
+.model-table {
+	width: 100%;
+	border-collapse: collapse;
+}
+.model-table th,
+.model-table td {
+	padding: var(--space-2) var(--space-3);
+	text-align: left;
+	border-bottom: 1px solid var(--border-table-inner);
+}
+.model-table th {
+	font-weight: 600;
+	background: var(--bg-table-th);
+	color: var(--text-table-th);
+}
+.model-table tr:hover td {
+	background: var(--bg-status-row);
+}
+
+/* Search item styles (for model search results) */
+.search-item {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: var(--space-3);
+	background: var(--bg-card);
+	border: 1px solid var(--border-card);
+	border-radius: 4px;
+	margin-bottom: var(--space-2);
+	transition: box-shadow 0.2s;
+}
+.search-item:hover {
+	box-shadow: 0 2px 8px var(--shadow-card);
+}
+.search-item-info {
+	flex: 1;
+	min-width: 0;
+}
+.search-item-name {
+	font-weight: 600;
+	font-size: var(--text-base);
+	margin-bottom: var(--space-1);
+}
+.search-item-meta {
+	font-size: var(--text-sm);
+	color: var(--text-muted);
+}
+.search-item-actions {
+	display: flex;
+	gap: var(--space-2);
+	flex-shrink: 0;
 }

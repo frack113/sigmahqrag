@@ -54,6 +54,7 @@
 {% endblock %}
 
 {% block scripts %}
+{{ super() }}
 <script>
 (function () {
     const API_BASE = '/api/v1/github';
@@ -82,11 +83,11 @@
 
             if (repos.length === 0) {
                 container.innerHTML = '<p>No repositories managed</p>';
-                prompt.style.display = 'none';
+                if (prompt) prompt.style.display = 'none';
                 return;
             }
 
-            prompt.style.display = 'block';
+            if (prompt) prompt.style.display = 'block';
 
             container.innerHTML = repos.map(function (repo) { return [
                 '<div class="card repo-card">',

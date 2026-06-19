@@ -3,50 +3,79 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 import httpx
-from fastapi import APIRouter, Query
+from fastapi import APIRouter
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
+
+from src.config.settings import get_config
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/explain", tags=["v1-explain"])
 
 
+class ExplainRequest(BaseModel):
+    """Request model for rule explanation."""
+
+    rule_id: str = Field(..., description="Rule ID")
+    text: str = Field(..., description="Rule content")
+
+
 @router.post("/rule")
 async def explain_rule(
-    rule_id: str = Query(..., description="Rule ID"),
-    text: str = Query(..., description="Rule text"),
+    request: ExplainRequest,
 ) -> JSONResponse:
-    """Explain a Sigma rule using the backend service.
+    """Explain a Sigma rule using the backend LLM service.
 
     Args:
-        rule_id: Rule identifier
-        text: Sigma rule content
+        request: Rule ID and content
 
     Returns:
         JSON with rule explanation
     """
-    if not rule_id or not text:
+    if not request.rule_id or not request.text:
         return JSONResponse(
             status_code=400,
             content={"error": "Rule ID and text are required"},
         )
 
-    url = "http://localhost:8080/v1/rule-explain"
+    config = get_config()
+    base_url = config.llama_base_url or "http://127.0.0.1:8080"
+    url = f"{base_url.rstrip('/')}/v1/chat/completions"
+    system_prompt = (
+        "You are a Sigma rule expert. Explain the given Sigma rule "
+        "in plain language: what it detects, the log source, the selection "
+        "logic, and any false positive considerations."
+    )
 
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(url, json={"rule_id": rule_id, "text": text})
+            response = await client.post(
+                url,
+                json={
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": request.text},
+                    ],
+                    "temperature": 0.3,
+                    "max_tokens": 1024,
+                },
+            )
 
             if response.status_code == 200:
-                result = response.json()
-                title = result.get("metadata", {}).get("title", "Unknown")
+                result: dict[str, Any] = response.json()
+                choices = result.get("choices", [])
+                explanation = ""
+                if choices:
+                    explanation = choices[0].get("message", {}).get("content", "")
                 return JSONResponse(
                     content={
-                        "rule_id": rule_id,
-                        "title": title,
-                        "text": text,
+                        "rule_id": request.rule_id,
+                        "explanation": explanation,
+                        "text": request.text,
                     }
                 )
             else:

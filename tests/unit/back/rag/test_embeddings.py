@@ -21,7 +21,7 @@ class TestGetEmbeddingModel:
 
     def test_uses_config_from_db(self) -> None:
         mock_db = MagicMock()
-        mock_db.get_embedding_config.return_value = {"model": "custom/model"}
+        mock_db.get_active_embedding_model_name.return_value = "custom/model"
         with (
             patch("src.core.embedding.factory._embed_model", None),
             patch("src.core.embedding.factory.DatabaseService.get_instance", return_value=mock_db),
@@ -34,7 +34,7 @@ class TestGetEmbeddingModel:
 
     def test_falls_back_to_default(self) -> None:
         mock_db = MagicMock()
-        mock_db.get_embedding_config.return_value = {}
+        mock_db.get_active_embedding_model_name.return_value = None
         with (
             patch("src.core.embedding.factory._embed_model", None),
             patch("src.core.embedding.factory.DatabaseService.get_instance", return_value=mock_db),

@@ -1,4 +1,4 @@
-"""Tests for POST /api/v1/admin/download endpoint (Story 3.1 - RED phase)."""
+"""Tests for POST /api/v1/orchestration/download endpoint."""
 
 from __future__ import annotations
 
@@ -8,15 +8,15 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from src.api.v1 import admin
 from src.api.v1.infrastructure import qdrant
+from src.api.v1.system import orchestration
 
 
 @pytest.fixture
 def app() -> FastAPI:
-    """Create FastAPI test app with admin and qdrant routers."""
+    """Create FastAPI test app with orchestration and qdrant routers."""
     test_app = FastAPI()
-    test_app.include_router(admin.router)
+    test_app.include_router(orchestration.router)
     test_app.include_router(qdrant.router)
     return test_app
 
@@ -27,36 +27,11 @@ def client(app: FastAPI) -> TestClient:
     return TestClient(app)
 
 
-class TestPostAdminDownload:
-    """Test POST /api/v1/admin/download endpoint."""
+class TestPostDownload:
+    """Test POST /api/v1/orchestration/download endpoint."""
 
-    @patch("src.api.v1.infrastructure.qdrant.create_download_manager")
-    def test_qdrant_download_returns_200_with_job_id(
-        self, mock_dm: AsyncMock, client: TestClient
-    ) -> None:
-        """Given frontend needs to download repos, when POST /api/v1/qdrant called, then returns 200 with job_id (FR16)."""
-        # Mocking the download manager to return a dummy stream
-        mock_manager = AsyncMock()
-        mock_dm.return_value = mock_manager
-
-        payload = {
-            "action": "download_update",
-            "payload": {"action": "download_update", "version": "latest"},
-        }
-
-        response = client.post(
-            "/api/v1/qdrant",
-            json=payload,
-            headers={"X-Idempotency-Key": "key-1"},
-        )
-
-        assert response.status_code == 200
-        data = response.json()
-        assert "success" in data["status"]
-        assert "Download initiated" in data["message"]
-
-    @patch("src.api.v1.admin.check_service_health", new_callable=AsyncMock)
-    @patch("src.api.v1.admin.start_download", new_callable=AsyncMock)
+    @patch("src.api.v1.system.orchestration.check_service_health", new_callable=AsyncMock)
+    @patch("src.api.v1.system.orchestration.start_download", new_callable=AsyncMock)
     def test_download_with_idempotency_key_returns_same_result(
         self, mock_start: AsyncMock, mock_health: AsyncMock, client: TestClient
     ) -> None:
@@ -68,13 +43,13 @@ class TestPostAdminDownload:
         }
 
         response1 = client.post(
-            "/api/v1/admin/download",
-            json={},
+            "/api/v1/orchestration/download",
+            json={"service": "qdrant"},
             headers={"X-Idempotency-Key": "same-key"},
         )
         response2 = client.post(
-            "/api/v1/admin/download",
-            json={},
+            "/api/v1/orchestration/download",
+            json={"service": "qdrant"},
             headers={"X-Idempotency-Key": "same-key"},
         )
 
@@ -84,7 +59,7 @@ class TestPostAdminDownload:
     def test_download_returns_202_with_service_info(self, client: TestClient) -> None:
         """Given download endpoint called, when service name provided, then returns 202 with job info."""
         response = client.post(
-            "/api/v1/admin/download",
+            "/api/v1/orchestration/download",
             json={"service": "qdrant"},
         )
 
@@ -93,12 +68,12 @@ class TestPostAdminDownload:
         assert "job_id" in data
         assert data["status"] == "started"
 
-    @patch("src.api.v1.admin.check_service_health", new_callable=AsyncMock)
-    @patch("src.api.v1.admin.start_download", new_callable=AsyncMock)
+    @patch("src.api.v1.system.orchestration.check_service_health", new_callable=AsyncMock)
+    @patch("src.api.v1.system.orchestration.start_download", new_callable=AsyncMock)
     def test_download_without_idempotency_key_processes_normally(
         self, mock_start: AsyncMock, mock_health: AsyncMock, client: TestClient
     ) -> None:
-        """Given request has no idempotency key, when API receives it, then processes normally (backward compatible, NFR20)."""
+        """Given request has no idempotency key, when API receives it, then processes normally."""
         mock_start.return_value = {"job_id": "job-789", "status": "started"}
         mock_health.return_value = {
             "llama_cpp": {"status": "active", "component": "llama.cpp"},
@@ -106,8 +81,8 @@ class TestPostAdminDownload:
         }
 
         response = client.post(
-            "/api/v1/admin/download",
-            json={},
+            "/api/v1/orchestration/download",
+            json={"service": "qdrant"},
         )
 
         assert response.status_code == 202
@@ -117,16 +92,16 @@ class TestPostAdminDownload:
 
 
 class TestDownloadProgress:
-    """Test GET /api/v1/admin/download/{job_id}/progress endpoint."""
+    """Test GET /api/v1/orchestration/download/{job_id}/progress endpoint."""
 
     def test_progress_returns_404_for_unknown_job(self, client: TestClient) -> None:
         """Given a non-existent job_id, when progress is queried, then returns 404."""
-        response = client.get("/api/v1/admin/download/unknown-job/progress")
+        response = client.get("/api/v1/orchestration/download/unknown-job/progress")
         assert response.status_code == 404
 
     def test_progress_returns_entry_for_stored_job(self, client: TestClient) -> None:
         """Given a job_id with stored progress, when queried, then returns progress data."""
-        from src.api.v1.admin import _download_progress
+        from src.api.v1.system.orchestration import _download_progress
 
         _download_progress["test-progress-job"] = {
             "progress": 42,
@@ -134,7 +109,7 @@ class TestDownloadProgress:
             "component": "binary",
         }
         try:
-            resp = client.get("/api/v1/admin/download/test-progress-job/progress")
+            resp = client.get("/api/v1/orchestration/download/test-progress-job/progress")
             assert resp.status_code == 200
             data = resp.json()["data"]
             assert data["progress"] == 42
@@ -144,7 +119,7 @@ class TestDownloadProgress:
 
     def test_progress_callback_updates_store(self) -> None:
         """Given a progress callback is created, when called with progress values, then in-memory store is updated."""
-        from src.api.v1.admin import _download_progress, _make_progress_callback
+        from src.api.v1.system.orchestration import _download_progress, _make_progress_callback
 
         cb = _make_progress_callback("test-job-1", "binary")
         cb(50, "Downloading... 256 KB")
@@ -158,8 +133,8 @@ class TestDownloadProgress:
 class TestResponseTime:
     """Test response time requirements (NFR5)."""
 
-    @patch("src.api.v1.admin.check_service_health", new_callable=AsyncMock)
-    @patch("src.api.v1.admin.start_download", new_callable=AsyncMock)
+    @patch("src.api.v1.system.orchestration.check_service_health", new_callable=AsyncMock)
+    @patch("src.api.v1.system.orchestration.start_download", new_callable=AsyncMock)
     def test_download_responds_under_500ms(
         self, mock_start: AsyncMock, mock_health: AsyncMock, client: TestClient
     ) -> None:
@@ -173,8 +148,8 @@ class TestResponseTime:
         }
 
         start = time.time()
-        response = client.post("/api/v1/admin/download", json={})
+        response = client.post("/api/v1/orchestration/download", json={"service": "qdrant"})
         elapsed = time.time() - start
 
         assert response.status_code == 202
-        assert elapsed < 0.5  # 500ms
+        assert elapsed < 0.5

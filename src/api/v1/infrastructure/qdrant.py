@@ -18,6 +18,7 @@ from src.infrastructure.vectorstore.collections import (
     list_collections,
 )
 from src.infrastructure.vectorstore.health import check_health
+from src.infrastructure.vectorstore import get_version as get_qdrant_version
 from src.infrastructure.vectorstore.service import get_qdrant_service
 from src.infrastructure.vectorstore.storage import delete_point, store_embeddings
 from src.infrastructure.vectorstore.storage import search as qdrant_search
@@ -74,7 +75,7 @@ async def qdrant_status():
 
         config = get_config()
         qdrant_base_url = config.qdrant_base_url
-        version = config.qdrant_version
+        version = get_qdrant_version()
         is_healthy = health_result.get("status") == "active"
 
         manager = create_download_manager()
@@ -87,7 +88,7 @@ async def qdrant_status():
                 "total_bytes": v.total_bytes,
             }
             for k, v in manager.active_downloads.items()
-            if v.service == SERVICE_NAME
+            if v.service in (SERVICE_NAME, "qdrant-web-ui")
         }
 
         return JSONResponse(
@@ -95,6 +96,7 @@ async def qdrant_status():
                 "service": SERVICE_NAME,
                 "healthy": is_healthy,
                 "current_version": version or "unknown",
+                "webui_version": config.qdrant_webui_version or "unknown",
                 "downloads": downloads,
                 "mode": "managed" if config.qdrant_manage_internally else "external",
                 "base_url": qdrant_base_url,
@@ -146,17 +148,26 @@ async def qdrant_action(
                 except Exception as e:
                     logger.error(f"Failed to generate Qdrant config: {e}")
 
-            download_id = await manager.start_download(
-                service="qdrant",
+            result = await manager.start_download(
+                service=payload.service,
                 version=payload.version,
                 post_install_callback=post_install_call,
             )
 
+            if result.get("status") == "skipped":
+                return QdrantActionResponse(
+                    status="success",
+                    action=action,
+                    data={"download_id": None},
+                    message=result.get("message", "Version already up to date"),
+                )
+
             return QdrantActionResponse(
-                status="success",
+                status="success" if result.get("download_id") else "error",
                 action=action,
-                data={"download_id": download_id},
-                message=f"Download initiated for version {payload.version}",
+                data={"download_id": result.get("download_id")},
+                message=result.get("message")
+                or f"Download initiated for version {payload.version}",
             )
 
         elif isinstance(payload, ServiceControlPayload):

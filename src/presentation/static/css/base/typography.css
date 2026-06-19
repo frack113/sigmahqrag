@@ -1,11 +1,22 @@
 /* Typography — headings, pre */
 
-h1, h2, h3 {
-    margin-bottom: 16px;
+h1 {
+	font-size: var(--text-2xl);
+	margin-bottom: var(--space-4);
+}
+
+h2 {
+	font-size: var(--text-xl);
+	margin-bottom: var(--space-4);
+}
+
+h3 {
+	font-size: var(--text-lg);
+	margin-bottom: var(--space-4);
 }
 
 pre {
-    background: var(--bg-code);
-    padding: 16px;
-    overflow-x: auto;
+	background: var(--bg-code);
+	padding: var(--space-4);
+	overflow-x: auto;
 }

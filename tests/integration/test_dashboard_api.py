@@ -33,14 +33,14 @@ def client(db: DatabaseService) -> TestClient:
 
 class TestDuckdbAPI:
     def test_list_tables(self, client: TestClient):
-        resp = client.get("/api/v1/duckdb/tables")
+        resp = client.get("/api/v1/dashboard/tables")
         assert resp.status_code == 200
         data = resp.json()
         assert "tables" in data
         assert "config" in data["tables"]
 
     def test_get_table_data(self, client: TestClient):
-        resp = client.get("/api/v1/duckdb/tables/config")
+        resp = client.get("/api/v1/dashboard/tables/config")
         assert resp.status_code == 200
         data = resp.json()
         assert data["table"] == "config"
@@ -48,11 +48,11 @@ class TestDuckdbAPI:
         assert "total" in data
 
     def test_invalid_table_returns_400(self, client: TestClient):
-        resp = client.get("/api/v1/duckdb/tables/nonexistent")
+        resp = client.get("/api/v1/dashboard/tables/nonexistent")
         assert resp.status_code == 400
 
     def test_pagination(self, client: TestClient):
-        resp = client.get("/api/v1/duckdb/tables/config?limit=5&offset=0")
+        resp = client.get("/api/v1/dashboard/tables/config?limit=5&offset=0")
         assert resp.status_code == 200
         data = resp.json()
         assert data["limit"] == 5
@@ -60,12 +60,12 @@ class TestDuckdbAPI:
         assert len(data["rows"]) <= 5
 
     def test_total_in_response(self, client: TestClient):
-        resp = client.get("/api/v1/duckdb/tables/git_selected_dirs")
+        resp = client.get("/api/v1/dashboard/tables/git_selected_dirs")
         assert resp.status_code == 200
         data = resp.json()
         assert data["total"] == 0
 
     def test_get_table_data_response_model(self, client: TestClient):
-        resp = client.get("/api/v1/duckdb/tables/config")
+        resp = client.get("/api/v1/dashboard/tables/config")
         data = resp.json()
         assert set(data.keys()) == {"table", "rows", "total", "limit", "offset"}

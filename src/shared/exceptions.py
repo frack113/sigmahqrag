@@ -106,3 +106,7 @@ class BackupError(SigmaError):
             message=message,
             details={},
         )
+
+
+class ServiceStartError(Exception):
+    """Raised when an auto-start service fails to start."""

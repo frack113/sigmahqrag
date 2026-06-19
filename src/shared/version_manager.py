@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import platform
 import re
 from dataclasses import dataclass
@@ -40,6 +41,7 @@ class VersionManager:
     SERVICE_REPOS = {
         "llama.cpp": ("ggml-org", "llama.cpp"),
         "qdrant": ("qdrant", "qdrant"),
+        "qdrant-web-ui": ("qdrant", "qdrant-web-ui"),
     }
 
     BINARY_PATTERNS = {
@@ -59,15 +61,48 @@ class VersionManager:
             r"aarch64-unknown-linux-musl",
             r"x86_64-pc-windows-msvc",
         ],
+        "qdrant-web-ui": [],
     }
 
     def __init__(self, github_token: str | None = None) -> None:
         """Initialize version manager.
 
+        If no token is provided, automatically discovers one from the
+        ``GITHUB_TOKEN`` environment variable, then from a ``.env`` file
+        in the project root.  If none is found a warning is logged once.
+
         Args:
             github_token: Optional GitHub token for API requests
         """
+        if github_token is None:
+            github_token = self._discover_github_token()
         self.github_token = github_token
+
+    @staticmethod
+    def _discover_github_token() -> str | None:
+        token = os.environ.get("GITHUB_TOKEN")
+        if token:
+            logger.info("GitHub token discovered from GITHUB_TOKEN env var")
+            return token
+        try:
+            dotenv_path = Path(".env")
+            if dotenv_path.is_file():
+                for line in dotenv_path.read_text(encoding="utf-8").splitlines():
+                    stripped = line.strip()
+                    if stripped.startswith("#") or "=" not in stripped:
+                        continue
+                    key, _, value = stripped.partition("=")
+                    if key.strip() == "GITHUB_TOKEN":
+                        token = value.strip().strip("\"'")
+                        if token:
+                            logger.info("GitHub token discovered from .env file")
+                            return token
+        except OSError:
+            pass
+        logger.warning(
+            "No GitHub token found. Set GITHUB_TOKEN env var or create a .env file with GITHUB_TOKEN=your_token to avoid API rate limits (60 req/h without token vs 5000 with token)."
+        )
+        return None
 
     def _get_headers(self) -> dict[str, str]:
         """Get headers for GitHub API requests."""
@@ -186,6 +221,10 @@ class VersionManager:
 
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.get(url, headers=self._get_headers())
+            if response.status_code == 404 and version and version != "latest":
+                logger.warning(f"Version {version} not found for {service}, falling back to latest")
+                fallback_url = f"{self.GITHUB_API_URL}/{owner}/{repo}/releases/latest"
+                response = await client.get(fallback_url, headers=self._get_headers())
             response.raise_for_status()
             data = response.json()
 
@@ -272,6 +311,9 @@ class VersionManager:
                     return asset
                 elif os_name == "macos" and "macos" in asset_name and arch in asset_name:
                     return asset
+
+            elif service == "qdrant-web-ui":
+                return release.assets[0] if release.assets else None
 
             elif service == "qdrant":
                 # For Qdrant, prioritize OS-specific match

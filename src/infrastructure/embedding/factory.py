@@ -28,8 +28,10 @@ def create_embedding_provider(model_name: str | None = None) -> Any:
         ValueError: If no model is configured and none provided.
     """
     if model_name is None:
-        config_data = DatabaseService.get_instance().get_embedding_config()
-        model_name = config_data.get("model") or "intfloat/multilingual-e5-small"
+        model_name = (
+            DatabaseService.get_instance().get_active_embedding_model_name()
+            or "intfloat/multilingual-e5-small"
+        )
 
     local_path = Path(get_config().embeddings_dir) / model_name
     resolved_model = str(local_path) if local_path.exists() else model_name

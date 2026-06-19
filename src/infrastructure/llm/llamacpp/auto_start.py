@@ -7,10 +7,29 @@ import logging
 import sys
 from pathlib import Path
 
+from src.shared.exceptions import ServiceStartError
+
 logger = logging.getLogger(__name__)
 
 _llamacpp_started_by_us: bool = False
 _started_binary_service = None
+
+
+def is_llamacpp_running() -> bool:
+    """Return whether llama.cpp is running (HTTP health check)."""
+    import httpx
+    from urllib.parse import urlparse
+
+    try:
+        from src.config.settings import get_config
+
+        config = get_config()
+        base_url = config.llama_base_url or "http://127.0.0.1:8080"
+        port = urlparse(base_url).port or 8080
+        response = httpx.get(f"http://127.0.0.1:{port}/health", timeout=2.0)
+        return response.status_code == 200
+    except Exception:
+        return False
 
 
 def _find_first_model() -> str | None:
@@ -34,10 +53,14 @@ async def start_llamacpp() -> None:
         logger.info("llama.cpp auto-start disabled (not internal or autorun=false) -- skipping")
         return
 
+    from urllib.parse import urlparse
+
+    llama_port = urlparse(config.llama_base_url).port or 8080
+
     from src.infrastructure.llm.llamacpp.health import check_health
 
     try:
-        health = await check_health(timeout=2.0, port=8080)
+        health = await check_health(timeout=2.0, port=llama_port)
         if health.get("status") == "active":
             logger.info("llama.cpp is already running -- skipping auto-start")
             return
@@ -67,19 +90,15 @@ async def start_llamacpp() -> None:
                 timeout=120.0,
             )
             if not result.get("success"):
-                logger.warning("Failed to download llama.cpp: %s", result.get("error"))
-                return
-        except TimeoutError:
-            logger.warning("llama.cpp download timed out after 120s")
-            return
+                raise ServiceStartError(f"Failed to download llama.cpp: {result.get('error')}")
+        except TimeoutError as e:
+            raise ServiceStartError("llama.cpp download timed out after 120s") from e
         except Exception as e:
-            logger.warning("llama.cpp download failed: %s", e)
-            return
+            raise ServiceStartError(f"llama.cpp download failed: {e}") from e
 
     model_path = _find_first_model()
     if not model_path:
-        logger.warning("No LLM model configured or found -- cannot start llama.cpp")
-        return
+        raise ServiceStartError("No LLM model configured or found -- cannot start llama.cpp")
 
     from src.infrastructure.llm.llamacpp.service import LlamaBinaryService
 
@@ -87,19 +106,19 @@ async def start_llamacpp() -> None:
     service = LlamaBinaryService()
 
     try:
-        result = await service.start(model_path=model_path, port=8080)
+        result = await service.start(model_path=model_path, port=llama_port)
         if not result.get("success"):
-            logger.warning("Failed to start llama.cpp: %s", result.get("error"))
-            return
+            raise ServiceStartError(f"Failed to start llama.cpp: {result.get('error')}")
+    except ServiceStartError:
+        raise
     except Exception as e:
-        logger.warning("llama.cpp start raised an exception: %s", e)
-        return
+        raise ServiceStartError(f"llama.cpp start raised an exception: {e}") from e
 
     _started_binary_service = service
 
     for _ in range(10):
         try:
-            health = await check_health(timeout=2.0, port=8080)
+            health = await check_health(timeout=2.0, port=llama_port)
             if health.get("status") == "active":
                 global _llamacpp_started_by_us
                 _llamacpp_started_by_us = True
@@ -110,7 +129,7 @@ async def start_llamacpp() -> None:
         await asyncio.sleep(1)
 
     _llamacpp_started_by_us = True
-    logger.warning("llama.cpp process started but health check timed out after 10s")
+    raise ServiceStartError("llama.cpp process started but health check timed out after 10s")
 
 
 async def stop_llamacpp() -> None:

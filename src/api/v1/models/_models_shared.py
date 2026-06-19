@@ -8,7 +8,12 @@ _download_progress: dict[str, dict] = {}
 
 
 def _delete_all_models_of_type(model_type: str) -> None:
-    """Delete all models of a given type (llm or embeddings) from disk and registry."""
+    """Delete all models of a given type (llm or embeddings) from disk and registry.
+
+    Logic: for each existing model of this type in DuckDB,
+      1. delete its directory/file from disk
+      2. remove it from the registry and delete its row from DuckDB
+    """
     import shutil
     from pathlib import Path
 
@@ -20,35 +25,27 @@ def _delete_all_models_of_type(model_type: str) -> None:
     reg = get_unified_registry()
     models_dir = llm_dir if model_type == "llm" else emb_dir
 
-    if model_type == "llm":
-        reg.sync_llm_folder(models_dir, db)
-        items = dict(reg.list_llms(db))
-    else:
-        reg.sync_embeddings_folder(models_dir, db)
-        items = dict(reg.list_embeddings(db))
+    models = [m for m in db.get_models() if m["model_type"] == model_type]
 
-    for repo_id, data in items.items():
-        if model_type == "llm":
-            for filename, info in data.get("files", {}).items():
-                path = Path(info["local_path"]).resolve()
-                if path.exists():
-                    path.unlink()
-                parent = path.parent
-                while (
-                    parent != Path(models_dir).resolve()
-                    and parent.exists()
-                    and not any(parent.iterdir())
-                ):
-                    parent.rmdir()
-                    parent = parent.parent
-            reg.remove_llm(repo_id, db)
-        else:
-            path = Path(data["local_path"]).resolve()
+    for model in models:
+        repo_id = model["repo_id"]
+        local_path = model.get("local_path", "")
+
+        if local_path:
+            path = Path(local_path).resolve()
+            try:
+                path.relative_to(Path(models_dir).resolve())
+            except ValueError:
+                continue
             if path.exists():
                 if path.is_dir():
                     shutil.rmtree(path)
                 else:
                     path.unlink()
+
+        if model_type == "llm":
+            reg.remove_llm(repo_id, db)
+        else:
             reg.remove_embedding(repo_id, db)
 
 

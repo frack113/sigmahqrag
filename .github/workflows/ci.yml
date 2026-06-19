@@ -28,3 +28,6 @@ jobs:
 
       - name: Ruff format check
         run: uv run ruff format --check main.py src/ tests/
+
+      - name: Biome check
+        run: npx @biomejs/biome check src/presentation/static/

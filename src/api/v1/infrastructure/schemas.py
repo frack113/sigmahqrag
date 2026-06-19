@@ -9,6 +9,7 @@ class DownloadUpdatePayload(BaseModel):
     action: Literal["download_update"] = "download_update"
     version: str = "latest"
     force: bool = False
+    service: str = "qdrant"
 
 
 class ServiceControlPayload(BaseModel):

@@ -9,8 +9,8 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-
-BASE_DIR = Path("data").resolve()
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+BASE_DIR = PROJECT_ROOT / "data"
 BIN_DIR = BASE_DIR / "bin"
 MODELS_DIR = BASE_DIR / "models"
 LLM_DIR = MODELS_DIR / "llm"
@@ -53,7 +53,6 @@ class Config:
     paths_duckdb_path: str = "data/duckdb/sigmahq.duckdb"
     paths_github_dir: str = "data/github"
     paths_rag_cache_dir: str = "data/rag_cache"
-    paths_model_registry: str = "data/models/registry.json"
     paths_sigma_ref_docs_dir: str = "data/documents/sigmaref"
     paths_spec_repos_dir: str = "data/specification"
     paths_sigma_spec_dir: str = "data/specification/sigmahq/sigma-specification"
@@ -112,13 +111,23 @@ class Config:
         }
 
     def save(self) -> bool:
-        """Persist config — no-op since shared must not depend on back."""
+        """Persist version fields to DuckDB (best-effort, in-memory state is already set)."""
+        try:
+            from src.infrastructure.database.service import DatabaseService
+
+            db = DatabaseService.get_instance()
+            db.set_config("services.llama.version", self.llamacpp_version)
+            db.set_config("services.qdrant.version", self.qdrant_version)
+            db.set_config("services.qdrant.webui_version", self.qdrant_webui_version)
+        except RuntimeError:
+            logger.debug("Cannot persist config — DatabaseService not ready")
+        except Exception as e:
+            logger.warning("Failed to persist config: %s", e)
         return True
 
     @classmethod
     def init_app(cls) -> Config:
         global _config
-        cls.ensure_qdrant_config()
         cfg = cls()
         try:
             from src.infrastructure.database.service import DatabaseService
@@ -160,10 +169,20 @@ class Config:
             qdrant_autorun = db.get_config("services.qdrant.autorun_at_startup")
             if qdrant_autorun is not None:
                 cfg.qdrant_autorun_at_startup = bool(qdrant_autorun)
+            llama_ver = db.get_config("services.llama.version")
+            if llama_ver is not None:
+                cfg.llamacpp_version = str(llama_ver)
+            qdrant_ver = db.get_config("services.qdrant.version")
+            if qdrant_ver is not None:
+                cfg.qdrant_version = str(qdrant_ver)
+            qdrant_webui_ver = db.get_config("services.qdrant.webui_version")
+            if qdrant_webui_ver is not None:
+                cfg.qdrant_webui_version = str(qdrant_webui_ver)
         except RuntimeError:
-            pass
+            logger.debug("DatabaseService not ready yet — using default config")
         except Exception as e:
             logger.warning("Failed to load persisted config from database: %s", e)
+        cls.ensure_qdrant_config(config=cfg)
         _config = cfg
         return cfg
 
@@ -210,6 +229,15 @@ class Config:
             qdrant_autorun = db.get_config("services.qdrant.autorun_at_startup")
             if qdrant_autorun is not None:
                 _config.qdrant_autorun_at_startup = bool(qdrant_autorun)
+            llama_ver = db.get_config("services.llama.version")
+            if llama_ver is not None:
+                _config.llamacpp_version = str(llama_ver)
+            qdrant_ver = db.get_config("services.qdrant.version")
+            if qdrant_ver is not None:
+                _config.qdrant_version = str(qdrant_ver)
+            qdrant_webui_ver = db.get_config("services.qdrant.webui_version")
+            if qdrant_webui_ver is not None:
+                _config.qdrant_webui_version = str(qdrant_webui_ver)
         except Exception as e:
             logger.warning("Failed to apply DB config overrides: %s", e)
         return _config
@@ -229,23 +257,23 @@ class Config:
         return path
 
     @staticmethod
-    def ensure_qdrant_config() -> None:
+    def ensure_qdrant_config(config: Config | None = None) -> None:
         """Generate qdrant config.yaml if not exists."""
-        qdrant_dir = Path(Config().qdrant_binary_path).resolve()
+        cfg = config or Config()
+        qdrant_dir = Path(cfg.qdrant_binary_path).resolve()
         config_file = qdrant_dir / "config" / "config.yaml"
 
         if config_file.exists():
             return
 
         try:
-            template_path = Path("templates/qdrant/config.yaml.j2")
+            template_path = PROJECT_ROOT / "templates" / "qdrant" / "config.yaml.j2"
             if template_path.exists():
                 import jinja2
 
                 template = jinja2.Template(template_path.read_text(), autoescape=True)
-                config = Config()
-                storage_path = Path(config.qdrant_storage_path).resolve().as_posix()
-                snapshots_path = Path(config.qdrant_snapshots_path).resolve().as_posix()
+                storage_path = Path(cfg.qdrant_storage_path).resolve().as_posix()
+                snapshots_path = Path(cfg.qdrant_snapshots_path).resolve().as_posix()
                 rendered = template.render(
                     storage_path=storage_path,
                     snapshots_path=snapshots_path,

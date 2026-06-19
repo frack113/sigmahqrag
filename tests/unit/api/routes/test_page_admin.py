@@ -12,33 +12,19 @@ def app() -> Any:
 
 
 @pytest.mark.asyncio
-async def test_admin_dashboard_route(app: Any):
-    """Test that /admin returns the dashboard landing page."""
+async def test_config_page_route(app: Any):
+    """Test that /config returns the config landing page."""
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
-        response = await ac.get("/admin")
-        assert response.status_code == 200
-        # We expect HTML content (not JSON)
-        assert response.headers["content-type"].startswith("text/html")
-        assert "Sigmahqrag" in response.text
+        response = await ac.get("/config")
+        assert response.status_code in (200, 302)  # 302 if redirected to /setup
 
 
 @pytest.mark.asyncio
-async def test_admin_health_route(app: Any):
-    """Test that /admin/health returns the health check page."""
+async def test_config_system_redirect(app: Any):
+    """Test that /config/system redirects to /config."""
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
-        response = await ac.get("/admin/health")
-        assert response.status_code == 200
-        # Returns HTML template (admin/health.html)
-        assert response.headers["content-type"].startswith("text/html")
-
-
-@pytest.mark.asyncio
-async def test_admin_logs_route(app: Any):
-    """Test that /admin/logs redirects to /logs."""
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
-        response = await ac.get("/admin/logs", follow_redirects=False)
+        response = await ac.get("/config/system", follow_redirects=False)
         assert response.status_code in (307, 302)
-        assert response.headers.get("location") == "/logs"
+        assert response.headers.get("location") == "/config"

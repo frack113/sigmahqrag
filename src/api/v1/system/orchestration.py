@@ -129,7 +129,10 @@ async def check_service_health() -> dict[str, Any]:
 
         async def check_qdrant():
             try:
-                response = await client.get(f"http://localhost:{qdrant_port}/readyz", timeout=2.0)
+                host = (
+                    config.qdrant_host.replace("http://", "").replace("https://", "").split("/")[0]
+                )
+                response = await client.get(f"http://{host}:{qdrant_port}/readyz", timeout=2.0)
                 if response.status_code == 200:
                     result["qdrant"]["status"] = "active"
             except Exception:
@@ -277,11 +280,11 @@ async def update_service_config(
                     config.qdrant_host = parsed.hostname
                 if parsed.port:
                     config.qdrant_port = parsed.port
-            db.set_config(f"{service}_base_url", url)
+            db.set_config(f"services.{service}.base_url", url)
 
         if request.manage_internally is not None:
             was_internal = config.service_is_internal(service)
-            db.set_config(f"{service}_manage_internally", request.manage_internally)
+            db.set_config(f"services.{service}.manage_internally", request.manage_internally)
             setattr(config, f"{service}_manage_internally", request.manage_internally)
             if was_internal and not request.manage_internally:
                 try:

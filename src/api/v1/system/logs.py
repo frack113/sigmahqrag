@@ -62,7 +62,6 @@ async def stream_logs(
     if source not in LOG_FILES:
         return JSONResponse(status_code=400, content={"error": f"Invalid log source: {source}"})
 
-    # Resolve lines=0 as "all" for backwards compat
     effective_lines = lines if lines > 0 else 0
 
     logs_dir = get_logs_dir()
@@ -83,7 +82,7 @@ async def stream_logs(
 
                 current_size = log_path.stat().st_size
 
-                if current_size == prev_size:
+                if current_size == prev_size and prev_size > 0:
                     await asyncio.sleep(0.5)
                     continue
 
@@ -173,8 +172,6 @@ async def get_logs(
     log_filename = LOG_FILES[source]
     log_path = logs_dir / log_filename
 
-    logger.info(f"Reading logs from: {log_path}, exists={log_path.exists()}")
-
     if not log_path.exists():
         return JSONResponse(content={"logs": [], "message": "Log file not found"})
 
@@ -182,7 +179,8 @@ async def get_logs(
         all_lines = read_log_file(log_path)
 
         if level:
-            filtered = [line for line in all_lines if f" {level}:" in line]
+            pattern = f" {level.upper()} "
+            filtered = [line for line in all_lines if pattern in line.upper()]
         else:
             filtered = all_lines
 

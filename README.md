@@ -18,11 +18,8 @@ This project is under active development. Some features may be incomplete.
 ## Quick Start
 
 ```bash
-# First-time setup
-uv run python setup.py
-
-# Start server
-uv run main.py
+# Start server (auto-initializes on first run)
+uv run python main.py
 ```
 
 Server starts on `http://localhost:7860` .
@@ -30,8 +27,7 @@ Server starts on `http://localhost:7860` .
 
 ## Configuration
 
-- `sigmarag.toml` — Main config at project root (Qdrant mode, paths, versions)
-- Backend info (OS, GPU, versions) stored in DuckDB, not in TOML
+- Config managed via the web UI Config page (stored in DuckDB)
 
 ## Testing
 

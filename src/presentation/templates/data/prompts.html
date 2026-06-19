@@ -48,7 +48,7 @@
         </div>
         <div class="form-group">
             <label for="prompt-content-input" class="form-label">Content (Markdown):</label>
-            <textarea id="prompt-content-input" class="form-control" rows="10" cols="120" placeholder="Enter prompt content..." disabled></textarea>
+            <textarea id="prompt-content-input" class="form-control" rows="10" placeholder="Enter prompt content..." disabled></textarea>
         </div>
         <div class="card-footer">
             <button class="btn btn-secondary" id="btn-cancel" onclick="resetForm()" disabled>Cancel</button>
@@ -69,7 +69,7 @@ function escapeHtml(str) {
 
 async function loadPrompts() {
     try {
-        const res = await fetch('/api/v1/prompts');
+        const res = await fetch('/api/v1/admin/prompts');
         if (!res.ok) throw new Error('Failed to load prompts');
         const promptsRes = await res.json();
         
@@ -103,7 +103,7 @@ async function loadPrompts() {
 async function syncFromFiles() {
     showStatus('Syncing prompts from files...', 'info');
     try {
-        const res = await fetch('/api/v1/prompts/sync', { method: 'POST' });
+        const res = await fetch('/api/v1/admin/prompts/sync', { method: 'POST' });
         const data = await res.json();
         if (res.ok) {
             showStatus(data.message || 'Sync complete', 'success');
@@ -167,7 +167,7 @@ function EnableEditForm() {
 
 async function editPrompt(id) {
     try {
-        const res = await fetch(`/api/v1/prompts/${encodeURIComponent(id)}`);
+        const res = await fetch(`/api/v1/admin/prompts/${encodeURIComponent(id)}`);
         const data = await res.json();
         
         if (!res.ok || data.error) throw new Error(data.error || 'Failed to load prompt');
@@ -203,7 +203,7 @@ async function savePrompt() {
     }
 
     const isNewPrompt = !currentPrompts.some(p => p.id === id);
-    const url = isNewPrompt ? '/api/v1/prompts' : `/api/v1/prompts/${id}`;
+    const url = isNewPrompt ? '/api/v1/admin/prompts' : `/api/v1/admin/prompts/${id}`;
     const method = isNewPrompt ? 'POST' : 'PUT';
     const body = JSON.stringify({ name: valName, description: valDesc, content: valContent });
 
@@ -236,7 +236,7 @@ async function savePrompt() {
 async function deletePrompt(id, name) {
     if (!confirm(`Delete prompt "${name}"?\n\nThis action cannot be undone.`)) return;
     try {
-        const res = await fetch(`/api/v1/prompts/${encodeURIComponent(id)}`, { method: 'DELETE' });
+        const res = await fetch(`/api/v1/admin/prompts/${encodeURIComponent(id)}`, { method: 'DELETE' });
         const data = await res.json();
         if (res.ok) {
             showStatus('Prompt deleted', 'success');
@@ -253,10 +253,7 @@ async function deletePrompt(id, name) {
 function showStatus(msg, type) {
     const el = document.getElementById('save-status');
     el.textContent = msg;
-    if (type === 'error') el.className = 'status-message';
-    else if (type === 'success') el.className = 'status-message';
-    else if (type === 'info') el.className = 'status-message';
-    else el.className = 'status-message';
+    el.className = 'status-message ' + (type || '');
 }
 
 document.addEventListener('DOMContentLoaded', loadPrompts);

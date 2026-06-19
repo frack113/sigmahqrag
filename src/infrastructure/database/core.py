@@ -14,15 +14,14 @@ logger = logging.getLogger(__name__)
 
 
 def _default_db_path() -> str:
-    from src.config.settings import get_config
+    from src.config.settings import Config
 
-    return get_config().paths_duckdb_path
+    return Config().paths_duckdb_path
 
 
 _VALID_TABLES = frozenset(
     {
         "config",
-        "embedding_config",
         "system_prompts",
         "models",
         "doc_registry",
@@ -32,6 +31,7 @@ _VALID_TABLES = frozenset(
         "git_selected_dirs",
         "worker_state",
         "release_cache",
+        "installed_versions",
     }
 )
 
@@ -174,9 +174,12 @@ class DatabaseServiceCore:
         result = self._safe_query("SELECT value FROM config WHERE key = ?", (key,))
         if result:
             try:
-                return json.loads(result[0])
+                value = json.loads(result[0])
             except (json.JSONDecodeError, TypeError):
-                return result[0]
+                value = result[0]
+            if key == "schema_version":
+                return int(value) if value is not None else None
+            return value
         return None
 
     def set_config(
@@ -206,6 +209,14 @@ class DatabaseServiceCore:
                 return None
         return None
 
+    def get_release_cache_timestamps(self) -> dict[str, str]:
+        with self._lock:
+            conn = self._get_reader_connection()
+            if conn is None:
+                return {}
+            rows = conn.execute("SELECT service, fetched_at FROM release_cache", ()).fetchall()
+        return {row[0]: row[1] for row in rows} if rows else {}
+
     def set_release_cache(self, service: str, releases: list[dict[str, Any]]) -> None:
         from datetime import datetime, timezone
 
@@ -214,5 +225,33 @@ class DatabaseServiceCore:
                 "INSERT INTO release_cache (service, data, fetched_at) VALUES (?, ?, ?) "
                 "ON CONFLICT (service) DO UPDATE SET data = EXCLUDED.data, fetched_at = EXCLUDED.fetched_at",
                 (service, json.dumps(releases), datetime.now(timezone.utc).isoformat()),
+            )
+            self._writer_conn.commit()
+
+    # ------------------------------------------------------------------
+    # Installed versions
+    # ------------------------------------------------------------------
+
+    def get_installed_versions(self) -> dict[str, dict[str, str]]:
+        """Return all installed versions stored in DuckDB."""
+        with self._lock:
+            conn = self._get_reader_connection()
+            if conn is None:
+                return {}
+            rows = conn.execute(
+                "SELECT service, version, scanned_at FROM installed_versions",
+                (),
+            ).fetchall()
+        return {row[0]: {"version": row[1], "scanned_at": row[2]} for row in rows} if rows else {}
+
+    def set_installed_version(self, service: str, version: str) -> None:
+        """Store or update an installed version in DuckDB."""
+        from datetime import datetime, timezone
+
+        with self._lock:
+            self._writer_conn.execute(
+                "INSERT INTO installed_versions (service, version, scanned_at) VALUES (?, ?, ?) "
+                "ON CONFLICT (service) DO UPDATE SET version = EXCLUDED.version, scanned_at = EXCLUDED.scanned_at",
+                (service, version, datetime.now(timezone.utc).isoformat()),
             )
             self._writer_conn.commit()

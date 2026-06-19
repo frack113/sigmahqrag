@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/llamacpp", tags=["v1-llamacpp"])
 
-SERVICE_NAME = "llama"
+SERVICE_NAME = "llama.cpp"
 
 
 _LLAMA_TERMINAL_STATUSES = frozenset({"completed", "updated", "cancelled", "failed"})

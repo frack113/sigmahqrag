@@ -1,237 +1,324 @@
 :root {
-    --bg-body: #f5f5f5;
-    --bg-card: #ffffff;
-    --bg-input: #ffffff;
-    --bg-header: #2c3e50;
-    --bg-sidebar: #2c3e50;
-    --bg-sidebar-hover: #3d566e;
-    --bg-sidebar-active: #3498db;
-    --bg-table-th: #34495e;
-    --bg-modal: #ffffff;
-    --bg-code: #2a2a2a;
-    --bg-progress: #e9ecef;
-    --bg-status-row: #f8f9fa;
-    --bg-nav-active: rgba(255,255,255,0.12);
+	/* Typographic scale (base 16px, ratio 1.25) */
+	--text-xs: 12px;
+	--text-sm: 14px;
+	--text-base: 16px;
+	--text-lg: 20px;
+	--text-xl: 24px;
+	--text-2xl: 32px;
 
-    --text-body: #1a1a1a;
-    --text-header: #ffffff;
-    --text-sidebar: #d5d5d5;
-    --text-sidebar-active: #ffffff;
-    --text-sidebar-hover: #ffffff;
-    --text-card-title: #1a1a1a;
-    --text-card-label: #7f8c8d;
-    --text-card-body: #555;
-    --text-input: #1a1a1a;
-    --text-table-th: #ffffff;
-    --text-muted: #777;
-    --text-progress: #333;
+	/* Spacing scale (base 8px) */
+	--space-1: 4px;
+	--space-2: 8px;
+	--space-3: 12px;
+	--space-4: 16px;
+	--space-5: 20px;
+	--space-6: 24px;
+	--space-8: 32px;
 
-    --border-header: #3498db;
-    --border-card: #e9ecef;
-    --border-input: #ddd;
-    --border-table: #ddd;
-    --border-table-inner: #ecf0f1;
-    --border-sidebar: #4a6280;
+	/* Badge / alert backgrounds (light theme) */
+	--badge-bg-success: #d4edda;
+	--badge-text-success: #155724;
+	--badge-bg-error: #f8d7da;
+	--badge-text-error: #721c24;
+	--badge-bg-warning: #fff3cd;
+	--badge-text-warning: #856404;
+	--badge-bg-info: #d1ecf1;
+	--badge-text-info: #0c5460;
 
-    --shadow-card: rgba(0,0,0,0.1);
-    --shadow-modal: rgba(0,0,0,0.2);
-    --shadow-modal-overlay: rgba(0,0,0,0.7);
+	--bg-body: #f0f4fa;
+	--bg-card: #fafcff;
+	--bg-input: #ffffff;
+	--bg-header: #e8f0fe;
+	--bg-sidebar: #e8f0fe;
+	--bg-sidebar-hover: #d4e4ff;
+	--bg-sidebar-active: #fef3c7;
+	--bg-table-th: #e8f0fe;
+	--bg-modal: #ffffff;
+	--bg-code: #2a2a2a;
+	--bg-progress: #e9ecef;
+	--bg-status-row: #f0f4fa;
+	--bg-nav-active: rgba(59, 130, 246, 0.12);
 
-    --color-primary: #3498db;
-    --color-primary-hover: #2980b9;
-    --color-success: #27ae60;
-    --color-success-hover: #219a52;
-    --color-danger: #e74c3c;
-    --color-danger-hover: #c0392b;
-    --color-warning: #f39c12;
-    --color-warning-hover: #d68910;
-    --color-secondary: #7f8c8d;
-    --color-secondary-hover: #6c7a7d;
-    --color-unknown: #95a5a6;
-    --color-unknown-hover: #7f8c8d;
+	--text-body: #1a1a1a;
+	--text-header: #1e293b;
+	--text-sidebar: #475569;
+	--text-sidebar-active: #92400e;
+	--text-sidebar-hover: #1e293b;
+	--text-card-title: #0f172a;
+	--text-card-label: #64748b;
+	--text-card-body: #334155;
+	--text-input: #1a1a1a;
+	--text-table-th: #1e293b;
+	--text-muted: #94a3b8;
+	--text-progress: #333;
 
-    --color-focus: #3498db;
+	--border-header: #c7d9f0;
+	--border-card: #e2e8f4;
+	--border-input: #cbd5e1;
+	--border-table: #cbd5e1;
+	--border-table-inner: #e2e8f4;
+	--border-sidebar: #c7d9f0;
 
-    --chat-bg: #f0f2f5;
-    --chat-sidebar-bg: #ffffff;
-    --chat-sidebar-hover: #f0f0f0;
-    --chat-sidebar-active: #e8f4fd;
-    --chat-sidebar-select-bg: #f8f8f8;
-    --chat-card-bg: #f8f8f8;
-    --chat-border: #e0e0e0;
-    --chat-border-light: #eee;
-    --chat-text: #1a1a1a;
-    --chat-text-secondary: #555;
-    --chat-text-muted: #888;
-    --chat-text-dim: #999;
-    --chat-text-subtle: #666;
-    --chat-label: #888;
-    --chat-primary: #2b5278;
-    --chat-primary-hover: #3a6a9a;
-    --chat-message-user-bg: #d0e8ff;
-    --chat-message-user-text: #1a1a1a;
-    --chat-message-assistant-bg: #ffffff;
-    --chat-message-assistant-text: #1a1a1a;
-    --chat-message-assistant-border: #e0e0e0;
-    --chat-message-error-bg: #fff0f0;
-    --chat-message-error-border: #ffcccc;
-    --chat-message-error-text: #cc3333;
-    --chat-input-bg: #ffffff;
-    --chat-input-border: #ccc;
-    --chat-input-text: #1a1a1a;
-    --chat-code-bg: #f0f0f0;
-    --chat-code-color: #c07050;
-    --chat-pre-bg: #f5f5f5;
-    --chat-link-color: #2980b9;
-    --chat-thinking-bg: #fafafa;
-    --chat-thinking-border: #e0e0e0;
-    --chat-typing-bg: #f0f0f0;
-    --chat-typing-dot: #ccc;
-    --chat-welcome-text: #888;
-    --chat-btn-bg: #e0e0e0;
-    --chat-btn-text: #333;
-    --chat-btn-border: #ccc;
-    --chat-text-code: #333;
-    --chat-code-inline: #c07050;
-    --chat-code-bg-deep: #e8e8e8;
-    --chat-blockquote-border: #ddd;
-    --chat-header-border: #e0e0e0;
-    --chat-text-bright: #000000;
+	--shadow-card: rgba(0, 0, 0, 0.06);
+	--shadow-modal: rgba(0, 0, 0, 0.2);
+	--shadow-modal-overlay: rgba(0, 0, 0, 0.7);
 
-    --log-level-error: #dc3545;
-    --log-level-warning: #e67e22;
-    --log-level-info: #2980b9;
-    --log-level-debug: #6b7280;
-    --log-text: #1a1a1a;
-    --log-text-muted: #888;
-    --log-output-bg: #ffffff;
-    --log-stat-text: #6b7280;
+	--hero-gradient-start: #e8f0fe;
+	--hero-gradient-end: #1e40af;
+	--hero-text: #ffffff;
+
+	--color-primary: #1e40af;
+	--color-primary-hover: #1e3a8a;
+	--color-accent: #f59e0b;
+	--color-accent-hover: #d97706;
+	--color-success: #0d9488;
+	--color-success-hover: #0f766e;
+	--color-danger: #dc2626;
+	--color-danger-hover: #b91c1c;
+	--color-warning: #f59e0b;
+	--color-warning-hover: #d97706;
+	--color-secondary: #64748b;
+	--color-secondary-hover: #475569;
+	--color-unknown: #94a3b8;
+	--color-unknown-hover: #64748b;
+
+	--color-focus: #1e40af;
+
+	--chat-bg: #ffffff;
+	--chat-sidebar-bg: #f9fafb;
+	--chat-sidebar-hover: #f3f4f6;
+	--chat-sidebar-active: #e0f2fe;
+	--chat-sidebar-select-bg: #f9fafb;
+	--chat-card-bg: #f9fafb;
+	--chat-border: #e5e7eb;
+	--chat-border-light: #f3f4f6;
+	--chat-text: #111827;
+	--chat-text-secondary: #6b7280;
+	--chat-text-muted: #9ca3af;
+	--chat-text-dim: #d1d5db;
+	--chat-text-subtle: #6b7280;
+	--chat-label: #9ca3af;
+	--chat-primary: #2563eb;
+	--chat-primary-hover: #1d4ed8;
+	--chat-message-user-bg: #2563eb;
+	--chat-message-user-text: #ffffff;
+	--chat-message-assistant-bg: #f9fafb;
+	--chat-message-assistant-text: #111827;
+	--chat-message-assistant-border: #e5e7eb;
+	--chat-message-error-bg: #fef2f2;
+	--chat-message-error-border: #fecaca;
+	--chat-message-error-text: #dc2626;
+	--chat-input-bg: #ffffff;
+	--chat-input-border: #e5e7eb;
+	--chat-input-text: #111827;
+	--chat-code-bg: #f3f4f6;
+	--chat-code-color: #dc2626;
+	--chat-pre-bg: #f9fafb;
+	--chat-link-color: #2563eb;
+	--chat-thinking-bg: #f9fafb;
+	--chat-thinking-border: #e5e7eb;
+	--chat-typing-bg: #f9fafb;
+	--chat-typing-dot: #d1d5db;
+	--chat-welcome-text: #9ca3af;
+	--chat-btn-bg: #f3f4f6;
+	--chat-btn-text: #374151;
+	--chat-btn-border: #e5e7eb;
+	--chat-text-code: #111827;
+	--chat-code-inline: #dc2626;
+	--chat-code-bg-deep: #f3f4f6;
+	--chat-blockquote-border: #e5e7eb;
+	--chat-header-border: #e5e7eb;
+	--chat-text-bright: #111827;
+
+	--log-level-error: #dc3545;
+	--log-level-warning: #e67e22;
+	--log-level-info: #2980b9;
+	--log-level-debug: #6b7280;
+	--log-text: #1a1a1a;
+	--log-text-muted: #888;
+	--log-output-bg: #ffffff;
+	--log-stat-text: #6b7280;
+}
+
+.log-level-error {
+	color: var(--log-level-error);
+	font-weight: 600;
+}
+.log-level-warning {
+	color: var(--log-level-warning);
+	font-weight: 600;
+}
+.log-level-info {
+	color: var(--log-level-info);
+}
+.log-level-debug {
+	color: var(--log-level-debug);
 }
 
 [data-theme="dark"] {
-    --bg-body: #121212;
-    --bg-card: #1e1e1e;
-    --bg-input: #2a2a2a;
-    --bg-header: #0d0d0d;
-    --bg-sidebar: #161616;
-    --bg-sidebar-hover: #2a2a2a;
-    --bg-sidebar-active: #3498db;
-    --bg-table-th: #1e1e1e;
-    --bg-modal: #1e1e1e;
-    --bg-code: #1a1a1a;
-    --bg-progress: #333;
-    --bg-status-row: #1a1a1a;
-    --bg-nav-active: rgba(255,255,255,0.12);
+	--bg-body: #121212;
+	--bg-card: #1e1e1e;
+	--bg-input: #2a2a2a;
+	--bg-header: #0d0d0d;
+	--bg-sidebar: #161616;
+	--bg-sidebar-hover: #2a2a2a;
+	--bg-sidebar-active: #f59e0b;
+	--bg-table-th: #1e1e1e;
+	--bg-modal: #1e1e1e;
+	--bg-code: #1a1a1a;
+	--bg-progress: #333;
+	--bg-status-row: #1a1a1a;
+	--bg-nav-active: rgba(255, 255, 255, 0.12);
 
-    --text-body: #e0e0e0;
-    --text-header: #ffffff;
-    --text-sidebar: #b0b0b0;
-    --text-sidebar-active: #ffffff;
-    --text-sidebar-hover: #ffffff;
-    --text-card-title: #e0e0e0;
-    --text-card-label: #888;
-    --text-card-body: #aaa;
-    --text-input: #e0e0e0;
-    --text-table-th: #e0e0e0;
-    --text-muted: #666;
-    --text-progress: #ccc;
+	--text-body: #e0e0e0;
+	--text-header: #ffffff;
+	--text-sidebar: #b0b0b0;
+	--text-sidebar-active: #0f172a;
+	--text-sidebar-hover: #ffffff;
+	--text-card-title: #e0e0e0;
+	--text-card-label: #888;
+	--text-card-body: #aaa;
+	--text-input: #e0e0e0;
+	--text-table-th: #e0e0e0;
+	--text-muted: #666;
+	--text-progress: #ccc;
 
-    --border-header: #3498db;
-    --border-card: #333;
-    --border-input: #444;
-    --border-table: #333;
-    --border-table-inner: #2a2a2a;
-    --border-sidebar: #2a2a2a;
+	--border-header: #3498db;
+	--border-card: #333;
+	--border-input: #444;
+	--border-table: #333;
+	--border-table-inner: #2a2a2a;
+	--border-sidebar: #2a2a2a;
 
-    --shadow-card: rgba(0,0,0,0.3);
-    --shadow-modal: rgba(0,0,0,0.4);
-    --shadow-modal-overlay: rgba(0,0,0,0.8);
+	--shadow-card: rgba(0, 0, 0, 0.3);
+	--shadow-modal: rgba(0, 0, 0, 0.4);
+	--shadow-modal-overlay: rgba(0, 0, 0, 0.8);
 
-    --color-focus: #5dade2;
+	--color-focus: #5dade2;
 
-    --chat-bg: #212121;
-    --chat-sidebar-bg: #1a1a1a;
-    --chat-sidebar-hover: #2a2a2a;
-    --chat-sidebar-active: #2b5278;
-    --chat-sidebar-select-bg: #2a2a2a;
-    --chat-card-bg: #2a2a2a;
-    --chat-border: #333;
-    --chat-border-light: #2a2a2a;
-    --chat-text: #e0e0e0;
-    --chat-text-secondary: #999;
-    --chat-text-muted: #555;
-    --chat-text-dim: #666;
-    --chat-text-subtle: #ccc;
-    --chat-label: #888;
-    --chat-primary: #2b5278;
-    --chat-primary-hover: #3a6a9a;
-    --chat-message-user-bg: #2b5278;
-    --chat-message-user-text: #e0e0e0;
-    --chat-message-assistant-bg: #2a2a2a;
-    --chat-message-assistant-text: #e0e0e0;
-    --chat-message-assistant-border: #333;
-    --chat-message-error-bg: #3a1a1a;
-    --chat-message-error-border: #5a2a2a;
-    --chat-message-error-text: #ff8888;
-    --chat-input-bg: #2a2a2a;
-    --chat-input-border: #444;
-    --chat-input-text: #e0e0e0;
-    --chat-code-bg: #1a1a1a;
-    --chat-code-color: #e07a5f;
-    --chat-pre-bg: #1a1a1a;
-    --chat-link-color: #569cd6;
-    --chat-thinking-bg: #1e1e1e;
-    --chat-thinking-border: #444;
-    --chat-typing-bg: #2a2a2a;
-    --chat-typing-dot: #666;
-    --chat-welcome-text: #555;
-    --chat-btn-bg: #444;
-    --chat-btn-text: #e0e0e0;
-    --chat-btn-border: #555;
-    --chat-text-code: #d4d4d4;
-    --chat-code-inline: #c07a5f;
-    --chat-code-bg-deep: #151515;
-    --chat-blockquote-border: #4a4a4a;
-    --chat-header-border: #333;
-    --chat-text-bright: #ffffff;
+	--hero-gradient-start: #0d0d0d;
+	--hero-gradient-end: #1e40af;
+	--hero-text: #ffffff;
 
-    --log-level-error: #f87171;
-    --log-level-warning: #facc15;
-    --log-level-info: #93c5fd;
-    --log-level-debug: #6b7280;
-    --log-text: #d4d4d4;
-    --log-text-muted: #666;
-    --log-output-bg: #1e1e1e;
-    --log-stat-text: #6b7280;
+	/* Badge / alert backgrounds (dark theme) */
+	--badge-bg-success: #1a3a2a;
+	--badge-text-success: #6fcf97;
+	--badge-bg-error: #3a1a1a;
+	--badge-text-error: #ff8888;
+	--badge-bg-warning: #3a2a1a;
+	--badge-text-warning: #f0b27a;
+	--badge-bg-info: #1a2a3a;
+	--badge-text-info: #85c1e9;
+
+	--chat-bg: #111827;
+	--chat-sidebar-bg: #0f172a;
+	--chat-sidebar-hover: #1e293b;
+	--chat-sidebar-active: #1e3a5f;
+	--chat-sidebar-select-bg: #1e293b;
+	--chat-card-bg: #1e293b;
+	--chat-border: #374151;
+	--chat-border-light: #1f2937;
+	--chat-text: #f3f4f6;
+	--chat-text-secondary: #9ca3af;
+	--chat-text-muted: #6b7280;
+	--chat-text-dim: #4b5563;
+	--chat-text-subtle: #d1d5db;
+	--chat-label: #6b7280;
+	--chat-primary: #3b82f6;
+	--chat-primary-hover: #60a5fa;
+	--chat-message-user-bg: #2563eb;
+	--chat-message-user-text: #ffffff;
+	--chat-message-assistant-bg: #1e293b;
+	--chat-message-assistant-text: #f3f4f6;
+	--chat-message-assistant-border: #374151;
+	--chat-message-error-bg: #451a1a;
+	--chat-message-error-border: #7f1d1d;
+	--chat-message-error-text: #fca5a5;
+	--chat-input-bg: #1e293b;
+	--chat-input-border: #374151;
+	--chat-input-text: #f3f4f6;
+	--chat-code-bg: #0f172a;
+	--chat-code-color: #f87171;
+	--chat-pre-bg: #0f172a;
+	--chat-link-color: #60a5fa;
+	--chat-thinking-bg: #0f172a;
+	--chat-thinking-border: #374151;
+	--chat-typing-bg: #1e293b;
+	--chat-typing-dot: #4b5563;
+	--chat-welcome-text: #6b7280;
+	--chat-btn-bg: #374151;
+	--chat-btn-text: #f3f4f6;
+	--chat-btn-border: #4b5563;
+	--chat-text-code: #f3f4f6;
+	--chat-code-inline: #f87171;
+	--chat-code-bg-deep: #0f172a;
+	--chat-blockquote-border: #4b5563;
+	--chat-header-border: #374151;
+	--chat-text-bright: #ffffff;
+
+	--log-level-error: #f87171;
+	--log-level-warning: #facc15;
+	--log-level-info: #93c5fd;
+	--log-level-debug: #6b7280;
+	--log-text: #d4d4d4;
+	--log-text-muted: #666;
+	--log-output-bg: #1e1e1e;
+	--log-stat-text: #6b7280;
 }
 
 /* Smooth theme transitions */
 body,
-.card, .stat-card,
-.btn, button,
-.app-sidebar, .sidebar-nav a,
+.card,
+.stat-card,
+.btn,
+button,
+.app-sidebar,
+.sidebar-nav a,
 .app-content,
-.form-group input, .form-group select, .form-control-sm,
-input, select, textarea,
-.modal-content, .modal-overlay,
-table, th, td,
-.chat-sidebar, .message,
+input,
+select,
+textarea,
+.form-group input,
+.form-group select,
+.form-control-sm,
+.modal-content,
+.modal-overlay,
+table,
+th,
+td,
+.chat-sidebar,
+.message,
 .logs-output {
-    transition: background 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+	transition:
+		background 0.3s ease,
+		color 0.3s ease,
+		border-color 0.3s ease;
 }
 
 @media (prefers-reduced-motion: reduce) {
-    body,
-    .card, .stat-card,
-    .btn, button,
-    .app-sidebar, .sidebar-nav a,
-    .app-content,
-    .form-group input, .form-group select, .form-control-sm,
-    input, select, textarea,
-    .modal-content, .modal-overlay,
-    table, th, td,
-    .chat-sidebar, .message,
-    .logs-output {
-        transition: none;
-    }
+	body,
+	.card,
+	.stat-card,
+	.btn,
+	button,
+	.app-sidebar,
+	.sidebar-nav a,
+	.app-content,
+	input,
+	select,
+	textarea,
+	.form-group input,
+	.form-group select,
+	.form-control-sm,
+	.modal-content,
+	.modal-overlay,
+	table,
+	th,
+	td,
+	.chat-sidebar,
+	.message,
+	.logs-output {
+		transition: none;
+	}
 }

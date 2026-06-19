@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import re
 
@@ -18,7 +17,6 @@ from src.api.v1.models._models_shared import (
     _delete_embedding_model as _shared_delete_embedding,
 )
 from src.application.models import EmbeddingManager
-from src.infrastructure.database import DatabaseService
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +35,8 @@ async def list_installed_embedding_models() -> JSONResponse:
 
         reg.sync_embeddings_folder(EMBEDDINGS_DIR, db)
         embeddings = reg.list_embeddings(db)
-        return JSONResponse(content={"models": embeddings})
+        models_list = [{"repo_id": k, **v} for k, v in embeddings.items()]
+        return JSONResponse(content={"models": models_list})
     except Exception as e:
         logger.error(f"Failed to list installed embedding models: {e}")
         return JSONResponse(status_code=500, content={"error": "An internal error occurred"})
@@ -58,6 +57,11 @@ async def download_embedding_model(
     """Download an embedding model. Auto-deletes existing embedding model first."""
     import asyncio
 
+    from src.infrastructure.llm.llamacpp.auto_start import stop_llamacpp as _stop_llm
+    from src.infrastructure.vectorstore.auto_start import stop_qdrant as _stop_qd
+
+    await _stop_qd()
+    await _stop_llm()
     _delete_all_models_of_type("embeddings")
 
     def set_emb_progress(r: str, p: int, s: str = "downloading"):
@@ -73,6 +77,12 @@ async def download_embedding_model(
             set_emb_progress(repo_id, 100, "completed")
         except Exception as e:
             set_emb_progress(repo_id, 0, f"error: {str(e)}")
+        finally:
+            from src.infrastructure.llm.llamacpp.auto_start import start_llamacpp as _start_llm
+            from src.infrastructure.vectorstore.auto_start import start_qdrant as _start_qd
+
+            await _start_qd()
+            await _start_llm()
 
     asyncio.create_task(download_in_background())
 
@@ -105,42 +115,10 @@ async def search_embedding_models(
     """Search for embedding models on HuggingFace."""
     try:
         results = await manager.search_models(query, limit=limit)
-        return JSONResponse(content={"models": results})
+        return JSONResponse(content={"models": [{"repo_id": r.full_id} for r in results]})
     except Exception as e:
         logger.error(f"Search failed: {e}")
         return JSONResponse(status_code=500, content={"error": "An internal error occurred"})
-
-
-@router.get("/embeddings/config")
-async def get_embedding_config() -> JSONResponse:
-    """Get the global embedding model configuration."""
-    config = DatabaseService.get_instance().get_embedding_config()
-    return JSONResponse(content=json.loads(json.dumps(config, default=str)))
-
-
-@router.put("/embeddings/config")
-async def update_embedding_config(body: dict) -> JSONResponse:
-    """Update the global embedding model.
-
-    Sending model="" resets to default.
-    """
-    if "model" not in body:
-        return JSONResponse(status_code=400, content={"error": "model is required"})
-
-    model = (body.get("model") or "").strip()
-    if model and not MODEL_ID_RE.match(model):
-        return JSONResponse(
-            status_code=400,
-            content={"error": "Invalid model ID format (expected: org/model)"},
-        )
-
-    db = DatabaseService.get_instance()
-    if model:
-        db.set_embedding_config(model)
-    else:
-        db.delete_embedding_config()
-    config = db.get_embedding_config()
-    return JSONResponse(content=json.loads(json.dumps(config, default=str)))
 
 
 @router.get("/embeddings/{repo_id}/files")

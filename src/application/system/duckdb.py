@@ -32,7 +32,6 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 # Tables that must exist per initdb.sql (CREATE TABLE IF NOT EXISTS order)
 _EXPECTED_TABLES = [
     "config",
-    "embedding_config",
     "system_prompts",
     "models",
     "doc_registry",
@@ -42,6 +41,7 @@ _EXPECTED_TABLES = [
     "doc_error",
     "worker_state",
     "release_cache",
+    "installed_versions",
 ]
 
 

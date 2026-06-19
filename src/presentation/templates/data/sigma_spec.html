@@ -26,7 +26,7 @@
 <div id="repo-detail" class="repo-detail-section" style="display: none;">
     <div class="repo-detail-header">
         <h2 id="selected-repo-name">Repository</h2>
-        <button id="close-detail-btn" class="btn" type="button">Close</button>
+        <button id="close-detail-btn" class="btn btn-secondary" type="button">Close</button>
     </div>
 
     {{ dir_browser_card(id="spec", mode="tree", title="Select Directories to Index") }}
@@ -46,7 +46,7 @@
             </div>
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary">Add</button>
-                <button id="modal-cancel-btn" type="button" class="btn">Cancel</button>
+                <button id="modal-cancel-btn" type="button" class="btn btn-secondary">Cancel</button>
             </div>
         </form>
     </div>
@@ -54,6 +54,7 @@
 {% endblock %}
 
 {% block scripts %}
+{{ super() }}
 <script>
 (function () {
     const API_BASE = '/api/v1/spec';
@@ -82,11 +83,11 @@
 
             if (repos.length === 0) {
                 container.innerHTML = '<p>No repositories managed</p>';
-                prompt.style.display = 'none';
+                if (prompt) prompt.style.display = 'none';
                 return;
             }
 
-            prompt.style.display = 'block';
+            if (prompt) prompt.style.display = 'block';
 
             container.innerHTML = repos.map(function (repo) { return [
                 '<div class="repo-card">',
@@ -94,7 +95,7 @@
                 '  <p>Last commit: ' + escHtml(formatDate(repo.last_commit)) + '</p>',
                 '  <div class="repo-actions">',
                 '    <button data-action="sync" data-org="' + escAttr(repo.org) + '" data-name="' + escAttr(repo.name) + '" class="btn btn-sm ' + escAttr(repo.sync_class || 'btn-unknown') + '">Sync</button>',
-                '    <button data-action="browse" data-org="' + escAttr(repo.org) + '" data-name="' + escAttr(repo.name) + '" class="btn btn-sm">Browse</button>',
+                '    <button data-action="browse" data-org="' + escAttr(repo.org) + '" data-name="' + escAttr(repo.name) + '" class="btn btn-sm btn-secondary">Browse</button>',
                 '    <button data-action="delete" data-org="' + escAttr(repo.org) + '" data-name="' + escAttr(repo.name) + '" class="btn btn-danger btn-sm">Delete</button>',
                 '  </div>',
                 '</div>'
@@ -411,4 +412,3 @@
 .table th { font-weight: 600; }
 </style>
 {% endblock %}
->>>>>>> origin/main

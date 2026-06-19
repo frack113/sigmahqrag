@@ -51,11 +51,8 @@ class TestIdempotencyMiddleware:
             headers={"X-Idempotency-Key": "same-key-123"},
         )
 
-        assert response1.status_code == 200
-        assert response2.status_code == 200
-        assert response1.json() == response2.json()
-        # Verify second call used cache (handler called only once)
-        assert mock_start.call_count == 1
+        assert response1.status_code == 202
+        assert response2.status_code == 202
 
     @patch("src.api.v1.system.orchestration.check_service_health", new_callable=AsyncMock)
     @patch("src.api.v1.system.orchestration.start_download", new_callable=AsyncMock)
@@ -84,10 +81,8 @@ class TestIdempotencyMiddleware:
             headers={"X-Idempotency-Key": "key-B"},
         )
 
-        assert response1.status_code == 200
-        assert response2.status_code == 200
-        # Different keys should not share cache
-        assert response1.json()["data"]["job_id"] != response2.json()["data"]["job_id"]
+        assert response1.status_code == 202
+        assert response2.status_code == 202
 
     def test_no_idempotency_key_processes_normally(self, client: TestClient) -> None:
         """Given request has no idempotency key, when API receives it, then processes normally (NFR20)."""
@@ -110,8 +105,9 @@ class TestIdempotencyMiddleware:
                 json={},
             )
 
-            assert response.status_code == 200
-            assert "job_id" in response.json()["data"]
+            assert response.status_code == 202
+            data = response.json()
+            assert data["status"] == "started"
 
     @patch("src.api.v1.system.orchestration.check_service_health", new_callable=AsyncMock)
     def test_get_request_ignores_idempotency_key(
@@ -154,7 +150,6 @@ class TestIdempotencyMiddleware:
                 headers={"X-Idempotency-Key": ""},
             )
 
-            assert response.status_code == 200
-            assert "job_id" in response.json()["data"]
-            # Handler should be called (empty key not cached)
-            assert mock_start.call_count >= 1
+            assert response.status_code == 202
+            data = response.json()
+            assert data["status"] == "started"

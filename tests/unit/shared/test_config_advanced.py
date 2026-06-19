@@ -19,13 +19,14 @@ class TestConfigToDict:
 class TestConfigSave:
     def test_save_returns_true(self) -> None:
         cfg = Config()
-        result = cfg.save()
+        with patch("src.infrastructure.database.service.DatabaseService.get_instance"):
+            result = cfg.save()
         assert result is True
 
 
 class TestConfigApplyDbOverrides:
-    def test_method_removed(self) -> None:
-        assert not hasattr(Config, "apply_db_overrides")
+    def test_method_exists(self) -> None:
+        assert hasattr(Config, "apply_db_overrides")
 
 
 class TestConfigInitApp:

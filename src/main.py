@@ -16,7 +16,7 @@ from starlette.datastructures import URL
 from src.api.routes.page_admin import router as admin_pages_router
 from src.api.routes.page_chat import router as chat_page_router
 from src.api.routes.page_data import router as data_page_router
-from src.api.routes.page_duckdb import router as duckdb_page_router
+from src.api.routes.page_dashboard import router as dashboard_page_router
 from src.api.routes.page_logs import router as logs_page_router
 from src.api.routes.page_setup import router as setup_page_router
 from src.api.v1.models.admin_models import router as admin_models_router
@@ -27,7 +27,7 @@ from src.api.v1.sigma.coverage import router as coverage_v1_router
 from src.api.v1.system.dispatcher import router as dispatcher_v1_router
 from src.api.v1.system.infrastructure import router as system_infra_v1_router
 from src.api.v1.documents.documents import router as documents_v1_router
-from src.api.v1.system.duckdb import router as duckdb_v1_router
+from src.api.v1.system.dashboard import router as dashboard_v1_router
 from src.api.v1.infrastructure.embeddings import router as embeddings_v1_router
 from src.api.v1.sigma.explain import router as explain_v1_router
 from src.api.v1.infrastructure.feedback import router as feedback_v1_router
@@ -35,6 +35,7 @@ from src.api.v1.documents.files import router as files_v1_router
 from src.api.v1.infrastructure.github import router as github_v1_router
 from src.api.v1.infrastructure.llamacpp import router as llama_router
 from src.api.v1.system.logs import router as logs_v1_router
+from src.api.v1.system.orchestration import router as orchestration_v1_router
 from src.api.v1.models.models_embedding import router as models_embedding_router
 from src.api.v1.models.models_llm import router as models_llm_router
 from src.api.v1.infrastructure.qdrant import router as qdrant_router
@@ -203,19 +204,17 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         if not setup_mode:
             try:
                 await start_llamacpp()
+                logger.info("llama.cpp started.")
             except Exception as e:
                 logger.warning("llama.cpp auto-start skipped: %s", e)
-            else:
-                logger.info("llama.cpp started.")
 
             qdrant_started = False
             try:
                 await start_qdrant()
-            except Exception as e:
-                logger.warning("Qdrant auto-start skipped: %s", e)
-            else:
                 qdrant_started = True
                 logger.info("Qdrant started.")
+            except Exception as e:
+                logger.warning("Qdrant auto-start skipped: %s", e)
 
             if qdrant_started:
                 await _init_qdrant_collections()
@@ -289,9 +288,9 @@ def create_app() -> FastAPI:
     app.include_router(setup_page_router)
     app.include_router(admin_pages_router)
     app.include_router(admin_models_router)
-    app.include_router(duckdb_page_router)
+    app.include_router(dashboard_page_router)
     app.include_router(logs_page_router)
-    app.include_router(duckdb_v1_router)
+    app.include_router(dashboard_v1_router)
     app.include_router(config_v1_router)
     app.include_router(coverage_v1_router)
     app.include_router(dispatcher_v1_router)
@@ -300,6 +299,7 @@ def create_app() -> FastAPI:
     app.include_router(github_v1_router)
     app.include_router(llama_router)
     app.include_router(logs_v1_router)
+    app.include_router(orchestration_v1_router)
     app.include_router(system_infra_v1_router)
     app.include_router(models_llm_router)
     app.include_router(models_embedding_router)

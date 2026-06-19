@@ -116,6 +116,25 @@ async def update_logging_config(request: LoggingConfigUpdateRequest) -> JSONResp
         )
 
 
+@router.post("/config/fix-schema")
+async def fix_schema_version() -> JSONResponse:
+    """POST /api/v1/config/fix-schema — Update DuckDB schema_version to match code."""
+    from src.config.constants import SCHEMA_VERSION
+
+    try:
+        db = DatabaseService.get_instance()
+        db.set_config("schema_version", SCHEMA_VERSION)
+        return JSONResponse(
+            content={
+                "status": "success",
+                "message": f"Schema version updated to {SCHEMA_VERSION}",
+            }
+        )
+    except Exception as e:
+        logger.error(f"Failed to fix schema version: {e}")
+        return JSONResponse(status_code=500, content={"status": "error", "error": str(e)})
+
+
 @router.post("/config")
 async def update_config(request: ConfigUpdateRequest) -> JSONResponse:
     """POST /api/v1/config — Update backend config persisted to DuckDB."""
@@ -124,24 +143,25 @@ async def update_config(request: ConfigUpdateRequest) -> JSONResponse:
         if request.backend:
             os_val = request.backend.get("os")
             gpu_val = request.backend.get("gpu_type")
-            llama_base_url = request.backend.get("llama_base_url") or request.backend.get(
-                "services", {}
-            ).get("llama", {}).get("base_url")
-            llama_manage = request.backend.get("llama_manage_internally") or request.backend.get(
-                "services", {}
-            ).get("llama", {}).get("manage_internally")
-            llama_autorun = request.backend.get("llama_autorun_at_startup") or request.backend.get(
-                "services", {}
-            ).get("llama", {}).get("autorun_at_startup")
-            qdrant_base_url = request.backend.get("qdrant_base_url") or request.backend.get(
-                "services", {}
-            ).get("qdrant", {}).get("base_url")
-            qdrant_manage = request.backend.get("qdrant_manage_internally") or request.backend.get(
-                "services", {}
-            ).get("qdrant", {}).get("manage_internally")
-            qdrant_autorun = request.backend.get(
-                "qdrant_autorun_at_startup"
-            ) or request.backend.get("services", {}).get("qdrant", {}).get("autorun_at_startup")
+            services = request.backend.get("services", {}) or {}
+            llama_base_url = request.backend.get("llama_base_url")
+            if llama_base_url is None:
+                llama_base_url = services.get("llama", {}).get("base_url")
+            llama_manage = request.backend.get("llama_manage_internally")
+            if llama_manage is None:
+                llama_manage = services.get("llama", {}).get("manage_internally")
+            llama_autorun = request.backend.get("llama_autorun_at_startup")
+            if llama_autorun is None:
+                llama_autorun = services.get("llama", {}).get("autorun_at_startup")
+            qdrant_base_url = request.backend.get("qdrant_base_url")
+            if qdrant_base_url is None:
+                qdrant_base_url = services.get("qdrant", {}).get("base_url")
+            qdrant_manage = request.backend.get("qdrant_manage_internally")
+            if qdrant_manage is None:
+                qdrant_manage = services.get("qdrant", {}).get("manage_internally")
+            qdrant_autorun = request.backend.get("qdrant_autorun_at_startup")
+            if qdrant_autorun is None:
+                qdrant_autorun = services.get("qdrant", {}).get("autorun_at_startup")
 
             if os_val:
                 config.os = os_val

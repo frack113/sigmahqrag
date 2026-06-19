@@ -81,7 +81,7 @@ class DownloadManager:
             post_install_callback: Async callback to run after installation
         """
 
-        if service not in ("llama.cpp", "qdrant"):
+        if service not in ("llama.cpp", "qdrant", "qdrant-web-ui"):
             raise DownloadError(f"Unsupported service: {service}")
 
         # Check if a download is already active for this service
@@ -106,6 +106,10 @@ class DownloadManager:
             from src.config.settings import get_config
 
             current_version = get_config().qdrant_version
+        elif service == "qdrant-web-ui":
+            from src.config.settings import get_config
+
+            current_version = get_config().qdrant_webui_version
         else:
             current_version = None
 
@@ -279,6 +283,12 @@ class DownloadManager:
                         config = get_config()
                         config.qdrant_version = version_str
                         config.save()
+                    elif task.service == "qdrant-web-ui":
+                        from src.config.settings import get_config
+
+                        config = get_config()
+                        config.qdrant_webui_version = version_str
+                        config.save()
 
                     logger.info(f"Download {download_id} completed: {task.target_path}")
 
@@ -305,9 +315,12 @@ class DownloadManager:
             service: Service name (llama.cpp, qdrant)
         """
 
-        service_dir = BIN_DIR / (
-            "llamacpp" if service == "llama.cpp" else service.replace(".", "-")
-        )
+        if service == "qdrant-web-ui":
+            service_dir = BIN_DIR / "qdrant" / "static"
+        else:
+            service_dir = BIN_DIR / (
+                "llamacpp" if service == "llama.cpp" else service.replace(".", "-")
+            )
 
         # Clean up existing service directory
         if service_dir.exists():

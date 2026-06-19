@@ -1,29 +1,29 @@
-(function () {
-  const STORAGE_KEY = "sigmahqrag-theme";
+(() => {
+	const STORAGE_KEY = "sigmahqrag-theme";
 
-  function getTheme() {
-    return localStorage.getItem(STORAGE_KEY) || "light";
-  }
+	function getTheme() {
+		return localStorage.getItem(STORAGE_KEY) || "light";
+	}
 
-  function setTheme(theme) {
-    document.documentElement.setAttribute("data-theme", theme);
-    localStorage.setItem(STORAGE_KEY, theme);
-    const checkbox = document.getElementById("theme-toggle-checkbox");
-    if (checkbox) {
-      checkbox.checked = theme === "dark";
-    }
-  }
+	function setTheme(theme) {
+		document.documentElement.setAttribute("data-theme", theme);
+		localStorage.setItem(STORAGE_KEY, theme);
+		const checkbox = document.getElementById("theme-toggle-checkbox");
+		if (checkbox) {
+			checkbox.checked = theme === "dark";
+		}
+	}
 
-  function toggleTheme() {
-    const next = getTheme() === "dark" ? "light" : "dark";
-    setTheme(next);
-  }
+	function toggleTheme() {
+		const next = getTheme() === "dark" ? "light" : "dark";
+		setTheme(next);
+	}
 
-  document.addEventListener("DOMContentLoaded", function () {
-    setTheme(getTheme());
-    const checkbox = document.getElementById("theme-toggle-checkbox");
-    if (checkbox) {
-      checkbox.addEventListener("change", toggleTheme);
-    }
-  });
+	document.addEventListener("DOMContentLoaded", () => {
+		setTheme(getTheme());
+		const checkbox = document.getElementById("theme-toggle-checkbox");
+		if (checkbox) {
+			checkbox.addEventListener("change", toggleTheme);
+		}
+	});
 })();

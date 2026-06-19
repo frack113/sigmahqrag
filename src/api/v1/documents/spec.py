@@ -7,7 +7,7 @@ from pathlib import Path
 from threading import Lock
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel, Field
 
 from src.config.settings import get_config
@@ -166,7 +166,7 @@ async def list_repos_handler() -> list[RepositoryStatus]:
 @router.post("/repos", response_model=SpecResponse)
 async def add_repo(
     request: RepositoryAddRequest,
-    background_tasks=None,
+    background_tasks: BackgroundTasks,
 ):
     """Add a new specification repository."""
     try:
@@ -213,8 +213,7 @@ async def add_repo(
                     repos_dir=_spec_repos_dir(),
                 )
 
-    if background_tasks is not None:
-        background_tasks.add_task(clone_with_status)
+    background_tasks.add_task(clone_with_status)
 
     return SpecResponse(
         success=True,
@@ -225,7 +224,7 @@ async def add_repo(
 
 @router.post("/repos/sync-all", response_model=SpecResponse)
 async def sync_all_repos(
-    background_tasks=None,
+    background_tasks: BackgroundTasks,
 ):
     """Sync all registered specification repositories."""
     repos = list_repos(repos_dir=_spec_repos_dir())
@@ -239,8 +238,7 @@ async def sync_all_repos(
             except Exception as e:
                 logger.error(f"Failed to sync {repo_data['org']}/{repo_data['name']}: {e}")
 
-    if background_tasks is not None:
-        background_tasks.add_task(sync_all_task)
+    background_tasks.add_task(sync_all_task)
 
     return SpecResponse(success=True, message="Sync started for all repositories")
 
@@ -274,8 +272,8 @@ async def delete_repo_handler(
 async def sync_repo(
     org: str,
     name: str,
+    background_tasks: BackgroundTasks,
     branch: str | None = None,
-    background_tasks=None,
 ):
     """Sync a specification repository."""
     _validate_org_name(org, name)
@@ -292,8 +290,7 @@ async def sync_repo(
     if not any(r["org"] == org and r["name"] == name for r in repos):
         return SpecResponse(success=False, error=f"Repository '{org}/{name}' not found")
 
-    if background_tasks is not None:
-        background_tasks.add_task(_sync_single_repo, org, name, branch)
+    background_tasks.add_task(_sync_single_repo, org, name, branch)
 
     return SpecResponse(success=True, message="Sync started in background")
 
@@ -310,7 +307,7 @@ async def get_repo_tree(
     except HTTPException as e:
         return DirectoryTreeResponse(success=False, error=e.detail)
     try:
-        repo_path = Path(_get_repo_path(_spec_repos_dir(), org, name))
+        repo_path = _get_repo_path(_spec_repos_dir(), org, name)
         if not repo_path.exists():
             metadata = get_metadata(org, name, repos_dir=_spec_repos_dir())
             if metadata:
@@ -355,7 +352,7 @@ async def select_dirs(
     except HTTPException as e:
         return SelectDirsResponse(success=False, error=e.detail)
     try:
-        repo_path = Path(_get_repo_path(_spec_repos_dir(), org, name))
+        repo_path = _get_repo_path(_spec_repos_dir(), org, name)
         if not repo_path.exists():
             return SelectDirsResponse(success=False, error=f"Repository '{org}/{name}' not found")
     except Exception as e:

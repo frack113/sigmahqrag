@@ -228,9 +228,3 @@ class LlamaClient:
             except Exception:
                 logger.exception("Failed to erase llama.cpp slot cache")
                 return False
-            except httpx.ConnectError:
-                logger.debug("llama.cpp not reachable — cannot erase slot cache")
-                return False
-            except Exception:
-                logger.exception("Failed to erase llama.cpp slot cache")
-                return False
