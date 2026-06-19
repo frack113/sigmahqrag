@@ -151,3 +151,150 @@
 	gap: var(--space-2);
 	flex-wrap: wrap;
 }
+
+.github-actions {
+	display: flex;
+	gap: var(--space-2);
+	flex-wrap: wrap;
+	margin-bottom: var(--space-3);
+}
+
+/* Repo detail / directory browser */
+.repo-detail-section {
+	margin-top: var(--space-5);
+}
+
+.repo-detail-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: var(--space-4);
+	padding-bottom: var(--space-3);
+	border-bottom: 1px solid var(--border-card);
+}
+
+.repo-detail-header h2 {
+	margin: 0;
+	font-size: var(--text-lg);
+}
+
+/* Select repo prompt */
+.select-repo-prompt {
+	padding: var(--space-4);
+	text-align: center;
+	color: var(--text-muted);
+	font-size: var(--text-sm);
+}
+.select-repo-prompt p {
+	margin: 0;
+}
+
+/* DirBrowser tree styles */
+.dir-browser .card-body {
+	min-height: 100px;
+}
+
+.tree-root {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.tree-node {
+	margin: 0;
+	padding: 0;
+}
+
+.tree-item {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+	padding: var(--space-1) var(--space-2);
+	border-radius: 4px;
+	cursor: default;
+}
+
+.tree-item:hover {
+	background: var(--bg-sidebar-hover);
+}
+
+.tree-toggle {
+	background: none;
+	border: none;
+	cursor: pointer;
+	font-size: 10px;
+	width: 16px;
+	height: 16px;
+	padding: 0;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	color: var(--text-muted);
+	flex-shrink: 0;
+}
+
+.tree-toggle:hover {
+	color: var(--text-body);
+}
+
+.tree-spacer {
+	display: inline-block;
+	width: 16px;
+	flex-shrink: 0;
+}
+
+.tree-checkbox {
+	margin: 0;
+	cursor: pointer;
+	flex-shrink: 0;
+}
+
+.tree-folder-icon {
+	font-size: var(--text-base);
+	line-height: 1;
+	flex-shrink: 0;
+}
+
+.tree-folder-name {
+	font-size: var(--text-sm);
+	color: var(--text-card-body);
+	line-height: 1.4;
+}
+
+.tree-children {
+	list-style: none;
+	margin: 0;
+	padding-left: var(--space-6);
+}
+
+/* Flat dir list */
+.dir-checkbox {
+	display: flex;
+	align-items: center;
+	gap: var(--space-2);
+	padding: var(--space-1) var(--space-2);
+	font-size: var(--text-sm);
+	color: var(--text-card-body);
+	cursor: pointer;
+	border-radius: 4px;
+}
+
+.dir-checkbox:hover {
+	background: var(--bg-sidebar-hover);
+}
+
+/* Empty/error state */
+.dir-browser-empty {
+	padding: var(--space-8);
+	text-align: center;
+	color: var(--text-muted);
+	font-size: var(--text-sm);
+}
+
+/* Selected count */
+.dir-browser-count {
+	margin-top: var(--space-3);
+	font-size: var(--text-sm);
+	color: var(--text-card-label);
+	text-align: right;
+}
