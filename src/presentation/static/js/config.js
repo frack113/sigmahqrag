@@ -8,7 +8,7 @@
 // ──────────────────────────────────────────────────────────────
 // API Configuration
 // ──────────────────────────────────────────────────────────────
-var CONFIG = {
+const CONFIG = {
 	spec: {
 		list: "/api/v1/spec/repos",
 		add: "/api/v1/spec/repos",
@@ -48,12 +48,12 @@ var CONFIG = {
 // ──────────────────────────────────────────────────────────────
 // State
 // ──────────────────────────────────────────────────────────────
-var _BACKEND_CONFIG = {};
-var selectedLlmRepo = null;
-var selectedEmbRepo = null;
+let _BACKEND_CONFIG = {};
+let selectedLlmRepo = null;
+let selectedEmbRepo = null;
 
 try {
-	var configDataEl = document.getElementById("backend-config-data");
+	const configDataEl = document.getElementById("backend-config-data");
 	if (configDataEl) {
 		_BACKEND_CONFIG = JSON.parse(configDataEl.textContent);
 	}
@@ -75,9 +75,9 @@ function escHtml(s) {
 
 function formatBytes(bytes) {
 	if (bytes === 0) return "0 B";
-	var k = 1024;
-	var sizes = ["B", "KB", "MB", "GB"];
-	var i = Math.floor(Math.log(bytes) / Math.log(k));
+	const k = 1024;
+	const sizes = ["B", "KB", "MB", "GB"];
+	const i = Math.floor(Math.log(bytes) / Math.log(k));
 	return `${Math.round((bytes / k ** i) * 100) / 100} ${sizes[i]}`;
 }
 
@@ -91,7 +91,7 @@ function setStatusText(el, text, ok) {
 // Native <details> group helpers
 // ──────────────────────────────────────────────────────────────
 function scrollToAndOpen(groupId) {
-	var el = document.getElementById(groupId);
+	const el = document.getElementById(groupId);
 	if (el) {
 		el.scrollIntoView({ behavior: "smooth", block: "start" });
 		if (!el.open) el.open = true;
@@ -124,16 +124,16 @@ function loadSystemStatus() {
 			.catch(() => ({})),
 	])
 		.then((results) => {
-			var adminData = results[0].data || {};
-			var _llamaInfo = results[1] || {};
-			var _qdrantInfo = results[2] || {};
-			var duckDbStatus = results[3] || {};
-			var _loggingData = results[4] || {};
-			var llama = adminData.llama_cpp || {};
-			var qdrant = adminData.qdrant || {};
+			const adminData = results[0].data || {};
+			const _llamaInfo = results[1] || {};
+			const _qdrantInfo = results[2] || {};
+			const duckDbStatus = results[3] || {};
+			const _loggingData = results[4] || {};
+			const llama = adminData.llama_cpp || {};
+			const qdrant = adminData.qdrant || {};
 
 			// Update llama status
-			var llamaStatusCard = document.querySelector('[data-service="llama"]');
+			const llamaStatusCard = document.querySelector('[data-service="llama"]');
 			if (llamaStatusCard) {
 				llamaStatusCard.querySelector(".status-text").textContent =
 					llama.status || "unknown";
@@ -141,7 +141,9 @@ function loadSystemStatus() {
 			}
 
 			// Update qdrant status
-			var qdrantStatusCard = document.querySelector('[data-service="qdrant"]');
+			const qdrantStatusCard = document.querySelector(
+				'[data-service="qdrant"]',
+			);
 			if (qdrantStatusCard) {
 				qdrantStatusCard.querySelector(".status-text").textContent =
 					qdrant.status || "unknown";
@@ -149,9 +151,11 @@ function loadSystemStatus() {
 			}
 
 			// Update duckdb status
-			var duckdbStatusCard = document.querySelector('[data-service="duckdb"]');
+			const duckdbStatusCard = document.querySelector(
+				'[data-service="duckdb"]',
+			);
 			if (duckdbStatusCard) {
-				var duckState = duckDbStatus.state || "healthy";
+				const duckState = duckDbStatus.state || "healthy";
 				duckdbStatusCard.querySelector(".status-text").textContent =
 					duckState || "unknown";
 				duckdbStatusCard.className =
@@ -160,7 +164,7 @@ function loadSystemStatus() {
 			}
 
 			// Update logging status
-			var loggingStatusCard = document.querySelector(
+			const loggingStatusCard = document.querySelector(
 				'[data-service="logging"]',
 			);
 			if (loggingStatusCard) {
@@ -191,15 +195,15 @@ function getStatusCardClass(status) {
 // Configuration (OS / GPU)
 // ──────────────────────────────────────────────────────────────
 function applyBackendConfig(cfg) {
-	var hw = cfg?.Hardware || {};
-	var osSel = document.getElementById("os-select");
-	var gpuSel = document.getElementById("gpu-select");
+	const hw = cfg?.Hardware || {};
+	const osSel = document.getElementById("os-select");
+	const gpuSel = document.getElementById("gpu-select");
 	if (osSel) osSel.value = hw.os || "windows";
 	if (gpuSel) gpuSel.value = hw.gpu || "cpu";
 }
 
 function saveBackendConfig() {
-	var statusEl = document.getElementById("config-status");
+	const statusEl = document.getElementById("config-status");
 	statusEl.textContent = "Saving...";
 	statusEl.className = "status-message";
 
@@ -230,46 +234,46 @@ function saveBackendConfig() {
 // ──────────────────────────────────────────────────────────────
 // Data directories
 // ──────────────────────────────────────────────────────────────
-var renderDataDirs = (dirs) => {
-	var readyCount = 0;
-	var missingCount = 0;
-	for (var i = 0; i < dirs.length; i++) {
-		var d = dirs[i];
+const renderDataDirs = (dirs) => {
+	let readyCount = 0;
+	let missingCount = 0;
+	for (let i = 0; i < dirs.length; i++) {
+		const d = dirs[i];
 		if (d.is_healthy) readyCount++;
 		else missingCount++;
 	}
 
-	var statusEl = document.getElementById("data-global-status");
+	const statusEl = document.getElementById("data-global-status");
 	statusEl.className = "global-status";
 	if (readyCount === dirs.length) statusEl.classList.add("ok");
 
-	var dotClass =
+	const dotClass =
 		readyCount === dirs.length
 			? "data-dot-ok"
 			: missingCount > 0 && readyCount === 0
 				? "data-dot-missing"
 				: "data-dot-warn";
 
-	var summaryClass =
+	const summaryClass =
 		readyCount === dirs.length
 			? "text-success"
 			: missingCount > 0 && readyCount === 0
 				? "text-danger"
 				: "text-warning";
 
-	var summaryLabel =
+	const summaryLabel =
 		readyCount === dirs.length
 			? "READY"
 			: missingCount > 0 && readyCount === 0
 				? "ERROR"
 				: "PARTIAL";
 
-	var fixBtnHtml =
+	const fixBtnHtml =
 		readyCount === dirs.length
 			? '<button class="btn btn-primary btn-sm" disabled>Fix</button>'
 			: '<button class="btn btn-primary btn-sm" onclick="Config.createDataDirs()">Fix</button>';
 
-	var listEl = document.getElementById("data-dirs-list");
+	const listEl = document.getElementById("data-dirs-list");
 	listEl.innerHTML =
 		'<div class="data-row">' +
 		'  <span class="' +
@@ -303,7 +307,7 @@ function checkDataDirs() {
 		})
 		.catch((e) => {
 			console.error(e);
-			var listEl = document.getElementById("data-dirs-list");
+			const listEl = document.getElementById("data-dirs-list");
 			if (listEl)
 				listEl.innerHTML =
 					'<div class="data-row">' +
@@ -369,11 +373,11 @@ function resetDataDirs() {
 // DuckDB
 // ──────────────────────────────────────────────────────────────
 function renderDuckDbStatus(status) {
-	var el = document.getElementById("duckdb-status");
+	const el = document.getElementById("duckdb-status");
 	if (!el) return;
 
-	var dotClass, labelClass, summaryLabel;
-	var st = status.state || "healthy";
+	let dotClass, labelClass, summaryLabel;
+	const st = status.state || "healthy";
 
 	if (st === "healthy") {
 		dotClass = "data-dot-ok";
@@ -397,11 +401,12 @@ function renderDuckDbStatus(status) {
 		summaryLabel = `UNKNOWN (${st})`;
 	}
 
-	var size = status.file_size > 0 ? ` (${formatBytes(status.file_size)})` : "";
-	var fixBtnHtml = status.needs_fix
+	const size =
+		status.file_size > 0 ? ` (${formatBytes(status.file_size)})` : "";
+	const fixBtnHtml = status.needs_fix
 		? '<button class="btn btn-primary btn-sm" onclick="Config.createDuckDb()">Fix</button>'
 		: '<button class="btn btn-primary btn-sm" disabled>Fix</button>';
-	var cleanBtnHtml = status.needs_clean
+	const cleanBtnHtml = status.needs_clean
 		? '<button class="btn btn-warning btn-sm" onclick="Config.cleanDuckDb()">Clean</button>'
 		: '<button class="btn btn-warning btn-sm" disabled>Clean</button>';
 
@@ -439,7 +444,7 @@ function checkDuckDbStatus() {
 		})
 		.catch((e) => {
 			console.error(e);
-			var el = document.getElementById("duckdb-status");
+			const el = document.getElementById("duckdb-status");
 			if (el)
 				el.innerHTML =
 					'<span class="label error-text">Error loading DuckDB: ' +
@@ -499,11 +504,11 @@ function resetDuckDb() {
 // Logging
 // ──────────────────────────────────────────────────────────────
 function renderLoggingConfig(data) {
-	var levelSelect = document.getElementById("log-level-select");
-	var maxSizeInput = document.getElementById("log-max-size-input");
-	var maxFileInput = document.getElementById("log-max-file-input");
-	var cleanToggle = document.getElementById("log-clean-at-startup");
-	var _toggleLabel = document.getElementById("log-clean-toggle");
+	const levelSelect = document.getElementById("log-level-select");
+	const maxSizeInput = document.getElementById("log-max-size-input");
+	const maxFileInput = document.getElementById("log-max-file-input");
+	const cleanToggle = document.getElementById("log-clean-at-startup");
+	const _toggleLabel = document.getElementById("log-clean-toggle");
 
 	setStatusText(
 		document.getElementById("logging-status"),
@@ -517,11 +522,11 @@ function renderLoggingConfig(data) {
 	if (cleanToggle) {
 		cleanToggle.checked = data.clean_at_startup || false;
 		cleanToggle.onchange = () => {
-			var lbl = document.getElementById("log-clean-label");
+			const lbl = document.getElementById("log-clean-label");
 			if (lbl) lbl.textContent = cleanToggle.checked ? "Yes" : "No";
 		};
 	}
-	var cleanLabel = document.getElementById("log-clean-label");
+	const cleanLabel = document.getElementById("log-clean-label");
 	if (cleanLabel) {
 		cleanLabel.textContent = data.clean_at_startup ? "Yes" : "No";
 	}
@@ -552,8 +557,8 @@ function checkLoggingConfig() {
 }
 
 function saveLoggingConfig() {
-	var statusEl = document.getElementById("logging-config-status");
-	var payload = {
+	const statusEl = document.getElementById("logging-config-status");
+	const payload = {
 		level: document.getElementById("log-level-select").value,
 		log_max_size: document.getElementById("log-max-size-input").value,
 		log_max_file: parseInt(
@@ -616,17 +621,17 @@ function loadBackendStatus() {
 			.catch(() => ({ data: {} })),
 	])
 		.then((results) => {
-			var adminData = results[0].data || {};
-			var llamaInfo = results[1] || {};
-			var qdrantInfo = results[2] || {};
-			var configData = results[3].data || {};
-			var llama = adminData.llama_cpp || {};
-			var qdrant = adminData.qdrant || {};
+			const adminData = results[0].data || {};
+			const llamaInfo = results[1] || {};
+			const qdrantInfo = results[2] || {};
+			const configData = results[3].data || {};
+			const llama = adminData.llama_cpp || {};
+			const qdrant = adminData.qdrant || {};
 
 			function setStatus(containerId, statusText, statusClass) {
-				var container = document.getElementById(containerId);
-				var dot = container.querySelector(".status-dot");
-				var textSpans = container.querySelectorAll("span:not(.status-dot)");
+				const container = document.getElementById(containerId);
+				const dot = container.querySelector(".status-dot");
+				const textSpans = container.querySelectorAll("span:not(.status-dot)");
 				if (dot)
 					dot.className = `status-dot status-${statusClass || "unknown"}`;
 				if (textSpans.length > 0)
@@ -652,30 +657,30 @@ function loadBackendStatus() {
 						: "warning",
 			);
 
-			var isLlamaExternal = llamaInfo.mode === "external";
+			const isLlamaExternal = llamaInfo.mode === "external";
 			document.getElementById("llama-start-btn").disabled = isLlamaExternal;
 			document.getElementById("llama-stop-btn").disabled = isLlamaExternal;
 			document.getElementById("llama-download-btn").disabled = isLlamaExternal;
 
-			var isQdrantExternal = qdrantInfo.mode === "external";
-			var qdrantStartBtn = document.getElementById("qdrant-start-btn");
-			var qdrantStopBtn = document.getElementById("qdrant-stop-btn");
-			var qdrantDownloadBtn = document.getElementById("qdrant-download-btn");
+			const isQdrantExternal = qdrantInfo.mode === "external";
+			const qdrantStartBtn = document.getElementById("qdrant-start-btn");
+			const qdrantStopBtn = document.getElementById("qdrant-stop-btn");
+			const qdrantDownloadBtn = document.getElementById("qdrant-download-btn");
 			if (qdrantStartBtn) qdrantStartBtn.disabled = isQdrantExternal;
 			if (qdrantStopBtn) qdrantStopBtn.disabled = isQdrantExternal;
 			if (qdrantDownloadBtn) qdrantDownloadBtn.disabled = isQdrantExternal;
 
-			var lv = (llamaInfo.current_version || "").replace(/^0$/, "");
+			const lv = (llamaInfo.current_version || "").replace(/^0$/, "");
 			loadReleaseTags("llama-release-select", "llama.cpp", { value: lv });
 
-			var qv = (qdrantInfo.current_version || "").replace(/^0$/, "");
+			const qv = (qdrantInfo.current_version || "").replace(/^0$/, "");
 			if (qv && qv !== "unknown" && qv !== "Not installed") {
 				loadReleaseTags("qdrant-release-select", "qdrant", { value: qv });
 			} else {
 				loadReleaseTags("qdrant-release-select", "qdrant");
 			}
 
-			var uv = (qdrantInfo.webui_version || "").replace(/^0$/, "");
+			const uv = (qdrantInfo.webui_version || "").replace(/^0$/, "");
 			if (uv && uv !== "unknown" && uv !== "Not installed") {
 				loadReleaseTags("qdrant-ui-release-select", "qdrant-web-ui", {
 					value: uv,
@@ -685,62 +690,62 @@ function loadBackendStatus() {
 			}
 
 			// Populate new backend service controls from config
-			var services =
+			const services =
 				configData.services ||
 				configData.backend?.services ||
 				_BACKEND_CONFIG.services ||
 				{};
-			var llamaSvc = services.llama || {};
-			var qdrantSvc = services.qdrant || {};
+			const llamaSvc = services.llama || {};
+			const qdrantSvc = services.qdrant || {};
 
-			var llamaUrlInput = document.getElementById("llama-base-url");
+			const llamaUrlInput = document.getElementById("llama-base-url");
 			if (llamaUrlInput)
 				llamaUrlInput.value = llamaSvc.base_url || "http://127.0.0.1:8080";
 
-			var llamaManageSlider = document.getElementById(
+			const llamaManageSlider = document.getElementById(
 				"llama-manage-internally",
 			);
 			if (llamaManageSlider)
 				llamaManageSlider.checked = llamaSvc.manage_internally !== false;
-			var llamaModeLabel = document.getElementById("llama-mode-label");
+			const llamaModeLabel = document.getElementById("llama-mode-label");
 			if (llamaModeLabel)
 				llamaModeLabel.textContent =
 					llamaSvc.manage_internally !== false ? "Internal" : "External";
 			updateServiceControls("llama", llamaSvc.manage_internally !== false);
 
-			var llamaAutostartSlider = document.getElementById(
+			const llamaAutostartSlider = document.getElementById(
 				"llama-autorun-at-startup",
 			);
 			if (llamaAutostartSlider)
 				llamaAutostartSlider.checked = llamaSvc.autorun_at_startup !== false;
-			var llamaAutostartLabel = document.getElementById(
+			const llamaAutostartLabel = document.getElementById(
 				"llama-autostart-label",
 			);
 			if (llamaAutostartLabel)
 				llamaAutostartLabel.textContent =
 					llamaSvc.autorun_at_startup !== false ? "Yes" : "No";
 
-			var qdrantUrlInput = document.getElementById("qdrant-base-url");
+			const qdrantUrlInput = document.getElementById("qdrant-base-url");
 			if (qdrantUrlInput)
 				qdrantUrlInput.value = qdrantSvc.base_url || "http://127.0.0.1:6333";
 
-			var qdrantManageSlider = document.getElementById(
+			const qdrantManageSlider = document.getElementById(
 				"qdrant-manage-internally",
 			);
 			if (qdrantManageSlider)
 				qdrantManageSlider.checked = qdrantSvc.manage_internally !== false;
-			var qdrantModeLabel = document.getElementById("qdrant-mode-label");
+			const qdrantModeLabel = document.getElementById("qdrant-mode-label");
 			if (qdrantModeLabel)
 				qdrantModeLabel.textContent =
 					qdrantSvc.manage_internally !== false ? "Internal" : "External";
 			updateServiceControls("qdrant", qdrantSvc.manage_internally !== false);
 
-			var qdrantAutostartSlider = document.getElementById(
+			const qdrantAutostartSlider = document.getElementById(
 				"qdrant-autorun-at-startup",
 			);
 			if (qdrantAutostartSlider)
 				qdrantAutostartSlider.checked = qdrantSvc.autorun_at_startup !== false;
-			var qdrantAutostartLabel = document.getElementById(
+			const qdrantAutostartLabel = document.getElementById(
 				"qdrant-autostart-label",
 			);
 			if (qdrantAutostartLabel)
@@ -748,7 +753,7 @@ function loadBackendStatus() {
 					qdrantSvc.autorun_at_startup !== false ? "Yes" : "No";
 
 			// Build summary
-			var _summaryHtml = "";
+			let _summaryHtml = "";
 			_summaryHtml +=
 				'<div class="data-row"><span class="status-dot ' +
 				(llama.status === "active" ? "data-dot-ok" : "data-dot-warn") +
@@ -774,9 +779,9 @@ function loadBackendStatus() {
 // Backend Service Config Toggles
 // ──────────────────────────────────────────────────────────────
 function updateBackendServiceConfig(service, field, value) {
-	var nested = {};
+	const nested = {};
 	nested[field] = value;
-	var svc = {};
+	const svc = {};
 	svc[service] = nested;
 	fetch("/api/v1/config", {
 		method: "POST",
@@ -797,10 +802,10 @@ function updateBackendServiceConfig(service, field, value) {
 }
 
 function saveBackendServiceConfig(service) {
-	var baseUrl = document.getElementById(`${service}-base-url`);
-	var manage = document.getElementById(`${service}-manage-internally`);
-	var autorun = document.getElementById(`${service}-autorun-at-startup`);
-	var payload = {
+	const baseUrl = document.getElementById(`${service}-base-url`);
+	const manage = document.getElementById(`${service}-manage-internally`);
+	const autorun = document.getElementById(`${service}-autorun-at-startup`);
+	const payload = {
 		backend: {
 			services: {},
 		},
@@ -812,7 +817,7 @@ function saveBackendServiceConfig(service) {
 	if (autorun)
 		payload.backend.services[service].autorun_at_startup = autorun.checked;
 
-	var statusEl = document.getElementById(`${service}-status-text`);
+	const statusEl = document.getElementById(`${service}-status-text`);
 	if (statusEl) statusEl.textContent = "Saving...";
 
 	fetch("/api/v1/config", {
@@ -835,14 +840,16 @@ function saveBackendServiceConfig(service) {
 }
 
 function updateServiceControls(service, isInternal) {
-	var startBtn = document.getElementById(`${service}-start-btn`);
-	var stopBtn = document.getElementById(`${service}-stop-btn`);
-	var downloadBtn = document.getElementById(`${service}-download-btn`);
-	var releaseSelect = document.getElementById(`${service}-release-select`);
-	var autostartSlider = document.getElementById(
+	const startBtn = document.getElementById(`${service}-start-btn`);
+	const stopBtn = document.getElementById(`${service}-stop-btn`);
+	const downloadBtn = document.getElementById(`${service}-download-btn`);
+	const releaseSelect = document.getElementById(`${service}-release-select`);
+	const autostartSlider = document.getElementById(
 		`${service}-autorun-at-startup`,
 	);
-	var autostartToggle = document.getElementById(`${service}-autostart-toggle`);
+	const autostartToggle = document.getElementById(
+		`${service}-autostart-toggle`,
+	);
 
 	if (isInternal) {
 		if (startBtn) startBtn.disabled = false;
@@ -862,56 +869,56 @@ function updateServiceControls(service, isInternal) {
 			updateBackendServiceConfig(service, "autorun_at_startup", false);
 		}
 		if (autostartToggle) autostartToggle.style.opacity = "0.5";
-		var label = document.getElementById(`${service}-autostart-label`);
+		const label = document.getElementById(`${service}-autostart-label`);
 		if (label) label.textContent = "Off";
 	}
 }
 
 function onLlamaModeChange() {
-	var cb = document.getElementById("llama-manage-internally");
-	var checked = cb.checked;
+	const cb = document.getElementById("llama-manage-internally");
+	const checked = cb.checked;
 	updateBackendServiceConfig("llama", "manage_internally", checked);
-	var label = document.getElementById("llama-mode-label");
+	const label = document.getElementById("llama-mode-label");
 	if (label) label.textContent = checked ? "Internal" : "External";
 	updateServiceControls("llama", checked);
 }
 
 function onLlamaAutostartChange() {
-	var cb = document.getElementById("llama-autorun-at-startup");
-	var checked = cb.checked;
+	const cb = document.getElementById("llama-autorun-at-startup");
+	const checked = cb.checked;
 	updateBackendServiceConfig("llama", "autorun_at_startup", checked);
-	var label = document.getElementById("llama-autostart-label");
+	const label = document.getElementById("llama-autostart-label");
 	if (label) label.textContent = checked ? "Yes" : "No";
 }
 
 function onQdrantModeChange() {
-	var cb = document.getElementById("qdrant-manage-internally");
-	var checked = cb.checked;
+	const cb = document.getElementById("qdrant-manage-internally");
+	const checked = cb.checked;
 	updateBackendServiceConfig("qdrant", "manage_internally", checked);
-	var label = document.getElementById("qdrant-mode-label");
+	const label = document.getElementById("qdrant-mode-label");
 	if (label) label.textContent = checked ? "Internal" : "External";
 	updateServiceControls("qdrant", checked);
 }
 
 function onQdrantAutostartChange() {
-	var cb = document.getElementById("qdrant-autorun-at-startup");
-	var checked = cb.checked;
+	const cb = document.getElementById("qdrant-autorun-at-startup");
+	const checked = cb.checked;
 	updateBackendServiceConfig("qdrant", "autorun_at_startup", checked);
-	var label = document.getElementById("qdrant-autostart-label");
+	const label = document.getElementById("qdrant-autostart-label");
 	if (label) label.textContent = checked ? "Yes" : "No";
 }
 
 function downloadLlama() {
-	var btn = document.getElementById("llama-download-btn");
+	const btn = document.getElementById("llama-download-btn");
 	if (btn?.disabled) return;
 	if (btn) btn.disabled = true;
-	var sel = document.getElementById("llama-release-select");
-	var version = sel ? sel.value : "";
-	var url =
+	const sel = document.getElementById("llama-release-select");
+	const version = sel ? sel.value : "";
+	const url =
 		"/api/v1/llamacpp/download" +
 		(version ? `?version=${encodeURIComponent(version)}` : "");
-	var pb = makeProgressBar("llama");
-	var statusEl = document.getElementById("llama-download-status");
+	const pb = makeProgressBar("llama");
+	const statusEl = document.getElementById("llama-download-status");
 	statusEl.textContent = "Starting download...";
 	statusEl.className = "status-message";
 	pb.show();
@@ -959,13 +966,13 @@ function downloadLlama() {
 }
 
 function downloadQdrantBinary() {
-	var pb = makeProgressBar("qdrant");
-	var statusEl = document.getElementById("qdrant-download-status");
+	const pb = makeProgressBar("qdrant");
+	const statusEl = document.getElementById("qdrant-download-status");
 	statusEl.textContent = "Starting download...";
 	statusEl.className = "status-message";
 	pb.show();
-	var sel = document.getElementById("qdrant-release-select");
-	var version = sel ? sel.value : "latest";
+	const sel = document.getElementById("qdrant-release-select");
+	const version = sel ? sel.value : "latest";
 	fetch("/api/v1/qdrant", {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
@@ -1013,13 +1020,13 @@ function downloadQdrantBinary() {
 }
 
 function downloadQdrantUI() {
-	var pb = makeProgressBar("qdrant");
-	var statusEl = document.getElementById("qdrant-download-status");
+	const pb = makeProgressBar("qdrant");
+	const statusEl = document.getElementById("qdrant-download-status");
 	statusEl.textContent = "Starting download...";
 	statusEl.className = "status-message";
 	pb.show();
-	var sel = document.getElementById("qdrant-ui-release-select");
-	var version = sel ? sel.value : "latest";
+	const sel = document.getElementById("qdrant-ui-release-select");
+	const version = sel ? sel.value : "latest";
 	fetch("/api/v1/qdrant", {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
@@ -1079,7 +1086,7 @@ function startService(service) {
 	})
 		.then((r) => r.json())
 		.then((data) => {
-			var msg =
+			const msg =
 				data.data?.message || data.data?.error || data.error || "Started";
 			alert(msg);
 			loadBackendStatus();
@@ -1095,7 +1102,7 @@ function stopService(service) {
 	})
 		.then((r) => r.json())
 		.then((data) => {
-			var msg =
+			const msg =
 				data.data?.message || data.data?.error || data.error || "Stopped";
 			alert(msg);
 			loadBackendStatus();
@@ -1110,15 +1117,15 @@ function loadReleaseTimestamps() {
 	fetch("/api/v1/releases/status/timestamps")
 		.then((r) => r.json())
 		.then((data) => {
-			var ts = data.timestamps || {};
-			var latest = "";
-			for (var key in ts) {
+			const ts = data.timestamps || {};
+			let latest = "";
+			for (const key in ts) {
 				if (ts[key] && (!latest || ts[key] > latest)) latest = ts[key];
 			}
-			var el = document.getElementById("releases-last-update");
+			const el = document.getElementById("releases-last-update");
 			if (el) {
 				if (latest) {
-					var d = new Date(latest);
+					const d = new Date(latest);
 					el.textContent = `${d.toLocaleDateString()} ${d.toLocaleTimeString()}`;
 				} else {
 					el.textContent = "Never";
@@ -1126,7 +1133,7 @@ function loadReleaseTimestamps() {
 			}
 		})
 		.catch(() => {
-			var el = document.getElementById("releases-last-update");
+			const el = document.getElementById("releases-last-update");
 			if (el) el.textContent = "—";
 		});
 }
@@ -1135,11 +1142,11 @@ function loadReleasesTable() {
 	fetch("/api/v1/releases/all-releases")
 		.then((r) => r.json())
 		.then((data) => {
-			var tableEl = document.getElementById("releases-table");
+			const tableEl = document.getElementById("releases-table");
 			if (!tableEl) return;
 
-			var releases = data.releases || [];
-			var versions = data.installed_versions || {};
+			const releases = data.releases || [];
+			const versions = data.installed_versions || {};
 
 			if (releases.length === 0 && Object.keys(versions).length === 0) {
 				tableEl.innerHTML =
@@ -1147,7 +1154,7 @@ function loadReleasesTable() {
 				return;
 			}
 
-			var html =
+			let html =
 				'<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;">';
 			html +=
 				'<thead><tr style="border-bottom:1px solid var(--layout-card-border);">' +
@@ -1161,18 +1168,18 @@ function loadReleasesTable() {
 			html += "<tbody>";
 
 			// Define known services in desired order
-			var knownServices = ["llama.cpp", "qdrant", "qdrant-web-ui"];
+			const knownServices = ["llama.cpp", "qdrant", "qdrant-web-ui"];
 
-			for (var si = 0; si < knownServices.length; si++) {
-				var svc = knownServices[si];
-				var release = null;
-				for (var ri = 0; ri < releases.length; ri++) {
+			for (let si = 0; si < knownServices.length; si++) {
+				const svc = knownServices[si];
+				let release = null;
+				for (let ri = 0; ri < releases.length; ri++) {
 					if (releases[ri].service === svc) {
 						release = releases[ri];
 						break;
 					}
 				}
-				var installed = versions[svc] || null;
+				const installed = versions[svc] || null;
 
 				html +=
 					'<tr style="border-bottom:1px solid var(--layout-card-border);">' +
@@ -1202,10 +1209,10 @@ function loadReleasesTable() {
 			}
 
 			// Add any extra releases not in knownServices
-			for (var ri = 0; ri < releases.length; ri++) {
-				var r = releases[ri];
+			for (let ri = 0; ri < releases.length; ri++) {
+				const r = releases[ri];
 				if (knownServices.indexOf(r.service) === -1) {
-					var extInstalled = versions[r.service] || null;
+					const extInstalled = versions[r.service] || null;
 					html +=
 						'<tr style="border-bottom:1px solid var(--layout-card-border);">' +
 						'<td style="padding:8px;">' +
@@ -1239,14 +1246,14 @@ function loadReleasesTable() {
 			tableEl.innerHTML = html;
 		})
 		.catch((_err) => {
-			var tableEl = document.getElementById("releases-table");
+			const tableEl = document.getElementById("releases-table");
 			if (tableEl)
 				tableEl.innerHTML = '<p class="error">Failed to load releases</p>';
 		});
 }
 
 function refreshReleases() {
-	var statusEl = document.getElementById("releases-refresh-status");
+	const statusEl = document.getElementById("releases-refresh-status");
 	if (statusEl) {
 		statusEl.textContent = "Refreshing...";
 		statusEl.className = "status-message";
@@ -1255,8 +1262,8 @@ function refreshReleases() {
 		.then((r) => r.json())
 		.then((data) => {
 			if (data.errors) {
-				var msgs = Object.values(data.errors);
-				var rateLimited = msgs.some((m) => m.indexOf("rate limit") !== -1);
+				const msgs = Object.values(data.errors);
+				const rateLimited = msgs.some((m) => m.indexOf("rate limit") !== -1);
 				if (rateLimited) {
 					alert(
 						"GitHub API rate limit reached. Please wait a few minutes and try again.",
@@ -1281,7 +1288,7 @@ function refreshReleases() {
 }
 
 function scanLocalVersions() {
-	var statusEl = document.getElementById("releases-refresh-status");
+	const statusEl = document.getElementById("releases-refresh-status");
 	if (statusEl) {
 		statusEl.textContent = "Scanning local versions...";
 		statusEl.className = "status-message";
@@ -1314,11 +1321,11 @@ function scanLocalVersions() {
 // LLM Management
 // ──────────────────────────────────────────────────────────────
 function renderLlmModels(models) {
-	var listEl = document.getElementById("llm-models-list");
-	var statusEl = document.getElementById("llm-global-status");
-	var textEl = document.getElementById("llm-global-text");
-	var btnDownload = document.getElementById("btn-download-llm");
-	var btnDelete = document.getElementById("btn-delete-llm");
+	const listEl = document.getElementById("llm-models-list");
+	const statusEl = document.getElementById("llm-global-status");
+	const textEl = document.getElementById("llm-global-text");
+	const btnDownload = document.getElementById("btn-download-llm");
+	const btnDelete = document.getElementById("btn-delete-llm");
 
 	statusEl.className = "global-status";
 
@@ -1337,9 +1344,9 @@ function renderLlmModels(models) {
 	btnDownload.style.display = "none";
 	btnDelete.style.display = "inline-block";
 
-	var html = '<table class="model-table"><tbody>';
-	for (var i = 0; i < models.length; i++) {
-		var m = models[i];
+	let html = '<table class="model-table"><tbody>';
+	for (let i = 0; i < models.length; i++) {
+		const m = models[i];
 		html += "<tr>";
 		html +=
 			'<td class="model-name" onclick="Config.selectLlmModel(\'' +
@@ -1365,8 +1372,8 @@ function checkLlmModels() {
 		})
 		.catch((e) => {
 			console.error(e);
-			var statusEl = document.getElementById("llm-global-status");
-			var textEl = document.getElementById("llm-global-text");
+			const statusEl = document.getElementById("llm-global-status");
+			const textEl = document.getElementById("llm-global-text");
 			statusEl.className = "global-status critical";
 			textEl.textContent = "Error loading LLM models";
 		});
@@ -1374,14 +1381,14 @@ function checkLlmModels() {
 
 function selectLlmModel(repoId) {
 	selectedLlmRepo = repoId;
-	var listEl = document.getElementById("llm-models-list");
-	var rows = listEl.querySelectorAll(".model-name");
-	for (var i = 0; i < rows.length; i++) {
+	const listEl = document.getElementById("llm-models-list");
+	const rows = listEl.querySelectorAll(".model-name");
+	for (let i = 0; i < rows.length; i++) {
 		rows[i].style.fontWeight = "normal";
 		rows[i].style.color = "#007bff";
 	}
 	if (rows.length > 0) {
-		for (var j = 0; j < rows.length; j++) {
+		for (let j = 0; j < rows.length; j++) {
 			if (rows[j].textContent === repoId) {
 				rows[j].style.fontWeight = "bold";
 				rows[j].style.color = "#0056b3";
@@ -1401,12 +1408,12 @@ function downloadLlmModel() {
 			r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)),
 		)
 		.then(() => {
-			var btn = document.getElementById("btn-download-llm");
-			var progressBtn = document.getElementById("btn-download-llm");
+			const btn = document.getElementById("btn-download-llm");
+			const progressBtn = document.getElementById("btn-download-llm");
 			progressBtn.textContent = "Downloading...";
 			progressBtn.disabled = true;
 
-			var checkProgress = setInterval(() => {
+			const checkProgress = setInterval(() => {
 				fetch(
 					CONFIG.llm.progress +
 						"?repo_id=" +
@@ -1462,11 +1469,11 @@ function deleteLlmModel() {
 // Embedding Management
 // ──────────────────────────────────────────────────────────────
 function renderEmbModels(models) {
-	var listEl = document.getElementById("emb-models-list");
-	var statusEl = document.getElementById("emb-global-status");
-	var textEl = document.getElementById("emb-global-text");
-	var btnDownload = document.getElementById("btn-download-emb");
-	var btnDelete = document.getElementById("btn-delete-emb");
+	const listEl = document.getElementById("emb-models-list");
+	const statusEl = document.getElementById("emb-global-status");
+	const textEl = document.getElementById("emb-global-text");
+	const btnDownload = document.getElementById("btn-download-emb");
+	const btnDelete = document.getElementById("btn-delete-emb");
 
 	statusEl.className = "global-status";
 
@@ -1485,10 +1492,10 @@ function renderEmbModels(models) {
 	btnDownload.style.display = "none";
 	btnDelete.style.display = "inline-block";
 
-	var html = '<table class="model-table"><tbody>';
-	for (var i = 0; i < models.length; i++) {
-		var m = models[i];
-		var repoId = m.repo_id;
+	let html = '<table class="model-table"><tbody>';
+	for (let i = 0; i < models.length; i++) {
+		const m = models[i];
+		const repoId = m.repo_id;
 		html += "<tr>";
 		html +=
 			'<td class="model-name" onclick="Config.selectEmbModel(\'' +
@@ -1515,8 +1522,8 @@ function checkEmbModels() {
 		})
 		.catch((e) => {
 			console.error(e);
-			var statusEl = document.getElementById("emb-global-status");
-			var textEl = document.getElementById("emb-global-text");
+			const statusEl = document.getElementById("emb-global-status");
+			const textEl = document.getElementById("emb-global-text");
 			statusEl.className = "global-status critical";
 			textEl.textContent = "Error loading embedding models";
 		});
@@ -1524,14 +1531,14 @@ function checkEmbModels() {
 
 function selectEmbModel(repoId) {
 	selectedEmbRepo = repoId;
-	var listEl = document.getElementById("emb-models-list");
-	var rows = listEl.querySelectorAll(".model-name");
-	for (var i = 0; i < rows.length; i++) {
+	const listEl = document.getElementById("emb-models-list");
+	const rows = listEl.querySelectorAll(".model-name");
+	for (let i = 0; i < rows.length; i++) {
 		rows[i].style.fontWeight = "normal";
 		rows[i].style.color = "#007bff";
 	}
 	if (rows.length > 0) {
-		for (var j = 0; j < rows.length; j++) {
+		for (let j = 0; j < rows.length; j++) {
 			if (rows[j].textContent === repoId) {
 				rows[j].style.fontWeight = "bold";
 				rows[j].style.color = "#0056b3";
@@ -1542,7 +1549,7 @@ function selectEmbModel(repoId) {
 }
 
 function searchEmbModel() {
-	var query = document.getElementById("emb-search-input").value.trim();
+	const query = document.getElementById("emb-search-input").value.trim();
 	if (!query) return;
 
 	fetch(
@@ -1555,15 +1562,15 @@ function searchEmbModel() {
 			r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)),
 		)
 		.then((data) => {
-			var resultsEl = document.getElementById("emb-search-results");
+			const resultsEl = document.getElementById("emb-search-results");
 			if (!data.models || data.models.length === 0) {
 				resultsEl.innerHTML = '<p class="info-text">No results found.</p>';
 				return;
 			}
 
-			var html = "";
-			for (var i = 0; i < data.models.length; i++) {
-				var m = data.models[i];
+			let html = "";
+			for (let i = 0; i < data.models.length; i++) {
+				const m = data.models[i];
 				html += '<div class="search-item">';
 				html += `<span class="result-name">${escHtml(m.repo_id)}</span>`;
 				html +=
@@ -1593,11 +1600,11 @@ function downloadEmbModel() {
 			r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)),
 		)
 		.then(() => {
-			var btn = document.getElementById("btn-download-emb");
+			const btn = document.getElementById("btn-download-emb");
 			btn.textContent = "Downloading...";
 			btn.disabled = true;
 
-			var checkProgress = setInterval(() => {
+			const checkProgress = setInterval(() => {
 				fetch(
 					CONFIG.embedding.progress +
 						"?repo_id=" +
@@ -1631,7 +1638,7 @@ function downloadEmbModelDirect(repoId) {
 }
 
 function checkDimensionStatus() {
-	var banner = document.getElementById("emb-dim-banner");
+	const banner = document.getElementById("emb-dim-banner");
 	if (banner) banner.style.display = "none";
 }
 
@@ -1642,12 +1649,12 @@ function recreateAndReindex() {
 		)
 	)
 		return;
-	var btn = document.querySelector("#emb-dim-banner .btn");
+	const btn = document.querySelector("#emb-dim-banner .btn");
 	if (btn) {
 		btn.textContent = "Recreating...";
 		btn.disabled = true;
 	}
-	var statusEl =
+	const statusEl =
 		document.getElementById("emb-download-status") ||
 		document.getElementById("qdrant-download-status");
 	if (statusEl) {
@@ -1655,8 +1662,8 @@ function recreateAndReindex() {
 		statusEl.className = "status-message";
 	}
 
-	var collections = ["sigma_docs"];
-	var chain = Promise.resolve();
+	const collections = ["sigma_docs"];
+	let chain = Promise.resolve();
 	collections.forEach((name) => {
 		chain = chain.then(() =>
 			fetch("/api/v1/qdrant", {
@@ -1715,8 +1722,8 @@ function deleteEmbModel() {
 // Specifications
 // ──────────────────────────────────────────────────────────────
 function renderSpecsStatus(repos, defaultOrg, defaultName) {
-	var statusEl = document.getElementById("specs-status");
-	var listEl = document.getElementById("specs-repos-list");
+	const statusEl = document.getElementById("specs-status");
+	const listEl = document.getElementById("specs-repos-list");
 
 	if (!repos || repos.length === 0) {
 		setStatusText(statusEl, "Default repository missing", false);
@@ -1736,9 +1743,9 @@ function renderSpecsStatus(repos, defaultOrg, defaultName) {
 		return;
 	}
 
-	var found = false;
-	var foundRepo = null;
-	for (var i = 0; i < repos.length; i++) {
+	let found = false;
+	let foundRepo = null;
+	for (let i = 0; i < repos.length; i++) {
 		if (repos[i].org === defaultOrg && repos[i].name === defaultName) {
 			found = true;
 			foundRepo = repos[i];
@@ -1748,23 +1755,23 @@ function renderSpecsStatus(repos, defaultOrg, defaultName) {
 
 	if (found) {
 		setStatusText(statusEl, "Default repository configured", true);
-		var statusClass =
+		const statusClass =
 			foundRepo.repo_status === "error" ? "text-danger" : "text-success";
-		var statusLabel =
+		const statusLabel =
 			foundRepo.repo_status === "error"
 				? "ERROR"
 				: foundRepo.repo_status === "cloning" ||
 						foundRepo.repo_status === "syncing"
 					? "SYNCING"
 					: "READY";
-		var dotClass =
+		const dotClass =
 			foundRepo.repo_status === "error"
 				? "data-dot-missing"
 				: foundRepo.repo_status === "cloning" ||
 						foundRepo.repo_status === "syncing"
 					? "data-dot-warn"
 					: "data-dot-ok";
-		var fixBtnHtml =
+		const fixBtnHtml =
 			foundRepo.repo_status === "error"
 				? '<button class="btn btn-primary btn-sm" onclick="Config.fixSpecRepo()">Fix</button>'
 				: '<button class="btn btn-primary btn-sm" disabled>Fix</button>';
@@ -1813,11 +1820,11 @@ function renderSpecsStatus(repos, defaultOrg, defaultName) {
 }
 
 function loadSpecs() {
-	var statusEl = document.getElementById("specs-status");
+	const statusEl = document.getElementById("specs-status");
 	setStatusText(statusEl, "Loading specifications...", true);
 
-	var defaultOrg = _BACKEND_CONFIG.Hardware ? "sigmahq" : "sigmahq";
-	var defaultName = _BACKEND_CONFIG.Hardware
+	const defaultOrg = _BACKEND_CONFIG.Hardware ? "sigmahq" : "sigmahq";
+	const defaultName = _BACKEND_CONFIG.Hardware
 		? "sigma-specification"
 		: "sigma-specification";
 
@@ -1831,7 +1838,7 @@ function loadSpecs() {
 		.catch((e) => {
 			console.error(e);
 			setStatusText(statusEl, `Error loading specs: ${e.message}`, false);
-			var listEl = document.getElementById("specs-repos-list");
+			const listEl = document.getElementById("specs-repos-list");
 			if (listEl) {
 				listEl.innerHTML =
 					'<div class="data-row">' +
@@ -1851,8 +1858,8 @@ function loadSpecs() {
 }
 
 function fixSpecRepo() {
-	var defaultUrl = "https://github.com/sigmahq/sigma-specification";
-	var defaultBranch = "main";
+	const defaultUrl = "https://github.com/sigmahq/sigma-specification";
+	const defaultBranch = "main";
 
 	if (
 		!confirm(
@@ -1863,7 +1870,7 @@ function fixSpecRepo() {
 	)
 		return;
 
-	var statusEl = document.getElementById("specs-config-status");
+	const statusEl = document.getElementById("specs-config-status");
 	statusEl.textContent = "Cloning repository...";
 	statusEl.className = "status-message";
 
@@ -1894,7 +1901,7 @@ function fixSpecRepo() {
 // ──────────────────────────────────────────────────────────────
 // Config Object (accessible via onclick=)
 // ──────────────────────────────────────────────────────────────
-var _Config = {
+const _Config = {
 	// System
 	saveBackendConfig: saveBackendConfig,
 	createDataDirs: createDataDirs,
@@ -1982,7 +1989,7 @@ document.addEventListener("DOMContentLoaded", () => {
 	loadSystemStatus();
 
 	// Bind form submit
-	var form = document.getElementById("config-form");
+	const form = document.getElementById("config-form");
 	if (form)
 		form.addEventListener("submit", (e) => {
 			e.preventDefault();
@@ -1990,11 +1997,11 @@ document.addEventListener("DOMContentLoaded", () => {
 		});
 
 	// Update Qdrant Web UI link when Base URL changes
-	var qdrantUrlInput = document.getElementById("qdrant-base-url");
-	var qdrantWebLink = document.getElementById("qdrant-webui-link");
+	const qdrantUrlInput = document.getElementById("qdrant-base-url");
+	const qdrantWebLink = document.getElementById("qdrant-webui-link");
 	if (qdrantUrlInput && qdrantWebLink) {
 		function updateQdrantWebLink() {
-			var base = qdrantUrlInput.value.replace(/\/+$/, "");
+			const base = qdrantUrlInput.value.replace(/\/+$/, "");
 			qdrantWebLink.href = base
 				? `${base}/dashboard`
 				: "http://127.0.0.1:6333/dashboard";
@@ -2004,7 +2011,7 @@ document.addEventListener("DOMContentLoaded", () => {
 	}
 
 	// Setup sidebar nav clicks
-	var navLinks = document.querySelectorAll(".config-nav-link");
+	const navLinks = document.querySelectorAll(".config-nav-link");
 	navLinks.forEach((link) => {
 		link.addEventListener("click", function (_e) {
 			navLinks.forEach((l) => {

@@ -18,17 +18,17 @@
 function _matchTag(tag, value) {
 	if (!value) return false;
 	if (tag === value) return true;
-	var t = tag.replace(/^[vb]/i, "");
-	var v = value.replace(/^[vb]/i, "");
+	const t = tag.replace(/^[vb]/i, "");
+	const v = value.replace(/^[vb]/i, "");
 	return t === value || tag === `v${v}` || tag === `b${v}` || t === v;
 }
 
 function _populateSelect(sel, releases, opts, fmt) {
-	var found = false;
+	let found = false;
 	releases.forEach((r) => {
-		var opt = document.createElement("option");
+		const opt = document.createElement("option");
 		opt.value = r.tag_name;
-		var label = fmt(r);
+		let label = fmt(r);
 		if (_matchTag(r.tag_name, opts.value)) {
 			opt.selected = true;
 			found = true;
@@ -38,7 +38,7 @@ function _populateSelect(sel, releases, opts, fmt) {
 		sel.appendChild(opt);
 	});
 	if (opts.value && !found) {
-		var opt = document.createElement("option");
+		const opt = document.createElement("option");
 		opt.value = opts.value;
 		opt.textContent = `${opts.value.replace(/^[vb]/i, "")} (installed)`;
 		opt.selected = true;
@@ -50,8 +50,8 @@ function _populateSelect(sel, releases, opts, fmt) {
  * Default label formatter: strip leading 'v' or 'b' prefix from tag for display.
  */
 function defaultReleaseLabel(r) {
-	var tag = r.tag_name || "";
-	var label = tag.replace(/^[vb]/i, "");
+	const tag = r.tag_name || "";
+	let label = tag.replace(/^[vb]/i, "");
 	if (r.prerelease) label += " (pre-release)";
 	return label || tag;
 }
@@ -68,9 +68,9 @@ function defaultReleaseLabel(r) {
  */
 function loadReleaseTags(selectId, service, opts) {
 	opts = opts || {};
-	var sel = document.getElementById(selectId);
+	const sel = document.getElementById(selectId);
 	if (!sel) return;
-	var fmt = opts.label || defaultReleaseLabel;
+	const fmt = opts.label || defaultReleaseLabel;
 	sel.innerHTML = "";
 	fetch(`/api/v1/releases/${encodeURIComponent(service)}`)
 		.then((r) => {
@@ -78,7 +78,7 @@ function loadReleaseTags(selectId, service, opts) {
 			return r.json();
 		})
 		.then((data) => {
-			var releases = data.releases || [];
+			const releases = data.releases || [];
 			if (releases.length) {
 				_populateSelect(sel, releases, opts, fmt);
 			} else if (opts.value) {
@@ -117,9 +117,9 @@ function loadReleaseTags(selectId, service, opts) {
  */
 function loadCustomReleaseTags(selectId, owner, repo, opts) {
 	opts = opts || {};
-	var sel = document.getElementById(selectId);
+	const sel = document.getElementById(selectId);
 	if (!sel) return;
-	var fmt = opts.label || defaultReleaseLabel;
+	const fmt = opts.label || defaultReleaseLabel;
 	sel.innerHTML = "";
 	fetch(
 		"/api/v1/releases/custom/?owner=" +
@@ -132,7 +132,7 @@ function loadCustomReleaseTags(selectId, owner, repo, opts) {
 			return r.json();
 		})
 		.then((data) => {
-			var releases = data.releases || [];
+			const releases = data.releases || [];
 			if (releases.length) {
 				_populateSelect(sel, releases, opts, fmt);
 			} else {

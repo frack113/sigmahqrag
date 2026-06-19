@@ -16,7 +16,7 @@ function safeCall1(fn, arg) {
 
 class ProgressBar {
 	constructor(opts) {
-		var options = opts || {};
+		const options = opts || {};
 		this.container =
 			typeof options.container === "string"
 				? document.getElementById(options.container)
@@ -39,7 +39,7 @@ class ProgressBar {
 
 	setProgress(pct) {
 		if (this.fill) {
-			var clamped = Math.min(100, Math.max(0, Number(pct) || 0));
+			const clamped = Math.min(100, Math.max(0, Number(pct) || 0));
 			this.fill.style.width = `${clamped}%`;
 			this.fill.style.background = clamped === 100 ? "#4caf50" : "";
 		}
@@ -85,29 +85,29 @@ class ProgressBar {
 
 	static pollDownload(opts) {
 		if (!opts) return 0;
-		var endpoint = opts.endpoint;
-		var downloadId = opts.downloadId;
-		var onUpdate = opts.onUpdate || (() => {});
-		var onComplete = opts.onComplete || (() => {});
-		var onError = opts.onError || (() => {});
-		var intervalMs = opts.interval || 1000;
-		var pollId = setInterval(() => {
+		const endpoint = opts.endpoint;
+		const downloadId = opts.downloadId;
+		const onUpdate = opts.onUpdate || (() => {});
+		const onComplete = opts.onComplete || (() => {});
+		const onError = opts.onError || (() => {});
+		const intervalMs = opts.interval || 1000;
+		const pollId = setInterval(() => {
 			fetch(endpoint)
 				.then((r) => {
 					if (!r.ok) throw new Error(`HTTP ${r.status}`);
 					return r.json();
 				})
 				.then((data) => {
-					var task = data.downloads ? data.downloads[downloadId] : null;
+					const task = data.downloads ? data.downloads[downloadId] : null;
 					if (!task) {
 						clearInterval(pollId);
 						safeCall1(onError, "Download task not found");
 						return;
 					}
-					var downloaded = task.bytes_downloaded || 0;
-					var total = task.total_bytes || 1;
-					var pct = Math.round((downloaded / total) * 100);
-					var text =
+					const downloaded = task.bytes_downloaded || 0;
+					const total = task.total_bytes || 1;
+					const pct = Math.round((downloaded / total) * 100);
+					const text =
 						pct +
 						"% (" +
 						Math.round(downloaded / 1024 / 1024) +
@@ -133,19 +133,19 @@ class ProgressBar {
 
 	static pollProgressEndpoint(opts) {
 		if (!opts) return 0;
-		var url = opts.url;
-		var onUpdate = opts.onUpdate || (() => {});
-		var onComplete = opts.onComplete || (() => {});
-		var onError = opts.onError || (() => {});
-		var intervalMs = opts.interval || 2000;
-		var pollId = setInterval(() => {
+		const url = opts.url;
+		const onUpdate = opts.onUpdate || (() => {});
+		const onComplete = opts.onComplete || (() => {});
+		const onError = opts.onError || (() => {});
+		const intervalMs = opts.interval || 2000;
+		const pollId = setInterval(() => {
 			fetch(url)
 				.then((r) =>
 					r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)),
 				)
 				.then((d) => {
-					var p = Number(d.progress) || 0;
-					var status = d.status || "";
+					const p = Number(d.progress) || 0;
+					const status = d.status || "";
 					safeCall1(onUpdate, p, status);
 					if (p >= 100 || status === "completed") {
 						clearInterval(pollId);

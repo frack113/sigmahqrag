@@ -59,9 +59,9 @@ function trimLines() {
 
 function selectSource(source) {
 	currentSource = source;
-	document
-		.querySelectorAll("#log-sources a")
-		.forEach((a) => a.classList.remove("active"));
+	document.querySelectorAll("#log-sources a").forEach((a) => {
+		a.classList.remove("active");
+	});
 	const link = document.querySelector(
 		`#log-sources a[data-source="${escAttr(source)}"]`,
 	);

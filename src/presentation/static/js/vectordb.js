@@ -2,7 +2,7 @@ const DISPATCHER_API = "/api/v1/dispatcher";
 
 function esc(s) {
 	if (s == null) return "";
-	var m = {
+	const m = {
 		"&": "\x26amp;",
 		"<": "\x26lt;",
 		">": "\x26gt;",
@@ -14,7 +14,7 @@ function esc(s) {
 
 function escAttr(s) {
 	if (s == null) return "";
-	var m = {
+	const m = {
 		"&": "\x26amp;",
 		'"': "\x26quot;",
 		"'": "\x26#39;",
@@ -28,17 +28,17 @@ async function loadVectorDB() {
 	if (window.isProcessing) return;
 	window.isProcessing = true;
 
-	var loadingEl = document.getElementById("vectordb-loading");
-	var contentEl = document.getElementById("vectordb-content");
-	var errorEl = document.getElementById("vectordb-error");
-	var tableBody = document.getElementById("collections-list");
+	const loadingEl = document.getElementById("vectordb-loading");
+	const contentEl = document.getElementById("vectordb-content");
+	const errorEl = document.getElementById("vectordb-error");
+	const tableBody = document.getElementById("collections-list");
 
 	if (loadingEl) loadingEl.style.display = "block";
 	if (contentEl) contentEl.style.display = "none";
 	if (errorEl) errorEl.style.display = "none";
 
 	try {
-		var status = await getQdrantStatus();
+		const status = await getQdrantStatus();
 
 		if (!status.healthy) {
 			throw new Error(
@@ -49,20 +49,20 @@ async function loadVectorDB() {
 			);
 		}
 
-		var collectionNames = await listCollections();
+		const collectionNames = await listCollections();
 
 		if (tableBody) {
 			tableBody.innerHTML = "";
 		}
 
-		for (var i = 0; i < collectionNames.length; i++) {
-			var col = collectionNames[i];
-			var config = col;
-			var nameEsc = esc(col.name);
-			var nameAttr = escAttr(col.name);
+		for (let i = 0; i < collectionNames.length; i++) {
+			const col = collectionNames[i];
+			const config = col;
+			const nameEsc = esc(col.name);
+			const nameAttr = escAttr(col.name);
 
 			if (tableBody) {
-				var row = document.createElement("tr");
+				const row = document.createElement("tr");
 				row.innerHTML =
 					"<td>" +
 					nameEsc +
@@ -115,7 +115,7 @@ async function _recreateCollection(name, event) {
 	if (window.isProcessing) return;
 	window.isProcessing = true;
 
-	var btn = event?.target || event?.srcElement || document.activeElement;
+	const btn = event?.target || event?.srcElement || document.activeElement;
 	if (btn) btn.disabled = true;
 
 	try {
@@ -133,7 +133,7 @@ async function _recreateCollection(name, event) {
 }
 
 async function _askWorker(workerType, taskParams) {
-	var resp = await fetch(`${DISPATCHER_API}/ask`, {
+	const resp = await fetch(`${DISPATCHER_API}/ask`, {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
 		body: JSON.stringify({
@@ -145,22 +145,22 @@ async function _askWorker(workerType, taskParams) {
 }
 
 async function _startUnifiedIndex() {
-	var btn = document.getElementById("btn-index-docs");
+	const btn = document.getElementById("btn-index-docs");
 	if (btn?.disabled) return; // already running
 	if (btn) btn.disabled = true;
 
-	var specBar = new ProgressBar({
+	const specBar = new ProgressBar({
 		container: document.getElementById("indexer-progress-spec"),
 		fill: document.getElementById("indexer-progress-spec-fill"),
 		text: document.getElementById("indexer-progress-spec-text"),
 	});
-	var docsBar = new ProgressBar({
+	const docsBar = new ProgressBar({
 		container: document.getElementById("indexer-progress-docs"),
 		fill: document.getElementById("indexer-progress-docs-fill"),
 		text: document.getElementById("indexer-progress-docs-text"),
 	});
-	var resultEl = document.getElementById("indexer-result");
-	var errorEl = document.getElementById("indexer-error");
+	const resultEl = document.getElementById("indexer-result");
+	const errorEl = document.getElementById("indexer-error");
 
 	if (resultEl) resultEl.style.display = "none";
 	if (errorEl) errorEl.style.display = "none";
@@ -176,7 +176,7 @@ async function _startUnifiedIndex() {
 	}
 
 	async function callGroup(group) {
-		var resp = await fetch("/api/v1/qdrant", {
+		const resp = await fetch("/api/v1/qdrant", {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
@@ -185,7 +185,7 @@ async function _startUnifiedIndex() {
 			}),
 		});
 		if (!resp.ok) {
-			var body = await resp.text();
+			const body = await resp.text();
 			throw new Error(`HTTP ${resp.status}: ${body.slice(0, 200)}`);
 		}
 		return await resp.json();
@@ -197,9 +197,9 @@ async function _startUnifiedIndex() {
 		// Phase 1: Specification
 		setSpecProgress(0, "Indexation...");
 		setDocsProgress(0, "En attente");
-		var specResult = await callGroup("spec");
+		const specResult = await callGroup("spec");
 		if (specResult.status === "success") {
-			var specCount = specResult.data?.results
+			const specCount = specResult.data?.results
 				? specResult.data.results.reduce((s, r) => s + r.processed, 0)
 				: 0;
 			setSpecProgress(100, `${specCount} documents`);
@@ -217,9 +217,9 @@ async function _startUnifiedIndex() {
 		// Phase 2: Documents
 		console.log("Indexer: starting docs phase...");
 		setDocsProgress(0, "Indexation...");
-		var docsResult = await callGroup("docs");
+		const docsResult = await callGroup("docs");
 		if (docsResult.status === "success") {
-			var docsCount = docsResult.data?.results
+			const docsCount = docsResult.data?.results
 				? docsResult.data.results.reduce((s, r) => s + r.processed, 0)
 				: 0;
 			setDocsProgress(100, `${docsCount} documents`);
@@ -236,10 +236,10 @@ async function _startUnifiedIndex() {
 
 		// Show combined result
 		if (resultEl) {
-			var specResults = specResult.data?.results || [];
-			var docsResults = docsResult.data?.results || [];
-			var allResults = specResults.concat(docsResults);
-			var lines = allResults.map(
+			const specResults = specResult.data?.results || [];
+			const docsResults = docsResult.data?.results || [];
+			const allResults = specResults.concat(docsResults);
+			const lines = allResults.map(
 				(r) =>
 					r.route +
 					": " +

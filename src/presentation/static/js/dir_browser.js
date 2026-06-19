@@ -40,7 +40,7 @@ class DirBrowser {
 		this._boundChange = null;
 		this._boundClick = null;
 
-		var prefix = containerId;
+		let prefix = containerId;
 		if (prefix.endsWith("-tree")) prefix = prefix.slice(0, -5);
 		window[`_db_expand_${prefix}`] = this.expandAll.bind(this);
 		window[`_db_collapse_${prefix}`] = this.collapseAll.bind(this);
@@ -57,7 +57,7 @@ class DirBrowser {
 			this.container.removeEventListener("click", this._boundClick);
 			this._boundClick = null;
 		}
-		var prefix = this.container.id;
+		let prefix = this.container.id;
 		if (prefix.endsWith("-tree")) prefix = prefix.slice(0, -5);
 		delete window[`_db_expand_${prefix}`];
 		delete window[`_db_collapse_${prefix}`];
@@ -65,7 +65,7 @@ class DirBrowser {
 
 	_delegateEvents() {
 		this._boundChange = function (e) {
-			var cb = e.target;
+			const cb = e.target;
 			if (
 				(cb.type === "checkbox" && cb.classList.contains("tree-checkbox")) ||
 				cb.classList.contains("dir-checkbox-inner")
@@ -81,12 +81,12 @@ class DirBrowser {
 		this.container.addEventListener("change", this._boundChange);
 
 		this._boundClick = ((e) => {
-			var btn = e.target.closest(".tree-toggle");
+			const btn = e.target.closest(".tree-toggle");
 			if (btn) {
-				var li = btn.closest(".tree-node");
-				var children = li?.querySelector(".tree-children");
+				const li = btn.closest(".tree-node");
+				const children = li?.querySelector(".tree-children");
 				if (children) {
-					var isExpanded = children.style.display !== "none";
+					const isExpanded = children.style.display !== "none";
 					children.style.display = isExpanded ? "none" : "block";
 					btn.innerHTML = isExpanded ? "&#9658;" : "&#9660;";
 				}
@@ -100,9 +100,9 @@ class DirBrowser {
 			const { endpoints, mode } = this.opts;
 
 			if (mode === "tree") {
-				var treeResp, selResp;
+				let treeResp, selResp;
 				if (endpoints.selected) {
-					var resps = await Promise.all([
+					const resps = await Promise.all([
 						fetch(endpoints.list),
 						fetch(endpoints.selected),
 					]);
@@ -117,7 +117,7 @@ class DirBrowser {
 					this._showError(data.error || "Failed to load directory tree");
 					return;
 				}
-				var tree =
+				const tree =
 					data.tree ||
 					(data.data?.dirs
 						? data.data.dirs.map((d) => ({ name: d, path: d }))
@@ -129,7 +129,7 @@ class DirBrowser {
 
 				if (selResp) {
 					const selData = await selResp.json();
-					var selected = selData.data?.selected ? selData.data.selected : [];
+					const selected = selData.data?.selected ? selData.data.selected : [];
 					selected.forEach(
 						function (d) {
 							this.selected.add(d);
@@ -203,8 +203,8 @@ class DirBrowser {
 	}
 
 	_collectSelected(nodes) {
-		for (var i = 0; i < nodes.length; i++) {
-			var node = nodes[i];
+		for (let i = 0; i < nodes.length; i++) {
+			const node = nodes[i];
 			if (node.selected) this.selected.add(node.path);
 			if (node.children) this._collectSelected(node.children);
 		}
@@ -216,12 +216,12 @@ class DirBrowser {
 	}
 
 	_renderTreeNodes(nodes) {
-		var html = "";
-		for (var i = 0; i < nodes.length; i++) {
-			var node = nodes[i];
-			var hasChildren = node.children && node.children.length > 0;
-			var isChecked = this.selected.has(node.path);
-			var childrenHtml = hasChildren
+		let html = "";
+		for (let i = 0; i < nodes.length; i++) {
+			const node = nodes[i];
+			const hasChildren = node.children && node.children.length > 0;
+			const isChecked = this.selected.has(node.path);
+			const childrenHtml = hasChildren
 				? '<ul class="tree-children" style="display:none;">' +
 					this._renderTreeNodes(node.children) +
 					"</ul>"
@@ -249,10 +249,10 @@ class DirBrowser {
 	}
 
 	_renderFlat(dirs) {
-		var html = "";
-		for (var i = 0; i < dirs.length; i++) {
-			var d = dirs[i];
-			var isChecked = this.selected.has(d);
+		let html = "";
+		for (let i = 0; i < dirs.length; i++) {
+			const d = dirs[i];
+			const isChecked = this.selected.has(d);
 			html +=
 				'<label class="dir-checkbox">' +
 				'<input type="checkbox" class="dir-checkbox-inner" value="' +
@@ -268,35 +268,35 @@ class DirBrowser {
 	}
 
 	expandAll() {
-		var children = this.container.querySelectorAll(".tree-children");
-		for (var i = 0; i < children.length; i++) {
+		const children = this.container.querySelectorAll(".tree-children");
+		for (let i = 0; i < children.length; i++) {
 			children[i].style.display = "block";
 		}
-		var toggles = this.container.querySelectorAll(".tree-toggle");
-		for (var i = 0; i < toggles.length; i++) {
+		const toggles = this.container.querySelectorAll(".tree-toggle");
+		for (let i = 0; i < toggles.length; i++) {
 			toggles[i].innerHTML = "&#9660;";
 		}
 	}
 
 	collapseAll() {
-		var children = this.container.querySelectorAll(".tree-children");
-		for (var i = 0; i < children.length; i++) {
+		const children = this.container.querySelectorAll(".tree-children");
+		for (let i = 0; i < children.length; i++) {
 			children[i].style.display = "none";
 		}
-		var toggles = this.container.querySelectorAll(".tree-toggle");
-		for (var i = 0; i < toggles.length; i++) {
+		const toggles = this.container.querySelectorAll(".tree-toggle");
+		for (let i = 0; i < toggles.length; i++) {
 			toggles[i].innerHTML = "&#9658;";
 		}
 	}
 
 	_updateCount() {
-		var countEl = this.opts.selectedCountEl
+		const countEl = this.opts.selectedCountEl
 			? typeof this.opts.selectedCountEl === "string"
 				? document.getElementById(this.opts.selectedCountEl)
 				: this.opts.selectedCountEl
 			: null;
 		if (countEl) {
-			var count = this.selected.size;
+			const count = this.selected.size;
 			countEl.textContent = count > 0 ? `${count} folder(s) selected` : "";
 		}
 	}

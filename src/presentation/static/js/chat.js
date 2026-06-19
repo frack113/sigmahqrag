@@ -13,14 +13,14 @@
 	}
 
 	function init() {
-		var messagesEl = document.getElementById("chat-messages");
-		var chatForm = document.getElementById("chat-form");
-		var input = document.getElementById("message-input");
-		var sendBtn = document.getElementById("send-btn");
-		var welcome = document.getElementById("chat-welcome");
-		var newChatBtn = document.getElementById("new-chat-btn");
-		var typingEl = document.getElementById("typing-indicator");
-		var promptSelect = document.getElementById("prompt-select");
+		const messagesEl = document.getElementById("chat-messages");
+		const chatForm = document.getElementById("chat-form");
+		const input = document.getElementById("message-input");
+		const sendBtn = document.getElementById("send-btn");
+		let welcome = document.getElementById("chat-welcome");
+		const newChatBtn = document.getElementById("new-chat-btn");
+		const typingEl = document.getElementById("typing-indicator");
+		const promptSelect = document.getElementById("prompt-select");
 
 		if (!messagesEl || !chatForm || !input || !sendBtn) return;
 
@@ -30,26 +30,26 @@
 
 		function renderMarkdown(text) {
 			if (typeof marked !== "undefined") {
-				var normalized = text
+				const normalized = text
 					.replace(/([^\n])\n*(#{1,6}\s)/g, "$1\n\n$2")
 					.replace(/([^\n])\n*(\|)/g, "$1\n\n$2");
 				return marked.parse(normalized);
 			}
-			var div = document.createElement("div");
+			const div = document.createElement("div");
 			div.textContent = text;
 			return div.innerHTML;
 		}
 
-		var currentAbort = null;
+		let currentAbort = null;
 
 		function extractThinkContent(raw) {
-			var openIdx = raw.indexOf("<think>");
-			var closeIdx = raw.indexOf("</think>");
+			const openIdx = raw.indexOf("<think>");
+			const closeIdx = raw.indexOf("</think>");
 
 			if (openIdx === -1) {
 				// Suppress flash: if raw starts with < but no full tag yet
-				var lastOpen = raw.lastIndexOf("<");
-				var lastClose = raw.lastIndexOf(">");
+				const lastOpen = raw.lastIndexOf("<");
+				const lastClose = raw.lastIndexOf(">");
 				if (lastOpen > lastClose && raw.trim().length < 10) {
 					return { thinking: null, answer: "" };
 				}
@@ -74,16 +74,16 @@
 			promptSelect.innerHTML = "";
 
 			if (!prompts || prompts.length === 0) {
-				var emptyOpt = document.createElement("option");
+				const emptyOpt = document.createElement("option");
 				emptyOpt.value = "";
 				emptyOpt.textContent = "— No prompts —";
 				promptSelect.appendChild(emptyOpt);
 				return;
 			}
 
-			var activeId = null;
+			let activeId = null;
 			prompts.forEach((p) => {
-				var opt = document.createElement("option");
+				const opt = document.createElement("option");
 				opt.value = p.id;
 				opt.textContent = p.name;
 				promptSelect.appendChild(opt);
@@ -130,23 +130,23 @@
 		}
 
 		function createMessageHeader(role) {
-			var header = document.createElement("div");
+			const header = document.createElement("div");
 			header.className = "message-header";
-			var label = document.createElement("span");
+			const label = document.createElement("span");
 			label.textContent = role === "user" ? "You" : "Assistant";
 			header.appendChild(label);
 			return header;
 		}
 
 		function createMessageActions(_role, bodyEl) {
-			var actions = document.createElement("div");
+			const actions = document.createElement("div");
 			actions.className = "message-actions";
 
-			var copyBtn = document.createElement("button");
+			const copyBtn = document.createElement("button");
 			copyBtn.className = "btn btn-ghost btn-sm";
 			copyBtn.textContent = "Copy";
 			copyBtn.addEventListener("click", () => {
-				var text = getAnswerText(bodyEl);
+				const text = getAnswerText(bodyEl);
 				navigator.clipboard
 					.writeText(text)
 					.then(() => {
@@ -161,9 +161,9 @@
 		}
 
 		function getAnswerText(bodyEl) {
-			var _thinkBlock = bodyEl.querySelector(".thinking-block");
-			var clone = bodyEl.cloneNode(true);
-			var thinkClone = clone.querySelector(".thinking-block");
+			const _thinkBlock = bodyEl.querySelector(".thinking-block");
+			const clone = bodyEl.cloneNode(true);
+			const thinkClone = clone.querySelector(".thinking-block");
 			if (thinkClone) thinkClone.remove();
 			return clone.textContent || clone.innerText || "";
 		}
@@ -172,12 +172,12 @@
 			bodyEl.innerHTML = "";
 
 			if (thinking !== null) {
-				var details = document.createElement("details");
+				const details = document.createElement("details");
 				details.className = "thinking-block";
-				var summary = document.createElement("summary");
+				const summary = document.createElement("summary");
 				summary.textContent = "Thinking";
 				details.appendChild(summary);
-				var content = document.createElement("div");
+				const content = document.createElement("div");
 				content.className = "thinking-content";
 				if (formatted) {
 					content.innerHTML = renderMarkdown(thinking);
@@ -189,7 +189,7 @@
 			}
 
 			if (answer) {
-				var answerDiv = document.createElement("div");
+				const answerDiv = document.createElement("div");
 				answerDiv.className = "answer-content";
 				if (formatted) {
 					answerDiv.innerHTML = renderMarkdown(answer);
@@ -201,24 +201,24 @@
 		}
 
 		function makeMessageEl(role, bodyContent, append) {
-			var div = document.createElement("div");
+			const div = document.createElement("div");
 			div.className = `message ${role}`;
 
-			var header = createMessageHeader(role);
+			const header = createMessageHeader(role);
 			div.appendChild(header);
 
-			var body = document.createElement("div");
+			const body = document.createElement("div");
 			body.className = "message-body";
 
 			if (role === "user") {
 				body.textContent = bodyContent;
 			} else {
-				var parsed = extractThinkContent(bodyContent);
+				const parsed = extractThinkContent(bodyContent);
 				updateMessageBody(body, parsed.thinking, parsed.answer, true);
 			}
 			div.appendChild(body);
 
-			var actions = createMessageActions(role, body);
+			const actions = createMessageActions(role, body);
 			div.appendChild(actions);
 
 			if (append !== false) {
@@ -264,7 +264,7 @@
 						el.remove();
 					});
 					if (!welcome) {
-						var w = document.createElement("div");
+						const w = document.createElement("div");
 						w.className = "chat-welcome";
 						w.innerHTML =
 							"<h2>SigmaHQ RAG</h2><p>Ask questions about Sigma detection rules</p>";
@@ -290,7 +290,7 @@
 		/* ---- Chat submit ---- */
 		chatForm.addEventListener("submit", async (e) => {
 			e.preventDefault();
-			var text = input.value.trim();
+			const text = input.value.trim();
 			if (!text) return;
 
 			if (currentAbort) {
@@ -308,10 +308,10 @@
 				welcome = null;
 			}
 
-			var promptId = getSelectedPrompt();
+			const promptId = getSelectedPrompt();
 
 			currentAbort = new AbortController();
-			var resp;
+			let resp;
 			try {
 				resp = await fetch("/api/v1/chat/message/stream", {
 					method: "POST",
@@ -344,25 +344,21 @@
 				return;
 			}
 
-			var reader = resp.body.getReader();
-			var decoder = new TextDecoder();
-			var accumulated = "";
-			var bubbleInfo = null;
-			var gotToken = false;
-			var sseBuffer = "";
+			const reader = resp.body.getReader();
+			const decoder = new TextDecoder();
+			let accumulated = "";
+			let bubbleInfo = null;
+			let gotToken = false;
+			let sseBuffer = "";
 
 			try {
 				while (true) {
-					var result;
+					let result;
 					try {
 						result = await reader.read();
 					} catch (err) {
 						if (err.name !== "AbortError") {
-							makeMessageEl(
-								"error",
-								`Stream read error: ${err.message}`,
-								true,
-							);
+							makeMessageEl("error", `Stream read error: ${err.message}`, true);
 						}
 						break;
 					}
@@ -370,34 +366,33 @@
 
 					sseBuffer += decoder.decode(result.value, { stream: true });
 
-					var eventEnd;
-					while ((eventEnd = sseBuffer.indexOf("\n\n")) !== -1) {
-						var event = sseBuffer.substring(0, eventEnd);
+					for (
+						let eventEnd = sseBuffer.indexOf("\n\n");
+						eventEnd !== -1;
+						eventEnd = sseBuffer.indexOf("\n\n")
+					) {
+						const event = sseBuffer.substring(0, eventEnd);
 						sseBuffer = sseBuffer.substring(eventEnd + 2);
 
 						if (!event.startsWith("data: ")) continue;
 
-						var data = event.slice(6);
+						const data = event.slice(6);
 
 						if (data === "[DONE]") {
 							if (!gotToken && !bubbleInfo) {
-								makeMessageEl(
-									"assistant",
-									"(no response from LLM)",
-									true,
-								);
+								makeMessageEl("assistant", "(no response from LLM)", true);
 							}
 							setLoading(false);
 
 							if (bubbleInfo) {
-								var finalParsed = extractThinkContent(accumulated);
+								const finalParsed = extractThinkContent(accumulated);
 								updateMessageBody(
 									bubbleInfo.bodyEl,
 									finalParsed.thinking,
 									finalParsed.answer,
 									true,
 								);
-								var ts = document.createElement("div");
+								const ts = document.createElement("div");
 								ts.className = "message-timestamp";
 								ts.textContent = "just now";
 								bubbleInfo.el.appendChild(ts);
@@ -419,7 +414,7 @@
 							bubbleInfo = makeMessageEl("assistant", "", true);
 						}
 
-						var parsed = extractThinkContent(accumulated);
+						const parsed = extractThinkContent(accumulated);
 						updateMessageBody(
 							bubbleInfo.bodyEl,
 							parsed.thinking,
