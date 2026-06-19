@@ -132,12 +132,8 @@
 		function createMessageHeader(role) {
 			var header = document.createElement("div");
 			header.className = "message-header";
-			var icon = document.createElement("span");
-			icon.className = "message-role-icon";
-			icon.textContent = role === "user" ? "\u{1F464}" : "\u{1F916}";
-			header.appendChild(icon);
 			var label = document.createElement("span");
-			label.textContent = role === "user" ? "Vous" : "SigmaHQ RAG";
+			label.textContent = role === "user" ? "You" : "Assistant";
 			header.appendChild(label);
 			return header;
 		}
@@ -148,16 +144,16 @@
 
 			var copyBtn = document.createElement("button");
 			copyBtn.className = "btn btn-ghost btn-sm";
-			copyBtn.textContent = "\u{1F4CB} Copier";
+			copyBtn.textContent = "Copy";
 			copyBtn.addEventListener("click", () => {
 				var text = getAnswerText(bodyEl);
 				navigator.clipboard
 					.writeText(text)
 					.then(() => {
-						showToast("Copi\u00E9 !");
+						showToast("Copied!");
 					})
 					.catch(() => {
-						showToast("Erreur de copie");
+						showToast("Copy failed");
 					});
 			});
 			actions.appendChild(copyBtn);
@@ -234,7 +230,9 @@
 
 		function setLoading(loading) {
 			sendBtn.disabled = loading;
-			sendBtn.textContent = loading ? "Envoi..." : "Send";
+			sendBtn.innerHTML = loading
+				? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;animation:spin 1s linear infinite"><circle cx="12" cy="12" r="10" stroke-dasharray="31.4 31.4" stroke-linecap="round"/></svg>'
+				: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>';
 			if (loading) {
 				showTyping();
 			} else {
@@ -269,7 +267,7 @@
 						var w = document.createElement("div");
 						w.className = "chat-welcome";
 						w.innerHTML =
-							"<h2>SigmaHQ RAG</h2><p>Posez vos questions sur les r\u00E8gles Sigma</p>";
+							"<h2>SigmaHQ RAG</h2><p>Ask questions about Sigma detection rules</p>";
 						messagesEl.appendChild(w);
 						welcome = w;
 					} else {
@@ -278,7 +276,7 @@
 					hideTyping();
 				})
 				.catch(() => {
-					showToast("Erreur lors de l'effacement");
+					showToast("Error clearing history");
 				});
 		}
 
@@ -328,7 +326,7 @@
 				});
 			} catch (err) {
 				if (err.name !== "AbortError") {
-					makeMessageEl("error", `Erreur r\u00E9seau: ${err.message}`, true);
+					makeMessageEl("error", `Network error: ${err.message}`, true);
 				}
 				setLoading(false);
 				currentAbort = null;
@@ -362,7 +360,7 @@
 						if (err.name !== "AbortError") {
 							makeMessageEl(
 								"error",
-								`Erreur de lecture du flux: ${err.message}`,
+								`Stream read error: ${err.message}`,
 								true,
 							);
 						}
@@ -385,7 +383,7 @@
 							if (!gotToken && !bubbleInfo) {
 								makeMessageEl(
 									"assistant",
-									"(aucune r\u00E9ponse du LLM)",
+									"(no response from LLM)",
 									true,
 								);
 							}
@@ -401,7 +399,7 @@
 								);
 								var ts = document.createElement("div");
 								ts.className = "message-timestamp";
-								ts.textContent = "\u00E0 l'instant";
+								ts.textContent = "just now";
 								bubbleInfo.el.appendChild(ts);
 							}
 
@@ -433,7 +431,7 @@
 				}
 
 				if (!gotToken && !bubbleInfo) {
-					makeMessageEl("assistant", "(aucune r\u00E9ponse du LLM)", true);
+					makeMessageEl("assistant", "(no response from LLM)", true);
 				}
 			} catch (err) {
 				if (err.name !== "AbortError") {
