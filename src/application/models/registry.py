@@ -176,10 +176,26 @@ class UnifiedRegistry:
                         "files": files,
                     }
 
+        self._prune_missing_disk_paths("llm", db)
+
         if save:
             self._save(db)
 
         self._trim_to_one("llm", db)
+
+    def _prune_missing_disk_paths(self, model_type: str, db: DatabaseService) -> None:
+        """Remove registry entries whose local_path no longer exists on disk."""
+        reg = self._registry[model_type]
+        stale = [
+            r for r, d in reg.items() if d.get("local_path") and not Path(d["local_path"]).exists()
+        ]
+        for repo_id in stale:
+            del reg[repo_id]
+            db.delete_model(repo_id)
+        if stale:
+            logger.info(
+                "Pruned %d stale %s entries with missing disk paths", len(stale), model_type
+            )
 
     def _trim_to_one(self, model_type: str, db: DatabaseService) -> None:
         """Keep only the first registered model (alphabetically). Remove extras from registry and DB."""
@@ -229,6 +245,8 @@ class UnifiedRegistry:
                         "dimension": existing.get("dimension"),
                         "index_path": existing.get("index_path"),
                     }
+
+        self._prune_missing_disk_paths("embeddings", db)
 
         if save:
             self._save(db)
