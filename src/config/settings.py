@@ -53,7 +53,6 @@ class Config:
     paths_duckdb_path: str = "data/duckdb/sigmahq.duckdb"
     paths_github_dir: str = "data/github"
     paths_rag_cache_dir: str = "data/rag_cache"
-    paths_model_registry: str = "data/models/registry.json"
     paths_sigma_ref_docs_dir: str = "data/documents/sigmaref"
     paths_spec_repos_dir: str = "data/specification"
     paths_sigma_spec_dir: str = "data/specification/sigmahq/sigma-specification"

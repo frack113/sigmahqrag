@@ -181,10 +181,14 @@ class TestEmbeddingSingleton:
         from src.core.embedding.factory import get_embedding_model, reset_embedding_model
 
         mock_db = MagicMock()
-        mock_db.get_embedding_config.return_value = {}
+        mock_db.get_active_embedding_model_name.return_value = None
 
-        with patch("src.core.embedding.factory.DatabaseService") as MockDB:
+        with (
+            patch("src.core.embedding.factory.DatabaseService") as MockDB,
+            patch("src.core.pipeline.ingestion.build_embed_model") as mock_build,
+        ):
             MockDB.get_instance.return_value = mock_db
+            mock_build.return_value = MagicMock()
             reset_embedding_model()
 
             model_a = get_embedding_model()
@@ -197,7 +201,7 @@ class TestEmbeddingSingleton:
         from src.core.embedding.factory import get_embedding_model, reset_embedding_model
 
         mock_db = MagicMock()
-        mock_db.get_embedding_config.return_value = {}
+        mock_db.get_active_embedding_model_name.return_value = None
 
         with (
             patch("src.core.embedding.factory.DatabaseService") as MockDB,

@@ -140,7 +140,11 @@ async def download_llm_model(
     from huggingface_hub import hf_hub_download
 
     from src.config.settings import LLM_DIR
+    from src.infrastructure.llm.llamacpp.auto_start import stop_llamacpp as _stop_llm
+    from src.infrastructure.vectorstore.auto_start import stop_qdrant as _stop_qd
 
+    await _stop_qd()
+    await _stop_llm()
     _delete_all_models_of_type("llm")
 
     set_progress(repo_id, 0, "starting")
@@ -177,6 +181,12 @@ async def download_llm_model(
         except Exception as e:
             set_progress(repo_id, 0, f"error: {str(e)}")
             logger.error(f"Download failed: {e}")
+        finally:
+            from src.infrastructure.llm.llamacpp.auto_start import start_llamacpp as _start_llm
+            from src.infrastructure.vectorstore.auto_start import start_qdrant as _start_qd
+
+            await _start_qd()
+            await _start_llm()
 
     asyncio.create_task(download_in_background())
 

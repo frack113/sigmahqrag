@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
 from src.infrastructure.database import DatabaseService
+
+logger = logging.getLogger(__name__)
 
 
 class UnifiedRegistry:
@@ -176,6 +179,18 @@ class UnifiedRegistry:
         if save:
             self._save(db)
 
+        self._trim_to_one("llm", db)
+
+    def _trim_to_one(self, model_type: str, db: DatabaseService) -> None:
+        """Keep only the first registered model (alphabetically). Remove extras from registry and DB."""
+        reg = self._registry[model_type]
+        if len(reg) <= 1:
+            return
+        sorted_ids = sorted(reg.keys())
+        for repo_id in sorted_ids[1:]:
+            del reg[repo_id]
+            db.delete_model(repo_id)
+
     def sync_embeddings_folder(
         self, embeddings_dir: Path, db: DatabaseService, save: bool = True
     ) -> None:
@@ -217,3 +232,5 @@ class UnifiedRegistry:
 
         if save:
             self._save(db)
+
+        self._trim_to_one("embeddings", db)

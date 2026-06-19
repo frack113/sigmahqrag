@@ -44,8 +44,9 @@ def get_embedding_model() -> Any:
 
         from src.core.pipeline.ingestion import build_embed_model
 
-        config_data = DatabaseService.get_instance().get_embedding_config()
-        model_name = config_data.get("model") or DEFAULT_MODEL
+        model_name = (
+            DatabaseService.get_instance().get_active_embedding_model_name() or DEFAULT_MODEL
+        )
         _embed_model = build_embed_model(model_name)
     return _embed_model
 

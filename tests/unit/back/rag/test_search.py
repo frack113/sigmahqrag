@@ -42,7 +42,7 @@ class TestSearchEngine:
 class TestGetSearchEmbedModel:
     def test_first_call_creates_model(self) -> None:
         mock_db = MagicMock()
-        mock_db.get_embedding_config.return_value = {}
+        mock_db.get_active_embedding_model_name.return_value = None
         with (
             patch("src.core.search.engine._async_embed_model", None),
             patch("src.core.search.engine.DatabaseService.get_instance", return_value=mock_db),
@@ -55,7 +55,7 @@ class TestGetSearchEmbedModel:
 
     def test_subsequent_call_returns_cached(self) -> None:
         mock_db = MagicMock()
-        mock_db.get_embedding_config.return_value = {}
+        mock_db.get_active_embedding_model_name.return_value = None
         with (
             patch("src.core.search.engine._async_embed_model", None),
             patch("src.core.search.engine.DatabaseService.get_instance", return_value=mock_db),

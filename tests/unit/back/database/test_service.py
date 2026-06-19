@@ -39,36 +39,36 @@ class TestConfig:
         assert db.get_config("nonexistent") is None
 
 
-class TestEmbeddingConfig:
-    """Tests for the new single global embedding config (replaced per-type mapping)."""
+class TestActiveEmbeddingModel:
+    """Tests for the active embedding model lookup from the models table."""
 
     def test_empty(self, db: DatabaseService) -> None:
-        cfg = db.get_embedding_config()
-        assert isinstance(cfg, dict)
+        name = db.get_active_embedding_model_name()
+        assert name is None
 
-    def test_set_and_get(self, db: DatabaseService) -> None:
-        db.set_embedding_config("org/model")
-        cfg = db.get_embedding_config()
-        assert cfg["model"] == "org/model"
+    def test_returns_embedding_model(self, db: DatabaseService) -> None:
+        db.upsert_model(
+            {
+                "repo_id": "org/model",
+                "model_type": "embeddings",
+                "local_path": "/some/path",
+                "status": "ready",
+            }
+        )
+        name = db.get_active_embedding_model_name()
+        assert name == "org/model"
 
-    def test_overwrite(self, db: DatabaseService) -> None:
-        db.set_embedding_config("m1")
-        db.set_embedding_config("m2")
-        cfg = db.get_embedding_config()
-        assert cfg["model"] == "m2"
-
-    def test_delete(self, db: DatabaseService) -> None:
-        db.set_embedding_config("m1")
-        db.delete_embedding_config()
-        cfg = db.get_embedding_config()
-        assert "model" not in cfg or cfg["model"] == ""
-
-    def test_single_model_only(self, db: DatabaseService) -> None:
-        """There should be only one global model, not per-type mapping."""
-        db.set_embedding_config("unique-model")
-        cfg = db.get_embedding_config()
-        assert "model" in cfg
-        assert len(cfg) == 1  # Only 'model' key, no type keys
+    def test_ignores_llm_models(self, db: DatabaseService) -> None:
+        db.upsert_model(
+            {
+                "repo_id": "org/llm-model",
+                "model_type": "llm",
+                "local_path": "/some/path",
+                "status": "ready",
+            }
+        )
+        name = db.get_active_embedding_model_name()
+        assert name is None
 
 
 class TestSystemPrompts:
@@ -749,9 +749,15 @@ class TestRoundtrip:
         db.set_config("ck", {"v": 1})
         assert db.get_config("ck") == {"v": 1}
 
-        db.set_embedding_config("m1")
-        cfg = db.get_embedding_config()
-        assert cfg.get("model") == "m1"
+        db.upsert_model(
+            {
+                "repo_id": "m1",
+                "model_type": "embeddings",
+                "local_path": "/path",
+                "status": "ready",
+            }
+        )
+        assert db.get_active_embedding_model_name() == "m1"
 
         db.upsert_prompt({"id": "pid", "name": "n", "description": "d", "content": "c"})
         assert len(db.get_prompts()) >= 1

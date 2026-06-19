@@ -1488,7 +1488,7 @@ function renderEmbModels(models) {
 	var html = '<table class="model-table"><tbody>';
 	for (var i = 0; i < models.length; i++) {
 		var m = models[i];
-		var repoId = Object.keys(m)[0];
+		var repoId = m.repo_id;
 		html += "<tr>";
 		html +=
 			'<td class="model-name" onclick="Config.selectEmbModel(\'' +
@@ -1501,8 +1501,7 @@ function renderEmbModels(models) {
 	html += "</tbody></table>";
 	listEl.innerHTML = html;
 	if (models.length > 0) {
-		selectedEmbRepo = Object.keys(models[0]);
-		selectedEmbRepo = selectedEmbRepo[0];
+		selectedEmbRepo = models[0].repo_id;
 	}
 }
 
@@ -1632,25 +1631,8 @@ function downloadEmbModelDirect(repoId) {
 }
 
 function checkDimensionStatus() {
-	fetch("/api/v1/models/embeddings/dimension-status")
-		.then((r) => r.json())
-		.then((data) => {
-			var banner = document.getElementById("emb-dim-banner");
-			if (!banner) return;
-			if (data.mismatch) {
-				document.getElementById("emb-model-dim").textContent =
-					data.model_dimension || "unknown";
-				document.getElementById("emb-coll-dim").textContent =
-					data.collection_dimension || "unknown";
-				banner.style.display = "block";
-			} else {
-				banner.style.display = "none";
-			}
-		})
-		.catch(() => {
-			var banner = document.getElementById("emb-dim-banner");
-			if (banner) banner.style.display = "none";
-		});
+	var banner = document.getElementById("emb-dim-banner");
+	if (banner) banner.style.display = "none";
 }
 
 function recreateAndReindex() {
@@ -1673,25 +1655,21 @@ function recreateAndReindex() {
 		statusEl.className = "status-message";
 	}
 
-	fetch("/api/v1/models/embeddings/dimension-status")
-		.then((r) => r.json())
-		.then((data) => {
-			var collections = data.mismatched_collections || ["sigma_docs"];
-			var chain = Promise.resolve();
-			collections.forEach((name) => {
-				chain = chain.then(() =>
-					fetch("/api/v1/qdrant", {
-						method: "POST",
-						headers: { "Content-Type": "application/json" },
-						body: JSON.stringify({
-							action: "reindex",
-							payload: { action: "reindex", collection_name: name },
-						}),
-					}).then((r) => r.json()),
-				);
-			});
-			return chain;
-		})
+	var collections = ["sigma_docs"];
+	var chain = Promise.resolve();
+	collections.forEach((name) => {
+		chain = chain.then(() =>
+			fetch("/api/v1/qdrant", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					action: "reindex",
+					payload: { action: "reindex", collection_name: name },
+				}),
+			}).then((r) => r.json()),
+		);
+	});
+	chain
 		.then(() => {
 			checkDimensionStatus();
 			if (statusEl) {

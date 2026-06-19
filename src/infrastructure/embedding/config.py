@@ -1,27 +1,18 @@
-"""Global embedding model configuration management — direct DB access."""
+"""Global embedding model configuration — reads from models table (single source of truth)."""
 
 from __future__ import annotations
 
 from src.infrastructure.database import DatabaseService
 
+DEFAULT_EMBEDDING_MODEL = "intfloat/multilingual-e5-small"
+
 
 def get_embedding_config() -> dict:
-    """Get the global embedding model config from DuckDB."""
-    return DatabaseService.get_instance().get_embedding_config()
+    """Get the active embedding model name from the models table."""
+    db = DatabaseService.get_instance()
+    model_name = db.get_active_embedding_model_name()
+    return {"model": model_name or DEFAULT_EMBEDDING_MODEL}
 
 
 def set_embedding_config(model: str) -> None:
-    """Set the global embedding model in DuckDB and reset cached singletons."""
-    from src.core.embedding.factory import reset_embedding_model
-    from src.core.pipeline.ingestion import reset_pipeline_registry
-    from src.core.search.engine import reset_search_embed_model
-
-    db = DatabaseService.get_instance()
-    model = model.strip()
-    if model:
-        db.set_embedding_config(model)
-    else:
-        db.delete_embedding_config()
-    reset_embedding_model()
-    reset_search_embed_model()
-    reset_pipeline_registry()
+    """No-op: embedding config is now managed via the models table."""

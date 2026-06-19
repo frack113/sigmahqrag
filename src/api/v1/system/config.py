@@ -116,6 +116,25 @@ async def update_logging_config(request: LoggingConfigUpdateRequest) -> JSONResp
         )
 
 
+@router.post("/config/fix-schema")
+async def fix_schema_version() -> JSONResponse:
+    """POST /api/v1/config/fix-schema — Update DuckDB schema_version to match code."""
+    from src.config.constants import SCHEMA_VERSION
+
+    try:
+        db = DatabaseService.get_instance()
+        db.set_config("schema_version", SCHEMA_VERSION)
+        return JSONResponse(
+            content={
+                "status": "success",
+                "message": f"Schema version updated to {SCHEMA_VERSION}",
+            }
+        )
+    except Exception as e:
+        logger.error(f"Failed to fix schema version: {e}")
+        return JSONResponse(status_code=500, content={"status": "error", "error": str(e)})
+
+
 @router.post("/config")
 async def update_config(request: ConfigUpdateRequest) -> JSONResponse:
     """POST /api/v1/config — Update backend config persisted to DuckDB."""

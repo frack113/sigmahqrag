@@ -1,4 +1,4 @@
-"""DuckDB table operations — models, prompts, git, worker, embedding_config."""
+"""DuckDB table operations — models, prompts, git, worker."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 class DatabaseServiceTableOps:
-    """Table-specific operations (models, system_prompts, git, worker_state, embedding_config)."""
+    """Table-specific operations (models, system_prompts, git, worker_state)."""
 
     # Provided by DatabaseServiceCore mixin
     _lock: threading.RLock
@@ -298,28 +298,13 @@ class DatabaseServiceTableOps:
             self._writer_conn.commit()
 
     # ------------------------------------------------------------------
-    # EMBEDDING_CONFIG table (single global config)
+    # Active embedding model (single model — source of truth is models table)
     # ------------------------------------------------------------------
 
-    def get_embedding_config(self) -> dict:
+    def get_active_embedding_model_name(self) -> str | None:
+        """Return repo_id of the single active embedding model from models table."""
         with self._lock:
-            row = self._writer_conn.execute(
-                "SELECT key, model FROM embedding_config LIMIT 1"
+            result = self._writer_conn.execute(
+                "SELECT repo_id FROM models WHERE model_type = 'embeddings' ORDER BY repo_id LIMIT 1"
             ).fetchone()
-        if row is None:
-            return {}
-        return {"model": row[1]}
-
-    def set_embedding_config(self, model: str) -> None:
-        with self._lock:
-            self._writer_conn.execute(
-                """INSERT INTO embedding_config (key, model) VALUES ('global', ?)
-                  ON CONFLICT (key) DO UPDATE SET model = EXCLUDED.model""",
-                (model,),
-            )
-            self._writer_conn.commit()
-
-    def delete_embedding_config(self) -> None:
-        with self._lock:
-            self._writer_conn.execute("DELETE FROM embedding_config WHERE key = 'global'")
-            self._writer_conn.commit()
+        return result[0] if result else None

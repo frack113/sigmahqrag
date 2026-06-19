@@ -145,8 +145,8 @@ class IngestionPipelineBuilder:
         if model_name is None:
             from src.infrastructure.database import DatabaseService
 
-            config_data = DatabaseService.get_instance().get_embedding_config()
-            self._model_name = (config_data.get("model") or "") or DEFAULT_MODEL
+            model_name = DatabaseService.get_instance().get_active_embedding_model_name()
+            self._model_name = model_name or DEFAULT_MODEL
         else:
             self._model_name = model_name
         self._collection_name = collection_name or "sigma_docs"
@@ -465,8 +465,9 @@ def get_pipeline(
     if model_name is None:
         from src.infrastructure.database import DatabaseService
 
-        config_data = DatabaseService.get_instance().get_embedding_config()
-        model_name = config_data.get("model") or DEFAULT_MODEL
+        model_name = (
+            DatabaseService.get_instance().get_active_embedding_model_name() or DEFAULT_MODEL
+        )
     model = model_name
     collection = collection_name or "sigma_docs"
     key = (model, collection)

@@ -87,8 +87,9 @@ def _get_search_embed_model() -> Any:
     with _search_embed_model_lock:
         if _async_embed_model is not None:
             return _async_embed_model
-        config_data = DatabaseService.get_instance().get_embedding_config()
-        model_name = config_data.get("model") or DEFAULT_MODEL
+        model_name = (
+            DatabaseService.get_instance().get_active_embedding_model_name() or DEFAULT_MODEL
+        )
         _async_embed_model = build_embed_model(model_name)
     return _async_embed_model
 

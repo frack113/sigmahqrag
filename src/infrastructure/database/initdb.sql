@@ -12,12 +12,6 @@ CREATE TABLE IF NOT EXISTS config (
     value TEXT NOT NULL
 );
 
--- embedding_config (single global config — one embedding model for all file types)
-CREATE TABLE IF NOT EXISTS embedding_config (
-    key TEXT PRIMARY KEY DEFAULT 'global',
-    model TEXT NOT NULL DEFAULT 'intfloat/multilingual-e5-small'
-);
-
 -- system_prompts
 CREATE TABLE IF NOT EXISTS system_prompts (
     id TEXT PRIMARY KEY,
@@ -141,12 +135,8 @@ CREATE INDEX IF NOT EXISTS idx_doc_registry_org_repo ON doc_registry(org, repo);
 -- SEED DATA
 -- =========================================================================
 
--- Embedding config defaults (single global model)
-INSERT OR IGNORE INTO embedding_config (key, model) VALUES
-    ('global', 'intfloat/multilingual-e5-small');
-
 -- Default app config
 INSERT OR IGNORE INTO config (key, value) VALUES
     ('app_version', '"0.1.0"'),
     ('theme', '"dark"'),
-    ('schema_version', '1');
+    ('schema_version', '20260619');

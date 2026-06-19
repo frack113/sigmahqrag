@@ -22,7 +22,6 @@ def _default_db_path() -> str:
 _VALID_TABLES = frozenset(
     {
         "config",
-        "embedding_config",
         "system_prompts",
         "models",
         "doc_registry",
