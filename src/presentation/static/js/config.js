@@ -351,46 +351,36 @@ function createDataDirs() {
 			checkDataDirs();
 		})
 		.catch((e) => {
-			alert(`Error: ${e.message}`);
+			showToast(`Error: ${e.message}`, "error");
 		});
 }
 
-function cleanDataDirs() {
-	if (
-		!confirm(
-			"Clean all data directories? Non-official contents will be deleted.",
-		)
-	)
+async function cleanDataDirs() {
+	if (!(await showConfirm("Clean all data directories? Non-official contents will be deleted.")))
 		return;
-	fetch(CONFIG.data.clean, { method: "POST" })
-		.then((r) =>
-			r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)),
-		)
-		.then(() => {
-			checkDataDirs();
-		})
-		.catch((e) => {
-			alert(`Error: ${e.message}`);
-		});
+	try {
+		const r = await fetch(CONFIG.data.clean, { method: "POST" });
+		if (!r.ok) throw new Error(`HTTP ${r.status}`);
+		checkDataDirs();
+	} catch (e) {
+		showToast(`Error: ${e.message}`, "error");
+	}
 }
 
-function resetDataDirs() {
+async function resetDataDirs() {
 	if (
-		!confirm(
+		!(await showConfirm(
 			"\u26a0\ufe0f HARD RESET \u2014 This will permanently delete ALL data in the data/ directory. Continue?",
-		)
+		))
 	)
 		return;
-	fetch(CONFIG.data.reset, { method: "POST" })
-		.then((r) =>
-			r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)),
-		)
-		.then(() => {
-			checkDataDirs();
-		})
-		.catch((e) => {
-			alert(`Error: ${e.message}`);
-		});
+	try {
+		const r = await fetch(CONFIG.data.reset, { method: "POST" });
+		if (!r.ok) throw new Error(`HTTP ${r.status}`);
+		checkDataDirs();
+	} catch (e) {
+		showToast(`Error: ${e.message}`, "error");
+	}
 }
 
 // ──────────────────────────────────────────────────────────────
@@ -493,42 +483,36 @@ function createDuckDb() {
 			checkDuckDbStatus();
 		})
 		.catch((e) => {
-			alert(`Error: ${e.message}`);
+			showToast(`Error: ${e.message}`, "error");
 		});
 }
 
-function cleanDuckDb() {
-	if (!confirm("This will remove excess tables not in the schema. Continue?"))
+async function cleanDuckDb() {
+	if (!(await showConfirm("This will remove excess tables not in the schema. Continue?")))
 		return;
-	fetch(CONFIG.duckdb.clean, { method: "POST" })
-		.then((r) =>
-			r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)),
-		)
-		.then(() => {
-			checkDuckDbStatus();
-		})
-		.catch((e) => {
-			alert(`Error: ${e.message}`);
-		});
+	try {
+		const r = await fetch(CONFIG.duckdb.clean, { method: "POST" });
+		if (!r.ok) throw new Error(`HTTP ${r.status}`);
+		checkDuckDbStatus();
+	} catch (e) {
+		showToast(`Error: ${e.message}`, "error");
+	}
 }
 
-function resetDuckDb() {
+async function resetDuckDb() {
 	if (
-		!confirm(
+		!(await showConfirm(
 			"\u26a0\ufe0f HARD RESET \u2014 This will permanently delete the DuckDB database and create a fresh one. Continue?",
-		)
+		))
 	)
 		return;
-	fetch(CONFIG.duckdb.reset, { method: "POST" })
-		.then((r) =>
-			r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)),
-		)
-		.then(() => {
-			checkDuckDbStatus();
-		})
-		.catch((e) => {
-			alert(`Error: ${e.message}`);
-		});
+	try {
+		const r = await fetch(CONFIG.duckdb.reset, { method: "POST" });
+		if (!r.ok) throw new Error(`HTTP ${r.status}`);
+		checkDuckDbStatus();
+	} catch (e) {
+		showToast(`Error: ${e.message}`, "error");
+	}
 }
 
 // ──────────────────────────────────────────────────────────────
@@ -1119,13 +1103,13 @@ function startService(service) {
 		.then((data) => {
 			const msg =
 				data.data?.message || data.data?.error || data.error || "Started";
-			alert(msg);
+			showToast(msg, data.data?.error || data.error ? "error" : "success");
 			loadBackendStatus();
 		});
 }
 
-function stopService(service) {
-	if (!confirm(`Stop ${service}?`)) return;
+async function stopService(service) {
+	if (!(await showConfirm(`Stop ${service}?`))) return;
 	fetch("/api/v1/orchestration/backend", {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
@@ -1135,7 +1119,7 @@ function stopService(service) {
 		.then((data) => {
 			const msg =
 				data.data?.message || data.data?.error || data.error || "Stopped";
-			alert(msg);
+			showToast(msg, data.data?.error || data.error ? "error" : "success");
 			loadBackendStatus();
 		});
 }
@@ -1295,11 +1279,12 @@ function refreshReleases() {
 			if (data.errors) {
 				const msgs = Object.values(data.errors);
 				const rateLimited = msgs.some((m) => m.indexOf("rate limit") !== -1);
-				if (rateLimited) {
-					alert(
-						"GitHub API rate limit reached. Please wait a few minutes and try again.",
-					);
-				}
+			if (rateLimited) {
+				showToast(
+					"GitHub API rate limit reached. Please wait a few minutes and try again.",
+					"error",
+				);
+			}
 			}
 			loadBackendStatus();
 			loadReleaseTimestamps();
@@ -1310,7 +1295,7 @@ function refreshReleases() {
 			}
 		})
 		.catch(() => {
-			alert("Failed to refresh releases. Check your connection.");
+			showToast("Failed to refresh releases. Check your connection.", "error");
 			if (statusEl) {
 				statusEl.textContent = "Failed";
 				statusEl.className = "status-message error";
@@ -1461,14 +1446,14 @@ function downloadLlmModel() {
 							clearInterval(checkProgress);
 							btn.textContent = "Download";
 							btn.disabled = false;
-							alert(`Download failed: ${data.status}`);
+							showToast(`Download failed: ${data.status}`, "error");
 						}
 					})
 					.catch(() => {});
 			}, 1000);
 		})
 		.catch((e) => {
-			alert(`Error: ${e.message}`);
+			showToast(`Error: ${e.message}`, "error");
 		});
 }
 
@@ -1477,23 +1462,20 @@ function downloadLlmModelDirect(repoId) {
 	downloadLlmModel();
 }
 
-function deleteLlmModel() {
+async function deleteLlmModel() {
 	if (!selectedLlmRepo) return;
-	if (!confirm(`Delete model ${selectedLlmRepo}?`)) return;
+	if (!(await showConfirm(`Delete model ${selectedLlmRepo}?`))) return;
 
-	fetch(`${CONFIG.llm.delete}/${encodeURIComponent(selectedLlmRepo)}`, {
-		method: "DELETE",
-	})
-		.then((r) =>
-			r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)),
-		)
-		.then(() => {
-			selectedLlmRepo = null;
-			checkLlmModels();
-		})
-		.catch((e) => {
-			alert(`Error: ${e.message}`);
+	try {
+		const r = await fetch(`${CONFIG.llm.delete}/${encodeURIComponent(selectedLlmRepo)}`, {
+			method: "DELETE",
 		});
+		if (!r.ok) throw new Error(`HTTP ${r.status}`);
+		selectedLlmRepo = null;
+		checkLlmModels();
+	} catch (e) {
+		showToast(`Error: ${e.message}`, "error");
+	}
 }
 
 // ──────────────────────────────────────────────────────────────
@@ -1652,14 +1634,14 @@ function downloadEmbModel() {
 							clearInterval(checkProgress);
 							btn.textContent = "Download";
 							btn.disabled = false;
-							alert(`Download failed: ${data.status}`);
+							showToast(`Download failed: ${data.status}`, "error");
 						}
 					})
 					.catch(() => {});
 			}, 1000);
 		})
 		.catch((e) => {
-			alert(`Error: ${e.message}`);
+			showToast(`Error: ${e.message}`, "error");
 		});
 }
 
@@ -1673,11 +1655,11 @@ function checkDimensionStatus() {
 	if (banner) banner.style.display = "none";
 }
 
-function recreateAndReindex() {
+async function recreateAndReindex() {
 	if (
-		!confirm(
+		!(await showConfirm(
 			"Recreate Qdrant collection(s) and reindex all documents? This will delete existing vectors.",
-		)
+		))
 	)
 		return;
 	const btn = document.querySelector("#emb-dim-banner .btn");
@@ -1694,59 +1676,51 @@ function recreateAndReindex() {
 	}
 
 	const collections = ["sigma_docs"];
-	let chain = Promise.resolve();
-	collections.forEach((name) => {
-		chain = chain.then(() =>
-			fetch("/api/v1/qdrant", {
+	try {
+		for (const name of collections) {
+			const r = await fetch("/api/v1/qdrant", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({
 					action: "reindex",
 					payload: { action: "reindex", collection_name: name },
 				}),
-			}).then((r) => r.json()),
-		);
-	});
-	chain
-		.then(() => {
-			checkDimensionStatus();
-			if (statusEl) {
-				statusEl.textContent = "Reindex completed";
-				statusEl.className = "status-message success";
-			}
-		})
-		.catch((e) => {
-			alert(`Reindex failed: ${e.message || "Unknown error"}`);
-			if (statusEl) {
-				statusEl.textContent = "Reindex failed";
-				statusEl.className = "status-message error";
-			}
-		})
-		.finally(() => {
-			if (btn) {
-				btn.textContent = "Recreate collection & Reindex";
-				btn.disabled = false;
-			}
-		});
+			});
+			await r.json();
+		}
+		checkDimensionStatus();
+		if (statusEl) {
+			statusEl.textContent = "Reindex completed";
+			statusEl.className = "status-message success";
+		}
+	} catch (e) {
+		showToast(`Reindex failed: ${e.message || "Unknown error"}`, "error");
+		if (statusEl) {
+			statusEl.textContent = "Reindex failed";
+			statusEl.className = "status-message error";
+		}
+	} finally {
+		if (btn) {
+			btn.textContent = "Recreate collection & Reindex";
+			btn.disabled = false;
+		}
+	}
 }
 
-function deleteEmbModel() {
+async function deleteEmbModel() {
 	if (!selectedEmbRepo) return;
-	if (!confirm(`Delete model ${selectedEmbRepo}?`)) return;
+	if (!(await showConfirm(`Delete model ${selectedEmbRepo}?`))) return;
 
-	fetch(`${CONFIG.embedding.delete}/${encodeURIComponent(selectedEmbRepo)}`, {
-		method: "DELETE",
-	})
-		.then((r) =>
-			r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)),
-		)
-		.then(() => {
-			selectedEmbRepo = null;
-			checkEmbModels();
-		})
-		.catch((e) => {
-			alert(`Error: ${e.message}`);
+	try {
+		const r = await fetch(`${CONFIG.embedding.delete}/${encodeURIComponent(selectedEmbRepo)}`, {
+			method: "DELETE",
 		});
+		if (!r.ok) throw new Error(`HTTP ${r.status}`);
+		selectedEmbRepo = null;
+		checkEmbModels();
+	} catch (e) {
+		showToast(`Error: ${e.message}`, "error");
+	}
 }
 
 // ──────────────────────────────────────────────────────────────
@@ -1888,16 +1862,16 @@ function loadSpecs() {
 		});
 }
 
-function fixSpecRepo() {
+async function fixSpecRepo() {
 	const defaultUrl = "https://github.com/sigmahq/sigma-specification";
 	const defaultBranch = "main";
 
 	if (
-		!confirm(
+		!(await showConfirm(
 			"Clone the default SigmaHQ specification repository (" +
 				defaultUrl +
 				")?",
-		)
+		))
 	)
 		return;
 
@@ -1905,28 +1879,27 @@ function fixSpecRepo() {
 	statusEl.textContent = "Cloning repository...";
 	statusEl.className = "status-message";
 
-	fetch(CONFIG.spec.add, {
-		method: "POST",
-		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({ url: defaultUrl, branch: defaultBranch }),
-	})
-		.then((r) => r.json())
-		.then((data) => {
-			if (data.success) {
-				statusEl.textContent = data.message || "Repository cloning started";
-				statusEl.className = "status-message success";
-				setTimeout(() => {
-					loadSpecs();
-				}, 2000);
-			} else {
-				statusEl.textContent = data.error || "Clone failed";
-				statusEl.className = "status-message error";
-			}
-		})
-		.catch((err) => {
-			statusEl.textContent = `Error: ${err.message}`;
-			statusEl.className = "status-message error";
+	try {
+		const r = await fetch(CONFIG.spec.add, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ url: defaultUrl, branch: defaultBranch }),
 		});
+		const data = await r.json();
+		if (data.success) {
+			statusEl.textContent = data.message || "Repository cloning started";
+			statusEl.className = "status-message success";
+			setTimeout(() => {
+				loadSpecs();
+			}, 2000);
+		} else {
+			statusEl.textContent = data.error || "Clone failed";
+			statusEl.className = "status-message error";
+		}
+	} catch (err) {
+		statusEl.textContent = `Error: ${err.message}`;
+		statusEl.className = "status-message error";
+	}
 }
 
 // ──────────────────────────────────────────────────────────────
