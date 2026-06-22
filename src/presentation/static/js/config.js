@@ -6,6 +6,23 @@
  */
 
 // ──────────────────────────────────────────────────────────────
+// Global state: storage fix tracking
+// ──────────────────────────────────────────────────────────────
+let _dataDirsNeedFix = false;
+let _duckDbNeedFix = false;
+
+function _updateStorageLock() {
+	const needsFix = _dataDirsNeedFix || _duckDbNeedFix;
+	// Target the inner .config-dashboard that wraps the sections
+	const container = document.querySelector(
+		".config-dashboard > .config-dashboard",
+	);
+	if (container) {
+		container.classList.toggle("storage-needs-fix", needsFix);
+	}
+}
+
+// ──────────────────────────────────────────────────────────────
 // API Configuration
 // ──────────────────────────────────────────────────────────────
 const CONFIG = {
@@ -268,10 +285,17 @@ const renderDataDirs = (dirs) => {
 				? "ERROR"
 				: "PARTIAL";
 
-	const fixBtnHtml =
-		readyCount === dirs.length
-			? '<button class="btn btn-primary btn-sm" disabled>Fix</button>'
-			: '<button class="btn btn-primary btn-sm" onclick="Config.createDataDirs()">Fix</button>';
+	const needsFix = readyCount !== dirs.length;
+	_dataDirsNeedFix = needsFix;
+	_updateStorageLock();
+
+	const fixBtnHtml = needsFix
+		? '<button class="btn btn-primary btn-sm" onclick="Config.createDataDirs()">Fix</button>'
+		: '<button class="btn btn-primary btn-sm" disabled>Fix</button>';
+
+	const hardResetHtml = needsFix
+		? '<button class="btn btn-danger btn-sm" disabled title="Apply Fix first">Hard Reset</button>'
+		: '<button class="btn btn-danger btn-sm" onclick="Config.resetDataDirs()">Hard Reset</button>';
 
 	const listEl = document.getElementById("data-dirs-list");
 	listEl.innerHTML =
@@ -292,7 +316,7 @@ const renderDataDirs = (dirs) => {
 		'  <span class="data-action-buttons">' +
 		fixBtnHtml +
 		'  <button class="btn btn-warning btn-sm" disabled>Clean</button>' +
-		'  <button class="btn btn-danger btn-sm" onclick="Config.resetDataDirs()">Hard Reset</button>' +
+		hardResetHtml +
 		"  </span>" +
 		"</div>";
 };
@@ -403,12 +427,19 @@ function renderDuckDbStatus(status) {
 
 	const size =
 		status.file_size > 0 ? ` (${formatBytes(status.file_size)})` : "";
-	const fixBtnHtml = status.needs_fix
+	const needsFix = status.needs_fix;
+	_duckDbNeedFix = needsFix;
+	_updateStorageLock();
+	const fixBtnHtml = needsFix
 		? '<button class="btn btn-primary btn-sm" onclick="Config.createDuckDb()">Fix</button>'
 		: '<button class="btn btn-primary btn-sm" disabled>Fix</button>';
-	const cleanBtnHtml = status.needs_clean
-		? '<button class="btn btn-warning btn-sm" onclick="Config.cleanDuckDb()">Clean</button>'
-		: '<button class="btn btn-warning btn-sm" disabled>Clean</button>';
+	const cleanBtnHtml =
+		status.needs_clean && !needsFix
+			? '<button class="btn btn-warning btn-sm" onclick="Config.cleanDuckDb()">Clean</button>'
+			: '<button class="btn btn-warning btn-sm" disabled>Clean</button>';
+	const resetHtml = needsFix
+		? '<button class="btn btn-danger btn-sm" disabled title="Apply Fix first">Hard Reset</button>'
+		: '<button class="btn btn-danger btn-sm" onclick="Config.resetDuckDb()">Hard Reset</button>';
 
 	el.innerHTML =
 		'<div class="data-row">' +
@@ -428,7 +459,7 @@ function renderDuckDbStatus(status) {
 		" " +
 		cleanBtnHtml +
 		" " +
-		'<button class="btn btn-danger btn-sm" onclick="Config.resetDuckDb()">Hard Reset</button>' +
+		resetHtml +
 		"  </span>" +
 		"</div>";
 }

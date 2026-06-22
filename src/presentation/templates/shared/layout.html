@@ -57,6 +57,34 @@
     {% endblock %}
 
     <script src="{{ url_for('static', path='/js/theme.js') }}"></script>
+    <script>
+    (() => {
+        const ALERT_ID = "service-alert";
+
+        function updateServiceAlert() {
+            const alertEl = document.getElementById(ALERT_ID);
+            if (!alertEl) return;
+
+            fetch("/api/v1/admin/status", { signal: AbortSignal.timeout(5000) })
+                .then(r => r.json())
+                .then(data => {
+                    const services = data?.data || {};
+                    const allActive = Object.values(services).every(
+                        s => s?.status === "active"
+                    );
+                    alertEl.style.display = allActive ? "none" : "";
+                })
+                .catch(() => {
+                    // On error (network, timeout) keep current state
+                });
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            updateServiceAlert();
+            setInterval(updateServiceAlert, 30000);
+        });
+    })();
+    </script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

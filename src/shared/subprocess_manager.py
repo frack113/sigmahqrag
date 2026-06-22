@@ -172,6 +172,7 @@ class SubprocessManager:
                 return {"success": False, "error": "Failed to get process PID"}
 
             try:
+                pid_file.parent.mkdir(parents=True, exist_ok=True)
                 pid_file.write_text(str(process.pid))
             except OSError as e:
                 logger.warning(f"Failed to write PID file for {name}: {e}")
