@@ -50,6 +50,7 @@ const CONFIG = {
 	llm: {
 		installed: "/api/v1/models/llm/installed",
 		search: "/api/v1/models/llm/search",
+		files: "/api/v1/models/llm/files",
 		download: "/api/v1/models/llm/download",
 		delete: "/api/v1/models/llm",
 		progress: "/api/v1/models/llm/progress",
@@ -1415,12 +1416,13 @@ function selectLlmModel(repoId) {
 	}
 }
 
-function downloadLlmModel() {
+function downloadLlmModel(filename) {
 	if (!selectedLlmRepo) return;
-	fetch(
-		`${CONFIG.llm.download}?repo_id=${encodeURIComponent(selectedLlmRepo)}`,
-		{ method: "POST" },
-	)
+	let url = `${CONFIG.llm.download}?repo_id=${encodeURIComponent(selectedLlmRepo)}`;
+	if (filename) {
+		url += "&filename=" + encodeURIComponent(filename);
+	}
+	fetch(url, { method: "POST" })
 		.then((r) =>
 			r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)),
 		)
@@ -1458,9 +1460,9 @@ function downloadLlmModel() {
 		});
 }
 
-function downloadLlmModelDirect(repoId) {
+function downloadLlmModelDirect(repoId, filename) {
 	selectedLlmRepo = repoId;
-	downloadLlmModel();
+	downloadLlmModel(filename);
 }
 
 async function deleteLlmModel() {
@@ -1625,12 +1627,14 @@ function searchLlmModel() {
 			let html = "";
 			for (let i = 0; i < data.models.length; i++) {
 				const m = data.models[i];
+				const safeId = escHtml(m.repo_id);
 				html += '<div class="search-item">';
-				html += `<span class="result-name">${escHtml(m.repo_id)}</span>`;
+				html += `<span class="result-name">${safeId}</span>`;
 				html +=
-					'<button class="btn btn-primary btn-sm" onclick="Config.downloadLlmModelDirect(\'' +
-					escHtml(m.repo_id) +
+					'<button class="btn btn-primary btn-sm" onclick="Config.showLlmFiles(\'' +
+					safeId +
 					"')\">Download</button>";
+				html += `<div id="llm-files-${i}" class="file-picker" style="display:none;margin-top:8px;"></div>`;
 				html += "</div>";
 			}
 			resultsEl.innerHTML = html;
@@ -1639,6 +1643,52 @@ function searchLlmModel() {
 			console.error(e);
 			document.getElementById("llm-search-results").innerHTML =
 				'<p class="error-text">Search error.</p>';
+		});
+}
+
+function showLlmFiles(repoId) {
+	const idx = Array.from(document.querySelectorAll(".search-item")).findIndex(
+		(el) => el.querySelector(".result-name")?.textContent === repoId,
+	);
+	if (idx < 0) return;
+	const picker = document.getElementById(`llm-files-${idx}`);
+	if (!picker) return;
+
+	if (picker.style.display === "block") {
+		picker.style.display = "none";
+		return;
+	}
+
+	picker.innerHTML = '<p class="info-text">Loading files...</p>';
+	picker.style.display = "block";
+
+	fetch(CONFIG.llm.files + "?repo_id=" + encodeURIComponent(repoId))
+		.then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+		.then((data) => {
+			if (!data.files || data.files.length === 0) {
+				picker.innerHTML = '<p class="info-text">No GGUF files found.</p>';
+				return;
+			}
+
+			let html = '<div style="display:flex;flex-direction:column;gap:4px;">';
+			for (const f of data.files) {
+				const size = formatBytes(f.size);
+				html +=
+					'<button class="btn btn-secondary btn-sm" style="text-align:left;justify-content:flex-start;" onclick="Config.downloadLlmModelDirect(\'' +
+					escHtml(repoId) +
+					"', '" +
+					escHtml(f.filename) +
+					"')\">" +
+					escHtml(f.filename) +
+					" <span style='color:var(--text-muted);margin-left:auto;'>" +
+					size +
+					"</span></button>";
+			}
+			html += "</div>";
+			picker.innerHTML = html;
+		})
+		.catch(() => {
+			picker.innerHTML = '<p class="error-text">Failed to load files.</p>';
 		});
 }
 
@@ -1985,6 +2035,7 @@ const _Config = {
 	// LLM
 	selectLlmModel: selectLlmModel,
 	searchLlmModel: searchLlmModel,
+	showLlmFiles: showLlmFiles,
 	downloadLlmModel: downloadLlmModel,
 	downloadLlmModelDirect: downloadLlmModelDirect,
 	deleteLlmModel: deleteLlmModel,
