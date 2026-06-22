@@ -95,13 +95,25 @@ class HFDownloadService:
                 sha256_hash.update(chunk)
         return sha256_hash.hexdigest()
 
-    async def list_models(self, query: str) -> list[HFRepo]:
-        """Search for models on HuggingFace."""
+    async def list_models(self, query: str, task: str | None = None) -> list[HFRepo]:
+        """Search for models on HuggingFace.
+
+        Args:
+            query: Search query string.
+            task: Optional pipeline tag filter (e.g. ``"feature-extraction"``
+                for embedding models, ``"text-generation"`` for LLMs).
+
+        Returns:
+            List of matching :class:`HFRepo` instances.
+        """
         from huggingface_hub import HfApi
 
         api = HfApi(token=self.token)
+        kwargs: dict[str, Any] = {"search": query, "sort": "downloads"}
+        if task:
+            kwargs["task"] = task
         try:
-            results = api.list_models(search=query, sort="downloads")
+            results = api.list_models(**kwargs)
             return [HFRepo.from_string(r.id) for r in results]
         except Exception as e:
             raise DownloadError(f"Failed to search models: {e}") from e

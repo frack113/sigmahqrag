@@ -81,8 +81,12 @@ class EmbeddingManager:
     async def search_models(
         self, query: str = "sentence-transformers", limit: int = 10
     ) -> list[HFRepo]:
-        """Search for embedding models."""
-        return await self.download_service.list_models(query)
+        """Search for embedding models on HuggingFace.
+
+        Filters by ``task="feature-extraction"`` so only actual embedding /
+        sentence-transformer models are returned.
+        """
+        return await self.download_service.list_models(query, task="feature-extraction")
 
     async def _create_index(self, model_dir: Path, dimension: int = 384) -> Path:
         """Create FAISS index for embeddings within the model directory."""

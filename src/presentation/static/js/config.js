@@ -49,6 +49,7 @@ const CONFIG = {
 	},
 	llm: {
 		installed: "/api/v1/models/llm/installed",
+		search: "/api/v1/models/llm/search",
 		download: "/api/v1/models/llm/download",
 		delete: "/api/v1/models/llm",
 		progress: "/api/v1/models/llm/progress",
@@ -1597,6 +1598,46 @@ function searchEmbModel() {
 		.catch((e) => {
 			console.error(e);
 			document.getElementById("emb-search-results").innerHTML =
+				'<p class="error-text">Search error.</p>';
+		});
+}
+
+function searchLlmModel() {
+	const query = document.getElementById("llm-search-input").value.trim();
+	if (!query) return;
+
+	fetch(
+		CONFIG.llm.search +
+			"?query=" +
+			encodeURIComponent(query) +
+			"&limit=10",
+	)
+		.then((r) =>
+			r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)),
+		)
+		.then((data) => {
+			const resultsEl = document.getElementById("llm-search-results");
+			if (!data.models || data.models.length === 0) {
+				resultsEl.innerHTML = '<p class="info-text">No results found.</p>';
+				return;
+			}
+
+			let html = "";
+			for (let i = 0; i < data.models.length; i++) {
+				const m = data.models[i];
+				html += '<div class="search-item">';
+				html += `<span class="result-name">${escHtml(m.repo_id)}</span>`;
+				html +=
+					'<button class="btn btn-primary btn-sm" onclick="Config.downloadLlmModelDirect(\'' +
+					escHtml(m.repo_id) +
+					"')\">Download</button>";
+				html += "</div>";
+			}
+			resultsEl.innerHTML = html;
+		})
+		.catch((e) => {
+			console.error(e);
+			document.getElementById("llm-search-results").innerHTML =
 				'<p class="error-text">Search error.</p>';
 		});
 }
