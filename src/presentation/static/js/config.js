@@ -1984,6 +1984,7 @@ const _Config = {
 
 	// LLM
 	selectLlmModel: selectLlmModel,
+	searchLlmModel: searchLlmModel,
 	downloadLlmModel: downloadLlmModel,
 	downloadLlmModelDirect: downloadLlmModelDirect,
 	deleteLlmModel: deleteLlmModel,
