@@ -134,6 +134,7 @@ class SubprocessManager:
         log_file: Path,
         pid_file: Path,
         cwd: Path | None = None,
+        env: dict[str, str] | None = None,
     ) -> dict[str, Any]:
         """Start a service process.
 
@@ -143,6 +144,7 @@ class SubprocessManager:
             log_file: Path to log file
             pid_file: Path to PID file
             cwd: Working directory for subprocess
+            env: Optional environment variables for the subprocess
 
         Returns:
             Dict with start status
@@ -157,12 +159,18 @@ class SubprocessManager:
         except OSError as e:
             return {"success": False, "error": f"Cannot open log file {log_file}: {e}"}
 
+        proc_env = None
+        if env:
+            proc_env = os.environ.copy()
+            proc_env.update(env)
+
         try:
             process = subprocess.Popen(
                 cmd,
                 stdout=log_handle,
                 stderr=subprocess.STDOUT,
                 cwd=str(cwd) if cwd else None,
+                env=proc_env,
                 text=True,
             )
 
