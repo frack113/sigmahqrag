@@ -45,7 +45,7 @@ class HFDownloadService:
 
         api = HfApi(token=self.token)
         try:
-            info = api.model_info(repo_id=repo.full_id)
+            info = api.model_info(repo_id=repo.full_id, files_metadata=True)
             siblings = info.siblings or []
 
             results = []
