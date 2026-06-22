@@ -69,10 +69,14 @@ async def list_installed_llm_models() -> JSONResponse:
 
 @router.get("/llm/search")
 async def search_llm_models(query: str, limit: int = 20) -> JSONResponse:
-    """Search for LLM models on HuggingFace."""
+    """Search for LLM models on HuggingFace.
+
+    No pipeline tag filter is applied because many GGUF repos
+    (e.g. MaziyarPanahi/*, bartowski/*) do not set a pipeline_tag.
+    """
     try:
         service = HFDownloadService()
-        results = await service.list_models(query, task="text-generation")
+        results = await service.list_models(query)
         return JSONResponse(content={"models": [{"repo_id": r.full_id} for r in results[:limit]]})
     except Exception as e:
         logger.error(f"LLM search failed: {e}")
