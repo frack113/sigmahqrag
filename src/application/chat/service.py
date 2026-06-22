@@ -154,7 +154,7 @@ class ChatService:
 
             if not tool_calls:
                 # LLM returned text, done
-                return message.get("content", "")
+                return message.get("content", "")  # type: ignore[no-any-return]
 
             # Execute each tool call
             tool_messages = [message] if "content" in message else []

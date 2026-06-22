@@ -105,6 +105,7 @@ def _setup_logging(level: str = "INFO", max_size: str = "10M", max_files: int = 
 
     log_file = LOGS_DIR / "sigmahqrag.log"
     log_level = getattr(logging, level.upper(), logging.INFO)
+    LOGS_DIR.mkdir(parents=True, exist_ok=True)
 
     handler = RotatingFileHandler(
         log_file, maxBytes=_parse_log_size(max_size), backupCount=max_files, encoding="utf-8"

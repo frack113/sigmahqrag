@@ -87,11 +87,11 @@ def get_qdrant_status():
         }
 
         try:
-            from src.infrastructure.vectorstore.storage import get_qdrant_manager
+            from src.infrastructure.vectorstore.client import get_qdrant_client
 
-            manager = get_qdrant_manager()
+            client = get_qdrant_client()
             qdrant_status["connected"] = True
-            qdrant_status["collections"] = list(manager.list_collections()) if manager else []
+            qdrant_status["collections"] = [c.name for c in client.get_collections().collections]
         except Exception as e:
             qdrant_status["connected"] = False
             qdrant_status["error"] = str(e)

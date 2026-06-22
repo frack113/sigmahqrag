@@ -252,7 +252,7 @@ async def explain_rule(
         related = await ctx.search_engine.search(rule_data.get("title", ""), top_k=5)
 
         # Use RAG pipeline's explain_rule
-        return await ctx.rag_pipeline.explain_rule(rule_data, related)
+        return await ctx.rag_pipeline.explain_rule(rule_data, related)  # type: ignore[no-any-return]
     except Exception as e:
         logger.error("explain_rule failed: %s", e)
         return "Error analyzing rule. Please try again."

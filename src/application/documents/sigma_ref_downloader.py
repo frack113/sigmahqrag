@@ -662,9 +662,9 @@ def download_references(
             future_map = {}
             for item in download_queue:
                 future = executor.submit(
-                    _download_file,
+                    _download_file,  # type: ignore[arg-type]
                     item["normalized_url"],
-                    item["output_file"],  # type: ignore[arg-type]
+                    item["output_file"],
                 )
                 future_map[future] = item
 

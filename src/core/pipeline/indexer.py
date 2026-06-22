@@ -169,7 +169,7 @@ class UnifiedIndexer:
                 return Path(cfg.paths_spec_repos_dir).resolve() / org / repo / file_name
             return Path(cfg.paths_sigma_spec_dir).resolve() / file_name
 
-        org: str = row.get("org", "") or ""
+        org = row.get("org", "") or ""
 
         if org == "local":
             return Path(cfg.local_documents_path).resolve() / file_name
@@ -177,7 +177,7 @@ class UnifiedIndexer:
         if org == "sigmaref":
             return Path(cfg.sigmaref_documents_path).resolve() / file_name
 
-        repo: str = row.get("repo", "") or ""
+        repo = row.get("repo", "") or ""
         if org and repo:
             return Path(cfg.paths_github_dir) / org / repo / file_name
 

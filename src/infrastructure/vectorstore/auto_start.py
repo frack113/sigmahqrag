@@ -70,19 +70,8 @@ async def start_qdrant(
             break
 
     if qdrant_exe is None:
-        logger.info("Qdrant binary not found, downloading...")
-        if installer_service is None:
-            from src.infrastructure.vectorstore.downloader import QdrantInstallerService
-
-            installer_service = QdrantInstallerService()
-        try:
-            result = await asyncio.wait_for(installer_service.download_binary(), timeout=120.0)
-            if not result.get("success"):
-                raise ServiceStartError(f"Failed to download Qdrant: {result.get('error')}")
-        except TimeoutError as e:
-            raise ServiceStartError("Qdrant download timed out after 120s") from e
-        except Exception as e:
-            raise ServiceStartError(f"Qdrant download failed: {e}") from e
+        logger.warning("Qdrant binary not found at %s -- skipping auto-start", qdrant_bin)
+        return
 
     if binary_service is None:
         from src.infrastructure.vectorstore.service import QdrantBinaryService

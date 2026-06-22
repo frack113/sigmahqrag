@@ -80,21 +80,8 @@ async def start_llamacpp() -> None:
             break
 
     if llama_exe is None:
-        logger.info("llama.cpp server binary not found in %s, will attempt download", llama_bin)
-        try:
-            from src.shared.download_manager import DownloadManager
-
-            manager = DownloadManager()
-            result = await asyncio.wait_for(
-                manager.start_download(service="llama.cpp", version="latest"),
-                timeout=120.0,
-            )
-            if not result.get("success"):
-                raise ServiceStartError(f"Failed to download llama.cpp: {result.get('error')}")
-        except TimeoutError as e:
-            raise ServiceStartError("llama.cpp download timed out after 120s") from e
-        except Exception as e:
-            raise ServiceStartError(f"llama.cpp download failed: {e}") from e
+        logger.warning("llama.cpp binary not found at %s -- skipping auto-start", llama_bin)
+        return
 
     model_path = _find_first_model()
     if not model_path:

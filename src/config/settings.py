@@ -23,7 +23,7 @@ TEMP_DIR = BASE_DIR / "temp"
 @dataclass
 class Config:
     gpu_type: str = "cpu"
-    os: str = "windows"
+    os: str = ""
     llamacpp_version: str = "0"
     qdrant_version: str = "0"
     qdrant_webui_version: str = "0"
@@ -56,6 +56,8 @@ class Config:
     paths_sigma_ref_docs_dir: str = "data/documents/sigmaref"
     paths_spec_repos_dir: str = "data/specification"
     paths_sigma_spec_dir: str = "data/specification/sigmahq/sigma-specification"
+
+    paths_model_registry: str = "data/models/registry.json"
 
     local_documents_path: str = "data/documents/local"
     sigmaref_documents_path: str = "data/documents/sigmaref"

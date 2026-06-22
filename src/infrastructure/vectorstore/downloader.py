@@ -17,8 +17,8 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-QDRANT_BINARY_VERSION = "1.17.1"
-QDRANT_UI_VERSION = "v0.2.11"
+QDRANT_BINARY_VERSION = "1.18.2"
+QDRANT_UI_VERSION = "v0.2.13"
 
 QDRANT_DOWNLOAD_BASE = (
     f"https://github.com/qdrant/qdrant/releases/download/v{QDRANT_BINARY_VERSION}"
@@ -145,7 +145,7 @@ class QdrantInstallerService:
         if system == "darwin":
             arch = "aarch64" if machine in ("aarch64", "arm64") else "x86_64"
             return f"{arch}-apple-darwin"
-        return "x86_64-pc-windows-msvc"
+        raise OSError(f"Unsupported platform: system={system}, machine={machine}")
 
     async def download_binary(self, progress_callback: ProgressCallback = None) -> dict[str, Any]:
         """Download Qdrant binary for the current platform."""
