@@ -1670,25 +1670,81 @@ function showLlmFiles(repoId) {
 				return;
 			}
 
-			let html = '<div style="display:flex;flex-direction:column;gap:4px;">';
+			let html =
+				'<div class="llm-file-list" style="display:flex;flex-direction:column;gap:2px;">';
 			for (const f of data.files) {
 				const size = formatBytes(f.size);
+				const safeFile = escHtml(f.filename);
 				html +=
-					'<button class="btn btn-secondary btn-sm" style="text-align:left;justify-content:flex-start;" onclick="Config.downloadLlmModelDirect(\'' +
+					'<div class="llm-file-item" style="display:flex;align-items:center;gap:8px;padding:4px 8px;border:1px solid var(--border-color);border-radius:4px;">';
+				html +=
+					'<span style="flex:1;font-size:var(--text-sm);color:var(--text-body);">' +
+					safeFile +
+					"</span>";
+				html +=
+					'<span style="font-size:var(--text-sm);color:var(--text-card-label);white-space:nowrap;">' +
+					size +
+					"</span>";
+				html +=
+					'<button class="btn btn-primary btn-sm" style="white-space:nowrap;" onclick="Config._downloadLlmFile(\'' +
 					escHtml(repoId) +
 					"', '" +
-					escHtml(f.filename) +
-					"')\">" +
-					escHtml(f.filename) +
-					" <span style='color:var(--text-muted);margin-left:auto;'>" +
-					size +
-					"</span></button>";
+					safeFile +
+					"', this)\">Download</button>";
+				html += "</div>";
 			}
 			html += "</div>";
 			picker.innerHTML = html;
 		})
 		.catch(() => {
 			picker.innerHTML = '<p class="error-text">Failed to load files.</p>';
+		});
+}
+
+function _downloadLlmFile(repoId, filename, btn) {
+	btn.disabled = true;
+	btn.textContent = "Downloading...";
+	selectedLlmRepo = repoId;
+
+	fetch(
+		CONFIG.llm.download +
+			"?repo_id=" +
+			encodeURIComponent(repoId) +
+			"&filename=" +
+			encodeURIComponent(filename),
+		{ method: "POST" },
+	)
+		.then((r) =>
+			r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)),
+		)
+		.then(() => {
+			const checkProgress = setInterval(() => {
+				fetch(
+					CONFIG.llm.progress +
+						"?repo_id=" +
+						encodeURIComponent(repoId),
+				)
+					.then((r) => r.json())
+					.then((data) => {
+						if (data.status === "completed") {
+							clearInterval(checkProgress);
+							btn.textContent = "Done";
+							btn.className = "btn btn-success btn-sm";
+							checkLlmModels();
+						} else if (data.status?.startsWith("error")) {
+							clearInterval(checkProgress);
+							btn.textContent = "Failed";
+							btn.className = "btn btn-danger btn-sm";
+							showToast(`Download failed: ${data.status}`, "error");
+						}
+					})
+					.catch(() => {});
+			}, 1000);
+		})
+		.catch((e) => {
+			btn.disabled = false;
+			btn.textContent = "Download";
+			showToast(`Error: ${e.message}`, "error");
 		});
 }
 
@@ -2036,6 +2092,7 @@ const _Config = {
 	selectLlmModel: selectLlmModel,
 	searchLlmModel: searchLlmModel,
 	showLlmFiles: showLlmFiles,
+	_downloadLlmFile: _downloadLlmFile,
 	downloadLlmModel: downloadLlmModel,
 	downloadLlmModelDirect: downloadLlmModelDirect,
 	deleteLlmModel: deleteLlmModel,
