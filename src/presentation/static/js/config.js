@@ -1703,8 +1703,11 @@ function showLlmFiles(repoId) {
 
 function _downloadLlmFile(repoId, filename, btn) {
 	btn.disabled = true;
-	btn.textContent = "Downloading...";
+	btn.textContent = "Starting...";
 	selectedLlmRepo = repoId;
+
+	const progressUrl =
+		CONFIG.llm.progress + "?repo_id=" + encodeURIComponent(repoId);
 
 	fetch(
 		CONFIG.llm.download +
@@ -1718,18 +1721,25 @@ function _downloadLlmFile(repoId, filename, btn) {
 			r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)),
 		)
 		.then(() => {
+			btn.textContent = "Downloading...";
+			let pollCount = 0;
 			const checkProgress = setInterval(() => {
-				fetch(
-					CONFIG.llm.progress +
-						"?repo_id=" +
-						encodeURIComponent(repoId),
-				)
+				pollCount++;
+				if (pollCount > 600) {
+					clearInterval(checkProgress);
+					btn.textContent = "Download";
+					btn.disabled = false;
+					showToast("Download progress timed out — check server logs", "error");
+					return;
+				}
+				fetch(progressUrl)
 					.then((r) => r.json())
 					.then((data) => {
 						if (data.status === "completed") {
 							clearInterval(checkProgress);
 							btn.textContent = "Done";
 							btn.className = "btn btn-success btn-sm";
+							showToast(`Downloaded ${filename}`, "success");
 							checkLlmModels();
 						} else if (data.status?.startsWith("error")) {
 							clearInterval(checkProgress);
@@ -1738,7 +1748,12 @@ function _downloadLlmFile(repoId, filename, btn) {
 							showToast(`Download failed: ${data.status}`, "error");
 						}
 					})
-					.catch(() => {});
+					.catch(() => {
+						btn.textContent = "Download";
+						btn.disabled = false;
+						clearInterval(checkProgress);
+						showToast("Progress check failed — see server logs", "error");
+					});
 			}, 1000);
 		})
 		.catch((e) => {
