@@ -204,7 +204,7 @@ class DatabaseServiceCore:
         result = self._safe_query("SELECT data FROM release_cache WHERE service = ?", (service,))
         if result:
             try:
-                return json.loads(result[0])
+                return cast("list[dict[str, Any]]", json.loads(result[0]))
             except (json.JSONDecodeError, TypeError):
                 return None
         return None

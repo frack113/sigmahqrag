@@ -59,6 +59,8 @@ class VersionManager:
         "qdrant": [
             r"x86_64-unknown-linux-musl",
             r"aarch64-unknown-linux-musl",
+            r"x86_64-apple-darwin",
+            r"aarch64-apple-darwin",
             r"x86_64-pc-windows-msvc",
         ],
         "qdrant-web-ui": [],
@@ -171,10 +173,11 @@ class VersionManager:
 
             config = get_config()
             os_val = config.os
-            if not os_val:
-                os_val = "windows"
-            logger.info(f"OS from config: {os_val}")
-            return os_val
+            if os_val:
+                logger.info(f"OS from config: {os_val}")
+                return os_val
+            logger.info("No OS configured — will auto-detect from system")
+            return None
         except Exception as e:
             logger.error(f"Could not read OS preference from config: {e}")
             import traceback
@@ -209,6 +212,8 @@ class VersionManager:
         Raises:
             ValueError: If service not supported or release not found
         """
+        import asyncio
+
         if service not in self.SERVICE_REPOS:
             raise ValueError(f"Unsupported service: {service}")
 
@@ -219,28 +224,46 @@ class VersionManager:
         else:
             url = f"{self.GITHUB_API_URL}/{owner}/{repo}/releases/tags/{version}"
 
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.get(url, headers=self._get_headers())
-            if response.status_code == 404 and version and version != "latest":
-                logger.warning(f"Version {version} not found for {service}, falling back to latest")
-                fallback_url = f"{self.GITHUB_API_URL}/{owner}/{repo}/releases/latest"
-                response = await client.get(fallback_url, headers=self._get_headers())
-            response.raise_for_status()
-            data = response.json()
+        for attempt in range(3):
+            try:
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    response = await client.get(url, headers=self._get_headers())
+                    if response.status_code == 404 and version and version != "latest":
+                        logger.warning(
+                            f"Version {version} not found for {service}, falling back to latest"
+                        )
+                        fallback_url = f"{self.GITHUB_API_URL}/{owner}/{repo}/releases/latest"
+                        response = await client.get(fallback_url, headers=self._get_headers())
+                    response.raise_for_status()
+                    data = response.json()
+                    break
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code >= 500 and attempt < 2:
+                    wait = 2**attempt
+                    logger.warning(
+                        "GitHub API %s for %s, retrying in %ds (attempt %d/3)",
+                        e.response.status_code,
+                        url,
+                        wait,
+                        attempt + 1,
+                    )
+                    await asyncio.sleep(wait)
+                    continue
+                raise
 
-            assets = [
-                ReleaseAsset(
-                    name=asset["name"],
-                    browser_download_url=asset["browser_download_url"],
-                    size=asset["size"],
-                )
-                for asset in data.get("assets", [])
-            ]
-
-            return ReleaseInfo(
-                tag_name=data.get("tag_name", ""),
-                assets=assets,
+        assets = [
+            ReleaseAsset(
+                name=asset["name"],
+                browser_download_url=asset["browser_download_url"],
+                size=asset["size"],
             )
+            for asset in data.get("assets", [])
+        ]
+
+        return ReleaseInfo(
+            tag_name=data.get("tag_name", ""),
+            assets=assets,
+        )
 
     def find_matching_asset(self, release: ReleaseInfo, service: str) -> ReleaseAsset | None:
         """Find the asset matching the current platform.
@@ -281,8 +304,29 @@ class VersionManager:
                         return "cpu"
                     return None
 
-                # Try pattern match
-                for pattern in patterns:
+                # Build OS- and architecture-specific patterns list
+                machine = platform.machine().lower()
+                if os_name == "windows":
+                    os_patterns = [p for p in patterns if "-win-" in p]
+                elif os_name == "linux":
+                    if machine in ("x86_64", "amd64"):
+                        os_patterns = [p for p in patterns if "ubuntu" in p and "x64" in p]
+                    elif machine in ("aarch64", "arm64"):
+                        os_patterns = [p for p in patterns if "ubuntu" in p and "arm64" in p]
+                    else:
+                        os_patterns = [p for p in patterns if "ubuntu" in p]
+                elif os_name == "macos":
+                    if machine in ("x86_64", "amd64"):
+                        os_patterns = [p for p in patterns if "macos" in p and "x64" in p]
+                    elif machine in ("aarch64", "arm64"):
+                        os_patterns = [p for p in patterns if "macos" in p and "arm64" in p]
+                    else:
+                        os_patterns = [p for p in patterns if "macos" in p]
+                else:
+                    os_patterns = patterns
+
+                # Try pattern match against OS-appropriate patterns only
+                for pattern in os_patterns:
                     if re.search(pattern, asset_name):
                         asset_gpu = _asset_gpu_type(asset_name)
                         # If GPU preference is set on Windows, only accept matching GPU type
@@ -318,9 +362,15 @@ class VersionManager:
             elif service == "qdrant":
                 # For Qdrant, prioritize OS-specific match
                 logger.info(f"QDRANT: Looking for {os_name} asset, asset_name={asset_name}")
+                machine = platform.machine().lower()
+                asset_arch = machine
+                if asset_arch in ("amd64",):
+                    asset_arch = "x86_64"
+                elif asset_arch in ("arm64",):
+                    asset_arch = "aarch64"
 
+                target: str | None = None
                 if os_name == "windows":
-                    # Look for windows-msvc first
                     for pattern in [r"x86_64-pc-windows-msvc"]:
                         if re.search(pattern, asset_name):
                             logger.info(
@@ -328,26 +378,38 @@ class VersionManager:
                             )
                             return asset
                 elif os_name == "linux":
-                    for pattern in [
-                        r"x86_64-unknown-linux-musl",
-                        r"aarch64-unknown-linux-musl",
-                    ]:
-                        if re.search(pattern, asset_name):
-                            logger.info(
-                                f"QDRANT: Matched Linux pattern '{pattern}' for asset '{asset.name}'"
-                            )
-                            return asset
+                    if machine in ("x86_64", "amd64"):
+                        target = r"x86_64-unknown-linux-musl"
+                    elif machine in ("aarch64", "arm64"):
+                        target = r"aarch64-unknown-linux-musl"
+
+                    if target and re.search(target, asset_name):
+                        logger.info(
+                            f"QDRANT: Matched Linux pattern '{target}' for asset '{asset.name}'"
+                        )
+                        return asset
                 elif os_name == "macos":
-                    if "macos" in asset_name or "apple" in asset_name:
-                        logger.info(f"QDRANT: Matched macOS pattern for asset '{asset.name}'")
+                    if machine in ("x86_64", "amd64"):
+                        target = r"x86_64-apple-darwin"
+                    elif machine in ("aarch64", "arm64"):
+                        target = r"aarch64-apple-darwin"
+
+                    if target and re.search(target, asset_name):
+                        logger.info(
+                            f"QDRANT: Matched macOS pattern '{target}' for asset '{asset.name}'"
+                        )
                         return asset
 
-                # Fallback: check for OS in asset name
+                # Fallback: check for OS+arch in asset name
                 if os_name == "windows" and "windows" in asset_name:
                     return asset
-                elif os_name == "linux" and "linux" in asset_name:
+                elif os_name == "linux" and "linux" in asset_name and asset_arch in asset_name:
                     return asset
-                elif os_name == "macos" and "macos" in asset_name:
+                elif (
+                    os_name == "macos"
+                    and asset_arch in asset_name
+                    and ("darwin" in asset_name or "macos" in asset_name)
+                ):
                     return asset
 
         logger.warning(

@@ -59,6 +59,7 @@ class HuggingFaceEmbeddingProvider(EmbeddingProvider):
     def _detect_dimension(self) -> int:
         """Detect embedding dimension from a sample document."""
         sample_text = "Sample text for dimension detection."
+        assert self._model is not None
         embedding = self._model.get_text_embedding(sample_text)
         return len(embedding)
 

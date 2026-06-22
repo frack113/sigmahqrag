@@ -61,7 +61,7 @@ async def send_chat_message(req: ChatMessageRequest) -> ChatMessageResponse:
         return ChatMessageResponse(
             response=response_text,
             timestamp=datetime.now(UTC).isoformat(),
-            citations=citations,
+            citations=[{"id": c} for c in citations] if citations else [],
             mode=req.mode,
         )
     except Exception as e:

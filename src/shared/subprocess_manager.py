@@ -321,7 +321,9 @@ class SubprocessManager:
             try:
                 if proc_info.process and proc_info.process.poll() is None:
                     proc_info.process.send_signal(
-                        signal.SIGTERM if os.name != "nt" else signal.CTRL_BREAK_EVENT
+                        signal.SIGTERM
+                        if os.name != "nt"
+                        else getattr(signal, "CTRL_BREAK_EVENT", signal.SIGTERM)
                     )
                     try:
                         proc_info.process.wait(timeout=5)

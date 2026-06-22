@@ -46,6 +46,26 @@ class DownloadTask:
     post_install_callback: Any | None = None
 
 
+def _binary_exists(service: str) -> bool:
+    """Check if the service binary actually exists on disk."""
+    from src.config.settings import get_config
+
+    config = get_config()
+    if service in ("llama", "llama.cpp"):
+        bin_dir = Path(config.llama_binary_path).resolve()
+        candidates = ("llama-server", "llama-server.exe")
+    elif service in ("qdrant", "qdrant_db"):
+        bin_dir = Path(config.qdrant_binary_path).resolve()
+        candidates = ("qdrant", "qdrant.exe")
+    elif service == "qdrant-web-ui":
+        from src.config.settings import BIN_DIR
+
+        return (BIN_DIR / "qdrant" / "static" / "index.html").is_file()
+    else:
+        return False
+    return any((bin_dir / name).is_file() for name in candidates)
+
+
 class DownloadManager:
     """Manager for downloading binaries from GitHub releases."""
 
@@ -97,6 +117,7 @@ class DownloadManager:
             version_to_check = release.tag_name.removeprefix("v")
         else:
             version_to_check = version.removeprefix("v")
+            release = None
 
         if service in ("llama", "llama.cpp"):
             from src.config.settings import get_config
@@ -114,16 +135,23 @@ class DownloadManager:
             current_version = None
 
         if current_version and current_version == version_to_check:
-            logger.info(f"Version {version_to_check} already installed for {service}")
-            return {
-                "download_id": None,
-                "status": "skipped",
-                "service": service,
-                "version": version_to_check,
-                "message": "Version already up to date",
-            }
+            if _binary_exists(service):
+                logger.info(f"Version {version_to_check} already installed for {service}")
+                return {
+                    "download_id": None,
+                    "status": "skipped",
+                    "service": service,
+                    "version": version_to_check,
+                    "message": "Version already up to date",
+                }
+            logger.warning(
+                "Version %s recorded but binary missing for %s — forcing re-download",
+                version_to_check,
+                service,
+            )
 
-        release = await self.version_manager.get_release(service, version)
+        if release is None:
+            release = await self.version_manager.get_release(service, version)
 
         asset = self.version_manager.find_matching_asset(release, service)
         if not asset:
@@ -292,19 +320,27 @@ class DownloadManager:
 
                     logger.info(f"Download {download_id} completed: {task.target_path}")
 
-        except BaseException as e:
+        except asyncio.CancelledError:
+            if task:
+                task.status = "cancelled"
+                self.temp_manager.cleanup(task.temp_path)
+                del self.active_downloads[download_id]
+            raise
+        except Exception as e:
             error_msg = str(e)
             logger.error(f"Download {download_id} failed: {error_msg}")
-            task.status = "failed"
-            task.error = error_msg
-            self.temp_manager.cleanup(task.temp_path)
-            if task.progress_queue:
-                await task.progress_queue.put(
-                    {
-                        "status": "failed",
-                        "error": error_msg,
-                    }
-                )
+            if task:
+                task.status = "failed"
+                task.error = error_msg
+                self.temp_manager.cleanup(task.temp_path)
+                del self.active_downloads[download_id]
+                if task.progress_queue:
+                    await task.progress_queue.put(
+                        {
+                            "status": "failed",
+                            "error": error_msg,
+                        }
+                    )
 
     async def _extract_and_install(self, temp_path: Path, target_path: Path, service: str) -> None:
         """Extract archive and install to bin directory.

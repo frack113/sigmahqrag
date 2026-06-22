@@ -41,15 +41,19 @@ class QdrantBinaryService:
         """Start Qdrant server using config file."""
         qdrant_path = self.qdrant_bin
         if qdrant_path.is_dir():
-            exe_in_dir = qdrant_path / "qdrant.exe"
-            if exe_in_dir.exists():
-                qdrant_path = exe_in_dir
+            for name in ("qdrant", "qdrant.exe"):
+                candidate = qdrant_path / name
+                if candidate.is_file():
+                    qdrant_path = candidate
+                    break
         elif qdrant_path.suffix == "":
-            qdrant_path_exe = qdrant_path.with_suffix(".exe")
-            if qdrant_path_exe.exists():
-                qdrant_path = qdrant_path_exe
+            for name in (f"{qdrant_path}", f"{qdrant_path}.exe"):
+                candidate = Path(name)
+                if candidate.is_file():
+                    qdrant_path = candidate
+                    break
 
-        if not qdrant_path.exists() or qdrant_path.is_dir():
+        if not qdrant_path.is_file():
             return {
                 "success": False,
                 "error": f"Qdrant binary not found: {qdrant_path}",
