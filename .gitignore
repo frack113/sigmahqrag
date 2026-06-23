@@ -63,3 +63,8 @@ AGENTS.md
 # Internal architecture documentation (local only, not tracked)
 DOCUMENTATION_ARCHITECTURE.md
 refractor.md
+.venv/
+qdrant_storage/
+__pycache__/
+*.pyc
+.env
