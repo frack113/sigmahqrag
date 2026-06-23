@@ -48,7 +48,7 @@
         </div>
         <div class="form-group">
             <label for="prompt-content-input" class="form-label">Content (Markdown):</label>
-            <textarea id="prompt-content-input" class="form-control" rows="10" placeholder="Enter prompt content..." disabled></textarea>
+            <textarea id="prompt-content-input" class="form-control" rows="10" placeholder="Enter prompt content..." style="width:100%; min-height:250px; resize:vertical;" disabled></textarea>
         </div>
         <div class="card-footer">
             <button class="btn btn-secondary" id="btn-cancel" onclick="resetForm()" disabled>Cancel</button>
@@ -128,8 +128,8 @@ function toggleFormInputs(disabled) {
         const el = document.getElementById(id);
         if (el) el.disabled = disabled;
     });
-    document.getElementById('btn-cancel').disabled = !disabled;
-    document.getElementById('btn-save').disabled = !disabled;
+    document.getElementById('btn-cancel').disabled = disabled;
+    document.getElementById('btn-save').disabled = disabled;
 }
 
 function generateUUID() {
