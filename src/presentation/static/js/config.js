@@ -1372,7 +1372,8 @@ function renderLlmModels(models) {
 			"')\">" +
 			escHtml(m.repo_id) +
 			"</td>";
-		html += `<td>${m.files ? `${m.files.length} file(s)` : ""}</td>`;
+		const filesHtml = m.files ? m.files.map(f => { const sizeGb = (f.size / (1024 * 1024 * 1024)).toFixed(1); return `${escHtml(f.filename)} (${sizeGb} GB)`; }).join("<br>") : "";
+		html += `<td>${filesHtml}</td>`;
 		html += "</tr>";
 	}
 	html += "</tbody></table>";
