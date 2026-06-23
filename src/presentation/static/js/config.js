@@ -358,7 +358,11 @@ function createDataDirs() {
 }
 
 async function cleanDataDirs() {
-	if (!(await showConfirm("Clean all data directories? Non-official contents will be deleted.")))
+	if (
+		!(await showConfirm(
+			"Clean all data directories? Non-official contents will be deleted.",
+		))
+	)
 		return;
 	try {
 		const r = await fetch(CONFIG.data.clean, { method: "POST" });
@@ -490,7 +494,11 @@ function createDuckDb() {
 }
 
 async function cleanDuckDb() {
-	if (!(await showConfirm("This will remove excess tables not in the schema. Continue?")))
+	if (
+		!(await showConfirm(
+			"This will remove excess tables not in the schema. Continue?",
+		))
+	)
 		return;
 	try {
 		const r = await fetch(CONFIG.duckdb.clean, { method: "POST" });
@@ -1281,12 +1289,12 @@ function refreshReleases() {
 			if (data.errors) {
 				const msgs = Object.values(data.errors);
 				const rateLimited = msgs.some((m) => m.indexOf("rate limit") !== -1);
-			if (rateLimited) {
-				showToast(
-					"GitHub API rate limit reached. Please wait a few minutes and try again.",
-					"error",
-				);
-			}
+				if (rateLimited) {
+					showToast(
+						"GitHub API rate limit reached. Please wait a few minutes and try again.",
+						"error",
+					);
+				}
 			}
 			loadBackendStatus();
 			loadReleaseTimestamps();
@@ -1372,7 +1380,14 @@ function renderLlmModels(models) {
 			"')\">" +
 			escHtml(m.repo_id) +
 			"</td>";
-		const filesHtml = m.files ? m.files.map(f => { const sizeGb = (f.size / (1024 * 1024 * 1024)).toFixed(1); return `${escHtml(f.filename)} (${sizeGb} GB)`; }).join("<br>") : "";
+		const filesHtml = m.files
+			? m.files
+					.map((f) => {
+						const sizeGb = (f.size / (1024 * 1024 * 1024)).toFixed(1);
+						return `${escHtml(f.filename)} (${sizeGb} GB)`;
+					})
+					.join("<br>")
+			: "";
 		html += `<td>${filesHtml}</td>`;
 		html += "</tr>";
 	}
@@ -1421,7 +1436,7 @@ function downloadLlmModel(filename) {
 	if (!selectedLlmRepo) return;
 	let url = `${CONFIG.llm.download}?repo_id=${encodeURIComponent(selectedLlmRepo)}`;
 	if (filename) {
-		url += "&filename=" + encodeURIComponent(filename);
+		url += `&filename=${encodeURIComponent(filename)}`;
 	}
 	fetch(url, { method: "POST" })
 		.then((r) =>
@@ -1471,9 +1486,12 @@ async function deleteLlmModel() {
 	if (!(await showConfirm(`Delete model ${selectedLlmRepo}?`))) return;
 
 	try {
-		const r = await fetch(`${CONFIG.llm.delete}/${encodeURIComponent(selectedLlmRepo)}`, {
-			method: "DELETE",
-		});
+		const r = await fetch(
+			`${CONFIG.llm.delete}/${encodeURIComponent(selectedLlmRepo)}`,
+			{
+				method: "DELETE",
+			},
+		);
 		if (!r.ok) throw new Error(`HTTP ${r.status}`);
 		selectedLlmRepo = null;
 		checkLlmModels();
@@ -1609,12 +1627,7 @@ function searchLlmModel() {
 	const query = document.getElementById("llm-search-input").value.trim();
 	if (!query) return;
 
-	fetch(
-		CONFIG.llm.search +
-			"?query=" +
-			encodeURIComponent(query) +
-			"&limit=10",
-	)
+	fetch(`${CONFIG.llm.search}?query=${encodeURIComponent(query)}&limit=10`)
 		.then((r) =>
 			r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)),
 		)
@@ -1663,8 +1676,10 @@ function showLlmFiles(repoId) {
 	picker.innerHTML = '<p class="info-text">Loading files...</p>';
 	picker.style.display = "block";
 
-	fetch(CONFIG.llm.files + "?repo_id=" + encodeURIComponent(repoId))
-		.then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+	fetch(`${CONFIG.llm.files}?repo_id=${encodeURIComponent(repoId)}`)
+		.then((r) =>
+			r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)),
+		)
 		.then((data) => {
 			if (!data.files || data.files.length === 0) {
 				picker.innerHTML = '<p class="info-text">No GGUF files found.</p>';
@@ -1707,8 +1722,7 @@ function _downloadLlmFile(repoId, filename, btn) {
 	btn.textContent = "Starting...";
 	selectedLlmRepo = repoId;
 
-	const progressUrl =
-		CONFIG.llm.progress + "?repo_id=" + encodeURIComponent(repoId);
+	const progressUrl = `${CONFIG.llm.progress}?repo_id=${encodeURIComponent(repoId)}`;
 
 	fetch(
 		CONFIG.llm.download +
@@ -1875,9 +1889,12 @@ async function deleteEmbModel() {
 	if (!(await showConfirm(`Delete model ${selectedEmbRepo}?`))) return;
 
 	try {
-		const r = await fetch(`${CONFIG.embedding.delete}/${encodeURIComponent(selectedEmbRepo)}`, {
-			method: "DELETE",
-		});
+		const r = await fetch(
+			`${CONFIG.embedding.delete}/${encodeURIComponent(selectedEmbRepo)}`,
+			{
+				method: "DELETE",
+			},
+		);
 		if (!r.ok) throw new Error(`HTTP ${r.status}`);
 		selectedEmbRepo = null;
 		checkEmbModels();

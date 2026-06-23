@@ -51,8 +51,12 @@
 				if (e.target === overlay) close(false);
 			});
 
-			box.querySelector(".confirm-cancel").addEventListener("click", () => close(false));
-			box.querySelector(".confirm-ok").addEventListener("click", () => close(true));
+			box
+				.querySelector(".confirm-cancel")
+				.addEventListener("click", () => close(false));
+			box
+				.querySelector(".confirm-ok")
+				.addEventListener("click", () => close(true));
 
 			overlay.addEventListener("keydown", (e) => {
 				if (e.key === "Escape") close(false);
