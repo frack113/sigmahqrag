@@ -241,7 +241,7 @@ async function loadLogs() {
 }
 
 async function _clearLogs() {
-	if (!confirm(`Clear all logs for ${currentSource}?`)) return;
+	if (!(await showConfirm(`Clear all logs for ${currentSource}?`))) return;
 	try {
 		const response = await fetch(
 			`/api/v1/logs?source=${encodeURIComponent(currentSource)}`,

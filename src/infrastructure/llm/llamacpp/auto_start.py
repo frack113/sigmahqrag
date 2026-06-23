@@ -33,10 +33,16 @@ def is_llamacpp_running() -> bool:
 
 
 def _find_first_model() -> str | None:
-    """Find the first available GGUF model in the LLM directory."""
+    """Find the first available GGUF model in the LLM directory.
+
+    Filters out ``mmproj-*.gguf`` files (multimodal projection layers) since
+    those are not standalone models.
+    """
     from src.config.settings import LLM_DIR
 
-    gguf_files = sorted(Path(LLM_DIR).rglob("*.gguf"))
+    gguf_files = sorted(
+        f for f in Path(LLM_DIR).rglob("*.gguf") if not f.name.startswith("mmproj-")
+    )
     if not gguf_files:
         logger.warning("No GGUF models found in %s", LLM_DIR)
         return None

@@ -51,6 +51,10 @@ class VersionManager:
             r"llama-.*-win-cpu-x64",
             r"llama-.*-win-vulkan-x64",
             r"llama-.*-win-sycl-x64",
+            r"llama-.*-ubuntu-vulkan-x64",
+            r"llama-.*-ubuntu-cuda-x64",
+            r"llama-.*-ubuntu-hip-x64",
+            r"llama-.*-ubuntu-sycl-x64",
             r"llama-.*-ubuntu-x64",
             r"llama-.*-ubuntu-arm64",
             r"llama-.*-macos-x64",
@@ -329,8 +333,7 @@ class VersionManager:
                 for pattern in os_patterns:
                     if re.search(pattern, asset_name):
                         asset_gpu = _asset_gpu_type(asset_name)
-                        # If GPU preference is set on Windows, only accept matching GPU type
-                        if preferred_gpu and os_name == "windows":
+                        if preferred_gpu is not None:
                             if asset_gpu == preferred_gpu:
                                 logger.info(
                                     f"Matched {preferred_gpu.upper()} pattern {pattern} for {asset.name} (from config)"
@@ -343,16 +346,15 @@ class VersionManager:
                 # Fallback: check for OS+arch in asset name
                 asset_gpu = _asset_gpu_type(asset_name)
                 if os_name == "windows" and "win" in asset_name and arch in asset_name:
-                    if preferred_gpu and asset_gpu == preferred_gpu:
-                        return asset
-                    elif preferred_gpu is None:
+                    if preferred_gpu is None or asset_gpu == preferred_gpu:
                         return asset
                 elif (
                     os_name == "linux"
                     and ("linux" in asset_name or "ubuntu" in asset_name)
                     and arch in asset_name
                 ):
-                    return asset
+                    if preferred_gpu is None or asset_gpu == preferred_gpu:
+                        return asset
                 elif os_name == "macos" and "macos" in asset_name and arch in asset_name:
                     return asset
 

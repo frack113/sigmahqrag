@@ -98,6 +98,7 @@ class RAGPipeline:
         self,
         rule_data: dict[str, Any],
         related_results: list[dict[str, Any]] | None = None,
+        system_prompt_id: str = "",
     ) -> str:
         """Generate explanation for an uploaded Sigma rule."""
         related_text = self._format_search_results(related_results or [])
@@ -112,7 +113,7 @@ class RAGPipeline:
             return cached
 
         try:
-            prompt_content = self._resolve_prompt(mode="explain")
+            prompt_content = self._resolve_prompt(system_prompt_id, mode="explain")
             rule_yaml = await self._format_rule_yaml(rule_data)
             prompt = Template(prompt_content).render(
                 uploaded_rule=rule_yaml,
@@ -133,6 +134,7 @@ class RAGPipeline:
         self,
         rule_data: dict[str, Any],
         related_results: list[dict[str, Any]] | None = None,
+        system_prompt_id: str = "",
     ) -> AsyncGenerator[str, None]:
         """Stream explanation for an uploaded Sigma rule."""
         related_text = self._format_search_results(related_results or [])
@@ -149,7 +151,7 @@ class RAGPipeline:
             return
 
         try:
-            prompt_content = self._resolve_prompt(mode="explain")
+            prompt_content = self._resolve_prompt(system_prompt_id, mode="explain")
             rule_yaml = await self._format_rule_yaml(rule_data)
             prompt = Template(prompt_content).render(
                 uploaded_rule=rule_yaml,
@@ -187,7 +189,7 @@ class RAGPipeline:
 
         try:
             prompt_content = self._resolve_prompt(system_prompt_id, mode="search")
-            prompt = Template(prompt_content).render(search_results=results_text)
+            prompt = Template(prompt_content).render(search_results=results_text, question=query)
 
             stream = self.llm_client.generate_stream(
                 prompt=f"{prompt}\n\nQuery:\n{query}",
@@ -236,7 +238,7 @@ class RAGPipeline:
             prompt_content = self._resolve_prompt(system_prompt_id, mode="search")
             # Render the prompt template with search results so the LLM gets
             # Sigma syntax reference as context when available.
-            prompt = Template(prompt_content).render(search_results=results_text)
+            prompt = Template(prompt_content).render(search_results=results_text, question=query)
 
             if use_chat:
                 messages = [
@@ -268,6 +270,7 @@ class RAGPipeline:
         self,
         rule_data: dict[str, Any],
         related_results: list[dict[str, Any]],
+        system_prompt_id: str = "",
     ) -> str:
         """Analyze detection coverage gaps."""
         related_text = self._format_search_results(related_results)
@@ -282,7 +285,7 @@ class RAGPipeline:
             return cached
 
         try:
-            prompt_content = self._resolve_prompt(mode="coverage")
+            prompt_content = self._resolve_prompt(system_prompt_id, mode="coverage")
             rule_yaml = await self._format_rule_yaml(rule_data)
             prompt = Template(prompt_content).render(
                 uploaded_rule=rule_yaml,
@@ -303,6 +306,7 @@ class RAGPipeline:
         self,
         rule_data: dict[str, Any],
         related_results: list[dict[str, Any]],
+        system_prompt_id: str = "",
     ) -> AsyncGenerator[str, None]:
         """Stream coverage analysis for an uploaded Sigma rule."""
         related_text = self._format_search_results(related_results)
@@ -319,7 +323,7 @@ class RAGPipeline:
             return
 
         try:
-            prompt_content = self._resolve_prompt(mode="coverage")
+            prompt_content = self._resolve_prompt(system_prompt_id, mode="coverage")
             rule_yaml = await self._format_rule_yaml(rule_data)
             prompt = Template(prompt_content).render(
                 uploaded_rule=rule_yaml,

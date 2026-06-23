@@ -287,6 +287,31 @@
 	padding-top: var(--space-2);
 }
 
+/* ── Storage lock: block other sections until Storage is fixed ── */
+.storage-needs-fix .config-group:not(#data-section) {
+	opacity: 0.45;
+	pointer-events: none;
+	position: relative;
+	overflow: hidden;
+	user-select: none;
+}
+
+.storage-needs-fix .config-group:not(#data-section)::after {
+	content: "⚠ Fix Storage first";
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: rgba(0, 0, 0, 0.35);
+	color: #fff;
+	font-size: var(--text-lg);
+	font-weight: 700;
+	z-index: 5;
+	letter-spacing: 0.5px;
+	backdrop-filter: blur(1px);
+}
+
 /* ── Responsive ── */
 @media (max-width: 1200px) {
 	.status-grid {

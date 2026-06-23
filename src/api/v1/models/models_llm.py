@@ -8,6 +8,7 @@ from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
 from src.api.dependencies import get_database_service, get_embedding_manager, get_unified_registry
+from src.application.models.download import HFDownloadService
 from src.api.v1.models._models_shared import (
     _delete_all_models_of_type,
     _delete_llm_model_file,
@@ -63,6 +64,22 @@ async def list_installed_llm_models() -> JSONResponse:
         return JSONResponse(content={"models": models})
     except Exception as e:
         logger.error(f"Failed to list installed LLM models: {e}")
+        return JSONResponse(status_code=500, content={"error": "An internal error occurred"})
+
+
+@router.get("/llm/search")
+async def search_llm_models(query: str, limit: int = 20) -> JSONResponse:
+    """Search for LLM models on HuggingFace.
+
+    No pipeline tag filter is applied because many GGUF repos
+    (e.g. MaziyarPanahi/*, bartowski/*) do not set a pipeline_tag.
+    """
+    try:
+        service = HFDownloadService()
+        results = await service.list_models(query)
+        return JSONResponse(content={"models": [{"repo_id": r.full_id} for r in results[:limit]]})
+    except Exception as e:
+        logger.error(f"LLM search failed: {e}")
         return JSONResponse(status_code=500, content={"error": "An internal error occurred"})
 
 

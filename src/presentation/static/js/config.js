@@ -6,6 +6,23 @@
  */
 
 // ──────────────────────────────────────────────────────────────
+// Global state: storage fix tracking
+// ──────────────────────────────────────────────────────────────
+let _dataDirsNeedFix = false;
+let _duckDbNeedFix = false;
+
+function _updateStorageLock() {
+	const needsFix = _dataDirsNeedFix || _duckDbNeedFix;
+	// Target the inner .config-dashboard that wraps the sections
+	const container = document.querySelector(
+		".config-dashboard > .config-dashboard",
+	);
+	if (container) {
+		container.classList.toggle("storage-needs-fix", needsFix);
+	}
+}
+
+// ──────────────────────────────────────────────────────────────
 // API Configuration
 // ──────────────────────────────────────────────────────────────
 const CONFIG = {
@@ -32,6 +49,8 @@ const CONFIG = {
 	},
 	llm: {
 		installed: "/api/v1/models/llm/installed",
+		search: "/api/v1/models/llm/search",
+		files: "/api/v1/models/llm/files",
 		download: "/api/v1/models/llm/download",
 		delete: "/api/v1/models/llm",
 		progress: "/api/v1/models/llm/progress",
@@ -268,10 +287,17 @@ const renderDataDirs = (dirs) => {
 				? "ERROR"
 				: "PARTIAL";
 
-	const fixBtnHtml =
-		readyCount === dirs.length
-			? '<button class="btn btn-primary btn-sm" disabled>Fix</button>'
-			: '<button class="btn btn-primary btn-sm" onclick="Config.createDataDirs()">Fix</button>';
+	const needsFix = readyCount !== dirs.length;
+	_dataDirsNeedFix = needsFix;
+	_updateStorageLock();
+
+	const fixBtnHtml = needsFix
+		? '<button class="btn btn-primary btn-sm" onclick="Config.createDataDirs()">Fix</button>'
+		: '<button class="btn btn-primary btn-sm" disabled>Fix</button>';
+
+	const hardResetHtml = needsFix
+		? '<button class="btn btn-danger btn-sm" disabled title="Apply Fix first">Hard Reset</button>'
+		: '<button class="btn btn-danger btn-sm" onclick="Config.resetDataDirs()">Hard Reset</button>';
 
 	const listEl = document.getElementById("data-dirs-list");
 	listEl.innerHTML =
@@ -292,7 +318,7 @@ const renderDataDirs = (dirs) => {
 		'  <span class="data-action-buttons">' +
 		fixBtnHtml +
 		'  <button class="btn btn-warning btn-sm" disabled>Clean</button>' +
-		'  <button class="btn btn-danger btn-sm" onclick="Config.resetDataDirs()">Hard Reset</button>' +
+		hardResetHtml +
 		"  </span>" +
 		"</div>";
 };
@@ -327,46 +353,40 @@ function createDataDirs() {
 			checkDataDirs();
 		})
 		.catch((e) => {
-			alert(`Error: ${e.message}`);
+			showToast(`Error: ${e.message}`, "error");
 		});
 }
 
-function cleanDataDirs() {
+async function cleanDataDirs() {
 	if (
-		!confirm(
+		!(await showConfirm(
 			"Clean all data directories? Non-official contents will be deleted.",
-		)
+		))
 	)
 		return;
-	fetch(CONFIG.data.clean, { method: "POST" })
-		.then((r) =>
-			r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)),
-		)
-		.then(() => {
-			checkDataDirs();
-		})
-		.catch((e) => {
-			alert(`Error: ${e.message}`);
-		});
+	try {
+		const r = await fetch(CONFIG.data.clean, { method: "POST" });
+		if (!r.ok) throw new Error(`HTTP ${r.status}`);
+		checkDataDirs();
+	} catch (e) {
+		showToast(`Error: ${e.message}`, "error");
+	}
 }
 
-function resetDataDirs() {
+async function resetDataDirs() {
 	if (
-		!confirm(
+		!(await showConfirm(
 			"\u26a0\ufe0f HARD RESET \u2014 This will permanently delete ALL data in the data/ directory. Continue?",
-		)
+		))
 	)
 		return;
-	fetch(CONFIG.data.reset, { method: "POST" })
-		.then((r) =>
-			r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)),
-		)
-		.then(() => {
-			checkDataDirs();
-		})
-		.catch((e) => {
-			alert(`Error: ${e.message}`);
-		});
+	try {
+		const r = await fetch(CONFIG.data.reset, { method: "POST" });
+		if (!r.ok) throw new Error(`HTTP ${r.status}`);
+		checkDataDirs();
+	} catch (e) {
+		showToast(`Error: ${e.message}`, "error");
+	}
 }
 
 // ──────────────────────────────────────────────────────────────
@@ -403,12 +423,19 @@ function renderDuckDbStatus(status) {
 
 	const size =
 		status.file_size > 0 ? ` (${formatBytes(status.file_size)})` : "";
-	const fixBtnHtml = status.needs_fix
+	const needsFix = status.needs_fix;
+	_duckDbNeedFix = needsFix;
+	_updateStorageLock();
+	const fixBtnHtml = needsFix
 		? '<button class="btn btn-primary btn-sm" onclick="Config.createDuckDb()">Fix</button>'
 		: '<button class="btn btn-primary btn-sm" disabled>Fix</button>';
-	const cleanBtnHtml = status.needs_clean
-		? '<button class="btn btn-warning btn-sm" onclick="Config.cleanDuckDb()">Clean</button>'
-		: '<button class="btn btn-warning btn-sm" disabled>Clean</button>';
+	const cleanBtnHtml =
+		status.needs_clean && !needsFix
+			? '<button class="btn btn-warning btn-sm" onclick="Config.cleanDuckDb()">Clean</button>'
+			: '<button class="btn btn-warning btn-sm" disabled>Clean</button>';
+	const resetHtml = needsFix
+		? '<button class="btn btn-danger btn-sm" disabled title="Apply Fix first">Hard Reset</button>'
+		: '<button class="btn btn-danger btn-sm" onclick="Config.resetDuckDb()">Hard Reset</button>';
 
 	el.innerHTML =
 		'<div class="data-row">' +
@@ -428,7 +455,7 @@ function renderDuckDbStatus(status) {
 		" " +
 		cleanBtnHtml +
 		" " +
-		'<button class="btn btn-danger btn-sm" onclick="Config.resetDuckDb()">Hard Reset</button>' +
+		resetHtml +
 		"  </span>" +
 		"</div>";
 }
@@ -462,42 +489,40 @@ function createDuckDb() {
 			checkDuckDbStatus();
 		})
 		.catch((e) => {
-			alert(`Error: ${e.message}`);
+			showToast(`Error: ${e.message}`, "error");
 		});
 }
 
-function cleanDuckDb() {
-	if (!confirm("This will remove excess tables not in the schema. Continue?"))
-		return;
-	fetch(CONFIG.duckdb.clean, { method: "POST" })
-		.then((r) =>
-			r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)),
-		)
-		.then(() => {
-			checkDuckDbStatus();
-		})
-		.catch((e) => {
-			alert(`Error: ${e.message}`);
-		});
-}
-
-function resetDuckDb() {
+async function cleanDuckDb() {
 	if (
-		!confirm(
-			"\u26a0\ufe0f HARD RESET \u2014 This will permanently delete the DuckDB database and create a fresh one. Continue?",
-		)
+		!(await showConfirm(
+			"This will remove excess tables not in the schema. Continue?",
+		))
 	)
 		return;
-	fetch(CONFIG.duckdb.reset, { method: "POST" })
-		.then((r) =>
-			r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)),
-		)
-		.then(() => {
-			checkDuckDbStatus();
-		})
-		.catch((e) => {
-			alert(`Error: ${e.message}`);
-		});
+	try {
+		const r = await fetch(CONFIG.duckdb.clean, { method: "POST" });
+		if (!r.ok) throw new Error(`HTTP ${r.status}`);
+		checkDuckDbStatus();
+	} catch (e) {
+		showToast(`Error: ${e.message}`, "error");
+	}
+}
+
+async function resetDuckDb() {
+	if (
+		!(await showConfirm(
+			"\u26a0\ufe0f HARD RESET \u2014 This will permanently delete the DuckDB database and create a fresh one. Continue?",
+		))
+	)
+		return;
+	try {
+		const r = await fetch(CONFIG.duckdb.reset, { method: "POST" });
+		if (!r.ok) throw new Error(`HTTP ${r.status}`);
+		checkDuckDbStatus();
+	} catch (e) {
+		showToast(`Error: ${e.message}`, "error");
+	}
 }
 
 // ──────────────────────────────────────────────────────────────
@@ -1088,13 +1113,13 @@ function startService(service) {
 		.then((data) => {
 			const msg =
 				data.data?.message || data.data?.error || data.error || "Started";
-			alert(msg);
+			showToast(msg, data.data?.error || data.error ? "error" : "success");
 			loadBackendStatus();
 		});
 }
 
-function stopService(service) {
-	if (!confirm(`Stop ${service}?`)) return;
+async function stopService(service) {
+	if (!(await showConfirm(`Stop ${service}?`))) return;
 	fetch("/api/v1/orchestration/backend", {
 		method: "POST",
 		headers: { "Content-Type": "application/json" },
@@ -1104,7 +1129,7 @@ function stopService(service) {
 		.then((data) => {
 			const msg =
 				data.data?.message || data.data?.error || data.error || "Stopped";
-			alert(msg);
+			showToast(msg, data.data?.error || data.error ? "error" : "success");
 			loadBackendStatus();
 		});
 }
@@ -1265,8 +1290,9 @@ function refreshReleases() {
 				const msgs = Object.values(data.errors);
 				const rateLimited = msgs.some((m) => m.indexOf("rate limit") !== -1);
 				if (rateLimited) {
-					alert(
+					showToast(
 						"GitHub API rate limit reached. Please wait a few minutes and try again.",
+						"error",
 					);
 				}
 			}
@@ -1279,7 +1305,7 @@ function refreshReleases() {
 			}
 		})
 		.catch(() => {
-			alert("Failed to refresh releases. Check your connection.");
+			showToast("Failed to refresh releases. Check your connection.", "error");
 			if (statusEl) {
 				statusEl.textContent = "Failed";
 				statusEl.className = "status-message error";
@@ -1354,7 +1380,15 @@ function renderLlmModels(models) {
 			"')\">" +
 			escHtml(m.repo_id) +
 			"</td>";
-		html += `<td>${m.files ? `${m.files.length} file(s)` : ""}</td>`;
+		const filesHtml = m.files
+			? m.files
+					.map((f) => {
+						const sizeGb = (f.size / (1024 * 1024 * 1024)).toFixed(1);
+						return `${escHtml(f.filename)} (${sizeGb} GB)`;
+					})
+					.join("<br>")
+			: "";
+		html += `<td>${filesHtml}</td>`;
 		html += "</tr>";
 	}
 	html += "</tbody></table>";
@@ -1398,12 +1432,13 @@ function selectLlmModel(repoId) {
 	}
 }
 
-function downloadLlmModel() {
+function downloadLlmModel(filename) {
 	if (!selectedLlmRepo) return;
-	fetch(
-		`${CONFIG.llm.download}?repo_id=${encodeURIComponent(selectedLlmRepo)}`,
-		{ method: "POST" },
-	)
+	let url = `${CONFIG.llm.download}?repo_id=${encodeURIComponent(selectedLlmRepo)}`;
+	if (filename) {
+		url += `&filename=${encodeURIComponent(filename)}`;
+	}
+	fetch(url, { method: "POST" })
 		.then((r) =>
 			r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)),
 		)
@@ -1430,39 +1465,39 @@ function downloadLlmModel() {
 							clearInterval(checkProgress);
 							btn.textContent = "Download";
 							btn.disabled = false;
-							alert(`Download failed: ${data.status}`);
+							showToast(`Download failed: ${data.status}`, "error");
 						}
 					})
 					.catch(() => {});
 			}, 1000);
 		})
 		.catch((e) => {
-			alert(`Error: ${e.message}`);
+			showToast(`Error: ${e.message}`, "error");
 		});
 }
 
-function downloadLlmModelDirect(repoId) {
+function downloadLlmModelDirect(repoId, filename) {
 	selectedLlmRepo = repoId;
-	downloadLlmModel();
+	downloadLlmModel(filename);
 }
 
-function deleteLlmModel() {
+async function deleteLlmModel() {
 	if (!selectedLlmRepo) return;
-	if (!confirm(`Delete model ${selectedLlmRepo}?`)) return;
+	if (!(await showConfirm(`Delete model ${selectedLlmRepo}?`))) return;
 
-	fetch(`${CONFIG.llm.delete}/${encodeURIComponent(selectedLlmRepo)}`, {
-		method: "DELETE",
-	})
-		.then((r) =>
-			r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)),
-		)
-		.then(() => {
-			selectedLlmRepo = null;
-			checkLlmModels();
-		})
-		.catch((e) => {
-			alert(`Error: ${e.message}`);
-		});
+	try {
+		const r = await fetch(
+			`${CONFIG.llm.delete}/${encodeURIComponent(selectedLlmRepo)}`,
+			{
+				method: "DELETE",
+			},
+		);
+		if (!r.ok) throw new Error(`HTTP ${r.status}`);
+		selectedLlmRepo = null;
+		checkLlmModels();
+	} catch (e) {
+		showToast(`Error: ${e.message}`, "error");
+	}
 }
 
 // ──────────────────────────────────────────────────────────────
@@ -1588,6 +1623,161 @@ function searchEmbModel() {
 		});
 }
 
+function searchLlmModel() {
+	const query = document.getElementById("llm-search-input").value.trim();
+	if (!query) return;
+
+	fetch(`${CONFIG.llm.search}?query=${encodeURIComponent(query)}&limit=10`)
+		.then((r) =>
+			r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)),
+		)
+		.then((data) => {
+			const resultsEl = document.getElementById("llm-search-results");
+			if (!data.models || data.models.length === 0) {
+				resultsEl.innerHTML = '<p class="info-text">No results found.</p>';
+				return;
+			}
+
+			let html = "";
+			for (let i = 0; i < data.models.length; i++) {
+				const m = data.models[i];
+				const safeId = escHtml(m.repo_id);
+				html += '<div class="search-item">';
+				html += `<span class="result-name">${safeId}</span>`;
+				html +=
+					'<button class="btn btn-primary btn-sm" onclick="Config.showLlmFiles(\'' +
+					safeId +
+					"')\">Download</button>";
+				html += `<div id="llm-files-${i}" class="file-picker" style="display:none;margin-top:8px;"></div>`;
+				html += "</div>";
+			}
+			resultsEl.innerHTML = html;
+		})
+		.catch((e) => {
+			console.error(e);
+			document.getElementById("llm-search-results").innerHTML =
+				'<p class="error-text">Search error.</p>';
+		});
+}
+
+function showLlmFiles(repoId) {
+	const idx = Array.from(document.querySelectorAll(".search-item")).findIndex(
+		(el) => el.querySelector(".result-name")?.textContent === repoId,
+	);
+	if (idx < 0) return;
+	const picker = document.getElementById(`llm-files-${idx}`);
+	if (!picker) return;
+
+	if (picker.style.display === "block") {
+		picker.style.display = "none";
+		return;
+	}
+
+	picker.innerHTML = '<p class="info-text">Loading files...</p>';
+	picker.style.display = "block";
+
+	fetch(`${CONFIG.llm.files}?repo_id=${encodeURIComponent(repoId)}`)
+		.then((r) =>
+			r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)),
+		)
+		.then((data) => {
+			if (!data.files || data.files.length === 0) {
+				picker.innerHTML = '<p class="info-text">No GGUF files found.</p>';
+				return;
+			}
+
+			let html =
+				'<div class="llm-file-list" style="display:flex;flex-direction:column;gap:2px;">';
+			for (const f of data.files) {
+				const size = formatBytes(f.size);
+				const safeFile = escHtml(f.filename);
+				html +=
+					'<div class="llm-file-item" style="display:flex;align-items:center;gap:8px;padding:4px 8px;border:1px solid var(--border-color);border-radius:4px;">';
+				html +=
+					'<span style="flex:1;font-size:var(--text-sm);color:var(--text-body);">' +
+					safeFile +
+					"</span>";
+				html +=
+					'<span style="font-size:var(--text-sm);color:var(--text-card-label);white-space:nowrap;">' +
+					size +
+					"</span>";
+				html +=
+					'<button class="btn btn-primary btn-sm" style="white-space:nowrap;" onclick="Config._downloadLlmFile(\'' +
+					escHtml(repoId) +
+					"', '" +
+					safeFile +
+					"', this)\">Download</button>";
+				html += "</div>";
+			}
+			html += "</div>";
+			picker.innerHTML = html;
+		})
+		.catch(() => {
+			picker.innerHTML = '<p class="error-text">Failed to load files.</p>';
+		});
+}
+
+function _downloadLlmFile(repoId, filename, btn) {
+	btn.disabled = true;
+	btn.textContent = "Starting...";
+	selectedLlmRepo = repoId;
+
+	const progressUrl = `${CONFIG.llm.progress}?repo_id=${encodeURIComponent(repoId)}`;
+
+	fetch(
+		CONFIG.llm.download +
+			"?repo_id=" +
+			encodeURIComponent(repoId) +
+			"&filename=" +
+			encodeURIComponent(filename),
+		{ method: "POST" },
+	)
+		.then((r) =>
+			r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)),
+		)
+		.then(() => {
+			btn.textContent = "Downloading...";
+			let pollCount = 0;
+			const checkProgress = setInterval(() => {
+				pollCount++;
+				if (pollCount > 600) {
+					clearInterval(checkProgress);
+					btn.textContent = "Download";
+					btn.disabled = false;
+					showToast("Download progress timed out — check server logs", "error");
+					return;
+				}
+				fetch(progressUrl)
+					.then((r) => r.json())
+					.then((data) => {
+						if (data.status === "completed") {
+							clearInterval(checkProgress);
+							btn.textContent = "Done";
+							btn.className = "btn btn-success btn-sm";
+							showToast(`Downloaded ${filename}`, "success");
+							checkLlmModels();
+						} else if (data.status?.startsWith("error")) {
+							clearInterval(checkProgress);
+							btn.textContent = "Failed";
+							btn.className = "btn btn-danger btn-sm";
+							showToast(`Download failed: ${data.status}`, "error");
+						}
+					})
+					.catch(() => {
+						btn.textContent = "Download";
+						btn.disabled = false;
+						clearInterval(checkProgress);
+						showToast("Progress check failed — see server logs", "error");
+					});
+			}, 1000);
+		})
+		.catch((e) => {
+			btn.disabled = false;
+			btn.textContent = "Download";
+			showToast(`Error: ${e.message}`, "error");
+		});
+}
+
 function downloadEmbModel() {
 	if (!selectedEmbRepo) return;
 	fetch(
@@ -1621,14 +1811,14 @@ function downloadEmbModel() {
 							clearInterval(checkProgress);
 							btn.textContent = "Download";
 							btn.disabled = false;
-							alert(`Download failed: ${data.status}`);
+							showToast(`Download failed: ${data.status}`, "error");
 						}
 					})
 					.catch(() => {});
 			}, 1000);
 		})
 		.catch((e) => {
-			alert(`Error: ${e.message}`);
+			showToast(`Error: ${e.message}`, "error");
 		});
 }
 
@@ -1642,11 +1832,11 @@ function checkDimensionStatus() {
 	if (banner) banner.style.display = "none";
 }
 
-function recreateAndReindex() {
+async function recreateAndReindex() {
 	if (
-		!confirm(
+		!(await showConfirm(
 			"Recreate Qdrant collection(s) and reindex all documents? This will delete existing vectors.",
-		)
+		))
 	)
 		return;
 	const btn = document.querySelector("#emb-dim-banner .btn");
@@ -1663,59 +1853,54 @@ function recreateAndReindex() {
 	}
 
 	const collections = ["sigma_docs"];
-	let chain = Promise.resolve();
-	collections.forEach((name) => {
-		chain = chain.then(() =>
-			fetch("/api/v1/qdrant", {
+	try {
+		for (const name of collections) {
+			const r = await fetch("/api/v1/qdrant", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({
 					action: "reindex",
 					payload: { action: "reindex", collection_name: name },
 				}),
-			}).then((r) => r.json()),
-		);
-	});
-	chain
-		.then(() => {
-			checkDimensionStatus();
-			if (statusEl) {
-				statusEl.textContent = "Reindex completed";
-				statusEl.className = "status-message success";
-			}
-		})
-		.catch((e) => {
-			alert(`Reindex failed: ${e.message || "Unknown error"}`);
-			if (statusEl) {
-				statusEl.textContent = "Reindex failed";
-				statusEl.className = "status-message error";
-			}
-		})
-		.finally(() => {
-			if (btn) {
-				btn.textContent = "Recreate collection & Reindex";
-				btn.disabled = false;
-			}
-		});
+			});
+			await r.json();
+		}
+		checkDimensionStatus();
+		if (statusEl) {
+			statusEl.textContent = "Reindex completed";
+			statusEl.className = "status-message success";
+		}
+	} catch (e) {
+		showToast(`Reindex failed: ${e.message || "Unknown error"}`, "error");
+		if (statusEl) {
+			statusEl.textContent = "Reindex failed";
+			statusEl.className = "status-message error";
+		}
+	} finally {
+		if (btn) {
+			btn.textContent = "Recreate collection & Reindex";
+			btn.disabled = false;
+		}
+	}
 }
 
-function deleteEmbModel() {
+async function deleteEmbModel() {
 	if (!selectedEmbRepo) return;
-	if (!confirm(`Delete model ${selectedEmbRepo}?`)) return;
+	if (!(await showConfirm(`Delete model ${selectedEmbRepo}?`))) return;
 
-	fetch(`${CONFIG.embedding.delete}/${encodeURIComponent(selectedEmbRepo)}`, {
-		method: "DELETE",
-	})
-		.then((r) =>
-			r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)),
-		)
-		.then(() => {
-			selectedEmbRepo = null;
-			checkEmbModels();
-		})
-		.catch((e) => {
-			alert(`Error: ${e.message}`);
-		});
+	try {
+		const r = await fetch(
+			`${CONFIG.embedding.delete}/${encodeURIComponent(selectedEmbRepo)}`,
+			{
+				method: "DELETE",
+			},
+		);
+		if (!r.ok) throw new Error(`HTTP ${r.status}`);
+		selectedEmbRepo = null;
+		checkEmbModels();
+	} catch (e) {
+		showToast(`Error: ${e.message}`, "error");
+	}
 }
 
 // ──────────────────────────────────────────────────────────────
@@ -1857,16 +2042,16 @@ function loadSpecs() {
 		});
 }
 
-function fixSpecRepo() {
+async function fixSpecRepo() {
 	const defaultUrl = "https://github.com/sigmahq/sigma-specification";
 	const defaultBranch = "main";
 
 	if (
-		!confirm(
+		!(await showConfirm(
 			"Clone the default SigmaHQ specification repository (" +
 				defaultUrl +
 				")?",
-		)
+		))
 	)
 		return;
 
@@ -1874,28 +2059,27 @@ function fixSpecRepo() {
 	statusEl.textContent = "Cloning repository...";
 	statusEl.className = "status-message";
 
-	fetch(CONFIG.spec.add, {
-		method: "POST",
-		headers: { "Content-Type": "application/json" },
-		body: JSON.stringify({ url: defaultUrl, branch: defaultBranch }),
-	})
-		.then((r) => r.json())
-		.then((data) => {
-			if (data.success) {
-				statusEl.textContent = data.message || "Repository cloning started";
-				statusEl.className = "status-message success";
-				setTimeout(() => {
-					loadSpecs();
-				}, 2000);
-			} else {
-				statusEl.textContent = data.error || "Clone failed";
-				statusEl.className = "status-message error";
-			}
-		})
-		.catch((err) => {
-			statusEl.textContent = `Error: ${err.message}`;
-			statusEl.className = "status-message error";
+	try {
+		const r = await fetch(CONFIG.spec.add, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ url: defaultUrl, branch: defaultBranch }),
 		});
+		const data = await r.json();
+		if (data.success) {
+			statusEl.textContent = data.message || "Repository cloning started";
+			statusEl.className = "status-message success";
+			setTimeout(() => {
+				loadSpecs();
+			}, 2000);
+		} else {
+			statusEl.textContent = data.error || "Clone failed";
+			statusEl.className = "status-message error";
+		}
+	} catch (err) {
+		statusEl.textContent = `Error: ${err.message}`;
+		statusEl.className = "status-message error";
+	}
 }
 
 // ──────────────────────────────────────────────────────────────
@@ -1939,6 +2123,9 @@ const _Config = {
 
 	// LLM
 	selectLlmModel: selectLlmModel,
+	searchLlmModel: searchLlmModel,
+	showLlmFiles: showLlmFiles,
+	_downloadLlmFile: _downloadLlmFile,
 	downloadLlmModel: downloadLlmModel,
 	downloadLlmModelDirect: downloadLlmModelDirect,
 	deleteLlmModel: deleteLlmModel,

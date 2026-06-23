@@ -103,11 +103,11 @@ async function loadVectorDB() {
 
 async function _recreateCollection(name, event) {
 	if (
-		!confirm(
+		!(await showConfirm(
 			'Are you sure you want to RE-CREATE the collection "' +
 				name +
 				'"? This will DELETE all existing data.',
-		)
+		))
 	) {
 		return;
 	}
@@ -125,7 +125,7 @@ async function _recreateCollection(name, event) {
 		await loadVectorDB();
 	} catch (e) {
 		console.error("Error recreating collection:", e);
-		alert(`Failed to recreate collection: ${e.message}`);
+		showToast(`Failed to recreate collection: ${e.message}`, "error");
 	} finally {
 		window.isProcessing = false;
 		if (btn) btn.disabled = false;
