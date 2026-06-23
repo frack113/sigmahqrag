@@ -214,20 +214,14 @@ class ChatService:
         Uses search_sigma, filter_metadata, explain_detection, explain_rule,
         and summarize tools to answer questions about Sigma detection rules.
         """
+        prompt_content = self.rag_pipeline._resolve_prompt(self._current_prompt_id, mode="search")
         assistant_message = {
             "role": "assistant",
             "content": message,
         }
         system_msg = {
             "role": "system",
-            "content": (
-                "You are a Sigma rule assistant. Use the provided tools to answer "
-                "questions about Sigma detection rules. If the user asks about Sigma "
-                "rules, use search_sigma. If they want to filter, use filter_metadata. "
-                "If they ask to explain a Sigma detection, use explain_detection. "
-                "If they ask to explain a full Sigma rule, use explain_rule. "
-                "If they want a summary of text, use summarize. Always use tools when appropriate."
-            ),
+            "content": prompt_content,
         }
         messages = [system_msg, assistant_message]
         return await self._execute_tool_calls(messages)

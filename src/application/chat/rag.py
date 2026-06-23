@@ -187,7 +187,7 @@ class RAGPipeline:
 
         try:
             prompt_content = self._resolve_prompt(system_prompt_id, mode="search")
-            prompt = Template(prompt_content).render(search_results=results_text)
+            prompt = Template(prompt_content).render(search_results=results_text, question=query)
 
             stream = self.llm_client.generate_stream(
                 prompt=f"{prompt}\n\nQuery:\n{query}",
@@ -236,7 +236,7 @@ class RAGPipeline:
             prompt_content = self._resolve_prompt(system_prompt_id, mode="search")
             # Render the prompt template with search results so the LLM gets
             # Sigma syntax reference as context when available.
-            prompt = Template(prompt_content).render(search_results=results_text)
+            prompt = Template(prompt_content).render(search_results=results_text, question=query)
 
             if use_chat:
                 messages = [
