@@ -232,7 +232,9 @@ class ChatService:
             return "No Sigma rule uploaded. Please upload a .yaml file first."
 
         related = await self.search_engine.search(self._uploaded_rule.get("name", ""))
-        return await self.rag_pipeline.explain_rule(self._uploaded_rule, related)
+        return await self.rag_pipeline.explain_rule(
+            self._uploaded_rule, related, system_prompt_id=self._current_prompt_id
+        )
 
     async def _handle_explain_stream(
         self,
@@ -244,7 +246,9 @@ class ChatService:
             return
 
         related = await self.search_engine.search(self._uploaded_rule.get("name", ""))
-        async for token in self.rag_pipeline.explain_rule_stream(self._uploaded_rule, related):
+        async for token in self.rag_pipeline.explain_rule_stream(
+            self._uploaded_rule, related, system_prompt_id=self._current_prompt_id
+        ):
             yield token
 
     async def _handle_coverage(self, message: str) -> str:
@@ -257,7 +261,9 @@ class ChatService:
             return "No related rules found for coverage analysis."
 
         try:
-            return await self.rag_pipeline.analyze_coverage(self._uploaded_rule, results)
+            return await self.rag_pipeline.analyze_coverage(
+                self._uploaded_rule, results, system_prompt_id=self._current_prompt_id
+            )
         except Exception as e:
             logger.error(f"RAG pipeline failed: {e}")
             return f"Found {len(results)} related rules for coverage comparison."
@@ -333,7 +339,7 @@ class ChatService:
 
         try:
             async for token in self.rag_pipeline.analyze_coverage_stream(
-                self._uploaded_rule, results
+                self._uploaded_rule, results, system_prompt_id=self._current_prompt_id
             ):
                 yield token
         except Exception as e:

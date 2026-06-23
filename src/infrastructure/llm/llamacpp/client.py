@@ -46,7 +46,7 @@ class LlamaClient:
             api_base=f"{self.base_url}/v1",
             api_key="sigma-key",
             context_window=128000,
-            is_chat_model=False,
+            is_chat_model=True,
             max_tokens=512,
             timeout=120.0,
         )
