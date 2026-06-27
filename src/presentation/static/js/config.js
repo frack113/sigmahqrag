@@ -1432,8 +1432,19 @@ function selectLlmModel(repoId) {
 	}
 }
 
+function _setLlmBusy(busy) {
+	const dl = document.getElementById("btn-download-llm");
+	const del = document.getElementById("btn-delete-llm");
+	if (dl) {
+		dl.disabled = busy;
+		dl.textContent = busy ? "Downloading..." : "Download";
+	}
+	if (del) del.disabled = busy;
+}
+
 function downloadLlmModel(filename) {
 	if (!selectedLlmRepo) return;
+	_setLlmBusy(true);
 	let url = `${CONFIG.llm.download}?repo_id=${encodeURIComponent(selectedLlmRepo)}`;
 	if (filename) {
 		url += `&filename=${encodeURIComponent(filename)}`;
@@ -1443,11 +1454,6 @@ function downloadLlmModel(filename) {
 			r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)),
 		)
 		.then(() => {
-			const btn = document.getElementById("btn-download-llm");
-			const progressBtn = document.getElementById("btn-download-llm");
-			progressBtn.textContent = "Downloading...";
-			progressBtn.disabled = true;
-
 			const checkProgress = setInterval(() => {
 				fetch(
 					CONFIG.llm.progress +
@@ -1458,13 +1464,11 @@ function downloadLlmModel(filename) {
 					.then((data) => {
 						if (data.status === "completed") {
 							clearInterval(checkProgress);
-							btn.textContent = "Download";
-							btn.disabled = false;
+							_setLlmBusy(false);
 							checkLlmModels();
 						} else if (data.status?.startsWith("error")) {
 							clearInterval(checkProgress);
-							btn.textContent = "Download";
-							btn.disabled = false;
+							_setLlmBusy(false);
 							showToast(`Download failed: ${data.status}`, "error");
 						}
 					})
@@ -1472,6 +1476,7 @@ function downloadLlmModel(filename) {
 			}, 1000);
 		})
 		.catch((e) => {
+			_setLlmBusy(false);
 			showToast(`Error: ${e.message}`, "error");
 		});
 }
@@ -1484,7 +1489,7 @@ function downloadLlmModelDirect(repoId, filename) {
 async function deleteLlmModel() {
 	if (!selectedLlmRepo) return;
 	if (!(await showConfirm(`Delete model ${selectedLlmRepo}?`))) return;
-
+	_setLlmBusy(true);
 	try {
 		const r = await fetch(
 			`${CONFIG.llm.delete}/${encodeURIComponent(selectedLlmRepo)}`,
@@ -1497,6 +1502,8 @@ async function deleteLlmModel() {
 		checkLlmModels();
 	} catch (e) {
 		showToast(`Error: ${e.message}`, "error");
+	} finally {
+		_setLlmBusy(false);
 	}
 }
 
@@ -1778,8 +1785,19 @@ function _downloadLlmFile(repoId, filename, btn) {
 		});
 }
 
+function _setEmbBusy(busy) {
+	const dl = document.getElementById("btn-download-emb");
+	const del = document.getElementById("btn-delete-emb");
+	if (dl) {
+		dl.disabled = busy;
+		dl.textContent = busy ? "Downloading..." : "Download";
+	}
+	if (del) del.disabled = busy;
+}
+
 function downloadEmbModel() {
 	if (!selectedEmbRepo) return;
+	_setEmbBusy(true);
 	fetch(
 		CONFIG.embedding.download +
 			"?repo_id=" +
@@ -1790,10 +1808,6 @@ function downloadEmbModel() {
 			r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)),
 		)
 		.then(() => {
-			const btn = document.getElementById("btn-download-emb");
-			btn.textContent = "Downloading...";
-			btn.disabled = true;
-
 			const checkProgress = setInterval(() => {
 				fetch(
 					CONFIG.embedding.progress +
@@ -1804,13 +1818,11 @@ function downloadEmbModel() {
 					.then((data) => {
 						if (data.status === "completed") {
 							clearInterval(checkProgress);
-							btn.textContent = "Download";
-							btn.disabled = false;
+							_setEmbBusy(false);
 							checkEmbModels();
 						} else if (data.status?.startsWith("error")) {
 							clearInterval(checkProgress);
-							btn.textContent = "Download";
-							btn.disabled = false;
+							_setEmbBusy(false);
 							showToast(`Download failed: ${data.status}`, "error");
 						}
 					})
@@ -1818,6 +1830,7 @@ function downloadEmbModel() {
 			}, 1000);
 		})
 		.catch((e) => {
+			_setEmbBusy(false);
 			showToast(`Error: ${e.message}`, "error");
 		});
 }
@@ -1887,7 +1900,7 @@ async function recreateAndReindex() {
 async function deleteEmbModel() {
 	if (!selectedEmbRepo) return;
 	if (!(await showConfirm(`Delete model ${selectedEmbRepo}?`))) return;
-
+	_setEmbBusy(true);
 	try {
 		const r = await fetch(
 			`${CONFIG.embedding.delete}/${encodeURIComponent(selectedEmbRepo)}`,
@@ -1900,6 +1913,8 @@ async function deleteEmbModel() {
 		checkEmbModels();
 	} catch (e) {
 		showToast(`Error: ${e.message}`, "error");
+	} finally {
+		_setEmbBusy(false);
 	}
 }
 
