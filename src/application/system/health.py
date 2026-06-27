@@ -100,15 +100,18 @@ class HealthCheckService:
                 from src.infrastructure.vectorstore.client import get_qdrant_client
 
                 client = get_qdrant_client(host=host, port=port, timeout=TIMEOUT)
-                collections = client.get_collections().collections
-                collection_exists = any(c.name == collection for c in collections)
-                result = {
-                    "status": "ok" if collection_exists else "warning",
-                    "host": f"{host}:{port}",
-                    "collection": collection,
-                    "collection_exists": collection_exists,
-                    "response_time": round(time.time() - start, 3),
-                }
+                try:
+                    collections = client.get_collections().collections
+                    collection_exists = any(c.name == collection for c in collections)
+                    result = {
+                        "status": "ok" if collection_exists else "warning",
+                        "host": f"{host}:{port}",
+                        "collection": collection,
+                        "collection_exists": collection_exists,
+                        "response_time": round(time.time() - start, 3),
+                    }
+                finally:
+                    client.close()
             except Exception as e:
                 result = {
                     "status": "warning",

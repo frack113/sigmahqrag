@@ -209,13 +209,15 @@ class QdrantVectorService:
 
     async def health_check(self) -> bool:
         """Check if service is healthy."""
+        client = get_qdrant_client(host=self.host, port=self.port)
         try:
-            client = get_qdrant_client(host=self.host, port=self.port)
             collections = client.get_collections()
             return collections is not None
         except Exception as e:
             logger.debug(f"Health check failed: {e}")
             return False
+        finally:
+            client.close()
 
     async def create_collection(self, enable_hybrid: bool = True) -> None:
         """Create the collection if it doesn't exist."""

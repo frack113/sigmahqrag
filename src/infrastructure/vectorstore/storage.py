@@ -167,8 +167,8 @@ async def delete_point(
     port: int = 6333,
 ) -> bool:
     """Delete a point from the collection."""
+    client = get_qdrant_client(host=host, port=port)
     try:
-        client = get_qdrant_client(host=host, port=port)
         client.delete(
             collection_name=collection_name,
             points_selector=qdrant_client.models.PointIdsList(points=[point_id]),
@@ -178,3 +178,5 @@ async def delete_point(
     except Exception as e:
         logger.error(f"Failed to delete point {point_id}: {e}")
         return False
+    finally:
+        client.close()

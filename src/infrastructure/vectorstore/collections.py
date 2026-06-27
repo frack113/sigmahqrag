@@ -83,8 +83,8 @@ def _delete_collection_sync(client, collection_name: str):
 
 async def list_collections(host: str, port: int) -> list[dict[str, Any]]:
     """List all collections with detailed info."""
+    client = get_qdrant_client(host=host, port=port)
     try:
-        client = get_qdrant_client(host=host, port=port)
         collections_response = await asyncio.to_thread(_get_collections_sync, client)
 
         detailed_collections = []
@@ -99,14 +99,16 @@ async def list_collections(host: str, port: int) -> list[dict[str, Any]]:
     except Exception as e:
         logger.error("Failed to list collections: %s: %s", type(e).__name__, e, exc_info=True)
         raise
+    finally:
+        client.close()
 
 
 async def create_collection(
     host: str, port: int, collection_name: str, vector_size: int = 384, enable_hybrid: bool = True
 ) -> bool:
     """Create a new collection (with optional sparse vector support for hybrid search)."""
+    client = get_qdrant_client(host=host, port=port)
     try:
-        client = get_qdrant_client(host=host, port=port)
         vectors_config = qdrant_client.models.VectorParams(
             size=vector_size,
             distance=qdrant_client.models.Distance.COSINE,
@@ -147,12 +149,14 @@ async def create_collection(
             exc_info=True,
         )
         raise
+    finally:
+        client.close()
 
 
 async def delete_collection(host: str, port: int, collection_name: str) -> bool:
     """Delete an existing collection."""
+    client = get_qdrant_client(host=host, port=port)
     try:
-        client = get_qdrant_client(host=host, port=port)
         await asyncio.to_thread(_delete_collection_sync, client, collection_name)
         logger.info("Collection '%s' deleted successfully.", collection_name)
         return True
@@ -165,12 +169,14 @@ async def delete_collection(host: str, port: int, collection_name: str) -> bool:
             exc_info=True,
         )
         raise
+    finally:
+        client.close()
 
 
 async def get_collection(host: str, port: int, collection_name: str) -> dict[str, Any]:
     """Get information about a collection with defensive extraction."""
+    client = get_qdrant_client(host=host, port=port)
     try:
-        client = get_qdrant_client(host=host, port=port)
         info = await asyncio.to_thread(_get_collection_sync, client, collection_name)
 
         points_count = 0
@@ -214,3 +220,5 @@ async def get_collection(host: str, port: int, collection_name: str) -> dict[str
             exc_info=True,
         )
         raise
+    finally:
+        client.close()

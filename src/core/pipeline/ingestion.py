@@ -270,7 +270,7 @@ class IngestionPipelineBuilder:
         lock_path = cache_path / "pipeline.lock"
         if cache_path.exists():
             try:
-                with portalocker.Lock(lock_path, timeout=5, flags=portalocker.LOCK_EX):
+                with portalocker.Lock(lock_path, timeout=5, flags=portalocker.LOCK_EX | portalocker.LOCK_NB):
                     self._pipeline.load(str(cache_path))
                     logger.info("Restored pipeline cache from %s", cache_path)
             except portalocker.LockException:
@@ -314,7 +314,7 @@ class IngestionPipelineBuilder:
             cache_path.mkdir(parents=True, exist_ok=True)
             lock_path = cache_path / "pipeline.lock"
             try:
-                with portalocker.Lock(lock_path, timeout=5, flags=portalocker.LOCK_EX):
+                with portalocker.Lock(lock_path, timeout=5, flags=portalocker.LOCK_EX | portalocker.LOCK_NB):
                     pipeline.persist(str(cache_path))
             except portalocker.LockException:
                 logger.warning("Cache lock acquisition failed, persisting without lock")
@@ -427,7 +427,7 @@ class IngestionPipelineBuilder:
             cache_path.mkdir(parents=True, exist_ok=True)
             lock_path = cache_path / "pipeline.lock"
             try:
-                with portalocker.Lock(lock_path, timeout=5, flags=portalocker.LOCK_EX):
+                with portalocker.Lock(lock_path, timeout=5, flags=portalocker.LOCK_EX | portalocker.LOCK_NB):
                     pipeline.persist(str(cache_path))
             except portalocker.LockException:
                 logger.warning("Cache lock acquisition failed, persisting without lock")
