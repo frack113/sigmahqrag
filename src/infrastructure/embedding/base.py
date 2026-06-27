@@ -47,6 +47,8 @@ class HuggingFaceEmbeddingProvider(EmbeddingProvider):
     def _load_model(self) -> Any:
         """Load or return cached SentenceTransformer model."""
         if self._model is None:
+            import os
+            os.environ.setdefault("HF_SAFETENSORS_CONVERSION_THREAD_DISABLE", "1")
             from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 
             self._model = HuggingFaceEmbedding(

@@ -110,6 +110,10 @@ def build_embed_model(model_name: str) -> BaseEmbedding:
     model_path = str(local_path) if local_path.exists() else model_name
     global _embed_dim
 
+    import os
+
+    os.environ.setdefault("HF_SAFETENSORS_CONVERSION_THREAD_DISABLE", "1")
+
     try:
         logger.info("Loading embedding model from %s", model_path)
         model = HuggingFaceEmbedding(
