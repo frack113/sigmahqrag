@@ -120,7 +120,6 @@ class MarkdownChunker(DocumentTransform):
                         "chunk_type": "global",
                         "heading_level": 0,
                         "heading_text": "Document entier",
-                        "has_llm_enrichment": bool(global_summary or global_keywords),
                     },
                 )
             )
@@ -202,7 +201,6 @@ class MarkdownChunker(DocumentTransform):
                                 "heading_text": heading,
                                 "heading_path": heading_path,
                                 "source_file": source,
-                                "has_llm_enrichment": bool(chunk_summary or chunk_keywords),
                             },
                         )
                     )
@@ -249,7 +247,6 @@ class MarkdownChunker(DocumentTransform):
                                 "answer": answer,
                                 "h2_section": h2,
                                 "h3_section": h3,
-                                "has_llm_enrichment": bool(qa_summary or qa_keywords),
                             },
                         )
                     )

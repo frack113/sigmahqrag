@@ -189,13 +189,13 @@ class DocumentTransform(ABC):
                     enrichment += f"Keywords: {keywords}\n"
                 doc = Document(
                     text=text + enrichment,
-                    metadata={**doc.metadata, "has_llm_enrichment": True},
+                    metadata={**doc.metadata},
                     excluded_embed_metadata_keys=doc.excluded_embed_metadata_keys,
                 )
             else:
                 doc = Document(
                     text=text,
-                    metadata={**doc.metadata, "has_llm_enrichment": False},
+                    metadata={**doc.metadata},
                     excluded_embed_metadata_keys=doc.excluded_embed_metadata_keys,
                 )
             updated.append(doc)
