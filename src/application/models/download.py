@@ -111,7 +111,7 @@ class HFDownloadService:
         api = HfApi(token=self.token)
         kwargs: dict[str, Any] = {"search": query, "sort": "downloads"}
         if task:
-            kwargs["task"] = task
+            kwargs["pipeline_tag"] = task
         try:
             results = api.list_models(**kwargs)
             return [HFRepo.from_string(r.id) for r in results]
