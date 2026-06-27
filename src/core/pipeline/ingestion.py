@@ -28,7 +28,7 @@ DEFAULT_MODEL = "intfloat/multilingual-e5-small"
 DEFAULT_CHUNK_SIZE = 1024
 DEFAULT_CHUNK_OVERLAP = 100
 DEFAULT_EMBED_BATCH_SIZE = 8
-DEFAULT_NUM_WORKERS = 4
+DEFAULT_NUM_WORKERS = 0
 DEFAULT_SIMILARITY_TOP_K = 5
 
 # Collection names that use the transform system instead of SentenceSplitter.
