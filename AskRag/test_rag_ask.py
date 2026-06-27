@@ -255,11 +255,25 @@ async def main() -> int:
 
 if __name__ == "__main__":
     import logging
+    import sys as _sys
+    
+    # Suppress verbose model loading logs and tqdm progress bars
     logging.basicConfig(level=logging.WARNING)
+    logging.getLogger("transformers").setLevel(logging.ERROR)
+    logging.getLogger("sentence_transformers").setLevel(logging.ERROR)
+    logging.getLogger("huggingface_hub").setLevel(logging.ERROR)
+    
+    # Redirect stderr to suppress tqdm/progress bar output
+    import io as _io
+    _sys.stderr = _io.StringIO()
 
     if sys.platform == "win32":
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
     result = asyncio.run(main())
+    
+    # Restore stderr
+    _sys.stderr = _sys.__stderr__
+    
     if result is not None and result < 10:
         sys.exit(1)

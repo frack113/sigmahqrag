@@ -125,6 +125,12 @@ def build_embed_model(model_name: str) -> BaseEmbedding:
             # Force offline mode when model is not found locally (air-gap)
             _os.environ["HF_HUB_OFFLINE"] = "1"
 
+        # Suppress tqdm/progress bar output during model loading
+        import sys as _sys
+        from io import StringIO as _StringIO
+        _old_stderr = _sys.stderr
+        _sys.stderr = _StringIO()
+
         model = HuggingFaceEmbedding(
             model_name=model_path,
             device="cpu",
@@ -132,7 +138,9 @@ def build_embed_model(model_name: str) -> BaseEmbedding:
             query_instruction="query: ",
             text_instruction="passage: ",
         )
-        # Restore previous offline state after loading
+        
+        # Restore stderr and previous offline state after loading
+        _sys.stderr = _old_stderr
         if not _was_offline and "HF_HUB_OFFLINE" in _os.environ:
             del _os.environ["HF_HUB_OFFLINE"]
 
@@ -140,7 +148,12 @@ def build_embed_model(model_name: str) -> BaseEmbedding:
         logger.info("Detected embedding dimension: %d", _embed_dim)
         return model
     except Exception as e:
-        # Restore previous offline state on error too
+        # Restore stderr on error too
+        if ' _sys' in dir() and hasattr(_sys, 'stderr'):
+            try:
+                _sys.stderr = _old_stderr
+            except:
+                pass
         if not _was_offline and "HF_HUB_OFFLINE" in _os.environ:
             del _os.environ["HF_HUB_OFFLINE"]
         logger.error(

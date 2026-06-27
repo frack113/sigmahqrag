@@ -4,14 +4,24 @@ from __future__ import annotations
 
 import logging
 import os
+import sys
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from logging.handlers import RotatingFileHandler
+from io import StringIO
 
 # Force air-gap mode: disable all HuggingFace Hub network calls
 os.environ.setdefault("HF_HUB_OFFLINE", "1")
 # Disable token warnings in air-gap mode
 os.environ.setdefault("HF_TOKEN", "")
+# Disable tqdm progress bars (Loading weights messages)
+os.environ.setdefault("TQDM_DISABLE", "1")
+
+# Suppress verbose model loading logs
+logging.getLogger("transformers").setLevel(logging.ERROR)
+logging.getLogger("sentence_transformers").setLevel(logging.ERROR)
+logging.getLogger("huggingface_hub").setLevel(logging.ERROR)
+logging.getLogger("urllib3").setLevel(logging.WARNING)
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -60,6 +70,14 @@ from src.workers.processor import TaskDispatcher
 
 logger = logging.getLogger(__name__)
 setup_mode = os.environ.get("_SIGMA_SETUP_MODE", "").lower() in ("1", "true", "yes")
+
+# Configure root logger to suppress verbose output during startup
+root_logger = logging.getLogger()
+root_logger.setLevel(logging.INFO)
+# Remove any existing handlers that might print to stderr
+for handler in root_logger.handlers[:]:
+    if hasattr(handler, 'stream') and getattr(handler.stream, 'name', None) == '<stderr>':
+        root_logger.removeHandler(handler)
 
 # Log air-gap status at startup
 _airgap_status = "AIR-GAP MODE ENABLED" if os.environ.get("HF_HUB_OFFLINE") == "1" else "Online mode (HF Hub accessible)"
@@ -177,6 +195,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan handler."""
     dispatcher = None
     db = None
+    
+    # Capture stderr to suppress tqdm/Loading weights messages during startup
+    old_stderr = sys.stderr
+    sys.stderr = StringIO()
+    
     try:
         db = DatabaseService()
         db.initialize()
@@ -236,6 +259,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     except BaseException as e:
         logger.error(f"Startup failed: {e}", exc_info=True)
         raise
+    finally:
+        # Restore stderr
+        sys.stderr = old_stderr
+    
     yield
     if dispatcher:
         dispatcher.stop()
