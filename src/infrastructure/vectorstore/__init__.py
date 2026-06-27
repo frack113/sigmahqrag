@@ -139,6 +139,8 @@ class QdrantVectorService:
             self._vector_store = QdrantVectorStore(
                 client=self._client,
                 collection_name=self.collection_name,
+                enable_hybrid=True,
+                sparse_vector_name="text-sparse",
             )
             logger.info(
                 f"QdrantVectorService initialized: {self.host}:{self.port}/{self.collection_name}"

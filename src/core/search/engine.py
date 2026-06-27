@@ -299,6 +299,7 @@ class SearchEngine:
         similarity_threshold: float = SIMILARITY_THRESHOLD,
         use_router: bool = False,
         llm_client: LlamaClient | None = None,
+        alpha: float = 0.5,
     ) -> None:
         """Initialize search engine.
 
@@ -311,12 +312,14 @@ class SearchEngine:
                 relevant collections instead of all three.
             llm_client: Optional LlamaClient for the router.
                 When not provided, creates a new LlamaClient.
+            alpha: Hybrid search weight (1.0=pure dense, 0.0=pure sparse, 0.5=balanced).
         """
         self.collection_names = collection_names or list(DEFAULT_COLLECTIONS)
         self.top_k = top_k
         self.similarity_threshold = similarity_threshold
         self.use_router = use_router
         self._llm_client = llm_client
+        self.alpha = alpha
 
     async def search(
         self,
@@ -361,6 +364,7 @@ class SearchEngine:
                     collection_name=col,
                     top_k=per_collection_k,
                     metadata_filter=qdrant_filter,
+                    alpha=self.alpha,
                 )
                 retrievers.append(retriever)
             except Exception as e:

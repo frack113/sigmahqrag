@@ -15,7 +15,7 @@ from pathlib import Path
 # Ensure imports work regardless of working directory
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.back.database import DatabaseService
+from src.infrastructure.database import DatabaseService
 
 
 STOP_WORDS = frozenset(
@@ -164,7 +164,6 @@ async def main() -> None:
     # --- Initialize DB ---
     db = DatabaseService()
     db.initialize()
-    db.set_embedding_config("intfloat/multilingual-e5-small")
 
     from src.core.search.engine import SearchEngine
 

@@ -8,6 +8,7 @@ from typing import Any
 from llama_index.core.retrievers import VectorIndexRetriever
 from llama_index.core.vector_stores import MetadataFilter, MetadataFilters
 from llama_index.core import VectorStoreIndex
+from llama_index.core.vector_stores.types import VectorStoreQueryMode
 from llama_index.vector_stores.qdrant import QdrantVectorStore
 
 from src.infrastructure.vectorstore.client import get_qdrant_client
@@ -45,6 +46,7 @@ def get_collection_retriever(
     collection_name: str,
     top_k: int = 30,
     metadata_filter: Any | None = None,
+    alpha: float = 0.5,
 ) -> VectorIndexRetriever:
     """Get a LlamaIndex retriever for a specific Qdrant collection.
 
@@ -52,6 +54,7 @@ def get_collection_retriever(
         collection_name: Qdrant collection name.
         top_k: Number of results per collection (before fusion).
         metadata_filter: Optional Qdrant Filter to apply as metadata filter.
+        alpha: Hybrid search weight (1.0=pure dense, 0.0=pure sparse, 0.5=balanced).
 
     Returns:
         Configured VectorIndexRetriever.
@@ -63,6 +66,8 @@ def get_collection_retriever(
         vector_store = QdrantVectorStore(
             client=client,
             collection_name=collection_name,
+            enable_hybrid=True,
+            sparse_vector_name="text-sparse",
         )
 
         embed_model = _get_search_embed_model()
@@ -74,6 +79,8 @@ def get_collection_retriever(
             index=index,
             similarity_top_k=top_k,
             filters=llama_filters,
+            vector_store_query_mode=VectorStoreQueryMode.HYBRID,
+            alpha=alpha,
         )
         return retriever
     except Exception as e:

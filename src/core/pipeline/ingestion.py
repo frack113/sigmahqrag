@@ -169,6 +169,8 @@ class IngestionPipelineBuilder:
             return QdrantVectorStore(
                 client=client,
                 collection_name=self._collection_name,
+                enable_hybrid=True,
+                sparse_vector_name="text-sparse",
             )
         except Exception as e:
             logger.warning("Failed to connect to Qdrant: %s", e)
