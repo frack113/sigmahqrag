@@ -145,7 +145,16 @@ def _build_test_app():
 
 
 async def main() -> int:
-    base_url = os.environ.get("SIGMA_RAG_URL", "http://localhost:7860")
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="Test RAG search against ask_spec.md questions"
+    )
+    parser.add_argument("--url", default="http://localhost:7860", help="RAG server URL")
+    parser.add_argument("--max", type=int, default=0, help="Max questions to test (0 = all)")
+    args = parser.parse_args()
+
+    base_url = args.url
 
     async with httpx.AsyncClient(base_url=base_url, timeout=30) as client:
         # Quick connectivity check via search endpoint (must return 400 for empty query or 200)
@@ -184,8 +193,8 @@ async def main() -> int:
         failed = 0
         partial = 0
 
-        # Limit to first N questions for faster testing (configurable via env)
-        max_questions = int(os.environ.get("RAG_TEST_MAX", "50"))
+        # Limit to first N questions (0 = all)
+        max_questions = args.max if args.max else len(questions)
 
         for idx, (question, expected_answer) in enumerate(questions[:max_questions], 1):
             preview = question[:80].replace("\n", " ")
