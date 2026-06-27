@@ -116,6 +116,8 @@ def build_embed_model(model_name: str) -> BaseEmbedding:
             model_name=model_path,
             device="cpu",
             embed_batch_size=DEFAULT_EMBED_BATCH_SIZE,
+            query_instruction="query: ",
+            text_instruction="passage: ",
         )
         _embed_dim = _detect_embed_dim(model)
         logger.info("Detected embedding dimension: %d", _embed_dim)

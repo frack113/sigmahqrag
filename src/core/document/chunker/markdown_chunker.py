@@ -20,6 +20,22 @@ logger = logging.getLogger(__name__)
 
 ATX_HEADING_RE = re.compile(r"^(#{1,6})\s+(.+)$", re.MULTILINE)
 
+QA_PATTERN = re.compile(
+    r"\*\*Q:\*\*\s*(?P<question>.*?)\n"
+    r"\*\*A:\*\*\s*(?P<answer>.*?)(?=\n\*\*Q:\*\*|\n###\s+|\n##\s+|\Z)",
+    re.DOTALL,
+)
+
+
+def _current_h2(text_before: str) -> str | None:
+    h2_titles = re.findall(r"^##\s+(.+?)\s*$", text_before, flags=re.MULTILINE)
+    return h2_titles[-1].strip() if h2_titles else None
+
+
+def _current_h3(text_before: str) -> str | None:
+    h3_titles = re.findall(r"^###\s+(.+?)\s*$", text_before, flags=re.MULTILINE)
+    return h3_titles[-1].strip() if h3_titles else None
+
 
 def _extract_keywords(text: str, llm_client: LLMClientLike | None) -> tuple[str, str]:
     """Extract summary and keywords from text via LLM.
@@ -187,6 +203,53 @@ class MarkdownChunker(DocumentTransform):
                                 "heading_path": heading_path,
                                 "source_file": source,
                                 "has_llm_enrichment": bool(chunk_summary or chunk_keywords),
+                            },
+                        )
+                    )
+
+            # --- Q&A pair chunks ---
+            if QA_PATTERN.search(text):
+                for qa_match in QA_PATTERN.finditer(text):
+                    question = qa_match.group("question").strip()
+                    answer = qa_match.group("answer").strip()
+
+                    text_before = text[: qa_match.start()]
+                    h2 = _current_h2(text_before)
+                    h3 = _current_h3(text_before)
+
+                    chunk_text = f"Question: {question}\nAnswer: {answer}"
+
+                    qa_summary = ""
+                    qa_keywords = ""
+                    if llm_client:
+                        try:
+                            qa_summary, qa_keywords = _extract_keywords(chunk_text, llm_client)
+                        except Exception as e:
+                            logger.warning(
+                                "LLM enrichment for Q&A '%s' failed: %s", question[:60], e
+                            )
+
+                    if llm_client and hasattr(llm_client, "erase_slot_cache"):
+                        try:
+                            llm_client.erase_slot_cache()
+                        except Exception:
+                            logger.debug("KV cache erase failed for Q&A chunk")
+
+                    enriched = chunk_text
+                    if qa_summary or qa_keywords:
+                        enriched = self._inject_enrichment(chunk_text, qa_summary, qa_keywords)
+
+                    result.append(
+                        Document(
+                            text=enriched.strip(),
+                            metadata={
+                                **doc.metadata,
+                                "chunk_type": "qa_pair",
+                                "question": question,
+                                "answer": answer,
+                                "h2_section": h2,
+                                "h3_section": h3,
+                                "has_llm_enrichment": bool(qa_summary or qa_keywords),
                             },
                         )
                     )
