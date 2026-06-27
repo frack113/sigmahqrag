@@ -8,7 +8,6 @@ import re
 import threading
 from typing import Any
 
-from llama_index.core.retrievers import QueryFusionRetriever
 from qdrant_client.models import FieldCondition, Filter, MatchText, MatchValue
 
 from src.core.pipeline.ingestion import DEFAULT_MODEL, build_embed_model
@@ -374,28 +373,9 @@ class SearchEngine:
             logger.error("No retrievers available for collections: %s", cols_to_search)
             return []
 
-        # Use LlamaIndex QueryFusionRetriever for built-in RRF fusion
-        try:
-            fusion_retriever = QueryFusionRetriever(
-                retrievers,  # type: ignore[arg-type]
-                similarity_top_k=limit,
-                num_queries=1,  # disable query generation to match current behavior
-                use_async=True,
-            )
-
-            nodes_with_scores = await fusion_retriever.aretrieve(query)
-
-            results = [_node_to_result(node) for node in nodes_with_scores]
-
-            # Apply similarity threshold filter
-            if self.similarity_threshold > 0:
-                results = [r for r in results if r.get("score", 0.0) >= self.similarity_threshold]
-
-            return results[:limit]
-
-        except Exception as e:
-            logger.error("QueryFusionRetriever failed, falling back to manual RRF: %s", e)
-            return await self._search_manual_rrf(query, cols_to_search, limit, qdrant_filter)
+        # Air-gap: avoid QueryFusionRetriever which tries to load an LLM (OpenAI).
+        # Always use manual RRF fusion directly.
+        return await self._search_manual_rrf(query, cols_to_search, limit, qdrant_filter)
 
     async def _search_manual_rrf(
         self,

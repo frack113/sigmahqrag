@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+import os
+
+os.environ.setdefault("DISABLE_SAFETENSORS_CONVERSION", "1")
+os.environ.setdefault("HF_HUB_OFFLINE", "1")
+
 import logging
 import threading
 from pathlib import Path
@@ -110,12 +115,16 @@ def build_embed_model(model_name: str) -> BaseEmbedding:
     model_path = str(local_path) if local_path.exists() else model_name
     global _embed_dim
 
-    import os
-
-    os.environ.setdefault("HF_SAFETENSORS_CONVERSION_THREAD_DISABLE", "1")
-
     try:
         logger.info("Loading embedding model from %s", model_path)
+        # Air-gap mode: use only local files, no network calls to HF Hub
+        import os as _os
+        _was_offline = _os.environ.get("HF_HUB_OFFLINE") == "1"
+        
+        if not Path(model_path).exists():
+            # Force offline mode when model is not found locally (air-gap)
+            _os.environ["HF_HUB_OFFLINE"] = "1"
+
         model = HuggingFaceEmbedding(
             model_name=model_path,
             device="cpu",
@@ -123,10 +132,17 @@ def build_embed_model(model_name: str) -> BaseEmbedding:
             query_instruction="query: ",
             text_instruction="passage: ",
         )
+        # Restore previous offline state after loading
+        if not _was_offline and "HF_HUB_OFFLINE" in _os.environ:
+            del _os.environ["HF_HUB_OFFLINE"]
+
         _embed_dim = _detect_embed_dim(model)
         logger.info("Detected embedding dimension: %d", _embed_dim)
         return model
     except Exception as e:
+        # Restore previous offline state on error too
+        if not _was_offline and "HF_HUB_OFFLINE" in _os.environ:
+            del _os.environ["HF_HUB_OFFLINE"]
         logger.error(
             "Embedding model %s failed to load (path: %s): %s",
             model_name,

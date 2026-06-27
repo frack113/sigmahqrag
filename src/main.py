@@ -8,6 +8,11 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from logging.handlers import RotatingFileHandler
 
+# Force air-gap mode: disable all HuggingFace Hub network calls
+os.environ.setdefault("HF_HUB_OFFLINE", "1")
+# Disable token warnings in air-gap mode
+os.environ.setdefault("HF_TOKEN", "")
+
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -55,6 +60,10 @@ from src.workers.processor import TaskDispatcher
 
 logger = logging.getLogger(__name__)
 setup_mode = os.environ.get("_SIGMA_SETUP_MODE", "").lower() in ("1", "true", "yes")
+
+# Log air-gap status at startup
+_airgap_status = "AIR-GAP MODE ENABLED" if os.environ.get("HF_HUB_OFFLINE") == "1" else "Online mode (HF Hub accessible)"
+logger.info(f"=== {_airgap_status} ===")
 
 
 def apply_db_config_overrides(db) -> Config:
