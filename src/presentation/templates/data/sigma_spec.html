@@ -144,7 +144,8 @@
             mode: 'tree',
             endpoints: {
                 list: API_BASE + '/repos/' + org + '/' + name + '/tree',
-                save: API_BASE + '/repos/' + org + '/' + name + '/select-dirs'
+                save: API_BASE + '/repos/' + org + '/' + name + '/select-dirs',
+                selected: API_BASE + '/repos/' + org + '/' + name + '/selected-dirs'
             },
             saveMethod: 'POST',
             saveOnChange: true,
