@@ -17,6 +17,6 @@ async def logs_explorer(request: Request):
     cfg = get_config().to_dict()
     return templates.TemplateResponse(
         request=request,
-        name="logs/index.html",
+        name="logs/index.html.j2",
         context={"config": cfg, "config_json": __import__("json").dumps(cfg)},
     )

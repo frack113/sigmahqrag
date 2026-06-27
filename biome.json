@@ -6,7 +6,8 @@
 		"useIgnoreFile": true
 	},
 	"files": {
-		"ignoreUnknown": false
+		"ignoreUnknown": false,
+		"ignore": ["**/*.j2", "**/*.html.j2"]
 	},
 	"formatter": {
 		"enabled": true,
