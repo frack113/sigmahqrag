@@ -280,13 +280,18 @@
 ### Level
 
 **Q:** What severity levels are available in Sigma?
-**A:** `informational`, `low`, `medium`, `high`, and `critical`.
+**A:** `informational`, `low`, `medium`, `high`, and `critical`. Each level describes the criticality of a triggered rule:
+- `informational`: Enrichment/tagging only. No case or alerting should be triggered because a huge amount of events is expected to match.
+- `low`: Notable event but rarely an incident. Low rated events can be relevant in high numbers or combination with others. Immediate reaction shouldn't be necessary, but a regular review is recommended.
+- `medium`: Relevant event that should be reviewed manually on a more frequent basis.
+- `high`: Relevant event that should trigger an internal alert and requires a prompt review.
+- `critical`: Highly relevant event that indicates an incident. Critical events should be reviewed immediately. Used only for cases in which probability borders certainty.
 
 **Q:** When should you use `critical` instead of `high`?
-**A:** `critical` is for incidents where probability borders certainty and requires immediate review. `high` is for events that should trigger an alert and require prompt review but may have slight uncertainty.
+**A:** `critical` is for incidents where probability borders certainty and requires immediate review. `high` is for events that should trigger an internal alert and require a prompt review but may have slight uncertainty.
 
 **Q:** What does the `informational` level mean?
-**A:** The rule is intended for enrichment/tagging only. No alerting should be triggered.
+**A:** The rule is intended for enrichment/tagging only (e.g., by tagging events). No case or alerting should be triggered because it is expected that a huge amount of events will match these rules.
 
 **Q:** Which level indicates a rule is for enrichment only?
 **A:** `informational`.
@@ -552,6 +557,7 @@ correlation:
         - website_access
     group-by:
         - SourceIP
+        - User
     timespan: 1h
     condition:
         field: bytes_sent
@@ -572,6 +578,7 @@ correlation:
         - rule_a_id
     group-by:
         - SourceIP
+        - User
     timespan: 24h
     condition:
         field: BytesOut
@@ -674,7 +681,7 @@ correlation:
 **A:** It treats the value as a PCRE regular expression. Regex is case-sensitive by default.
 
 **Q:** What regex flavor is supported by Sigma?
-**A:** PCRE with wildcards (`.`), anchors (`^`, `$`), quantifiers (`*`, `+`, `?`, `{n,m}`), character classes (`[a-z]`), alternation (`|`), and grouping (`()`).
+**A:** PCRE with a specific set of supported metacharacters: wildcards (`.`), anchors (`^`, `$`), quantifiers (`*`, `+`, `?`, `{n,m}`), character classes (`[a-z]`, `[^a-z]`), alternation (`|`), and grouping (`()`). Other metacharacters are **unsupported** and cannot be used.
 
 **Q:** How do you enable case-insensitive regex matching?
 **A:** Use the `i` sub-modifier: `field|re/i: 'pattern'`.
@@ -777,6 +784,12 @@ correlation:
 
 **Q:** How do you tag a tactic like "Defense Evasion"?
 **A:** Use `attack.defense-evasion`.
+
+**Q:** What does `attack.m1234` refer to?
+**A:** A MITRE ATT&CK mitigation.
+
+**Q:** What does `attack.a1234` refer to?
+**A:** A MITRE ATT&CK asset.
 
 ### Namespace: car
 

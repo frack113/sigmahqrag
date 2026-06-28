@@ -152,6 +152,12 @@ async def main() -> int:
     )
     parser.add_argument("--url", default="http://localhost:7860", help="RAG server URL")
     parser.add_argument("--max", type=int, default=0, help="Max questions to test (0 = all)")
+    parser.add_argument(
+        "--question",
+        type=int,
+        default=0,
+        help="Test a single question by 1-based index (e.g. --question 43)",
+    )
     args = parser.parse_args()
 
     base_url = args.url
@@ -193,12 +199,21 @@ async def main() -> int:
         failed = 0
         partial = 0
 
-        # Limit to first N questions (0 = all)
-        max_questions = args.max if args.max else len(questions)
+        # Determine which questions to test
+        if args.question and 1 <= args.question <= total:
+            test_indices = [args.question - 1]
+            print(f"Testing single question #{args.question} of {total}\n")
+        else:
+            max_questions = args.max if args.max else len(questions)
+            test_indices = list(range(min(total, max_questions)))
 
-        for idx, (question, expected_answer) in enumerate(questions[:max_questions], 1):
+        for idx in test_indices:
+            question, expected_answer = questions[idx]
             preview = question[:80].replace("\n", " ")
-            print(f"\n[{idx}/{total}] Q: {preview}")
+            if args.question:
+                print(f"\nQ#{args.question}: {preview}")
+            else:
+                print(f"\n[{idx + 1}/{total}] Q: {preview}")
 
             try:
                 resp = await client.post(
@@ -253,9 +268,12 @@ async def main() -> int:
                 failed += 1
 
         print("\n" + "=" * 80)
-        tested = min(total, max_questions)
+        if args.question:
+            tested = 1
+            print(f"RESULTS for question #{args.question}: {passed} passed, {partial} partial, {failed} failed")
+        else:
+            tested = min(total, max_questions)
         pass_rate = (passed + partial) / tested * 100 if tested else 0
-        print(f"RESULTS: {passed} passed, {partial} partial, {failed} failed out of {tested}")
         print(f"         {pass_rate:.1f}% acceptable (pass + partial)")
         print("=" * 80)
 
