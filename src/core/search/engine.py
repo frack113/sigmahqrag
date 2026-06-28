@@ -374,8 +374,10 @@ class SearchEngine:
             return []
 
         # Air-gap: avoid QueryFusionRetriever which tries to load an LLM (OpenAI).
-        # Always use manual RRF fusion directly.
-        return await self._search_manual_rrf(query, cols_to_search, limit, qdrant_filter)
+        # Always use manual RRF fusion directly with hybrid retrievers.
+        return await self._search_manual_rrf(
+            query, cols_to_search, limit, qdrant_filter, retrievers
+        )
 
     async def _search_manual_rrf(
         self,
@@ -383,21 +385,47 @@ class SearchEngine:
         collections: list[str],
         limit: int,
         qdrant_filter: Filter | None,
+        retrievers: list[Any] | None = None,
     ) -> list[dict[str, Any]]:
-        """Fallback manual RRF search when QueryFusionRetriever fails."""
+        """Manual RRF fusion using hybrid-aware retrievers.
+
+        Uses VectorIndexRetriever with HYBRID mode when retrievers are provided;
+        falls back to dense-only ``search()`` otherwise.
+        """
         per_collection_k = max(limit * 2, 10)
 
-        tasks = [
-            search(
-                query=query,
-                collection_name=col,
-                top_k=per_collection_k,
-                similarity_threshold=self.similarity_threshold,
-                qdrant_filter=qdrant_filter,
-            )
-            for col in collections
-        ]
-        all_results = await asyncio.gather(*tasks, return_exceptions=True)
+        if retrievers:
+            # Use hybrid retrievers (sparse + dense) for each collection
+            async def _retrieve_from(retriever: Any) -> list[dict[str, Any]]:
+                try:
+                    nodes = await retriever.aretrieve(query)
+                    return [
+                        {
+                            "text": n.node.text or "",
+                            "score": float(n.score) if n.score else 0.0,
+                            "metadata": dict(n.node.metadata) if n.node.metadata else {},
+                        }
+                        for n in nodes
+                    ]
+                except Exception as e:
+                    logger.warning("Hybrid retrieval failed, skipping: %s", e)
+                    return []
+
+            tasks = [_retrieve_from(r) for r in retrievers]
+            all_results = await asyncio.gather(*tasks, return_exceptions=True)
+        else:
+            # Fallback: dense-only search per collection
+            tasks = [
+                search(
+                    query=query,
+                    collection_name=col,
+                    top_k=per_collection_k,
+                    similarity_threshold=self.similarity_threshold,
+                    qdrant_filter=qdrant_filter,
+                )
+                for col in collections
+            ]
+            all_results = await asyncio.gather(*tasks, return_exceptions=True)
 
         rrf_scores: dict[tuple[str, str], dict[str, Any]] = {}
         for col_results in all_results:
