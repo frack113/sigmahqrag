@@ -11,7 +11,7 @@
         hint        — optional help text below heading
 
     Usage:
-        {% from "shared/_dir_browser.html" import dir_browser_card %}
+        {% from "shared/_dir_browser.html.j2" import dir_browser_card %}
         {{ dir_browser_card(id="my", mode="tree", title="Browse") }}
         <script>
         new DirBrowser('my-tree', {
