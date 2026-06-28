@@ -14,7 +14,9 @@ BASE_DIR = PROJECT_ROOT / "data"
 BIN_DIR = BASE_DIR / "bin"
 MODELS_DIR = BASE_DIR / "models"
 LLM_DIR = MODELS_DIR / "llm"
-EMBEDDINGS_DIR = MODELS_DIR / "embeddings"
+EMBEDDING_E5_DIR = MODELS_DIR / "embedding_e5"
+EMBEDDING_FAST_DIR = MODELS_DIR / "embedding_fast"
+EMBEDDINGS_DIR = EMBEDDING_E5_DIR
 LOGS_DIR = BASE_DIR / "logs"
 PID_DIR = BASE_DIR / "pids"
 TEMP_DIR = BASE_DIR / "temp"
@@ -29,7 +31,7 @@ class Config:
     qdrant_webui_version: str = "0"
 
     llm_dir: str = "data/models/llm"
-    embeddings_dir: str = "data/models/embeddings"
+    embeddings_dir: str = "data/models/embedding_e5"
 
     llama_base_url: str = "http://127.0.0.1:8080"
     llama_manage_internally: bool = True

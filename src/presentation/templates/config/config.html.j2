@@ -1,5 +1,5 @@
 {# Config Dashboard — sections with side-by-side cards #}
-{% extends "config/layout.html" %}
+{% extends "config/layout.html.j2" %}
 
 {% block title %}Config - SigmaHQ RAG{% endblock %}
 
@@ -293,9 +293,9 @@
             <details class="config-group" id="model-section" open>
                 <summary class="config-group-summary">Model</summary>
                 <div class="config-cards">
-                    <!-- Embedding Card -->
+                    <!-- Embedding E5 Card (dense) -->
                     <div class="card">
-                        <div class="card-header"><h2>Embedding</h2></div>
+                        <div class="card-header"><h2>Embedding E5</h2></div>
                         <div id="emb-dim-banner" class="alert alert-warning" style="display:none; margin:8px 16px; padding:10px; background:#fff3cd; border:1px solid #ffc107; border-radius:6px;">
                             <strong>Dimension mismatch</strong> ??? The active embedding model dimension (<span id="emb-model-dim"></span>) differs from the Qdrant collection (<span id="emb-coll-dim"></span>). Vectors will be rejected until the collection is recreated.
                             <div style="margin-top:8px;">
@@ -317,6 +317,17 @@
                                 <button class="btn btn-primary btn-sm" onclick="Config.downloadEmbModel()" id="btn-download-emb">Download</button>
                                 <button class="btn btn-danger btn-sm" onclick="Config.deleteEmbModel()" id="btn-delete-emb">Delete</button>
                             </div>
+                        </div>
+                    </div>
+                    <!-- Embedding Fast Card (sparse / fastembed) -->
+                    <div class="card">
+                        <div class="card-header"><h2>Embedding Fast</h2></div>
+                        <div class="card-body">
+                            <div id="fast-global-status" class="global-status">
+                                <span class="status-dot"></span>
+                                <span id="fast-global-text">Loading...</span>
+                            </div>
+                            <div id="fast-models-list" style="margin-top:12px;"></div>
                         </div>
                     </div>
                     <!-- LLM Card -->

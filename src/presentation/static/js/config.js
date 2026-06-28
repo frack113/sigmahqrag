@@ -62,6 +62,10 @@ const CONFIG = {
 		delete: "/api/v1/models/embedding",
 		progress: "/api/v1/models/embedding/progress",
 	},
+	embeddingFast: {
+		installed: "/api/v1/models/embedding-fast/installed",
+		progress: "/api/v1/models/embedding-fast/progress",
+	},
 };
 
 // ──────────────────────────────────────────────────────────────
@@ -1918,8 +1922,52 @@ async function deleteEmbModel() {
 	}
 }
 
-// ──────────────────────────────────────────────────────────────
-// Specifications
+function renderFastModels(models) {
+	const listEl = document.getElementById("fast-models-list");
+	const statusEl = document.getElementById("fast-global-status");
+	const textEl = document.getElementById("fast-global-text");
+
+	statusEl.className = "global-status";
+
+	if (!models || models.length === 0) {
+		statusEl.classList.add("warn");
+		textEl.textContent = "No fastembed models installed";
+		listEl.innerHTML = '<p class="info-text">No sparse models found in embedding_fast.</p>';
+		return;
+	}
+
+	statusEl.classList.add("ok");
+	textEl.textContent = `${models.length} model(s) installed`;
+
+	let html = '<table class="model-table"><tbody>';
+	for (let i = 0; i < models.length; i++) {
+		const m = models[i];
+		html += "<tr>";
+		html += '<td class="model-name">' + escHtml(m.repo_id) + "</td>";
+		html += "</tr>";
+	}
+	html += "</tbody></table>";
+	listEl.innerHTML = html;
+}
+
+function checkFastModels() {
+	fetch(CONFIG.embeddingFast.installed)
+		.then((r) =>
+			r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)),
+		)
+		.then((data) => {
+			renderFastModels(data.models);
+		})
+		.catch((e) => {
+			console.error(e);
+			const statusEl = document.getElementById("fast-global-status");
+			const textEl = document.getElementById("fast-global-text");
+			statusEl.className = "global-status critical";
+			textEl.textContent = "Error loading fastembed models";
+		});
+}
+
+
 // ──────────────────────────────────────────────────────────────
 function renderSpecsStatus(repos, defaultOrg, defaultName) {
 	const statusEl = document.getElementById("specs-status");
@@ -2152,6 +2200,9 @@ const _Config = {
 	downloadEmbModelDirect: downloadEmbModelDirect,
 	deleteEmbModel: deleteEmbModel,
 
+	// FastEmbed
+	checkFastModels: checkFastModels,
+
 	// Scroll helpers
 	scrollToAndOpen: scrollToAndOpen,
 
@@ -2187,6 +2238,7 @@ document.addEventListener("DOMContentLoaded", () => {
 	loadReleasesTable();
 	checkLlmModels();
 	checkEmbModels();
+	checkFastModels();
 	checkDimensionStatus();
 	loadSystemStatus();
 
