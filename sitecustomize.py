@@ -11,7 +11,7 @@ os.environ.setdefault("TQDM_DISABLE", "1")
 os.environ.setdefault(
     "FASTEMBED_CACHE_PATH",
     os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        os.path.dirname(os.path.abspath(__file__)),
         "data",
         "models",
         "embedding_fast",

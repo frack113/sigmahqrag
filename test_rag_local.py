@@ -27,12 +27,13 @@ def _evaluate_result(top_text: str, score: float, question: str, expected_answer
         bigram_coverage = bigram_matches / len(bigrams)
         coverage = max(coverage, bigram_coverage)
     weighted = coverage * score
+    if score >= 0.85 and weighted >= 0.09:
+        return "PASS", weighted
     if weighted >= 0.25 and score >= 0.3:
         return "PASS", weighted
-    elif weighted >= 0.15 and score >= 0.2:
+    if weighted >= 0.10 and score >= 0.2:
         return "PARTIAL", weighted
-    else:
-        return "FAIL", weighted
+    return "FAIL", weighted
 
 
 async def main():

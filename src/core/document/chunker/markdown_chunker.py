@@ -277,13 +277,15 @@ class MarkdownChunker(DocumentTransform):
 
     @staticmethod
     def _inject_enrichment(text: str, summary: str, keywords: str) -> str:
-        """Append LLM-generated summary and keywords at the end of the text for embedding."""
-        enrichment = "\n\n---\n"
+        """Prepend summary (for embedding signal) and append keywords at the end."""
+        parts = []
         if summary:
-            enrichment += f"Summary: {summary}\n\n"
+            parts.append(f"Summary: {summary.strip()}")
+        parts.append(text.strip())
+        enriched = "\n\n".join(parts)
         if keywords:
-            enrichment += f"Keywords: {keywords}\n"
-        return text + enrichment
+            enriched += f"\n\n---\nKeywords: {keywords}"
+        return enriched
 
 
 TransformRegistry.register(MarkdownChunker)
