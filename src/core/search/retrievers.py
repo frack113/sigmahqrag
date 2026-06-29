@@ -64,14 +64,19 @@ def get_collection_retriever(
     from src.core.search.engine import _get_search_embed_model
 
     try:
+        from src.core.search.sparse_encoder import create_sparse_encoder
+
         client = get_qdrant_client()
         cfg = get_config()
         aclient = AsyncQdrantClient(host=cfg.qdrant_host, port=cfg.qdrant_port)
+        sparse_encoder = create_sparse_encoder()
         vector_store = QdrantVectorStore(
             client=client,
             aclient=aclient,
             collection_name=collection_name,
             enable_hybrid=True,
+            sparse_doc_fn=sparse_encoder,
+            sparse_query_fn=sparse_encoder,
             sparse_vector_name="text-sparse",
         )
 

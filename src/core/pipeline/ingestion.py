@@ -198,13 +198,17 @@ class IngestionPipelineBuilder:
 
     def _get_qdrant_store(self) -> QdrantVectorStore | None:
         try:
+            from src.core.search.sparse_encoder import create_sparse_encoder
             from src.infrastructure.vectorstore.client import get_qdrant_client
 
             client = get_qdrant_client()
+            sparse_encoder = create_sparse_encoder()
             return QdrantVectorStore(
                 client=client,
                 collection_name=self._collection_name,
                 enable_hybrid=True,
+                sparse_doc_fn=sparse_encoder,
+                sparse_query_fn=sparse_encoder,
                 sparse_vector_name="text-sparse",
             )
         except Exception as e:

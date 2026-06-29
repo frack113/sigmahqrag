@@ -135,11 +135,16 @@ class QdrantVectorService:
     async def initialize(self) -> None:
         """Initialize the Qdrant client and vector store."""
         try:
+            from src.core.search.sparse_encoder import create_sparse_encoder
+
             self._client = get_qdrant_client(host=self.host, port=self.port)
+            sparse_encoder = create_sparse_encoder()
             self._vector_store = QdrantVectorStore(
                 client=self._client,
                 collection_name=self.collection_name,
                 enable_hybrid=True,
+                sparse_doc_fn=sparse_encoder,
+                sparse_query_fn=sparse_encoder,
                 sparse_vector_name="text-sparse",
             )
             logger.info(

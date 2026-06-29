@@ -64,6 +64,7 @@ const CONFIG = {
 	},
 	embeddingFast: {
 		installed: "/api/v1/models/embedding-fast/installed",
+		download: "/api/v1/models/embedding-fast/download",
 		progress: "/api/v1/models/embedding-fast/progress",
 	},
 };
@@ -1922,6 +1923,8 @@ async function deleteEmbModel() {
 	}
 }
 
+let _sparseDlBusy = false;
+
 function renderFastModels(models) {
 	const listEl = document.getElementById("fast-models-list");
 	const statusEl = document.getElementById("fast-global-status");
@@ -1931,23 +1934,61 @@ function renderFastModels(models) {
 
 	if (!models || models.length === 0) {
 		statusEl.classList.add("warn");
-		textEl.textContent = "No fastembed models installed";
-		listEl.innerHTML = '<p class="info-text">No sparse models found in embedding_fast.</p>';
+		textEl.textContent = "No sparse models installed";
+		listEl.innerHTML = '<p class="info-text">No sparse model cache found.</p>';
 		return;
 	}
 
-	statusEl.classList.add("ok");
-	textEl.textContent = `${models.length} model(s) installed`;
+	const m = models[0];
+	statusEl.className = "global-status";
 
-	let html = '<table class="model-table"><tbody>';
-	for (let i = 0; i < models.length; i++) {
-		const m = models[i];
-		html += "<tr>";
-		html += '<td class="model-name">' + escHtml(m.repo_id) + "</td>";
-		html += "</tr>";
-	}
-	html += "</tbody></table>";
-	listEl.innerHTML = html;
+	statusEl.className = "global-status";
+	statusEl.classList.add(m.installed ? "ok" : "warn");
+	textEl.textContent = m.installed ? "SPLADE model installed" : "SPLADE model not found";
+
+	const btnDisabled = m.installed || _sparseDlBusy;
+	listEl.innerHTML = '<table class="model-table"><tbody><tr><td class="model-name">' + escHtml(m.repo_id) + '</td></tr></tbody></table>'
+		+ '<div class="form-actions" style="margin-top:12px;">'
+		+ '<button class="btn btn-primary btn-sm" id="btn-download-sparse"' + (btnDisabled ? ' disabled' : '') + ' onclick="Config.downloadSparseModel()">Download</button>'
+		+ '<span id="sparse-dl-progress" style="margin-left:8px;"></span>'
+		+ '</div>';
+}
+
+function pollSparseProgress() {
+	if (!_sparseDlBusy) return;
+	fetch(CONFIG.embeddingFast.progress)
+		.then(r => r.json())
+		.then(data => {
+			const el = document.getElementById("sparse-dl-progress");
+			if (!el) return;
+			el.textContent = data.status === "completed" ? "Done" : data.status === "downloading" ? `Downloading... ${data.progress}%` : data.status;
+			if (data.status === "completed" || data.status.startsWith("error")) {
+				_sparseDlBusy = false;
+				document.getElementById("btn-download-sparse")?.removeAttribute("disabled");
+				checkFastModels();
+			} else {
+				setTimeout(pollSparseProgress, 1000);
+			}
+		})
+		.catch(() => setTimeout(pollSparseProgress, 2000));
+}
+
+function downloadSparseModel() {
+	if (_sparseDlBusy) return;
+	_sparseDlBusy = true;
+	const btn = document.getElementById("btn-download-sparse");
+	if (btn) btn.disabled = true;
+	const el = document.getElementById("sparse-dl-progress");
+	if (el) el.textContent = "Starting...";
+	fetch(CONFIG.embeddingFast.download, { method: "POST" })
+		.then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
+		.then(() => setTimeout(pollSparseProgress, 500))
+		.catch(e => {
+			console.error(e);
+			_sparseDlBusy = false;
+			if (btn) btn.disabled = false;
+			if (el) el.textContent = "Download failed";
+		});
 }
 
 function checkFastModels() {
@@ -1963,7 +2004,7 @@ function checkFastModels() {
 			const statusEl = document.getElementById("fast-global-status");
 			const textEl = document.getElementById("fast-global-text");
 			statusEl.className = "global-status critical";
-			textEl.textContent = "Error loading fastembed models";
+			textEl.textContent = "Error loading sparse ONNX models";
 		});
 }
 
@@ -2200,8 +2241,9 @@ const _Config = {
 	downloadEmbModelDirect: downloadEmbModelDirect,
 	deleteEmbModel: deleteEmbModel,
 
-	// FastEmbed
+	// Sparse model
 	checkFastModels: checkFastModels,
+	downloadSparseModel: downloadSparseModel,
 
 	// Scroll helpers
 	scrollToAndOpen: scrollToAndOpen,
