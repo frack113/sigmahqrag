@@ -1944,27 +1944,41 @@ function renderFastModels(models) {
 
 	statusEl.className = "global-status";
 	statusEl.classList.add(m.installed ? "ok" : "warn");
-	textEl.textContent = m.installed ? "SPLADE model installed" : "SPLADE model not found";
+	textEl.textContent = m.installed
+		? "SPLADE model installed"
+		: "SPLADE model not found";
 
 	const btnDisabled = m.installed || _sparseDlBusy;
-	listEl.innerHTML = '<table class="model-table"><tbody><tr><td class="model-name">' + escHtml(m.repo_id) + '</td></tr></tbody></table>'
-		+ '<div class="form-actions" style="margin-top:12px;">'
-		+ '<button class="btn btn-primary btn-sm" id="btn-download-sparse"' + (btnDisabled ? ' disabled' : '') + ' onclick="Config.downloadSparseModel()">Download</button>'
-		+ '<span id="sparse-dl-progress" style="margin-left:8px;"></span>'
-		+ '</div>';
+	listEl.innerHTML =
+		'<table class="model-table"><tbody><tr><td class="model-name">' +
+		escHtml(m.repo_id) +
+		"</td></tr></tbody></table>" +
+		'<div class="form-actions" style="margin-top:12px;">' +
+		'<button class="btn btn-primary btn-sm" id="btn-download-sparse"' +
+		(btnDisabled ? " disabled" : "") +
+		' onclick="Config.downloadSparseModel()">Download</button>' +
+		'<span id="sparse-dl-progress" style="margin-left:8px;"></span>' +
+		"</div>";
 }
 
 function pollSparseProgress() {
 	if (!_sparseDlBusy) return;
 	fetch(CONFIG.embeddingFast.progress)
-		.then(r => r.json())
-		.then(data => {
+		.then((r) => r.json())
+		.then((data) => {
 			const el = document.getElementById("sparse-dl-progress");
 			if (!el) return;
-			el.textContent = data.status === "completed" ? "Done" : data.status === "downloading" ? `Downloading... ${data.progress}%` : data.status;
+			el.textContent =
+				data.status === "completed"
+					? "Done"
+					: data.status === "downloading"
+						? `Downloading... ${data.progress}%`
+						: data.status;
 			if (data.status === "completed" || data.status.startsWith("error")) {
 				_sparseDlBusy = false;
-				document.getElementById("btn-download-sparse")?.removeAttribute("disabled");
+				document
+					.getElementById("btn-download-sparse")
+					?.removeAttribute("disabled");
 				checkFastModels();
 			} else {
 				setTimeout(pollSparseProgress, 1000);
@@ -1981,9 +1995,11 @@ function downloadSparseModel() {
 	const el = document.getElementById("sparse-dl-progress");
 	if (el) el.textContent = "Starting...";
 	fetch(CONFIG.embeddingFast.download, { method: "POST" })
-		.then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
+		.then((r) =>
+			r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)),
+		)
 		.then(() => setTimeout(pollSparseProgress, 500))
-		.catch(e => {
+		.catch((e) => {
 			console.error(e);
 			_sparseDlBusy = false;
 			if (btn) btn.disabled = false;
@@ -2007,7 +2023,6 @@ function checkFastModels() {
 			textEl.textContent = "Error loading sparse ONNX models";
 		});
 }
-
 
 // ──────────────────────────────────────────────────────────────
 function renderSpecsStatus(repos, defaultOrg, defaultName) {

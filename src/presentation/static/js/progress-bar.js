@@ -14,6 +14,7 @@ function safeCall1(fn, arg) {
 	}
 }
 
+// biome-ignore lint/correctness/noUnusedVariables: used from Jinja2 templates
 class ProgressBar {
 	constructor(opts) {
 		const options = opts || {};
