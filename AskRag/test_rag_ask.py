@@ -27,9 +27,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 # The test does NOT need a running uvicorn server — only Qdrant + DuckDB.
 # ---------------------------------------------------------------------------
 
+
 def _bootstrap_infra() -> None:
     """Initialise DatabaseService (singleton) with an in-memory DuckDB."""
-    from src.config.settings import Config, TEMP_DIR
+    from src.config.settings import TEMP_DIR
 
     # Ensure data dirs exist
     for d in (TEMP_DIR / "duckdb",):
@@ -49,18 +50,89 @@ _bootstrap_infra()
 
 STOP_WORDS = frozenset(
     {
-        "what", "are", "the", "in", "for", "is", "of", "and", "to",
-        "how", "does", "a", "an", "at", "on", "with", "as",
-        "not", "be", "or", "from", "by", "it", "its", "that",
-        "this", "which", "can", "when", "if", "where", "will",
-        "use", "used", "vs", "between", "than", "but", "must",
-        "should", "would", "shall", "may", "might", "need",
-        "do", "did", "has", "have", "had", "being", "been",
-        "were", "was", "into", "about", "up", "out", "all",
-        "any", "each", "every", "both", "few", "more", "most",
-        "other", "some", "such", "only", "own", "same", "so",
-        "too", "very", "just", "also", "then", "now", "no",
-        "yes", "q", "a",
+        "what",
+        "are",
+        "the",
+        "in",
+        "for",
+        "is",
+        "of",
+        "and",
+        "to",
+        "how",
+        "does",
+        "a",
+        "an",
+        "at",
+        "on",
+        "with",
+        "as",
+        "not",
+        "be",
+        "or",
+        "from",
+        "by",
+        "it",
+        "its",
+        "that",
+        "this",
+        "which",
+        "can",
+        "when",
+        "if",
+        "where",
+        "will",
+        "use",
+        "used",
+        "vs",
+        "between",
+        "than",
+        "but",
+        "must",
+        "should",
+        "would",
+        "shall",
+        "may",
+        "might",
+        "need",
+        "do",
+        "did",
+        "has",
+        "have",
+        "had",
+        "being",
+        "been",
+        "were",
+        "was",
+        "into",
+        "about",
+        "up",
+        "out",
+        "all",
+        "any",
+        "each",
+        "every",
+        "both",
+        "few",
+        "more",
+        "most",
+        "other",
+        "some",
+        "such",
+        "only",
+        "own",
+        "same",
+        "so",
+        "too",
+        "very",
+        "just",
+        "also",
+        "then",
+        "now",
+        "no",
+        "yes",
+        "q",
+        "a",
     }
 )
 
@@ -126,7 +198,7 @@ async def _get_engine():
 
 def _build_test_app():
     """Build a minimal FastAPI app with only the search endpoint."""
-    from fastapi import FastAPI, HTTPException, status
+    from fastapi import FastAPI, HTTPException
 
     app = FastAPI(title="SigmaHQ RAG — test")
 
@@ -147,9 +219,7 @@ def _build_test_app():
 async def main() -> int:
     import argparse
 
-    parser = argparse.ArgumentParser(
-        description="Test RAG search against ask_spec.md questions"
-    )
+    parser = argparse.ArgumentParser(description="Test RAG search against ask_spec.md questions")
     parser.add_argument("--url", default="http://localhost:7860", help="RAG server URL")
     parser.add_argument("--max", type=int, default=0, help="Max questions to test (0 = all)")
     parser.add_argument(
@@ -165,9 +235,7 @@ async def main() -> int:
     async with httpx.AsyncClient(base_url=base_url, timeout=30) as client:
         # Quick connectivity check via search endpoint (must return 400 for empty query or 200)
         try:
-            resp = await client.post(
-                "/api/v1/search", json={"query": "ping", "limit": 1}
-            )
+            resp = await client.post("/api/v1/search", json={"query": "ping", "limit": 1})
             if resp.status_code not in (200, 400):
                 print(f"App not reachable at {base_url} (HTTP {resp.status_code})")
                 return -1
@@ -258,7 +326,9 @@ async def main() -> int:
                     best_weighted = weighted
                     best_score = score
 
-            print(f"  -> Best: {best_status} (score={best_score:.4f}, coverage={best_weighted:.2f})")
+            print(
+                f"  -> Best: {best_status} (score={best_score:.4f}, coverage={best_weighted:.2f})"
+            )
 
             if best_status == "PASS":
                 passed += 1
@@ -270,7 +340,9 @@ async def main() -> int:
         print("\n" + "=" * 80)
         if args.question:
             tested = 1
-            print(f"RESULTS for question #{args.question}: {passed} passed, {partial} partial, {failed} failed")
+            print(
+                f"RESULTS for question #{args.question}: {passed} passed, {partial} partial, {failed} failed"
+            )
         else:
             tested = min(total, max_questions)
         pass_rate = (passed + partial) / tested * 100 if tested else 0
@@ -283,24 +355,25 @@ async def main() -> int:
 if __name__ == "__main__":
     import logging
     import sys as _sys
-    
+
     # Suppress verbose model loading logs and tqdm progress bars
     logging.basicConfig(level=logging.WARNING)
     logging.getLogger("transformers").setLevel(logging.ERROR)
     logging.getLogger("sentence_transformers").setLevel(logging.ERROR)
     logging.getLogger("huggingface_hub").setLevel(logging.ERROR)
-    
+
     # Redirect stderr to suppress tqdm/progress bar output
     import io as _io
+
     _sys.stderr = _io.StringIO()
 
     if sys.platform == "win32":
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
     result = asyncio.run(main())
-    
+
     # Restore stderr
     _sys.stderr = _sys.__stderr__
-    
+
     if result is not None and result < 10:
         sys.exit(1)

@@ -64,9 +64,7 @@ def _recreate_collection(client: Any, collection_name: str, vector_size: int | N
         collection_name=collection_name,
         vectors_config=models.VectorParams(size=vector_size, distance=models.Distance.COSINE),
         sparse_vectors_config={
-            "text-sparse": models.SparseVectorParams(
-                index=models.SparseIndexParams()
-            )
+            "text-sparse": models.SparseVectorParams(index=models.SparseIndexParams())
         },
     )
 

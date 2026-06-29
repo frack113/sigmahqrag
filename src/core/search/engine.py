@@ -335,6 +335,7 @@ class SearchEngine:
         When ``metadata_filter`` is provided, applies a Qdrant metadata filter to
         each collection search before RRF fusion.
         """
+        query = query.replace("`", "").rstrip("?").strip()
         limit = top_k if top_k is not None else self.top_k
         per_collection_k = max(limit * 2, 10)
 

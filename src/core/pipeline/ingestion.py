@@ -119,8 +119,9 @@ def build_embed_model(model_name: str) -> BaseEmbedding:
         logger.info("Loading embedding model from %s", model_path)
         # Air-gap mode: use only local files, no network calls to HF Hub
         import os as _os
+
         _was_offline = _os.environ.get("HF_HUB_OFFLINE") == "1"
-        
+
         if not Path(model_path).exists():
             # Force offline mode when model is not found locally (air-gap)
             _os.environ["HF_HUB_OFFLINE"] = "1"
@@ -128,6 +129,7 @@ def build_embed_model(model_name: str) -> BaseEmbedding:
         # Suppress tqdm/progress bar output during model loading
         import sys as _sys
         from io import StringIO as _StringIO
+
         _old_stderr = _sys.stderr
         _sys.stderr = _StringIO()
 
@@ -138,7 +140,7 @@ def build_embed_model(model_name: str) -> BaseEmbedding:
             query_instruction="query: ",
             text_instruction="passage: ",
         )
-        
+
         # Restore stderr and previous offline state after loading
         _sys.stderr = _old_stderr
         if not _was_offline and "HF_HUB_OFFLINE" in _os.environ:
@@ -149,7 +151,7 @@ def build_embed_model(model_name: str) -> BaseEmbedding:
         return model
     except Exception as e:
         # Restore stderr on error too
-        if ' _sys' in dir() and hasattr(_sys, 'stderr'):
+        if " _sys" in dir() and hasattr(_sys, "stderr"):
             try:
                 _sys.stderr = _old_stderr
             except:
@@ -305,7 +307,9 @@ class IngestionPipelineBuilder:
         lock_path = cache_path / "pipeline.lock"
         if cache_path.exists():
             try:
-                with portalocker.Lock(lock_path, timeout=5, flags=portalocker.LOCK_EX | portalocker.LOCK_NB):
+                with portalocker.Lock(
+                    lock_path, timeout=5, flags=portalocker.LOCK_EX | portalocker.LOCK_NB
+                ):
                     self._pipeline.load(str(cache_path))
                     logger.info("Restored pipeline cache from %s", cache_path)
             except portalocker.LockException:
@@ -349,7 +353,9 @@ class IngestionPipelineBuilder:
             cache_path.mkdir(parents=True, exist_ok=True)
             lock_path = cache_path / "pipeline.lock"
             try:
-                with portalocker.Lock(lock_path, timeout=5, flags=portalocker.LOCK_EX | portalocker.LOCK_NB):
+                with portalocker.Lock(
+                    lock_path, timeout=5, flags=portalocker.LOCK_EX | portalocker.LOCK_NB
+                ):
                     pipeline.persist(str(cache_path))
             except portalocker.LockException:
                 logger.warning("Cache lock acquisition failed, persisting without lock")
@@ -462,7 +468,9 @@ class IngestionPipelineBuilder:
             cache_path.mkdir(parents=True, exist_ok=True)
             lock_path = cache_path / "pipeline.lock"
             try:
-                with portalocker.Lock(lock_path, timeout=5, flags=portalocker.LOCK_EX | portalocker.LOCK_NB):
+                with portalocker.Lock(
+                    lock_path, timeout=5, flags=portalocker.LOCK_EX | portalocker.LOCK_NB
+                ):
                     pipeline.persist(str(cache_path))
             except portalocker.LockException:
                 logger.warning("Cache lock acquisition failed, persisting without lock")

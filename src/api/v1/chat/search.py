@@ -26,8 +26,9 @@ async def search_rules_endpoint(
         )
 
     try:
+        clean_query = request.query.replace("`", "").rstrip("?").strip()
         engine = SearchEngine(use_router=request.use_router)
-        results = await engine.search(request.query, top_k=request.limit)
+        results = await engine.search(clean_query, top_k=request.limit)
         return SearchResponse(
             data=results,
             meta={"total": len(results), "query": request.query, "routed": request.use_router},

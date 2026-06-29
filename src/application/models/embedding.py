@@ -222,6 +222,7 @@ class EmbeddingManager:
         """Detect embedding dimension by loading the model and encoding a probe."""
         try:
             import os
+
             os.environ.setdefault("HF_SAFETENSORS_CONVERSION_THREAD_DISABLE", "1")
             from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 

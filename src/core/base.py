@@ -36,8 +36,8 @@ class TransformConfig:
     enable_sbert: bool = True
     enable_eval_questions: bool = False
     llm_client: Any = None
-    max_heading_level: int = 3
-    """Max heading depth for markdown chunking (1=H1 only, 2=H1+H2, 3=H1+H2+H3)."""
+    max_heading_level: int = 4
+    """Max heading depth for markdown chunking (1=H1 only, 2=H1+H2, 3=H1+H2+H3, 4=H1+H2+H3+H4)."""
 
 
 class DocumentTransform(ABC):

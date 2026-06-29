@@ -120,6 +120,7 @@ class MarkdownChunker(DocumentTransform):
                         "chunk_type": "global",
                         "heading_level": 0,
                         "heading_text": "Document entier",
+                        "heading_path": "Document entier",
                     },
                 )
             )
@@ -191,9 +192,10 @@ class MarkdownChunker(DocumentTransform):
                             chunk_text, chunk_summary, chunk_keywords
                         )
 
+                    breadcrumb_prefix = f"Section path: {heading_path}\n\n"
                     result.append(
                         Document(
-                            text=enriched.strip(),
+                            text=breadcrumb_prefix + enriched.strip(),
                             metadata={
                                 **doc.metadata,
                                 "chunk_type": f"heading_h{level}",
@@ -237,9 +239,10 @@ class MarkdownChunker(DocumentTransform):
                     if qa_summary or qa_keywords:
                         enriched = self._inject_enrichment(chunk_text, qa_summary, qa_keywords)
 
+                    breadcrumb_prefix = f"Section path: {heading_path}\n\n"
                     result.append(
                         Document(
-                            text=enriched.strip(),
+                            text=breadcrumb_prefix + enriched.strip(),
                             metadata={
                                 **doc.metadata,
                                 "chunk_type": "qa_pair",

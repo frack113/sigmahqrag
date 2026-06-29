@@ -77,11 +77,15 @@ root_logger = logging.getLogger()
 root_logger.setLevel(logging.INFO)
 # Remove any existing handlers that might print to stderr
 for handler in root_logger.handlers[:]:
-    if hasattr(handler, 'stream') and getattr(handler.stream, 'name', None) == '<stderr>':
+    if hasattr(handler, "stream") and getattr(handler.stream, "name", None) == "<stderr>":
         root_logger.removeHandler(handler)
 
 # Log air-gap status at startup
-_airgap_status = "AIR-GAP MODE ENABLED" if os.environ.get("HF_HUB_OFFLINE") == "1" else "Online mode (HF Hub accessible)"
+_airgap_status = (
+    "AIR-GAP MODE ENABLED"
+    if os.environ.get("HF_HUB_OFFLINE") == "1"
+    else "Online mode (HF Hub accessible)"
+)
 logger.info(f"=== {_airgap_status} ===")
 
 
@@ -196,11 +200,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan handler."""
     dispatcher = None
     db = None
-    
+
     # Capture stderr to suppress tqdm/Loading weights messages during startup
     old_stderr = sys.stderr
     sys.stderr = StringIO()
-    
+
     try:
         db = DatabaseService()
         db.initialize()
@@ -263,7 +267,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     finally:
         # Restore stderr
         sys.stderr = old_stderr
-    
+
     yield
     if dispatcher:
         dispatcher.stop()

@@ -9,8 +9,10 @@ from llama_index.core.retrievers import VectorIndexRetriever
 from llama_index.core.vector_stores import MetadataFilter, MetadataFilters
 from llama_index.core import VectorStoreIndex
 from llama_index.core.vector_stores.types import VectorStoreQueryMode
+from qdrant_client import AsyncQdrantClient
 from llama_index.vector_stores.qdrant import QdrantVectorStore
 
+from src.config.settings import get_config
 from src.infrastructure.vectorstore.client import get_qdrant_client
 
 logger = logging.getLogger(__name__)
@@ -63,8 +65,11 @@ def get_collection_retriever(
 
     try:
         client = get_qdrant_client()
+        cfg = get_config()
+        aclient = AsyncQdrantClient(host=cfg.qdrant_host, port=cfg.qdrant_port)
         vector_store = QdrantVectorStore(
             client=client,
+            aclient=aclient,
             collection_name=collection_name,
             enable_hybrid=True,
             sparse_vector_name="text-sparse",

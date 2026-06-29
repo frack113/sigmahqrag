@@ -1,5 +1,7 @@
 """Check how many Q&A chunks are created for ask_spec.md and if they're in Qdrant."""
-import sys, re
+
+import sys
+import re
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
@@ -22,13 +24,14 @@ for idx, (q, a) in enumerate(matches, 1):
 print("\n--- Checking Qdrant sigma_spec collection ---")
 try:
     from src.infrastructure.vectorstore import QdrantVectorService
+
     svc = QdrantVectorService(collection_name="sigma_spec")
     count = svc.count()
     print(f"Total points in sigma_spec: {count}")
-    
+
     # Try a direct search for "maps key value pairs evaluated"
     results = svc.search("How are maps key/value pairs evaluated", limit=5)
-    print(f"\nTop results for 'maps (key/value pairs)':")
+    print("\nTop results for 'maps (key/value pairs)':")
     for r in results[:3]:
         text_preview = r.get("text", "")[:120]
         score = r.get("score", 0)
