@@ -48,7 +48,7 @@ def get_collection_retriever(
     collection_name: str,
     top_k: int = 30,
     metadata_filter: Any | None = None,
-    alpha: float = 0.5,
+    alpha: float = 0.3,
 ) -> VectorIndexRetriever:
     """Get a LlamaIndex retriever for a specific Qdrant collection.
 
@@ -56,7 +56,7 @@ def get_collection_retriever(
         collection_name: Qdrant collection name.
         top_k: Number of results per collection (before fusion).
         metadata_filter: Optional Qdrant Filter to apply as metadata filter.
-        alpha: Hybrid search weight (1.0=pure dense, 0.0=pure sparse, 0.5=balanced).
+        alpha: Hybrid search weight (1.0=pure dense, 0.0=pure sparse, 0.3=keyword-leaning).
 
     Returns:
         Configured VectorIndexRetriever.
