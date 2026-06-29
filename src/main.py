@@ -10,6 +10,7 @@ from contextlib import asynccontextmanager
 from logging.handlers import RotatingFileHandler
 from io import StringIO
 
+# ruff: noqa: E402 — env vars must be set before HuggingFace/model imports
 # Force air-gap mode: disable all HuggingFace Hub network calls
 os.environ.setdefault("HF_HUB_OFFLINE", "1")
 # Disable token warnings in air-gap mode
