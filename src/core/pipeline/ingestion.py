@@ -154,7 +154,7 @@ def build_embed_model(model_name: str) -> BaseEmbedding:
         if " _sys" in dir() and hasattr(_sys, "stderr"):
             try:
                 _sys.stderr = _old_stderr
-            except:
+            except Exception:
                 pass
         if not _was_offline and "HF_HUB_OFFLINE" in _os.environ:
             del _os.environ["HF_HUB_OFFLINE"]

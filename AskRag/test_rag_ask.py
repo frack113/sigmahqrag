@@ -17,6 +17,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from pydantic import BaseModel
+
 import httpx
 
 # Ensure project root is on the path BEFORE any imports from src/
@@ -175,8 +177,6 @@ def _evaluate_result(
     else:
         return "FAIL", weighted
 
-
-from pydantic import BaseModel
 
 
 class _SearchRequest(BaseModel):
