@@ -121,6 +121,7 @@ class MarkdownChunker(DocumentTransform):
                         "heading_level": 0,
                         "heading_text": "Document entier",
                         "heading_path": "Document entier",
+                        "llm_keywords": global_keywords,
                     },
                 )
             )
@@ -203,6 +204,7 @@ class MarkdownChunker(DocumentTransform):
                                 "heading_text": heading,
                                 "heading_path": heading_path,
                                 "source_file": source,
+                                "llm_keywords": chunk_keywords,
                             },
                         )
                     )
@@ -250,6 +252,7 @@ class MarkdownChunker(DocumentTransform):
                                 "answer": answer,
                                 "h2_section": h2,
                                 "h3_section": h3,
+                                "llm_keywords": qa_keywords,
                             },
                         )
                     )
