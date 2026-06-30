@@ -22,11 +22,14 @@ Classify the user query into the most relevant collection(s).
 Collections:
 - sigma_rules: Detection rules (YARA, Sigma, Splunk queries, MITRE ATT&CK techniques, threat hunting, IOCs, log sources)
 - sigma_docs: Documentation (architecture, setup, configuration, how-to guides, explanations)
-- sigma_spec: Specifications (YAML format, field definitions, schema, syntax, encoding rules)
+- sigma_spec: Specification reference (YAML format, field definitions, schema, syntax, encoding rules, modifiers, tags, logsource taxonomy, correlation rules, filters, FAQ level/status definitions)
+
+Examples of sigma_spec queries: "What severity levels exist", "How do I write a correlation rule", "What does the contains modifier do", "How to tag a MITRE technique", "What logsource for Windows Security", "How are maps evaluated", "What filename conventions for Sigma rules", "How does group-by work", "What is the difference between temporal and temporal_ordered"
 
 Return ONLY a JSON object with a single key "collections" containing a list of collection names.
 Examples:
 {"collections": ["sigma_rules"]}
+{"collections": ["sigma_spec"]}
 {"collections": ["sigma_rules", "sigma_spec"]}
 {"collections": ["sigma_docs", "sigma_spec"]}
 {"collections": ["sigma_rules", "sigma_docs", "sigma_spec"]}

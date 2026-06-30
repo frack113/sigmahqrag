@@ -100,14 +100,23 @@ async def store_embeddings(
     try:
         client = get_qdrant_client()
 
-        # Auto-create collection if missing
+        # Auto-create collection if missing (include sparse vectors so hybrid
+        # search works even when the collection is created via this code path).
         existing_collections = [c.name for c in client.get_collections().collections]
         if collection_name not in existing_collections:
-            from qdrant_client.models import Distance, VectorParams
+            from qdrant_client.models import (
+                Distance,
+                SparseIndexParams,
+                SparseVectorParams,
+                VectorParams,
+            )
 
             client.recreate_collection(
                 collection_name=collection_name,
                 vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE),
+                sparse_vectors_config={
+                    "text-sparse": SparseVectorParams(index=SparseIndexParams()),
+                },
             )
 
         # Delete old points for each source before upserting
@@ -167,8 +176,8 @@ async def delete_point(
     port: int = 6333,
 ) -> bool:
     """Delete a point from the collection."""
+    client = get_qdrant_client(host=host, port=port)
     try:
-        client = get_qdrant_client(host=host, port=port)
         client.delete(
             collection_name=collection_name,
             points_selector=qdrant_client.models.PointIdsList(points=[point_id]),
@@ -178,3 +187,5 @@ async def delete_point(
     except Exception as e:
         logger.error(f"Failed to delete point {point_id}: {e}")
         return False
+    finally:
+        client.close()

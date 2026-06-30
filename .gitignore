@@ -63,3 +63,7 @@ AGENTS.md
 # Internal architecture documentation (local only, not tracked)
 DOCUMENTATION_ARCHITECTURE.md
 refractor.md
+
+
+#qdrant
+.qdrant-initialized

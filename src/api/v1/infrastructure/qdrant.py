@@ -45,7 +45,7 @@ SERVICE_NAME = "qdrant"
 
 
 def _recreate_collection(client: Any, collection_name: str, vector_size: int | None = None) -> None:
-    """Recreate an empty Qdrant collection with the configured vector size.
+    """Recreate an empty Qdrant collection with the configured vector size and hybrid (sparse) support.
 
     The collection was just deleted by the caller; we recreate it with the
     same shape so the indexer can store_embeddings() into it again.
@@ -63,6 +63,9 @@ def _recreate_collection(client: Any, collection_name: str, vector_size: int | N
     client.create_collection(
         collection_name=collection_name,
         vectors_config=models.VectorParams(size=vector_size, distance=models.Distance.COSINE),
+        sparse_vectors_config={
+            "text-sparse": models.SparseVectorParams(index=models.SparseIndexParams())
+        },
     )
 
 

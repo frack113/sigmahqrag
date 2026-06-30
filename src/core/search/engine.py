@@ -8,7 +8,6 @@ import re
 import threading
 from typing import Any
 
-from llama_index.core.retrievers import QueryFusionRetriever
 from qdrant_client.models import FieldCondition, Filter, MatchText, MatchValue
 
 from src.core.pipeline.ingestion import DEFAULT_MODEL, build_embed_model
@@ -299,6 +298,7 @@ class SearchEngine:
         similarity_threshold: float = SIMILARITY_THRESHOLD,
         use_router: bool = False,
         llm_client: LlamaClient | None = None,
+        alpha: float = 0.3,
     ) -> None:
         """Initialize search engine.
 
@@ -311,12 +311,14 @@ class SearchEngine:
                 relevant collections instead of all three.
             llm_client: Optional LlamaClient for the router.
                 When not provided, creates a new LlamaClient.
+            alpha: Hybrid search weight (1.0=pure dense, 0.0=pure sparse, 0.3=keyword-leaning).
         """
         self.collection_names = collection_names or list(DEFAULT_COLLECTIONS)
         self.top_k = top_k
         self.similarity_threshold = similarity_threshold
         self.use_router = use_router
         self._llm_client = llm_client
+        self.alpha = alpha
 
     async def search(
         self,
@@ -333,6 +335,7 @@ class SearchEngine:
         When ``metadata_filter`` is provided, applies a Qdrant metadata filter to
         each collection search before RRF fusion.
         """
+        query = query.replace("`", "").rstrip("?").strip()
         limit = top_k if top_k is not None else self.top_k
         per_collection_k = max(limit * 2, 10)
 
@@ -361,6 +364,7 @@ class SearchEngine:
                     collection_name=col,
                     top_k=per_collection_k,
                     metadata_filter=qdrant_filter,
+                    alpha=self.alpha,
                 )
                 retrievers.append(retriever)
             except Exception as e:
@@ -370,28 +374,11 @@ class SearchEngine:
             logger.error("No retrievers available for collections: %s", cols_to_search)
             return []
 
-        # Use LlamaIndex QueryFusionRetriever for built-in RRF fusion
-        try:
-            fusion_retriever = QueryFusionRetriever(
-                retrievers,  # type: ignore[arg-type]
-                similarity_top_k=limit,
-                num_queries=1,  # disable query generation to match current behavior
-                use_async=True,
-            )
-
-            nodes_with_scores = await fusion_retriever.aretrieve(query)
-
-            results = [_node_to_result(node) for node in nodes_with_scores]
-
-            # Apply similarity threshold filter
-            if self.similarity_threshold > 0:
-                results = [r for r in results if r.get("score", 0.0) >= self.similarity_threshold]
-
-            return results[:limit]
-
-        except Exception as e:
-            logger.error("QueryFusionRetriever failed, falling back to manual RRF: %s", e)
-            return await self._search_manual_rrf(query, cols_to_search, limit, qdrant_filter)
+        # Air-gap: avoid QueryFusionRetriever which tries to load an LLM (OpenAI).
+        # Always use manual RRF fusion directly with hybrid retrievers.
+        return await self._search_manual_rrf(
+            query, cols_to_search, limit, qdrant_filter, retrievers
+        )
 
     async def _search_manual_rrf(
         self,
@@ -399,21 +386,47 @@ class SearchEngine:
         collections: list[str],
         limit: int,
         qdrant_filter: Filter | None,
+        retrievers: list[Any] | None = None,
     ) -> list[dict[str, Any]]:
-        """Fallback manual RRF search when QueryFusionRetriever fails."""
+        """Manual RRF fusion using hybrid-aware retrievers.
+
+        Uses VectorIndexRetriever with HYBRID mode when retrievers are provided;
+        falls back to dense-only ``search()`` otherwise.
+        """
         per_collection_k = max(limit * 2, 10)
 
-        tasks = [
-            search(
-                query=query,
-                collection_name=col,
-                top_k=per_collection_k,
-                similarity_threshold=self.similarity_threshold,
-                qdrant_filter=qdrant_filter,
-            )
-            for col in collections
-        ]
-        all_results = await asyncio.gather(*tasks, return_exceptions=True)
+        if retrievers:
+            # Use hybrid retrievers (sparse + dense) for each collection
+            async def _retrieve_from(retriever: Any) -> list[dict[str, Any]]:
+                try:
+                    nodes = await retriever.aretrieve(query)
+                    return [
+                        {
+                            "text": n.node.text or "",
+                            "score": float(n.score) if n.score else 0.0,
+                            "metadata": dict(n.node.metadata) if n.node.metadata else {},
+                        }
+                        for n in nodes
+                    ]
+                except Exception as e:
+                    logger.warning("Hybrid retrieval failed, skipping: %s", e)
+                    return []
+
+            tasks = [_retrieve_from(r) for r in retrievers]
+            all_results = await asyncio.gather(*tasks, return_exceptions=True)
+        else:
+            # Fallback: dense-only search per collection
+            tasks = [
+                search(
+                    query=query,
+                    collection_name=col,
+                    top_k=per_collection_k,
+                    similarity_threshold=self.similarity_threshold,
+                    qdrant_filter=qdrant_filter,
+                )
+                for col in collections
+            ]
+            all_results = await asyncio.gather(*tasks, return_exceptions=True)
 
         rrf_scores: dict[tuple[str, str], dict[str, Any]] = {}
         for col_results in all_results:

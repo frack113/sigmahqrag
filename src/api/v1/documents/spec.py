@@ -369,6 +369,26 @@ async def select_dirs(
     )
 
 
+@router.get("/repos/{org}/{name}/selected-dirs", response_model=SelectDirsResponse)
+async def get_selected_dirs(
+    org: str,
+    name: str,
+) -> SelectDirsResponse:
+    """Get saved selected directories for a specification repository."""
+    try:
+        _validate_org_name(org, name)
+    except HTTPException as e:
+        return SelectDirsResponse(success=False, error=e.detail)
+    from src.infrastructure.github.git import get_selected_dirs as _get_selected_dirs
+
+    selected = _get_selected_dirs(org, name, repos_dir=_spec_repos_dir())
+    return SelectDirsResponse(
+        success=True,
+        message=f"Loaded {len(selected)} selected directories for {org}/{name}",
+        data={"selected": selected},
+    )
+
+
 def _get_repo_path(repos_dir: Path, org: str, name: str) -> Path:
     """Get the full path for a repository."""
     _validate_org_name(org, name)

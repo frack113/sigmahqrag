@@ -186,3 +186,93 @@ class TestMarkdownChunker:
         chunks = chunker.process(docs)
         # global + 2 H1 + 3 H2 + 1 H3 = 7
         assert len(chunks) == 7
+
+
+QA_SAMPLE_MD = """# Sigma Spec
+
+## LogSource
+
+### category/product/service
+
+**Q:** What is a logsource?
+**A:** It describes the log data on which the detection is meant to be applied.
+
+**Q:** Is logsource mandatory?
+**A:** Yes. The logsource section is mandatory.
+
+## Detection
+
+### Condition
+
+**Q:** What is the condition field for?
+**A:** It specifies which search-identifier must evaluate to true.
+"""
+
+
+@pytest.fixture
+def qa_file(tmp_path: Path) -> Path:
+    f = tmp_path / "qa_spec.md"
+    f.write_text(QA_SAMPLE_MD)
+    return f
+
+
+class TestMarkdownChunkerQA:
+    def test_qa_chunks_produced(self, qa_file: Path):
+        config = TransformConfig(max_heading_level=2)
+        chunker = MarkdownChunker(config)
+        docs = chunker.parse(qa_file)
+        chunks = chunker.process(docs)
+        qa_chunks = [c for c in chunks if c.metadata["chunk_type"] == "qa_pair"]
+        assert len(qa_chunks) == 3
+
+    def test_qa_no_chunks_when_no_qa(self, md_file: Path):
+        config = TransformConfig(max_heading_level=2)
+        chunker = MarkdownChunker(config)
+        docs = chunker.parse(md_file)
+        chunks = chunker.process(docs)
+        qa_chunks = [c for c in chunks if c.metadata["chunk_type"] == "qa_pair"]
+        assert len(qa_chunks) == 0
+
+    def test_qa_h2_h3_context(self, qa_file: Path):
+        config = TransformConfig(max_heading_level=2)
+        chunker = MarkdownChunker(config)
+        docs = chunker.parse(qa_file)
+        chunks = chunker.process(docs)
+        qa_chunks = [c for c in chunks if c.metadata["chunk_type"] == "qa_pair"]
+
+        first = next(c for c in qa_chunks if "What is a logsource" in c.metadata["question"])
+        assert first.metadata["h2_section"] == "LogSource"
+        assert first.metadata["h3_section"] == "category/product/service"
+
+        second = next(c for c in qa_chunks if "condition" in c.metadata["question"])
+        assert second.metadata["h2_section"] == "Detection"
+        assert second.metadata["h3_section"] == "Condition"
+
+    def test_qa_both_chunk_types(self, qa_file: Path):
+        config = TransformConfig(max_heading_level=2)
+        chunker = MarkdownChunker(config)
+        docs = chunker.parse(qa_file)
+        chunks = chunker.process(docs)
+        chunk_types = {c.metadata["chunk_type"] for c in chunks}
+        assert "heading_h1" in chunk_types
+        assert "heading_h2" in chunk_types
+        assert "qa_pair" in chunk_types
+
+    def test_qa_chunk_content(self, qa_file: Path):
+        config = TransformConfig(max_heading_level=2)
+        chunker = MarkdownChunker(config)
+        docs = chunker.parse(qa_file)
+        chunks = chunker.process(docs)
+        qa = next(c for c in chunks if c.metadata["chunk_type"] == "qa_pair")
+
+        assert qa.metadata["question"] == "What is a logsource?"
+        assert "describes the log data" in qa.metadata["answer"]
+        assert "logsource" in qa.text.lower()
+
+    def test_qa_run_pipeline(self, qa_file: Path):
+        config = TransformConfig(max_heading_level=2)
+        chunker = MarkdownChunker(config)
+        result = chunker.run(qa_file)
+        qa_chunks = [c for c in result if c.metadata["chunk_type"] == "qa_pair"]
+        assert len(qa_chunks) == 3
+        assert all(c.metadata["collection"] == "default" for c in result)

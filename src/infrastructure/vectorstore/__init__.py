@@ -135,10 +135,17 @@ class QdrantVectorService:
     async def initialize(self) -> None:
         """Initialize the Qdrant client and vector store."""
         try:
+            from src.core.search.sparse_encoder import create_sparse_encoder
+
             self._client = get_qdrant_client(host=self.host, port=self.port)
+            sparse_encoder = create_sparse_encoder()
             self._vector_store = QdrantVectorStore(
                 client=self._client,
                 collection_name=self.collection_name,
+                enable_hybrid=True,
+                sparse_doc_fn=sparse_encoder,
+                sparse_query_fn=sparse_encoder,
+                sparse_vector_name="text-sparse",
             )
             logger.info(
                 f"QdrantVectorService initialized: {self.host}:{self.port}/{self.collection_name}"
@@ -209,13 +216,15 @@ class QdrantVectorService:
 
     async def health_check(self) -> bool:
         """Check if service is healthy."""
+        client = get_qdrant_client(host=self.host, port=self.port)
         try:
-            client = get_qdrant_client(host=self.host, port=self.port)
             collections = client.get_collections()
             return collections is not None
         except Exception as e:
             logger.debug(f"Health check failed: {e}")
             return False
+        finally:
+            client.close()
 
     async def create_collection(self, enable_hybrid: bool = True) -> None:
         """Create the collection if it doesn't exist."""

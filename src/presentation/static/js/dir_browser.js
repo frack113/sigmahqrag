@@ -20,6 +20,7 @@ function escHtml(s) {
 		.replace(/'/g, "&#39;");
 }
 
+// biome-ignore lint/correctness/noUnusedVariables: used from Jinja2 templates
 class DirBrowser {
 	constructor(containerId, options) {
 		this.container = document.getElementById(containerId);

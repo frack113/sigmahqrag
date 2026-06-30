@@ -110,10 +110,18 @@ class HFDownloadService:
 
         api = HfApi(token=self.token)
         kwargs: dict[str, Any] = {"search": query, "sort": "downloads"}
-        if task:
-            kwargs["task"] = task
+        pipeline_tags = [task] if task else ["feature-extraction"]
+        if task == "feature-extraction":
+            pipeline_tags = ["feature-extraction", "sentence-similarity"]
         try:
-            results = api.list_models(**kwargs)
-            return [HFRepo.from_string(r.id) for r in results]
+            seen: set[str] = set()
+            results: list[HFRepo] = []
+            for tag in pipeline_tags:
+                kwargs["pipeline_tag"] = tag
+                for r in api.list_models(**kwargs):
+                    if r.id not in seen:
+                        seen.add(r.id)
+                        results.append(HFRepo.from_string(r.id))
+            return results
         except Exception as e:
             raise DownloadError(f"Failed to search models: {e}") from e

@@ -221,6 +221,9 @@ class EmbeddingManager:
     async def _detect_model_dimension(model_dir: Path) -> int:
         """Detect embedding dimension by loading the model and encoding a probe."""
         try:
+            import os
+
+            os.environ.setdefault("HF_SAFETENSORS_CONVERSION_THREAD_DISABLE", "1")
             from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 
             model = HuggingFaceEmbedding(model_name=str(model_dir), device="cpu")

@@ -1,11 +1,11 @@
-{% extends "data/base.html" %}
-{% from "shared/_dir_browser.html" import dir_browser_card %}
+{% extends "data/base.html.j2" %}
+{% from "shared/_dir_browser.html.j2" import dir_browser_card %}
 
-{% block title %}Specification Repositories - Data Sources{% endblock %}
+{% block title %}GitHub - Data Sources{% endblock %}
 
 {% block page_content %}
-<h1>Specification Repositories</h1>
-<p>Manage GitHub repositories for Sigma specification indexing.</p>
+<h1>GitHub Repositories</h1>
+<p>Manage GitHub repositories for Sigma rule indexing.</p>
 
 <div class="card">
     <div class="github-actions">
@@ -13,7 +13,7 @@
         <button id="sync-all-btn" class="btn btn-success" type="button">Sync All</button>
         <button id="refresh-btn" class="btn btn-primary" type="button">Refresh list</button>
         <button id="list-document-btn" class="btn btn-primary" type="button">List document</button>
-        <button id="index-btn" class="btn btn-success" type="button">Index</button>
+        <button id="download-ref-btn" class="btn btn-secondary" type="button">Download Ref</button>
     </div>
 
     <div id="repos-list" class="repos-grid"></div>
@@ -29,16 +29,16 @@
         <button id="close-detail-btn" class="btn btn-secondary" type="button">Close</button>
     </div>
 
-    {{ dir_browser_card(id="spec", mode="tree", title="Select Directories to Index") }}
+    {{ dir_browser_card(id="github", mode="tree", title="Select Directories to Index") }}
 </div>
 
 <div id="add-repo-modal" class="modal" style="display: none;">
     <div class="modal-content">
-        <h2>Add Specification Repository</h2>
+        <h2>Add GitHub Repository</h2>
         <form id="add-repo-form">
             <div class="form-group">
                 <label for="repo-url">Repository (owner/repo)</label>
-                <input type="text" id="repo-url" name="url" placeholder="SigmaHQ/sigma-specification" required>
+                <input type="text" id="repo-url" name="url" placeholder="SigmaHQ/sigma" required>
             </div>
             <div class="form-group">
                 <label for="repo-branch">Branch</label>
@@ -57,7 +57,7 @@
 {{ super() }}
 <script>
 (function () {
-    const API_BASE = '/api/v1/spec';
+    const API_BASE = '/api/v1/github';
     let currentRepo = null;
     let detailContainer = null;
 
@@ -90,7 +90,7 @@
             if (prompt) prompt.style.display = 'block';
 
             container.innerHTML = repos.map(function (repo) { return [
-                '<div class="repo-card">',
+                '<div class="card repo-card">',
                 '  <h3>' + escHtml(repo.org) + '/' + escHtml(repo.name) + '</h3>',
                 '  <p>Last commit: ' + escHtml(formatDate(repo.last_commit)) + '</p>',
                 '  <div class="repo-actions">',
@@ -134,13 +134,13 @@
             detailContainer = null;
         }
 
-        const tree = document.getElementById('spec-tree');
+        const tree = document.getElementById('github-tree');
         tree.innerHTML = '<p class="dir-browser-empty">Loading directories...</p>';
 
         document.getElementById('repo-detail').style.display = 'block';
-        document.getElementById('spec-count').textContent = '';
+        document.getElementById('github-count').textContent = '';
 
-        detailContainer = new DirBrowser('spec-tree', {
+        detailContainer = new DirBrowser('github-tree', {
             mode: 'tree',
             endpoints: {
                 list: API_BASE + '/repos/' + org + '/' + name + '/tree',
@@ -148,7 +148,7 @@
             },
             saveMethod: 'POST',
             saveOnChange: true,
-            selectedCountEl: 'spec-count'
+            selectedCountEl: 'github-count'
         });
         detailContainer.load();
     }
@@ -160,7 +160,7 @@
         }
         document.getElementById('repo-detail').style.display = 'none';
         currentRepo = null;
-        document.getElementById('spec-tree').innerHTML = '<p class="dir-browser-empty">Loading directories...</p>';
+        document.getElementById('github-tree').innerHTML = '<p class="dir-browser-empty">Loading directories...</p>';
     }
 
     function closeModal() {
@@ -207,7 +207,7 @@
         }
     }
 
-    const DISCOVERY_WORKERS = ['github_discovery', 'local_discovery', 'sigmaref_discovery', 'spec_discovery'];
+    const DISCOVERY_WORKERS = ['github_discovery', 'local_discovery', 'sigmaref_discovery'];
     let _discoveryPollInterval = null;
 
     function isWorkerActive(status) {
@@ -235,7 +235,7 @@
     }
 
     function setButtonsDisabled(disabled) {
-        ['list-document-btn', 'index-btn'].forEach(function (id) {
+        ['list-document-btn', 'download-ref-btn'].forEach(function (id) {
             const btn = document.getElementById(id);
             if (btn) btn.disabled = disabled;
         });
@@ -264,7 +264,7 @@
                 stopDiscoveryPolling();
                 setButtonsDisabled(false);
                 setButtonText('list-document-btn', 'List document');
-                setButtonText('index-btn', 'Index');
+                setButtonText('download-ref-btn', 'Download Ref');
                 if (onIdle) onIdle();
                 return;
             }
@@ -275,6 +275,13 @@
                 setButtonText('list-document-btn', pct !== undefined ? 'Scanning ' + pct + '%..' : 'Scanning...');
             } else {
                 setButtonText('list-document-btn', 'List document');
+            }
+
+            if (srActive) {
+                const pct = sr.progress_percent > 0 ? Math.round(sr.progress_percent) : undefined;
+                setButtonText('download-ref-btn', pct !== undefined ? 'References ' + pct + '%..' : 'References...');
+            } else {
+                setButtonText('download-ref-btn', 'Download Ref');
             }
         }, 2000);
     }
@@ -335,28 +342,23 @@
         }
     });
 
-    document.getElementById('index-btn').addEventListener('click', async function () {
-        setButtonText('index-btn', 'Indexing...');
+    document.getElementById('download-ref-btn').addEventListener('click', async function () {
+        setButtonText('download-ref-btn', 'References...');
         try {
-            const response = await fetch('/api/v1/qdrant', {
+            const response = await fetch('/api/v1/dispatcher/ask', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'index_all', payload: { action: 'index_all', group: 'spec' } }),
+                body: JSON.stringify({ worker_type: 'sigmaref_discovery', task_params: {} }),
             });
+            if (response.status === 409) return;
             const result = await response.json();
-            if (result.status === 'success') {
-                var processed = 0;
-                if (result.data && result.data.results && result.data.results[0]) {
-                    processed = result.data.results[0].processed || 0;
-                }
-                alert('Indexed ' + processed + ' document(s) successfully');
+            if (result.task_id) {
+                startDiscoveryPolling(function () { loadRepos(); });
             } else {
-                alert(result.message || 'Index failed');
+                setButtonText('download-ref-btn', 'Download Ref');
             }
         } catch {
-            alert('Index request failed');
-        } finally {
-            setButtonText('index-btn', 'Index');
+            setButtonText('download-ref-btn', 'Download Ref');
         }
     });
 
@@ -403,12 +405,4 @@
 
 {% block styles %}
 {{ super() }}
-<style>
-.repo-info { padding: 1rem; }
-.repo-info h3 { margin-top: 0; }
-.error-message { color: var(--color-danger); padding: 0.75rem; text-align: center; background: var(--chat-message-error-bg); border-radius: 4px; }
-.table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; }
-.table th, .table td { padding: 0.5rem; text-align: left; border-bottom: 1px solid var(--border-color); }
-.table th { font-weight: 600; }
-</style>
 {% endblock %}

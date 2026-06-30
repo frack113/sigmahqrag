@@ -48,14 +48,15 @@ async def index_sigma_rules(
     collection = collection_name or config.qdrant_collection_name
 
     service_client = get_qdrant_client(host=config.qdrant_host, port=config.qdrant_port)
-
-    # Delete + full reindex strategy: clear old vectors before pipeline insert
     try:
+        # Delete + full reindex strategy: clear old vectors before pipeline insert
         service_client.delete_collection(collection)
     except Exception as e:
         logger.warning(
             "Collection %s not found or cannot be deleted (first run?): %s", collection, e
         )
+    finally:
+        service_client.close()
 
     nodes = []
     for rule in rules:

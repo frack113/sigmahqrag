@@ -36,8 +36,8 @@ class TransformConfig:
     enable_sbert: bool = True
     enable_eval_questions: bool = False
     llm_client: Any = None
-    max_heading_level: int = 3
-    """Max heading depth for markdown chunking (1=H1 only, 2=H1+H2, 3=H1+H2+H3)."""
+    max_heading_level: int = 4
+    """Max heading depth for markdown chunking (1=H1 only, 2=H1+H2, 3=H1+H2+H3, 4=H1+H2+H3+H4)."""
 
 
 class DocumentTransform(ABC):
@@ -189,13 +189,13 @@ class DocumentTransform(ABC):
                     enrichment += f"Keywords: {keywords}\n"
                 doc = Document(
                     text=text + enrichment,
-                    metadata={**doc.metadata, "has_llm_enrichment": True},
+                    metadata={**doc.metadata},
                     excluded_embed_metadata_keys=doc.excluded_embed_metadata_keys,
                 )
             else:
                 doc = Document(
                     text=text,
-                    metadata={**doc.metadata, "has_llm_enrichment": False},
+                    metadata={**doc.metadata},
                     excluded_embed_metadata_keys=doc.excluded_embed_metadata_keys,
                 )
             updated.append(doc)

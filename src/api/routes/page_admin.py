@@ -23,7 +23,7 @@ async def config_page(request: Request):
     cfg = get_config().to_dict()
     return templates.TemplateResponse(
         request=request,
-        name="config/config.html",
+        name="config/config.html.j2",
         context={"config": cfg, "config_json": json.dumps(cfg)},
     )
 

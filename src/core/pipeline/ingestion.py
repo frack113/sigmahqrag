@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+import os
+
+os.environ.setdefault("DISABLE_SAFETENSORS_CONVERSION", "1")
+os.environ.setdefault("HF_HUB_OFFLINE", "1")
+
 import logging
 import threading
 from pathlib import Path
@@ -28,7 +33,7 @@ DEFAULT_MODEL = "intfloat/multilingual-e5-small"
 DEFAULT_CHUNK_SIZE = 1024
 DEFAULT_CHUNK_OVERLAP = 100
 DEFAULT_EMBED_BATCH_SIZE = 8
-DEFAULT_NUM_WORKERS = 4
+DEFAULT_NUM_WORKERS = 0
 DEFAULT_SIMILARITY_TOP_K = 5
 
 # Collection names that use the transform system instead of SentenceSplitter.
@@ -112,15 +117,47 @@ def build_embed_model(model_name: str) -> BaseEmbedding:
 
     try:
         logger.info("Loading embedding model from %s", model_path)
+        # Air-gap mode: use only local files, no network calls to HF Hub
+        import os as _os
+
+        _was_offline = _os.environ.get("HF_HUB_OFFLINE") == "1"
+
+        if not Path(model_path).exists():
+            # Force offline mode when model is not found locally (air-gap)
+            _os.environ["HF_HUB_OFFLINE"] = "1"
+
+        # Suppress tqdm/progress bar output during model loading
+        import sys as _sys
+        from io import StringIO as _StringIO
+
+        _old_stderr = _sys.stderr
+        _sys.stderr = _StringIO()
+
         model = HuggingFaceEmbedding(
             model_name=model_path,
             device="cpu",
             embed_batch_size=DEFAULT_EMBED_BATCH_SIZE,
+            query_instruction="query: ",
+            text_instruction="passage: ",
         )
+
+        # Restore stderr and previous offline state after loading
+        _sys.stderr = _old_stderr
+        if not _was_offline and "HF_HUB_OFFLINE" in _os.environ:
+            del _os.environ["HF_HUB_OFFLINE"]
+
         _embed_dim = _detect_embed_dim(model)
         logger.info("Detected embedding dimension: %d", _embed_dim)
         return model
     except Exception as e:
+        # Restore stderr on error too
+        if " _sys" in dir() and hasattr(_sys, "stderr"):
+            try:
+                _sys.stderr = _old_stderr
+            except Exception:
+                pass
+        if not _was_offline and "HF_HUB_OFFLINE" in _os.environ:
+            del _os.environ["HF_HUB_OFFLINE"]
         logger.error(
             "Embedding model %s failed to load (path: %s): %s",
             model_name,
@@ -161,12 +198,18 @@ class IngestionPipelineBuilder:
 
     def _get_qdrant_store(self) -> QdrantVectorStore | None:
         try:
+            from src.core.search.sparse_encoder import create_sparse_encoder
             from src.infrastructure.vectorstore.client import get_qdrant_client
 
             client = get_qdrant_client()
+            sparse_encoder = create_sparse_encoder()
             return QdrantVectorStore(
                 client=client,
                 collection_name=self._collection_name,
+                enable_hybrid=True,
+                sparse_doc_fn=sparse_encoder,
+                sparse_query_fn=sparse_encoder,
+                sparse_vector_name="text-sparse",
             )
         except Exception as e:
             logger.warning("Failed to connect to Qdrant: %s", e)
@@ -268,7 +311,9 @@ class IngestionPipelineBuilder:
         lock_path = cache_path / "pipeline.lock"
         if cache_path.exists():
             try:
-                with portalocker.Lock(lock_path, timeout=5, flags=portalocker.LOCK_EX):
+                with portalocker.Lock(
+                    lock_path, timeout=5, flags=portalocker.LOCK_EX | portalocker.LOCK_NB
+                ):
                     self._pipeline.load(str(cache_path))
                     logger.info("Restored pipeline cache from %s", cache_path)
             except portalocker.LockException:
@@ -312,7 +357,9 @@ class IngestionPipelineBuilder:
             cache_path.mkdir(parents=True, exist_ok=True)
             lock_path = cache_path / "pipeline.lock"
             try:
-                with portalocker.Lock(lock_path, timeout=5, flags=portalocker.LOCK_EX):
+                with portalocker.Lock(
+                    lock_path, timeout=5, flags=portalocker.LOCK_EX | portalocker.LOCK_NB
+                ):
                     pipeline.persist(str(cache_path))
             except portalocker.LockException:
                 logger.warning("Cache lock acquisition failed, persisting without lock")
@@ -425,7 +472,9 @@ class IngestionPipelineBuilder:
             cache_path.mkdir(parents=True, exist_ok=True)
             lock_path = cache_path / "pipeline.lock"
             try:
-                with portalocker.Lock(lock_path, timeout=5, flags=portalocker.LOCK_EX):
+                with portalocker.Lock(
+                    lock_path, timeout=5, flags=portalocker.LOCK_EX | portalocker.LOCK_NB
+                ):
                     pipeline.persist(str(cache_path))
             except portalocker.LockException:
                 logger.warning("Cache lock acquisition failed, persisting without lock")
