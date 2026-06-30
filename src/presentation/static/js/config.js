@@ -1424,13 +1424,13 @@ function selectLlmModel(repoId) {
 	const rows = listEl.querySelectorAll(".model-name");
 	for (let i = 0; i < rows.length; i++) {
 		rows[i].style.fontWeight = "normal";
-		rows[i].style.color = "#007bff";
+		rows[i].style.color = "var(--color-primary)";
 	}
 	if (rows.length > 0) {
 		for (let j = 0; j < rows.length; j++) {
 			if (rows[j].textContent === repoId) {
 				rows[j].style.fontWeight = "bold";
-				rows[j].style.color = "#0056b3";
+				rows[j].style.color = "var(--color-primary-hover)";
 				break;
 			}
 		}
@@ -1582,13 +1582,13 @@ function selectEmbModel(repoId) {
 	const rows = listEl.querySelectorAll(".model-name");
 	for (let i = 0; i < rows.length; i++) {
 		rows[i].style.fontWeight = "normal";
-		rows[i].style.color = "#007bff";
+		rows[i].style.color = "var(--color-primary)";
 	}
 	if (rows.length > 0) {
 		for (let j = 0; j < rows.length; j++) {
 			if (rows[j].textContent === repoId) {
 				rows[j].style.fontWeight = "bold";
-				rows[j].style.color = "#0056b3";
+				rows[j].style.color = "var(--color-primary-hover)";
 				break;
 			}
 		}

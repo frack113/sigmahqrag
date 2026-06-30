@@ -266,7 +266,7 @@ async function deleteFile(idx, originalUrl) {
     if (!confirm('Are you sure you want to delete this file? This cannot be undone.')) return;
 
     try {
-        const response = await fetch(`/api/v1/files/local/delete?file_path=${encodeURIComponent(originalUrl)}&${originalUrl}`);
+        const response = await fetch(`/api/v1/files/local/delete?file_path=${encodeURIComponent(originalUrl)}`);
         const data = await response.json();
 
         if (data.success) {

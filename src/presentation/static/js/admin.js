@@ -14,11 +14,11 @@ function _showToast(message, type) {
 function _esc(s) {
 	if (s == null) return "";
 	var m = {
-		"&": "\x26amp;",
-		"<": "\x26lt;",
-		">": "\x26gt;",
-		'"': "\x26quot;",
-		"'": "\x26#39;",
+		"&": "&amp;",
+		"<": "&lt;",
+		">": "&gt;",
+		'"': "&quot;",
+		"'": "&#39;",
 	};
 	return String(s).replace(/[&<>"']/g, (c) => m[c]);
 }

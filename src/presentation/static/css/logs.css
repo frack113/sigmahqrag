@@ -36,8 +36,8 @@
 
 /* Log output area */
 .logs-output {
-	background: #1e1e1e;
-	color: #d4d4d4;
+	background: var(--log-output-bg);
+	color: var(--log-text);
 	font-family: "Cascadia Code", "Fira Code", "Consolas", monospace;
 	font-size: var(--text-xs);
 	line-height: 1.6;
