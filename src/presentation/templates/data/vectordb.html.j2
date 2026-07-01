@@ -75,9 +75,9 @@
 
 {% block scripts %}
 {{ super() }}
-<script src="{{ url_for('static', path='/js/progress-bar.js') }}"></script>
-<script src="{{ url_for('static', path='/js/qdrant.js') }}"></script>
-<script src="{{ url_for('static', path='/js/vectordb.js') }}"></script>
+<script src="{{ url_for('static', path='/js/internal/progress-bar.js') }}"></script>
+<script src="{{ url_for('static', path='/js/internal/qdrant.js') }}"></script>
+<script src="{{ url_for('static', path='/js/internal/vectordb.js') }}"></script>
 {% endblock %}
 
 

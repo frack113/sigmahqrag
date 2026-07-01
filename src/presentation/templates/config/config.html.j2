@@ -360,7 +360,7 @@
 
 {% block scripts %}
 <script id="backend-config-data" type="application/json">{{ config_json | safe }}</script>
-<script src="{{ url_for('static', path='/js/release-selector.js') }}"></script>
-<script src="{{ url_for('static', path='/js/progress-bar.js') }}"></script>
-<script src="{{ url_for('static', path='/js/config.js') }}"></script>
+<script src="{{ url_for('static', path='/js/internal/release-selector.js') }}"></script>
+<script src="{{ url_for('static', path='/js/internal/progress-bar.js') }}"></script>
+<script src="{{ url_for('static', path='/js/internal/config.js') }}"></script>
 {% endblock %}
