@@ -22,7 +22,7 @@ This project is under active development. Some features may be incomplete.
 uv run python main.py
 ```
 
-Server starts on `http://localhost:7860` .
+Server starts on `http://localhost:8000` .
 
 
 ## Configuration
