@@ -688,9 +688,12 @@ function loadBackendStatus() {
 			);
 
 			const isLlamaExternal = llamaInfo.mode === "external";
-			document.getElementById("llama-start-btn").disabled = isLlamaExternal;
-			document.getElementById("llama-stop-btn").disabled = isLlamaExternal;
-			document.getElementById("llama-download-btn").disabled = isLlamaExternal;
+			const llamaStartBtn = document.getElementById("llama-start-btn");
+			const llamaStopBtn = document.getElementById("llama-stop-btn");
+			const llamaDownloadBtn = document.getElementById("llama-download-btn");
+			if (llamaStartBtn) llamaStartBtn.disabled = isLlamaExternal;
+			if (llamaStopBtn) llamaStopBtn.disabled = isLlamaExternal;
+			if (llamaDownloadBtn) llamaDownloadBtn.disabled = isLlamaExternal;
 
 			const isQdrantExternal = qdrantInfo.mode === "external";
 			const qdrantStartBtn = document.getElementById("qdrant-start-btn");
@@ -1704,7 +1707,7 @@ function showLlmFiles(repoId) {
 				const size = formatBytes(f.size);
 				const safeFile = escHtml(f.filename);
 				html +=
-					'<div class="llm-file-item" style="display:flex;align-items:center;gap:8px;padding:4px 8px;border:1px solid var(--border-color);border-radius:4px;">';
+					'<div class="llm-file-item" style="display:flex;align-items:center;gap:8px;padding:4px 8px;border:1px solid var(--border-card);border-radius:4px;">';
 				html +=
 					'<span style="flex:1;font-size:var(--text-sm);color:var(--text-body);">' +
 					safeFile +

@@ -55,7 +55,7 @@
 
 {% block scripts %}
 {{ super() }}
-<script src="{{ static_path }}/js/github.js"></script>
+<script src="{{ url_for('static', path='/js/github.js') }}"></script>
 {% endblock %}
 
 {% block styles %}

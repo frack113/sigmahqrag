@@ -55,7 +55,7 @@
 
 {% block scripts %}
 {{ super() }}
-<script src="{{ static_path }}/js/sigma-spec.js"></script>
+<script src="{{ url_for('static', path='/js/sigma-spec.js') }}"></script>
 {% endblock %}
 
 {% block styles %}
@@ -65,7 +65,7 @@
 .repo-info h3 { margin-top: 0; }
 .error-message { color: var(--color-danger); padding: 0.75rem; text-align: center; background: var(--chat-message-error-bg); border-radius: 4px; }
 .table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; }
-.table th, .table td { padding: 0.5rem; text-align: left; border-bottom: 1px solid var(--border-color); }
+.table th, .table td { padding: 0.5rem; text-align: left; border-bottom: 1px solid var(--border-card); }
 .table th { font-weight: 600; }
 </style>
 {% endblock %}

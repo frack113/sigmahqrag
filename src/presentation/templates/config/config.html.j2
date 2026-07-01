@@ -177,8 +177,8 @@
                             <div class="config-row mb-3">
                                 <div class="form-group inline">
                                     <label>Manage</label>
-                                    <label class="theme-toggle" id="qdrant-mode-toggle" onchange="Config.onQdrantModeChange()">
-                                        <input type="checkbox" id="qdrant-manage-internally" checked>
+                                    <label class="theme-toggle" id="qdrant-mode-toggle">
+                                        <input type="checkbox" id="qdrant-manage-internally" checked onchange="Config.onQdrantModeChange()">
                                         <span class="theme-slider"></span>
                                         <span class="theme-text-label" id="qdrant-mode-label">Internal</span>
                                     </label>
@@ -188,8 +188,8 @@
                             <div class="config-row mb-3">
                                 <div class="form-group inline">
                                     <label>Auto start</label>
-                                    <label class="theme-toggle" id="qdrant-autostart-toggle" onchange="Config.onQdrantAutostartChange()">
-                                        <input type="checkbox" id="qdrant-autorun-at-startup" checked>
+                                    <label class="theme-toggle" id="qdrant-autostart-toggle">
+                                        <input type="checkbox" id="qdrant-autorun-at-startup" checked onchange="Config.onQdrantAutostartChange()">
                                         <span class="theme-slider"></span>
                                         <span class="theme-text-label" id="qdrant-autostart-label">Off</span>
                                     </label>
@@ -243,8 +243,8 @@
                             <div class="config-row mb-3">
                                 <div class="form-group inline">
                                     <label>Manage</label>
-                                    <label class="theme-toggle" id="llama-mode-toggle" onchange="Config.onLlamaModeChange()">
-                                        <input type="checkbox" id="llama-manage-internally" checked>
+                                    <label class="theme-toggle" id="llama-mode-toggle">
+                                        <input type="checkbox" id="llama-manage-internally" checked onchange="Config.onLlamaModeChange()">
                                         <span class="theme-slider"></span>
                                         <span class="theme-text-label" id="llama-mode-label">Internal</span>
                                     </label>
@@ -254,8 +254,8 @@
                             <div class="config-row mb-3">
                                 <div class="form-group inline">
                                     <label>Auto start</label>
-                                    <label class="theme-toggle" id="llama-autostart-toggle" onchange="Config.onLlamaAutostartChange()">
-                                        <input type="checkbox" id="llama-autorun-at-startup" checked>
+                                    <label class="theme-toggle" id="llama-autostart-toggle">
+                                        <input type="checkbox" id="llama-autorun-at-startup" checked onchange="Config.onLlamaAutostartChange()">
                                         <span class="theme-slider"></span>
                                         <span class="theme-text-label" id="llama-autostart-label">Off</span>
                                     </label>
@@ -308,12 +308,12 @@
                                 <span id="emb-global-text">Loading...</span>
                             </div>
                             <div id="emb-models-list" class="mt-3"></div>
-                            <div class="search-row" class="mt-3">
+                            <div class="search-row mt-3">
                                 <input type="text" id="emb-search-input" placeholder="Search HuggingFace...">
                                 <button class="btn btn-primary btn-sm" onclick="Config.searchEmbModel()">Search</button>
                             </div>
-                            <div id="emb-search-results" class="search-results" class="mt-3"></div>
-                            <div class="form-actions" class="mt-3">
+                            <div id="emb-search-results" class="search-results mt-3"></div>
+                            <div class="form-actions mt-3">
                                 <button class="btn btn-primary btn-sm" onclick="Config.downloadEmbModel()" id="btn-download-emb">Download</button>
                                 <button class="btn btn-danger btn-sm" onclick="Config.deleteEmbModel()" id="btn-delete-emb">Delete</button>
                             </div>
@@ -339,12 +339,12 @@
                                 <span id="llm-global-text">Loading...</span>
                             </div>
                             <div id="llm-models-list" class="mt-3"></div>
-                            <div class="search-row" class="mt-3">
+                            <div class="search-row mt-3">
                                 <input type="text" id="llm-search-input" placeholder="Search HuggingFace...">
                                 <button class="btn btn-primary btn-sm" onclick="Config.searchLlmModel()">Search</button>
                             </div>
-                            <div id="llm-search-results" class="search-results" class="mt-3"></div>
-                            <div class="form-actions" class="mt-3">
+                            <div id="llm-search-results" class="search-results mt-3"></div>
+                            <div class="form-actions mt-3">
                                 <button class="btn btn-primary btn-sm" onclick="Config.downloadLlmModel()" id="btn-download-llm">Download</button>
                                 <button class="btn btn-danger btn-sm" onclick="Config.deleteLlmModel()" id="btn-delete-llm">Delete</button>
                             </div>
