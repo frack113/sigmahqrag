@@ -15,6 +15,9 @@
 	width: 0%;
 	transition: width 0.3s;
 }
+.progress-bar .progress-fill.complete {
+	background: var(--color-success);
+}
 
 .progress-blue-gradient {
 	width: 100%;
