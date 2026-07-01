@@ -12,7 +12,6 @@
         <button id="add-repo-btn" class="btn btn-primary" type="button">Add Repository</button>
         <button id="sync-all-btn" class="btn btn-success" type="button">Sync All</button>
         <button id="refresh-btn" class="btn btn-primary" type="button">Refresh list</button>
-        <button id="list-document-btn" class="btn btn-primary" type="button">List document</button>
         <button id="index-btn" class="btn btn-success" type="button">Index</button>
     </div>
 
@@ -26,6 +25,7 @@
 <div id="repo-detail" class="repo-detail-section" style="display: none;">
     <div class="repo-detail-header">
         <h2 id="selected-repo-name">Repository</h2>
+                <button id="save-detail-btn" class="btn btn-primary" type="button">Save</button>
         <button id="close-detail-btn" class="btn btn-secondary" type="button">Close</button>
     </div>
 
@@ -55,6 +55,7 @@
 
 {% block scripts %}
 {{ super() }}
+<script src="{{ url_for('static', path='/js/internal/repo-browser.js') }}"></script>
 <script src="{{ url_for('static', path='/js/internal/sigma-spec.js') }}"></script>
 {% endblock %}
 
