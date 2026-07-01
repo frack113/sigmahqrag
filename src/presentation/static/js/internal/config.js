@@ -1182,21 +1182,20 @@ function loadReleasesTable() {
 			const versions = data.installed_versions || {};
 
 			if (releases.length === 0 && Object.keys(versions).length === 0) {
-				tableEl.innerHTML =
-					'<p style="font-style:italic;color:var(--text-card-body);"><i>undef</i></p>';
+				tableEl.innerHTML = '<p class="releases-table-empty"><i>undef</i></p>';
 				return;
 			}
 
 			let html =
-				'<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;">';
+				'<div class="releases-table-wrapper"><table class="releases-table">';
 			html +=
-				'<thead><tr style="border-bottom:1px solid var(--layout-card-border);">' +
-				'<th style="padding:8px;text-align:left;">Service</th>' +
-				'<th style="padding:8px;text-align:left;">Latest Tag</th>' +
-				'<th style="padding:8px;text-align:left;">Installed Version</th>' +
-				'<th style="padding:8px;text-align:left;">Last Scanned</th>' +
-				'<th style="padding:8px;text-align:left;">Published At</th>' +
-				'<th style="padding:8px;text-align:left;">Fetched At</th>' +
+				"<thead><tr>" +
+				"<th>Service</th>" +
+				"<th>Latest Tag</th>" +
+				"<th>Installed Version</th>" +
+				"<th>Last Scanned</th>" +
+				"<th>Published At</th>" +
+				"<th>Fetched At</th>" +
 				"</tr></thead>";
 			html += "<tbody>";
 
@@ -1215,27 +1214,27 @@ function loadReleasesTable() {
 				const installed = versions[svc] || null;
 
 				html +=
-					'<tr style="border-bottom:1px solid var(--layout-card-border);">' +
-					'<td style="padding:8px;">' +
+					"<tr>" +
+					"<td>" +
 					svc +
 					"</td>" +
-					'<td style="padding:8px;">' +
+					"<td>" +
 					(release ? release.last_tag_name || "—" : "—") +
 					"</td>" +
-					'<td style="padding:8px;">' +
+					"<td>" +
 					(installed ? installed.version : "—") +
 					"</td>" +
-					'<td style="padding:8px;">' +
+					"<td>" +
 					(installed
 						? installed.scanned_at
 							? new Date(installed.scanned_at).toLocaleString()
 							: "—"
 						: "—") +
 					"</td>" +
-					'<td style="padding:8px;">' +
+					"<td>" +
 					(release ? release.published_at || "—" : "—") +
 					"</td>" +
-					'<td style="padding:8px;">' +
+					"<td>" +
 					(release ? release.fetched_at || "—" : "—") +
 					"</td>" +
 					"</tr>";
@@ -1247,27 +1246,27 @@ function loadReleasesTable() {
 				if (knownServices.indexOf(r.service) === -1) {
 					const extInstalled = versions[r.service] || null;
 					html +=
-						'<tr style="border-bottom:1px solid var(--layout-card-border);">' +
-						'<td style="padding:8px;">' +
+						"<tr>" +
+						"<td>" +
 						(r.service || "—") +
 						"</td>" +
-						'<td style="padding:8px;">' +
+						"<td>" +
 						(r.last_tag_name || "—") +
 						"</td>" +
-						'<td style="padding:8px;">' +
+						"<td>" +
 						(extInstalled ? extInstalled.version : "—") +
 						"</td>" +
-						'<td style="padding:8px;">' +
+						"<td>" +
 						(extInstalled
 							? extInstalled.scanned_at
 								? new Date(extInstalled.scanned_at).toLocaleString()
 								: "—"
 							: "—") +
 						"</td>" +
-						'<td style="padding:8px;">' +
+						"<td>" +
 						(r.published_at || "—") +
 						"</td>" +
-						'<td style="padding:8px;">' +
+						"<td>" +
 						(r.fetched_at || "—") +
 						"</td>" +
 						"</tr>";
