@@ -235,11 +235,13 @@
 
 			const gh = results[0],
 				local = results[1],
-				sr = results[2];
+				sr = results[2],
+				spec = results[3];
 			const ghActive = gh && isWorkerActive(gh.status);
 			const localActive = local && isWorkerActive(local.status);
 			const srActive = sr && isWorkerActive(sr.status);
-			const anyActive = ghActive || localActive || srActive;
+			const specActive = spec && isWorkerActive(spec.status);
+			const anyActive = ghActive || localActive || srActive || specActive;
 
 			if (!anyActive) {
 				stopDiscoveryPolling();

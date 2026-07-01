@@ -80,7 +80,7 @@
                                 <span class="status-dot"></span>
                                 <span id="logging-status-text">Loading...</span>
                             </div>
-                            <div class="config-row" style="margin-top:12px;">
+                            <div class="config-row mt-3">
                                 <div class="form-group inline">
                                     <label for="log-level-select">Log Level</label>
                                     <select id="log-level-select">
@@ -93,15 +93,15 @@
                                 </div>
                                 <div class="form-group inline">
                                     <label for="log-max-size-input">Max Size</label>
-                                    <input type="text" id="log-max-size-input" value="10M" placeholder="10M" maxlength="5" style="width:80px;">
+                                    <input type="text" id="log-max-size-input" value="10M" placeholder="10M" maxlength="5" class="w-80">
                                 </div>
                                 <div class="form-group inline">
                                     <label for="log-max-file-input">Max Files</label>
-                                    <input type="number" id="log-max-file-input" value="5" min="1" max="99" style="width:70px;">
+                                    <input type="number" id="log-max-file-input" value="5" min="1" max="99" class="w-70">
                                 </div>
                             </div>
                                 <div class="config-row">
-                                <span style="font-size:var(--text-sm);color:var(--text-body);margin-right:var(--space-2);">Clean at startup</span>
+                                <span class="text-sm" style="color:var(--text-body);margin-right:var(--space-2);">Clean at startup</span>
                                 <label class="theme-toggle" id="log-clean-toggle">
                                     <input type="checkbox" id="log-clean-at-startup">
                                     <span class="theme-slider"></span>
@@ -119,23 +119,23 @@
                 <summary class="config-group-summary">Storage</summary>
                 <div class="config-cards">
                     <!-- Storage Card -->
-                    <div class="card" style="flex:2;">
+                    <div class="card card-flex-2">
                         <div class="card-header"><h2>Storage</h2></div>
                         <div class="card-body">
                             <div id="data-global-status" class="global-status"></div>
-                            <div id="data-dirs-list" style="margin-top:12px;"></div>
-                            <div id="duckdb-status" style="margin-top:12px;"></div>
+                            <div id="data-dirs-list" class="mt-3"></div>
+                            <div id="duckdb-status" class="mt-3"></div>
                         </div>
                     </div>
                     <!-- Specifications Card -->
-                    <div class="card" style="flex:1;">
+                    <div class="card card-flex-1">
                         <div class="card-header"><h2>Spécifications</h2></div>
                         <div class="card-body">
                             <div id="specs-status" class="global-status">
                                 <span class="status-dot"></span>
                                 <span id="specs-status-text">Loading...</span>
                             </div>
-                            <div id="specs-repos-list" style="margin-top:12px;"></div>
+                            <div id="specs-repos-list" class="mt-3"></div>
                             <div id="specs-config-status" class="status-message"></div>
                         </div>
                     </div>
@@ -147,37 +147,37 @@
                 <summary class="config-group-summary">Backend</summary>
                 <div class="config-cards">
                     <!-- Releases Management Card -->
-                    <div class="card" style="grid-column:1/-1">
+                    <div class="card card-full">
                         <div class="card-header"><h2>Releases Management</h2></div>
                         <div class="card-body">
-                        <div id="releases-timestamp" style="font-size:var(--text-sm);color:var(--text-card-body);margin-bottom:16px;">
+                        <div id="releases-timestamp" class="text-sm mb-4" style="color:var(--text-card-body);">
                             Last update: <span id="releases-last-update">—</span>
                         </div>
-                        <div id="releases-table" style="margin-top:8px;">
+                        <div id="releases-table" class="mt-2">
                             <!-- Releases table will be populated here -->
                         </div>
-                        <div style="margin-top:12px; display:flex; gap:8px;">
+                        <div class="flex-row mt-3">
                             <button class="btn btn-primary btn-sm" onclick="Config.refreshReleases()">Refresh GitHub Releases</button>
                             <button class="btn btn-secondary btn-sm" onclick="Config.scanLocalVersions()">Scan Local Versions</button>
                         </div>
-                        <div id="releases-refresh-status" class="status-message" style="margin-top:8px;"></div>
+                        <div id="releases-refresh-status" class="status-message mt-2"></div>
                         </div>
                     </div>
                     <!-- Qdrant Card -->
                     <div class="card">
                         <div class="card-header"><h2>Qdrant</h2><button class="btn btn-primary btn-sm" onclick="Config.saveBackendServiceConfig('qdrant')">Save</button></div>
                         <div class="card-body">
-                            <div class="config-row" style="margin-bottom:12px;">
+                            <div class="config-row mb-3">
                                 <div class="form-group inline">
                                     <label for="qdrant-base-url">Base URL</label>
                                     <input type="text" id="qdrant-base-url" value="http://127.0.0.1:6333" placeholder="http://127.0.0.1:6333">
                                 </div>
                             </div>
 
-                            <div class="config-row" style="margin-bottom:12px;">
+                            <div class="config-row mb-3">
                                 <div class="form-group inline">
                                     <label>Manage</label>
-                                    <label class="theme-toggle" id="qdrant-mode-toggle" style="width:auto" onchange="Config.onQdrantModeChange()">
+                                    <label class="theme-toggle" id="qdrant-mode-toggle" onchange="Config.onQdrantModeChange()">
                                         <input type="checkbox" id="qdrant-manage-internally" checked>
                                         <span class="theme-slider"></span>
                                         <span class="theme-text-label" id="qdrant-mode-label">Internal</span>
@@ -185,10 +185,10 @@
                                 </div>
                             </div>
 
-                            <div class="config-row" style="margin-bottom:12px;">
+                            <div class="config-row mb-3">
                                 <div class="form-group inline">
                                     <label>Auto start</label>
-                                    <label class="theme-toggle" id="qdrant-autostart-toggle" style="width:auto" onchange="Config.onQdrantAutostartChange()">
+                                    <label class="theme-toggle" id="qdrant-autostart-toggle" onchange="Config.onQdrantAutostartChange()">
                                         <input type="checkbox" id="qdrant-autorun-at-startup" checked>
                                         <span class="theme-slider"></span>
                                         <span class="theme-text-label" id="qdrant-autostart-label">Off</span>
@@ -196,7 +196,7 @@
                                 </div>
                             </div>
 
-                            <div id="qdrant-status" class="status-row" style="margin-bottom:16px;">
+                            <div id="qdrant-status" class="status-row mb-4">
                                 <span class="status-dot status-unknown"></span>
                                 <span id="qdrant-status-text">Inactive</span>
                                 <button class="btn btn-secondary btn-sm" onclick="Config.loadBackendStatus()">Refresh</button>
@@ -205,24 +205,24 @@
                                 <a id="qdrant-webui-link" href="http://127.0.0.1:6333/dashboard" target="_blank" class="btn btn-secondary btn-sm">Web UI</a>
                             </div>
 
-                            <div class="config-row" style="margin-bottom:16px;">
+                            <div class="config-row mb-4">
                                 <div class="form-group inline">
                                     <label>Binary:</label>
-                                    <select id="qdrant-release-select" style="min-width:200px"></select>
+                                    <select id="qdrant-release-select" class="min-w-200"></select>
                                 </div>
                                 <button id="qdrant-download-btn" class="btn btn-primary btn-sm" onclick="Config.downloadQdrantBinary()">Update</button>
                             </div>
 
-                            <div class="config-row" style="margin-bottom:16px;">
+                            <div class="config-row mb-4">
                                 <div class="form-group inline">
                                     <label>UI Version:</label>
-                                    <select id="qdrant-ui-release-select" style="min-width:200px"></select>
+                                    <select id="qdrant-ui-release-select" class="min-w-200"></select>
                                 </div>
                                 <button id="qdrant-ui-download-btn" class="btn btn-primary btn-sm" onclick="Config.downloadQdrantUI()">Download Web UI</button>
                             </div>
 
                             <div id="qdrant-download-status" class="status-message"></div>
-                            <div id="qdrant-progress-container" style="display:none;">
+                            <div id="qdrant-progress-container" class="d-none">
                                 <div class="progress-bar"><div class="progress-fill" id="qdrant-progress-fill"></div></div>
                                 <p id="qdrant-progress-text">Downloading...</p>
                             </div>
@@ -233,17 +233,17 @@
                     <div class="card">
                         <div class="card-header"><h2>llama.cpp</h2><button class="btn btn-primary btn-sm" onclick="Config.saveBackendServiceConfig('llama')">Save</button></div>
                         <div class="card-body">
-                            <div class="config-row" style="margin-bottom:12px;">
+                            <div class="config-row mb-3">
                                 <div class="form-group inline">
                                     <label for="llama-base-url">Base URL</label>
                                     <input type="text" id="llama-base-url" value="http://127.0.0.1:8080" placeholder="http://127.0.0.1:8080">
                                 </div>
                             </div>
 
-                            <div class="config-row" style="margin-bottom:12px;">
+                            <div class="config-row mb-3">
                                 <div class="form-group inline">
                                     <label>Manage</label>
-                                    <label class="theme-toggle" id="llama-mode-toggle" style="width:auto" onchange="Config.onLlamaModeChange()">
+                                    <label class="theme-toggle" id="llama-mode-toggle" onchange="Config.onLlamaModeChange()">
                                         <input type="checkbox" id="llama-manage-internally" checked>
                                         <span class="theme-slider"></span>
                                         <span class="theme-text-label" id="llama-mode-label">Internal</span>
@@ -251,10 +251,10 @@
                                 </div>
                             </div>
 
-                            <div class="config-row" style="margin-bottom:12px;">
+                            <div class="config-row mb-3">
                                 <div class="form-group inline">
                                     <label>Auto start</label>
-                                    <label class="theme-toggle" id="llama-autostart-toggle" style="width:auto" onchange="Config.onLlamaAutostartChange()">
+                                    <label class="theme-toggle" id="llama-autostart-toggle" onchange="Config.onLlamaAutostartChange()">
                                         <input type="checkbox" id="llama-autorun-at-startup" checked>
                                         <span class="theme-slider"></span>
                                         <span class="theme-text-label" id="llama-autostart-label">Off</span>
@@ -262,7 +262,7 @@
                                 </div>
                             </div>
 
-                            <div id="llama-status" class="status-row" style="margin-bottom:16px;">
+                            <div id="llama-status" class="status-row mb-4">
                                 <span class="status-dot status-unknown"></span>
                                 <span id="llama-status-text">Inactive</span>
                                 <button class="btn btn-secondary btn-sm" onclick="Config.loadBackendStatus()">Refresh</button>
@@ -270,16 +270,16 @@
                                 <button id="llama-stop-btn" class="btn btn-danger btn-sm" onclick="Config.stopService('llama')">Stop</button>
                             </div>
 
-                            <div class="config-row" style="margin-bottom:16px;">
+                            <div class="config-row mb-4">
                                 <div class="form-group inline">
                                     <label>Release:</label>
-                                    <select id="llama-release-select" style="min-width:200px"></select>
+                                    <select id="llama-release-select" class="min-w-200"></select>
                                 </div>
                                 <button id="llama-download-btn" class="btn btn-primary btn-sm" onclick="Config.downloadLlama()">Update</button>
                             </div>
 
                             <div id="llama-download-status" class="status-message"></div>
-                            <div id="llama-progress-container" style="display:none;">
+                            <div id="llama-progress-container" class="d-none">
                                 <div class="progress-bar"><div class="progress-fill" id="llama-progress-fill"></div></div>
                                 <p id="llama-progress-text">Downloading...</p>
                             </div>
@@ -296,9 +296,9 @@
                     <!-- Embedding E5 Card (dense) -->
                     <div class="card">
                         <div class="card-header"><h2>Embedding E5</h2></div>
-                        <div id="emb-dim-banner" class="alert alert-warning" style="display:none; margin:8px 16px; padding:10px; background:#fff3cd; border:1px solid #ffc107; border-radius:6px;">
+                        <div id="emb-dim-banner" class="alert-warning-dim d-none">
                             <strong>Dimension mismatch</strong> ??? The active embedding model dimension (<span id="emb-model-dim"></span>) differs from the Qdrant collection (<span id="emb-coll-dim"></span>). Vectors will be rejected until the collection is recreated.
-                            <div style="margin-top:8px;">
+                            <div class="mt-2">
                                 <button class="btn btn-primary btn-sm" onclick="Config.recreateAndReindex()">Recreate collection &amp; Reindex</button>
                             </div>
                         </div>
@@ -307,13 +307,13 @@
                                 <span class="status-dot"></span>
                                 <span id="emb-global-text">Loading...</span>
                             </div>
-                            <div id="emb-models-list" style="margin-top:12px;"></div>
-                            <div class="search-row" style="margin-top:12px;">
+                            <div id="emb-models-list" class="mt-3"></div>
+                            <div class="search-row" class="mt-3">
                                 <input type="text" id="emb-search-input" placeholder="Search HuggingFace...">
                                 <button class="btn btn-primary btn-sm" onclick="Config.searchEmbModel()">Search</button>
                             </div>
-                            <div id="emb-search-results" class="search-results" style="margin-top:12px;"></div>
-                            <div class="form-actions" style="margin-top:12px;">
+                            <div id="emb-search-results" class="search-results" class="mt-3"></div>
+                            <div class="form-actions" class="mt-3">
                                 <button class="btn btn-primary btn-sm" onclick="Config.downloadEmbModel()" id="btn-download-emb">Download</button>
                                 <button class="btn btn-danger btn-sm" onclick="Config.deleteEmbModel()" id="btn-delete-emb">Delete</button>
                             </div>
@@ -327,7 +327,7 @@
                                 <span class="status-dot"></span>
                                 <span id="fast-global-text">Loading...</span>
                             </div>
-                            <div id="fast-models-list" style="margin-top:12px;"></div>
+                            <div id="fast-models-list" class="mt-3"></div>
                         </div>
                     </div>
                     <!-- LLM Card -->
@@ -338,13 +338,13 @@
                                 <span class="status-dot"></span>
                                 <span id="llm-global-text">Loading...</span>
                             </div>
-                            <div id="llm-models-list" style="margin-top:12px;"></div>
-                            <div class="search-row" style="margin-top:12px;">
+                            <div id="llm-models-list" class="mt-3"></div>
+                            <div class="search-row" class="mt-3">
                                 <input type="text" id="llm-search-input" placeholder="Search HuggingFace...">
                                 <button class="btn btn-primary btn-sm" onclick="Config.searchLlmModel()">Search</button>
                             </div>
-                            <div id="llm-search-results" class="search-results" style="margin-top:12px;"></div>
-                            <div class="form-actions" style="margin-top:12px;">
+                            <div id="llm-search-results" class="search-results" class="mt-3"></div>
+                            <div class="form-actions" class="mt-3">
                                 <button class="btn btn-primary btn-sm" onclick="Config.downloadLlmModel()" id="btn-download-llm">Download</button>
                                 <button class="btn btn-danger btn-sm" onclick="Config.deleteLlmModel()" id="btn-delete-llm">Delete</button>
                             </div>
