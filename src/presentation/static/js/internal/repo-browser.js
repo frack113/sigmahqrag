@@ -102,7 +102,8 @@ class RepoBrowser {
 	}
 
 	async syncRepo(org, name) {
-		if (!confirm("Sync repository " + org + "/" + name + "?")) return;
+		if (!(await showConfirm("Sync repository " + org + "/" + name + "?")))
+			return;
 		try {
 			const response = await fetch(
 				this.apiBase + "/repos/" + org + "/" + name + "/sync",
@@ -124,7 +125,8 @@ class RepoBrowser {
 	}
 
 	async deleteRepo(org, name) {
-		if (!confirm("Delete repository " + org + "/" + name + "?")) return;
+		if (!(await showConfirm("Delete repository " + org + "/" + name + "?")))
+			return;
 		try {
 			const response = await fetch(
 				this.apiBase + "/repos/" + org + "/" + name,

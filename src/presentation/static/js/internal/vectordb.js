@@ -261,4 +261,7 @@ async function _startUnifiedIndex() {
 	}
 }
 
-document.addEventListener("DOMContentLoaded", loadVectorDB);
+document.addEventListener("DOMContentLoaded", () => {
+	loadVectorDB();
+	setInterval(loadVectorDB, 30000);
+});

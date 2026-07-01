@@ -189,7 +189,11 @@ async function savePrompt() {
 }
 
 async function deletePrompt(id, name) {
-	if (!confirm(`Delete prompt "${name}"?\n\nThis action cannot be undone.`))
+	if (
+		!(await showConfirm(
+			`Delete prompt "${name}"?\n\nThis action cannot be undone.`,
+		))
+	)
 		return;
 	try {
 		const res = await fetch(`/api/v1/admin/prompts/${encodeURIComponent(id)}`, {

@@ -75,6 +75,7 @@ const CONFIG = {
 let _BACKEND_CONFIG = {};
 let selectedLlmRepo = null;
 let selectedEmbRepo = null;
+let _isSaving = false;
 
 try {
 	const configDataEl = document.getElementById("backend-config-data");
@@ -95,6 +96,13 @@ function escHtml(s) {
 		.replace(/</g, "&lt;")
 		.replace(/>/g, "&gt;")
 		.replace(/"/g, "&quot;");
+}
+
+function fetchWithTimeout(url, options = {}, timeout = 10000) {
+	const controller = new AbortController();
+	const timeoutId = setTimeout(() => controller.abort(), timeout);
+	options.signal = controller.signal;
+	return fetch(url, options).finally(() => clearTimeout(timeoutId));
 }
 
 function formatBytes(bytes) {
@@ -227,6 +235,8 @@ function applyBackendConfig(cfg) {
 }
 
 function saveBackendConfig() {
+	if (_isSaving) return;
+	_isSaving = true;
 	const statusEl = document.getElementById("config-status");
 	statusEl.textContent = "Saving...";
 	statusEl.className = "status-message";
@@ -252,6 +262,9 @@ function saveBackendConfig() {
 		.catch((err) => {
 			statusEl.textContent = `Error: ${err.message}`;
 			statusEl.className = "status-message error";
+		})
+		.finally(() => {
+			_isSaving = false;
 		});
 }
 
@@ -587,6 +600,8 @@ function checkLoggingConfig() {
 }
 
 function saveLoggingConfig() {
+	if (_isSaving) return;
+	_isSaving = true;
 	const statusEl = document.getElementById("logging-config-status");
 	const payload = {
 		level: document.getElementById("log-level-select").value,
@@ -619,6 +634,9 @@ function saveLoggingConfig() {
 		.catch((err) => {
 			statusEl.textContent = `Error: ${err.message}`;
 			statusEl.className = "status-message error";
+		})
+		.finally(() => {
+			_isSaving = false;
 		});
 }
 
@@ -835,6 +853,8 @@ function updateBackendServiceConfig(service, field, value) {
 }
 
 function saveBackendServiceConfig(service) {
+	if (_isSaving) return;
+	_isSaving = true;
 	const baseUrl = document.getElementById(`${service}-base-url`);
 	const manage = document.getElementById(`${service}-manage-internally`);
 	const autorun = document.getElementById(`${service}-autorun-at-startup`);
@@ -869,6 +889,9 @@ function saveBackendServiceConfig(service) {
 		})
 		.catch((err) => {
 			if (statusEl) statusEl.textContent = `Error: ${err.message}`;
+		})
+		.finally(() => {
+			_isSaving = false;
 		});
 }
 
