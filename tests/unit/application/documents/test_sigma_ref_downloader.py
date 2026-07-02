@@ -8,20 +8,19 @@ from unittest.mock import ANY, MagicMock, patch
 import httpx
 
 from src.shared.utils import iso_now
+from src.shared.utils.crypto_utils import compute_sha256_file as _sha256_file
+from src.shared.utils.crypto_utils import compute_sha256_str as _sha256
+from src.shared.utils.url_utils import is_private_url as _is_private_url, normalize_url
 
 from src.application.documents.sigma_ref_downloader import (
     _backoff_delay,
     _detect_url_type,
     _download_file,
     _get_retry_after,
-    _is_private_url,
     _load_registry,
     _registry_lock,
     _save_registry,
-    _sha256,
-    _sha256_file,
     download_references,
-    normalize_url,
 )
 
 

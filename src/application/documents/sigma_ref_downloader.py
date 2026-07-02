@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import ipaddress
 import logging
-import re
 import threading
 import time
 import urllib.parse
@@ -16,34 +14,17 @@ from typing import Any, cast
 import httpx
 import yaml
 
+from src.shared.utils.crypto_utils import compute_sha256_file, compute_sha256_str
 from src.shared.utils.identify_file_type import (
     SUPPORTED_DOC_EXTENSION_MAP,
     SUPPORTED_REFERENCE_DOC_TYPES,
 )
+from src.shared.utils.url_utils import is_private_url, normalize_url, url_ext
 from src.infrastructure.database import DatabaseService
 from src.core.sigma.models import is_sigma_rule_dict
 from src.shared.utils import iso_now
 
 logger = logging.getLogger(__name__)
-
-
-def _is_private_url(url: str) -> bool:
-    """Check if a URL points to a private/reserved IP to prevent SSRF."""
-    parsed = urllib.parse.urlparse(url)
-    host = parsed.hostname or ""
-    if host in ("localhost", "127.0.0.1", "::1"):
-        return True
-    try:
-        ip = ipaddress.ip_address(host)
-        return ip.is_private or ip.is_loopback or ip.is_link_local
-    except ValueError:
-        return False
-
-
-GITHUB_BLOB_PATTERN = re.compile(
-    r"^https?://(?:www\.)?github\.com/([^/]+/[^/]+)/blob/([^#?]+)",
-    re.IGNORECASE,
-)
 MAX_RETRIES = 3
 BACKOFF_DELAYS = [1, 4, 9]
 RETRY_STATUSES = {429, 500, 502, 503, 504}
@@ -54,25 +35,6 @@ SUPPORTED_EXTENSIONS: dict[str, str] = {
 }
 
 _registry_lock = threading.Lock()
-
-
-def normalize_url(url: str) -> str:
-    """Normalize a reference URL for deduplication."""
-    match = GITHUB_BLOB_PATTERN.match(url)
-    if match:
-        repo = match.group(1)
-        path_part = match.group(2)
-        path_part = re.sub(r"^refs/heads/", "", path_part)
-        path_part = re.sub(r"^refs/tags/", "", path_part)
-        result = f"https://raw.githubusercontent.com/{repo}/{path_part}"
-        parsed = urllib.parse.urlparse(result)
-        if parsed.fragment:
-            result = urllib.parse.urlunparse(parsed._replace(fragment=""))
-        return result
-
-    parsed = urllib.parse.urlparse(url)
-    clean = parsed._replace(fragment="")
-    return urllib.parse.urlunparse(clean)
 
 
 def _detect_url_type(url: str, content_type: str | None = None) -> str | None:
@@ -481,7 +443,7 @@ def download_references(
                 logger.debug("Non-HTTP ref skipped: %s", ref)
                 continue
 
-            if _is_private_url(ref):
+            if is_private_url(ref):
                 logger.warning("Skipping private URL ref: %s", ref)
                 skipped += 1
                 continue
@@ -489,7 +451,7 @@ def download_references(
             total_refs += 1
             normalized = normalize_url(ref)
 
-            url_hash = _sha256(normalized)
+            url_hash = compute_sha256_str(normalized)
 
             if url_hash in error_registry:
                 logger.debug("Skipping previously failed URL: %s", normalized)
@@ -503,7 +465,10 @@ def download_references(
                     output_file = output_path / fname
                     if output_file.exists():
                         existing_sha = registry[url_hash].get("content_sha256")
-                        if existing_sha is not None and _sha256_file(output_file) != existing_sha:
+                        if (
+                            existing_sha is not None
+                            and compute_sha256_file(output_file) != existing_sha
+                        ):
                             download_queue.append(
                                 {
                                     "url_hash": url_hash,
@@ -524,7 +489,7 @@ def download_references(
                 # File missing or no file_name — fall through to re-download
 
             # Determine extension and content type
-            ext = _url_ext(normalized)
+            ext = url_ext(normalized)
             ftype = _detect_url_type(normalized)
             if ftype is None and url_hash in registry:
                 ct = registry[url_hash].get("content_type")
@@ -560,7 +525,7 @@ def download_references(
             output_file = output_path / f"{url_hash}{ext}"
 
             if output_file.exists():
-                content_hash = _sha256_file(output_file)
+                content_hash = compute_sha256_file(output_file)
                 if url_hash in registry:
                     existing_sha = registry[url_hash].get("content_sha256")
                     if existing_sha is not None and content_hash != existing_sha:
@@ -675,7 +640,7 @@ def download_references(
                 success, status_code = cast(tuple[bool, int | None], future.result())
                 if success:
                     output_file = item["output_file"]
-                    content_hash = _sha256_file(output_file) if output_file.exists() else ""
+                    content_hash = compute_sha256_file(output_file) if output_file.exists() else ""
                     registry[item["url_hash"]] = _make_entry(
                         url_hash=item["url_hash"],
                         original_url=item["original_url"],
@@ -713,33 +678,6 @@ def download_references(
     }
     logger.info("Download complete: %s", summary)
     return summary
-
-
-def _sha256(text: str) -> str:
-    """Compute SHA256 hex digest of a string."""
-    import hashlib
-
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()
-
-
-def _sha256_file(path: Path) -> str:
-    """Compute SHA256 hex digest of a file's contents."""
-    import hashlib
-
-    h = hashlib.sha256()
-    try:
-        with open(path, "rb") as f:
-            for chunk in iter(lambda: f.read(65536), b""):
-                h.update(chunk)
-    except OSError:
-        return ""
-    return h.hexdigest()
-
-
-def _url_ext(url: str) -> str:
-    """Extract the file extension from a URL path."""
-    parsed = urllib.parse.urlparse(url)
-    return Path(parsed.path).suffix.lower()
 
 
 def _empty_summary() -> dict[str, Any]:

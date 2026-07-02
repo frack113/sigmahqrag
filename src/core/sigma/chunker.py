@@ -500,20 +500,6 @@ class SigmaChunker(DocumentTransform):
             f"What field contains {value} in {title}?",
         ]
 
-    def _generate_eval_questions(self, rule: dict) -> dict[str, list[str]]:
-        """Generate eval question groups for a rule (for flat-mode post_process)."""
-        title = rule.get("title", "Untitled Sigma rule")
-        return {
-            "summary": self._summarize_questions(title),
-            "lifecycle": self._lifecycle_questions(title),
-            "logsource": self._logsource_questions(
-                title,
-                rule.get("logsource", {}).get("product", "unknown"),
-                rule.get("logsource", {}).get("category", "unknown"),
-                rule.get("logsource", {}).get("service", "unknown"),
-            ),
-        }
-
 
 # Register SigmaChunker for rich mode.
 TransformRegistry.register(SigmaChunker)

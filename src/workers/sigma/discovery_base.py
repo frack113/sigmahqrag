@@ -1,7 +1,7 @@
-import hashlib
 import logging
 from pathlib import Path
 
+from src.shared.utils.crypto_utils import compute_sha256_file, compute_sha256_str
 from src.shared.utils.identify_file_type import identify
 from src.shared.utils import iso_now
 from src.workers.base import BaseWorker
@@ -14,16 +14,14 @@ class DiscoveryWorker(BaseWorker):
 
     def _compute_sha256(self, file_path: Path) -> tuple[str, int]:
         """Returns (content_hash, file_size) using streaming hash."""
-        h = hashlib.sha256()
-        size = 0
-        try:
-            with open(file_path, "rb") as f:
-                for chunk in iter(lambda: f.read(65536), b""):
-                    h.update(chunk)
-                    size += len(chunk)
-            return h.hexdigest(), size
-        except Exception:
+        content_hash = compute_sha256_file(file_path)
+        if not content_hash:
             return "", 0
+        try:
+            size = file_path.stat().st_size
+        except OSError:
+            size = 0
+        return content_hash, size
 
     def _identify_content_type(self, file_path: Path) -> str:
         try:
@@ -44,7 +42,7 @@ class DiscoveryWorker(BaseWorker):
         title: str,
         rule_id: str = "00000000-0000-0000-0000-000000000000",
     ) -> dict:
-        url_hash = hashlib.sha256(normalized_url.encode()).hexdigest()
+        url_hash = compute_sha256_str(normalized_url)
         now = iso_now()
         return {
             "url_hash": url_hash,
@@ -75,7 +73,7 @@ class DiscoveryWorker(BaseWorker):
         normalized_url: str,
         title: str,
     ) -> dict:
-        url_hash = hashlib.sha256(normalized_url.encode()).hexdigest()
+        url_hash = compute_sha256_str(normalized_url)
         now = iso_now()
         return {
             "url_hash": url_hash,

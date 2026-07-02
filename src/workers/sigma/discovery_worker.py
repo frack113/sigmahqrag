@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
 from src.shared.utils.identify_file_type import SIGMA_RULE_EXTENSIONS, SUPPORTED_DOC_EXTENSION_MAP
+from src.shared.utils.sigma_utils import get_sigma_rule_id
 from src.infrastructure.database.service import DatabaseService
 from src.workers.enums import WorkerName
 from src.workers.sigma.discovery_base import DiscoveryWorker
@@ -440,8 +441,6 @@ class GenericDiscoveryWorker(DiscoveryWorker):
 
             rule_id = "00000000-0000-0000-0000-000000000000"
             if content_type == "sigma_rule":
-                from src.shared.utils.sigma_utils import get_sigma_rule_id
-
                 rid = get_sigma_rule_id(file_path)
                 if rid:
                     rule_id = rid

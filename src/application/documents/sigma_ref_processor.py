@@ -10,8 +10,10 @@ from typing import Any, cast
 
 import httpx
 
+from src.shared.utils.crypto_utils import compute_sha256_bytes
 from src.shared.utils.identify_file_type import SUPPORTED_REFERENCE_DOC_TYPES
 from src.shared.utils.sigma_utils import extract_sigma_references
+from src.shared.utils.url_utils import is_private_url, normalize_url
 from src.config.settings import get_config
 from src.shared.utils import iso_now
 
@@ -19,7 +21,6 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_REQUEST_DELAY = 0.5
 DEFAULT_MAX_WORKERS = 5
-GITHUB_BLOB_PATTERN: Any = None  # imported lazily to avoid circular imports
 
 
 def _build_head_entry(
@@ -31,7 +32,7 @@ def _build_head_entry(
 ) -> dict[str, Any]:
     now = iso_now()
     return {
-        "url_hash": _sha256_bytes(normalized_url.encode()),
+        "url_hash": compute_sha256_bytes(normalized_url.encode()),
         "org": "sigmaref",
         "repo": "references",
         "content_type": content_type,
@@ -60,7 +61,7 @@ def _build_download_entry(
     """Build a doc_registry entry for a downloaded reference document."""
     now = iso_now()
     return {
-        "url_hash": _sha256_bytes(normalized_url.encode()),
+        "url_hash": compute_sha256_bytes(normalized_url.encode()),
         "org": "sigmaref",
         "repo": "references",
         "content_type": content_type,
@@ -159,8 +160,8 @@ def process_sigma_refs(
             if not ref_url_clean:
                 continue
 
-            norm_url = _normalize_url(ref_url_clean)
-            url_hash = _sha256_bytes(norm_url.encode())
+            norm_url = normalize_url(ref_url_clean)
+            url_hash = compute_sha256_bytes(norm_url.encode())
 
             # Deduplicate within a single run (same URL across multiple rules)
             if url_hash in seen_urls:
@@ -218,8 +219,8 @@ def process_sigma_refs(
             url = item["url"]
             try:
                 content_type, size, final_url = future.result()
-                norm_url = _normalize_url(final_url or url)
-                url_hash = _sha256_bytes(norm_url.encode())
+                norm_url = normalize_url(final_url or url)
+                url_hash = compute_sha256_bytes(norm_url.encode())
 
                 if content_type not in supported_types:
                     logger.info("Reference skipped (unsupported type): %s (%s)", url, content_type)
@@ -273,7 +274,7 @@ def process_sigma_refs(
         file_path = output_path / _sanitize_filename(url)
 
         if file_path.exists():
-            url_hash = _sha256_bytes(url.encode())
+            url_hash = compute_sha256_bytes(url.encode())
             existing = db.get_entry(url_hash)
             if existing and existing.get("content_sha256"):
                 logger.info("Reference already present: %s", url)
@@ -288,7 +289,7 @@ def process_sigma_refs(
                 content = resp.content
             file_path.write_bytes(content)
             logger.info("Reference downloaded: %s", url)
-            return ("ok", _sha256_bytes(content), len(content))
+            return ("ok", compute_sha256_bytes(content), len(content))
         except Exception as e:
             logger.error("Reference download failed: %s - %s", url, e)
             return ("fail", "", 0)
@@ -369,13 +370,11 @@ def _resolve_rule_path(entry: dict, cfg: Any) -> Path | None:
     return None
 
 
-def _normalize_url(url: str) -> str:
-    """Simple URL normalizer - keeps the URL as-is for now."""
-    return url.strip().rstrip("/")
-
-
 def _head_request(url: str, delay: float = 0.0) -> tuple[str | None, int | None, str | None]:
     """HEAD request to resolve content type and size."""
+    if is_private_url(url):
+        logger.warning("Skipping private URL: %s", url)
+        return None, None, None
     try:
         with httpx.Client(
             timeout=httpx.Timeout(15.0), headers={"User-Agent": "SigmaRAG/1.0"}
@@ -387,22 +386,6 @@ def _head_request(url: str, delay: float = 0.0) -> tuple[str | None, int | None,
             return ctype, size, str(resp.url)
     except Exception:
         return None, None, None
-
-
-def _sha256_file(path: Path) -> str:
-    import hashlib
-
-    h = hashlib.sha256()
-    with open(path, "rb") as f:
-        for chunk in iter(lambda: f.read(65536), b""):
-            h.update(chunk)
-    return h.hexdigest()
-
-
-def _sha256_bytes(data: bytes) -> str:
-    import hashlib
-
-    return hashlib.sha256(data).hexdigest()
 
 
 def _sanitize_filename(url: str) -> str:
