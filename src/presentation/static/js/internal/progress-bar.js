@@ -42,7 +42,7 @@ class ProgressBar {
 		if (this.fill) {
 			const clamped = Math.min(100, Math.max(0, Number(pct) || 0));
 			this.fill.style.width = `${clamped}%`;
-			this.fill.style.background = clamped === 100 ? "#4caf50" : "";
+			this.fill.classList.toggle("complete", clamped === 100);
 		}
 		if (this.container) {
 			this.container.style.display = "block";

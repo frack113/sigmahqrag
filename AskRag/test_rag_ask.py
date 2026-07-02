@@ -220,7 +220,7 @@ async def main() -> int:
     import argparse
 
     parser = argparse.ArgumentParser(description="Test RAG search against ask_spec.md questions")
-    parser.add_argument("--url", default="http://localhost:7860", help="RAG server URL")
+    parser.add_argument("--url", default="http://localhost:8000", help="RAG server URL")
     parser.add_argument("--max", type=int, default=0, help="Max questions to test (0 = all)")
     parser.add_argument(
         "--question",

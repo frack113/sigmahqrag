@@ -277,6 +277,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     await shutdown_all_services()
     await stop_qdrant()
     if db:
+        try:
+            db.persist()
+        except Exception as exc:
+            logger.warning("Failed to persist database on shutdown: %s", exc)
         db.close()
 
 

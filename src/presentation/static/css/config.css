@@ -347,3 +347,82 @@
 		margin-top: var(--space-1);
 	}
 }
+
+/* ── Releases table ── */
+.releases-table-wrapper {
+	overflow-x: auto;
+}
+
+.releases-table {
+	width: 100%;
+	border-collapse: collapse;
+}
+
+.releases-table th,
+.releases-table td {
+	padding: 8px;
+}
+
+.releases-table th {
+	text-align: left;
+}
+
+.releases-table tr {
+	border-bottom: 1px solid var(--layout-card-border);
+}
+
+.releases-table-empty {
+	font-style: italic;
+	color: var(--text-card-body);
+}
+
+/* ── Utility spacing classes (Phase 3.4) ── */
+.mt-2 {
+	margin-top: var(--space-2);
+}
+.mt-3 {
+	margin-top: var(--space-3);
+}
+.mt-4 {
+	margin-top: var(--space-4);
+}
+.mb-3 {
+	margin-bottom: var(--space-3);
+}
+.mb-4 {
+	margin-bottom: var(--space-4);
+}
+.w-70 {
+	width: 70px;
+}
+.w-80 {
+	width: 80px;
+}
+.min-w-200 {
+	min-width: 200px;
+}
+.flex-row {
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	gap: 8px;
+}
+.d-none {
+	display: none;
+}
+.card-flex-2 {
+	flex: 2;
+}
+.card-flex-1 {
+	flex: 1;
+}
+.card-full {
+	grid-column: 1 / -1;
+}
+.alert-warning-dim {
+	background: var(--color-warning-bg, #fff3cd);
+	border: 1px solid var(--color-warning-border, #ffc107);
+	border-radius: 6px;
+	padding: 10px;
+	margin: 8px 16px;
+}

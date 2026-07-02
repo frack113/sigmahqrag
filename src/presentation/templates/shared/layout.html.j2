@@ -4,6 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light dark">
     <title>{% block title %}Sigmahqrag{% endblock %}</title>
     <link rel="icon" type="image/x-icon" href="{{ url_for('static', path='/favicon.ico') }}">
     <script>!function(){var t=localStorage.getItem("sigmahqrag-theme");if(t==="dark"){document.documentElement.setAttribute("data-theme","dark")}}()</script>
@@ -56,8 +57,8 @@
     </footer>
     {% endblock %}
 
-    <script src="{{ url_for('static', path='/js/notifications.js') }}"></script>
-    <script src="{{ url_for('static', path='/js/theme.js') }}"></script>
+    <script src="{{ url_for('static', path='/js/internal/notifications.js') }}"></script>
+    <script src="{{ url_for('static', path='/js/internal/theme.js') }}"></script>
     <script>
     (() => {
         const ALERT_ID = "service-alert";

@@ -34,7 +34,7 @@ async function qdrantAction(action, payload = {}) {
 /**
  * Fetches the status of the Qdrant service.
  */
-async function _getQdrantStatus() {
+async function getQdrantStatus() {
 	const response = await fetch(`${API_BASE}/status`);
 	if (!response.ok) throw new Error("Failed to fetch Qdrant status");
 	return await response.json();
@@ -43,7 +43,7 @@ async function _getQdrantStatus() {
 /**
  * Lists all collections in the database.
  */
-async function _listCollections() {
+async function listCollections() {
 	const result = await qdrantAction("collection_management", {
 		operation: "list",
 	});
@@ -53,7 +53,7 @@ async function _listCollections() {
 /**
  * Gets details for a specific collection.
  */
-async function _getCollectionDetails(name) {
+async function getCollectionDetails(name) {
 	const result = await qdrantAction("collection_management", {
 		operation: "get",
 		collection_name: name,
@@ -64,7 +64,7 @@ async function _getCollectionDetails(name) {
 /**
  * Deletes a collection from the database.
  */
-async function _deleteCollection(name) {
+async function deleteCollection(name) {
 	await qdrantAction("collection_management", {
 		operation: "delete",
 		collection_name: name,
@@ -74,7 +74,7 @@ async function _deleteCollection(name) {
 /**
  * Re-creates a collection with default configuration.
  */
-async function _createCollection(name, vectorSize = 384) {
+async function createCollection(name, vectorSize = 384) {
 	await qdrantAction("collection_management", {
 		operation: "create",
 		collection_name: name,

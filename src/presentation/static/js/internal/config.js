@@ -75,6 +75,7 @@ const CONFIG = {
 let _BACKEND_CONFIG = {};
 let selectedLlmRepo = null;
 let selectedEmbRepo = null;
+let _isSaving = false;
 
 try {
 	const configDataEl = document.getElementById("backend-config-data");
@@ -95,6 +96,13 @@ function escHtml(s) {
 		.replace(/</g, "&lt;")
 		.replace(/>/g, "&gt;")
 		.replace(/"/g, "&quot;");
+}
+
+function fetchWithTimeout(url, options = {}, timeout = 10000) {
+	const controller = new AbortController();
+	const timeoutId = setTimeout(() => controller.abort(), timeout);
+	options.signal = controller.signal;
+	return fetch(url, options).finally(() => clearTimeout(timeoutId));
 }
 
 function formatBytes(bytes) {
@@ -227,6 +235,8 @@ function applyBackendConfig(cfg) {
 }
 
 function saveBackendConfig() {
+	if (_isSaving) return;
+	_isSaving = true;
 	const statusEl = document.getElementById("config-status");
 	statusEl.textContent = "Saving...";
 	statusEl.className = "status-message";
@@ -252,6 +262,9 @@ function saveBackendConfig() {
 		.catch((err) => {
 			statusEl.textContent = `Error: ${err.message}`;
 			statusEl.className = "status-message error";
+		})
+		.finally(() => {
+			_isSaving = false;
 		});
 }
 
@@ -587,6 +600,8 @@ function checkLoggingConfig() {
 }
 
 function saveLoggingConfig() {
+	if (_isSaving) return;
+	_isSaving = true;
 	const statusEl = document.getElementById("logging-config-status");
 	const payload = {
 		level: document.getElementById("log-level-select").value,
@@ -619,6 +634,9 @@ function saveLoggingConfig() {
 		.catch((err) => {
 			statusEl.textContent = `Error: ${err.message}`;
 			statusEl.className = "status-message error";
+		})
+		.finally(() => {
+			_isSaving = false;
 		});
 }
 
@@ -688,9 +706,12 @@ function loadBackendStatus() {
 			);
 
 			const isLlamaExternal = llamaInfo.mode === "external";
-			document.getElementById("llama-start-btn").disabled = isLlamaExternal;
-			document.getElementById("llama-stop-btn").disabled = isLlamaExternal;
-			document.getElementById("llama-download-btn").disabled = isLlamaExternal;
+			const llamaStartBtn = document.getElementById("llama-start-btn");
+			const llamaStopBtn = document.getElementById("llama-stop-btn");
+			const llamaDownloadBtn = document.getElementById("llama-download-btn");
+			if (llamaStartBtn) llamaStartBtn.disabled = isLlamaExternal;
+			if (llamaStopBtn) llamaStopBtn.disabled = isLlamaExternal;
+			if (llamaDownloadBtn) llamaDownloadBtn.disabled = isLlamaExternal;
 
 			const isQdrantExternal = qdrantInfo.mode === "external";
 			const qdrantStartBtn = document.getElementById("qdrant-start-btn");
@@ -832,6 +853,8 @@ function updateBackendServiceConfig(service, field, value) {
 }
 
 function saveBackendServiceConfig(service) {
+	if (_isSaving) return;
+	_isSaving = true;
 	const baseUrl = document.getElementById(`${service}-base-url`);
 	const manage = document.getElementById(`${service}-manage-internally`);
 	const autorun = document.getElementById(`${service}-autorun-at-startup`);
@@ -866,6 +889,9 @@ function saveBackendServiceConfig(service) {
 		})
 		.catch((err) => {
 			if (statusEl) statusEl.textContent = `Error: ${err.message}`;
+		})
+		.finally(() => {
+			_isSaving = false;
 		});
 }
 
@@ -1179,21 +1205,20 @@ function loadReleasesTable() {
 			const versions = data.installed_versions || {};
 
 			if (releases.length === 0 && Object.keys(versions).length === 0) {
-				tableEl.innerHTML =
-					'<p style="font-style:italic;color:var(--text-card-body);"><i>undef</i></p>';
+				tableEl.innerHTML = '<p class="releases-table-empty"><i>undef</i></p>';
 				return;
 			}
 
 			let html =
-				'<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;">';
+				'<div class="releases-table-wrapper"><table class="releases-table">';
 			html +=
-				'<thead><tr style="border-bottom:1px solid var(--layout-card-border);">' +
-				'<th style="padding:8px;text-align:left;">Service</th>' +
-				'<th style="padding:8px;text-align:left;">Latest Tag</th>' +
-				'<th style="padding:8px;text-align:left;">Installed Version</th>' +
-				'<th style="padding:8px;text-align:left;">Last Scanned</th>' +
-				'<th style="padding:8px;text-align:left;">Published At</th>' +
-				'<th style="padding:8px;text-align:left;">Fetched At</th>' +
+				"<thead><tr>" +
+				"<th>Service</th>" +
+				"<th>Latest Tag</th>" +
+				"<th>Installed Version</th>" +
+				"<th>Last Scanned</th>" +
+				"<th>Published At</th>" +
+				"<th>Fetched At</th>" +
 				"</tr></thead>";
 			html += "<tbody>";
 
@@ -1212,27 +1237,27 @@ function loadReleasesTable() {
 				const installed = versions[svc] || null;
 
 				html +=
-					'<tr style="border-bottom:1px solid var(--layout-card-border);">' +
-					'<td style="padding:8px;">' +
+					"<tr>" +
+					"<td>" +
 					svc +
 					"</td>" +
-					'<td style="padding:8px;">' +
+					"<td>" +
 					(release ? release.last_tag_name || "—" : "—") +
 					"</td>" +
-					'<td style="padding:8px;">' +
+					"<td>" +
 					(installed ? installed.version : "—") +
 					"</td>" +
-					'<td style="padding:8px;">' +
+					"<td>" +
 					(installed
 						? installed.scanned_at
 							? new Date(installed.scanned_at).toLocaleString()
 							: "—"
 						: "—") +
 					"</td>" +
-					'<td style="padding:8px;">' +
+					"<td>" +
 					(release ? release.published_at || "—" : "—") +
 					"</td>" +
-					'<td style="padding:8px;">' +
+					"<td>" +
 					(release ? release.fetched_at || "—" : "—") +
 					"</td>" +
 					"</tr>";
@@ -1244,27 +1269,27 @@ function loadReleasesTable() {
 				if (knownServices.indexOf(r.service) === -1) {
 					const extInstalled = versions[r.service] || null;
 					html +=
-						'<tr style="border-bottom:1px solid var(--layout-card-border);">' +
-						'<td style="padding:8px;">' +
+						"<tr>" +
+						"<td>" +
 						(r.service || "—") +
 						"</td>" +
-						'<td style="padding:8px;">' +
+						"<td>" +
 						(r.last_tag_name || "—") +
 						"</td>" +
-						'<td style="padding:8px;">' +
+						"<td>" +
 						(extInstalled ? extInstalled.version : "—") +
 						"</td>" +
-						'<td style="padding:8px;">' +
+						"<td>" +
 						(extInstalled
 							? extInstalled.scanned_at
 								? new Date(extInstalled.scanned_at).toLocaleString()
 								: "—"
 							: "—") +
 						"</td>" +
-						'<td style="padding:8px;">' +
+						"<td>" +
 						(r.published_at || "—") +
 						"</td>" +
-						'<td style="padding:8px;">' +
+						"<td>" +
 						(r.fetched_at || "—") +
 						"</td>" +
 						"</tr>";
@@ -1424,13 +1449,13 @@ function selectLlmModel(repoId) {
 	const rows = listEl.querySelectorAll(".model-name");
 	for (let i = 0; i < rows.length; i++) {
 		rows[i].style.fontWeight = "normal";
-		rows[i].style.color = "#007bff";
+		rows[i].style.color = "var(--color-primary)";
 	}
 	if (rows.length > 0) {
 		for (let j = 0; j < rows.length; j++) {
 			if (rows[j].textContent === repoId) {
 				rows[j].style.fontWeight = "bold";
-				rows[j].style.color = "#0056b3";
+				rows[j].style.color = "var(--color-primary-hover)";
 				break;
 			}
 		}
@@ -1582,13 +1607,13 @@ function selectEmbModel(repoId) {
 	const rows = listEl.querySelectorAll(".model-name");
 	for (let i = 0; i < rows.length; i++) {
 		rows[i].style.fontWeight = "normal";
-		rows[i].style.color = "#007bff";
+		rows[i].style.color = "var(--color-primary)";
 	}
 	if (rows.length > 0) {
 		for (let j = 0; j < rows.length; j++) {
 			if (rows[j].textContent === repoId) {
 				rows[j].style.fontWeight = "bold";
-				rows[j].style.color = "#0056b3";
+				rows[j].style.color = "var(--color-primary-hover)";
 				break;
 			}
 		}
@@ -1704,7 +1729,7 @@ function showLlmFiles(repoId) {
 				const size = formatBytes(f.size);
 				const safeFile = escHtml(f.filename);
 				html +=
-					'<div class="llm-file-item" style="display:flex;align-items:center;gap:8px;padding:4px 8px;border:1px solid var(--border-color);border-radius:4px;">';
+					'<div class="llm-file-item" style="display:flex;align-items:center;gap:8px;padding:4px 8px;border:1px solid var(--border-card);border-radius:4px;">';
 				html +=
 					'<span style="flex:1;font-size:var(--text-sm);color:var(--text-body);">' +
 					safeFile +

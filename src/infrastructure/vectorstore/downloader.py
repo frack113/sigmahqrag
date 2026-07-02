@@ -8,6 +8,7 @@ import os
 import platform
 import shutil
 import sys
+import tarfile
 import zipfile
 from collections.abc import Callable
 from pathlib import Path
@@ -147,18 +148,56 @@ class QdrantInstallerService:
             return f"{arch}-apple-darwin"
         raise OSError(f"Unsupported platform: system={system}, machine={machine}")
 
+    @staticmethod
+    def _archive_ext() -> str:
+        return ".zip" if sys.platform == "win32" else ".tar.gz"
+
+    def _safe_extract_tar_gz(self, archive_path: Path, dest_dir: Path) -> None:
+        """Extract a .tar.gz file safely into dest_dir."""
+        dest_resolved = dest_dir.resolve()
+        dest_resolved.mkdir(parents=True, exist_ok=True)
+        with tarfile.open(archive_path, "r:gz") as tar:
+            for member in tar.getmembers():
+                name = member.name
+                if os.path.isabs(name) or ".." in name:
+                    raise ValueError(
+                        f"Archive entry '{name}' would extract outside destination directory"
+                    )
+            import tempfile
+
+            with tempfile.TemporaryDirectory() as tmp_dir:
+                tar.extractall(tmp_dir)
+                tmp_path = Path(tmp_dir)
+                items = list(tmp_path.iterdir())
+                if len(items) == 1 and items[0].is_dir():
+                    extracted_dir = items[0]
+                    for f in extracted_dir.iterdir():
+                        dst = dest_resolved / f.name
+                        if f.is_file():
+                            shutil.copy2(f, dst)
+                        elif f.is_dir():
+                            shutil.copytree(f, dst, dirs_exist_ok=True)
+                else:
+                    for f in items:
+                        dst = dest_resolved / f.name
+                        if f.is_file():
+                            shutil.copy2(f, dst)
+                        elif f.is_dir():
+                            shutil.copytree(f, dst, dirs_exist_ok=True)
+
     async def download_binary(self, progress_callback: ProgressCallback = None) -> dict[str, Any]:
         """Download Qdrant binary for the current platform."""
         self.bin_dir.mkdir(parents=True, exist_ok=True)
 
+        ext = self._archive_ext()
         asset_name = self._platform_asset_name()
-        binary_url = f"{QDRANT_DOWNLOAD_BASE}/qdrant-{asset_name}.zip"
-        zip_path = self.bin_dir / "qdrant.zip"
+        binary_url = f"{QDRANT_DOWNLOAD_BASE}/qdrant-{asset_name}{ext}"
+        archive_path = self.bin_dir / f"qdrant{ext}"
         binary_path = self.get_binary_path()
 
         # Clean stale files before extraction to avoid version mix
         for f in list(self.bin_dir.iterdir()):
-            if f.name == "qdrant.zip" or f.is_dir():
+            if f.name == archive_path.name or f.is_dir():
                 continue
             if f.suffix == ".exe" or f.name == "qdrant":
                 try:
@@ -171,18 +210,21 @@ class QdrantInstallerService:
                 progress_callback(5, "Downloading binary...")
 
             await self._stream_to_file(
-                binary_url, zip_path, progress_callback, pct_before=5, pct_after=45
+                binary_url, archive_path, progress_callback, pct_before=5, pct_after=45
             )
 
             if progress_callback:
                 progress_callback(50, "Extracting binary...")
 
-            self._safe_extract_zip(zip_path, self.bin_dir)
+            if ext == ".zip":
+                self._safe_extract_zip(archive_path, self.bin_dir)
+            else:
+                self._safe_extract_tar_gz(archive_path, self.bin_dir)
 
             if progress_callback:
                 progress_callback(80, "Cleaning up...")
 
-            zip_path.unlink()
+            archive_path.unlink()
 
             qdrant_exe_name = "qdrant.exe" if sys.platform == "win32" else "qdrant"
             for f in self.bin_dir.glob(qdrant_exe_name):

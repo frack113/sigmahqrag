@@ -401,6 +401,7 @@ def save_selected_dirs(
     repo_key = _get_repo_key(org, name)
     try:
         db.set_selected_dirs(repo_key, selected)
+        db.persist()
         logger.info(f"Saved selection for {org}/{name}: {selected}")
         return {"success": True}
     except Exception as e:

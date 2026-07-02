@@ -32,7 +32,7 @@
 			box.className = "modal-content confirm-dialog";
 
 			box.innerHTML = `
-				<p style="margin:0 0 20px;font-size:var(--text-base);color:var(--text-body);line-height:1.5">${_esc(message)}</p>
+				<p style="margin:0 0 20px;font-size:var(--text-base);color:var(--text-body);line-height:1.5">${escHtml(message)}</p>
 				<div style="display:flex;gap:8px;justify-content:flex-end">
 					<button class="btn btn-secondary btn-sm confirm-cancel">Cancel</button>
 					<button class="btn btn-danger btn-sm confirm-ok">Confirm</button>
