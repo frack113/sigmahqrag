@@ -8,74 +8,19 @@ from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, cast
 
-import httpx
-
+from src.shared.http import download_file as http_download_file
+from src.shared.http import head_url as http_head_url
+from src.shared.utils.registry_utils import build_registry_entry
 from src.shared.utils.crypto_utils import compute_sha256_bytes
 from src.shared.utils.identify_file_type import SUPPORTED_REFERENCE_DOC_TYPES
 from src.shared.utils.sigma_utils import extract_sigma_references
-from src.shared.utils.url_utils import is_private_url, normalize_url
+from src.shared.utils.url_utils import normalize_url
 from src.config.settings import get_config
-from src.shared.utils import iso_now
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_REQUEST_DELAY = 0.5
 DEFAULT_MAX_WORKERS = 5
-
-
-def _build_head_entry(
-    normalized_url: str,
-    content_type: str,
-    rule_id: str,
-    title: str,
-    file_size: int | None = None,
-) -> dict[str, Any]:
-    now = iso_now()
-    return {
-        "url_hash": compute_sha256_bytes(normalized_url.encode()),
-        "org": "sigmaref",
-        "repo": "references",
-        "content_type": content_type,
-        "file_name": Path(normalized_url).name,
-        "content_sha256": "",
-        "file_size": file_size or 0,
-        "original_url": normalized_url,
-        "normalized_url": normalized_url,
-        "rule_id": rule_id,
-        "title": title,
-        "timestamp": now,
-        "last_seen": now,
-        "embed_status": "head_verified",
-    }
-
-
-def _build_download_entry(
-    normalized_url: str,
-    content_type: str,
-    rule_id: str,
-    title: str,
-    content_sha256: str,
-    file_name: str = "",
-    file_size: int | None = None,
-) -> dict[str, Any]:
-    """Build a doc_registry entry for a downloaded reference document."""
-    now = iso_now()
-    return {
-        "url_hash": compute_sha256_bytes(normalized_url.encode()),
-        "org": "sigmaref",
-        "repo": "references",
-        "content_type": content_type,
-        "file_name": file_name or Path(normalized_url).name,
-        "content_sha256": content_sha256,
-        "file_size": file_size or 0,
-        "original_url": normalized_url,
-        "normalized_url": normalized_url,
-        "rule_id": rule_id,
-        "title": title,
-        "timestamp": now,
-        "last_seen": now,
-        "embed_status": "discovery",
-    }
 
 
 def process_sigma_refs(
@@ -203,7 +148,7 @@ def process_sigma_refs(
     total_head = len(head_queue)
     with ThreadPoolExecutor(max_workers=max_workers) as head_executor:
         for item in head_queue:
-            future = head_executor.submit(_head_request, item["url"])
+            future = head_executor.submit(http_head_url, item["url"], 15.0)
             head_futures[future] = item
 
         for future in as_completed(head_futures):
@@ -226,11 +171,12 @@ def process_sigma_refs(
                     logger.info("Reference skipped (unsupported type): %s (%s)", url, content_type)
                     db.batch_upsert_doc_registry(
                         [
-                            _build_head_entry(
+                            build_registry_entry(
                                 normalized_url=norm_url,
                                 content_type=content_type or "unknown",
                                 rule_id=item["rule_id"],
                                 title=item["rule_title"],
+                                embed_status="head_verified",
                             )
                         ]
                     )
@@ -240,12 +186,13 @@ def process_sigma_refs(
                 # Cache HEAD result immediately
                 db.batch_upsert_doc_registry(
                     [
-                        _build_head_entry(
+                        build_registry_entry(
                             normalized_url=norm_url,
                             content_type=content_type,
                             rule_id=item["rule_id"],
                             title=item["rule_title"],
                             file_size=size,
+                            embed_status="head_verified",
                         )
                     ]
                 )
@@ -270,8 +217,7 @@ def process_sigma_refs(
     # Phase 2: Parallel downloads
     def _download_one(item: dict[str, Any]) -> tuple[str, str, int] | None:
         url = item["final_url"]
-        output_path = Path(output_dir)
-        file_path = output_path / _sanitize_filename(url)
+        file_path = Path(output_dir) / _sanitize_filename(url)
 
         if file_path.exists():
             url_hash = compute_sha256_bytes(url.encode())
@@ -280,19 +226,12 @@ def process_sigma_refs(
                 logger.info("Reference already present: %s", url)
                 return None
 
-        try:
-            with httpx.Client(
-                timeout=httpx.Timeout(30.0), headers={"User-Agent": "SigmaRAG/1.0"}
-            ) as client:
-                resp = client.get(url)
-                resp.raise_for_status()
-                content = resp.content
-            file_path.write_bytes(content)
-            logger.info("Reference downloaded: %s", url)
+        ok, _ = http_download_file(url, file_path, check_ssrf=False)
+        if ok:
+            content = file_path.read_bytes()
             return ("ok", compute_sha256_bytes(content), len(content))
-        except Exception as e:
-            logger.error("Reference download failed: %s - %s", url, e)
-            return ("fail", "", 0)
+        logger.error("Reference download failed: %s", url)
+        return ("fail", "", 0)
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures: dict[Future, dict[str, Any]] = {
@@ -308,13 +247,14 @@ def process_sigma_refs(
                 elif result[0] == "ok":
                     final_url = item["final_url"]
                     head_result = cast("tuple[str, str, int]", result)
-                    entry = _build_download_entry(
+                    entry = build_registry_entry(
                         normalized_url=final_url,
                         content_type=item["content_type"],
                         rule_id=item["rule_id"],
                         title=item["rule_title"],
                         content_sha256=head_result[1],
                         file_size=head_result[2],
+                        embed_status="discovery",
                     )
                     db.batch_upsert_doc_registry([entry])
                     downloaded += 1
@@ -368,24 +308,6 @@ def _resolve_rule_path(entry: dict, cfg: Any) -> Path | None:
         return Path(base, org, repo, file_name)
 
     return None
-
-
-def _head_request(url: str, delay: float = 0.0) -> tuple[str | None, int | None, str | None]:
-    """HEAD request to resolve content type and size."""
-    if is_private_url(url):
-        logger.warning("Skipping private URL: %s", url)
-        return None, None, None
-    try:
-        with httpx.Client(
-            timeout=httpx.Timeout(15.0), headers={"User-Agent": "SigmaRAG/1.0"}
-        ) as client:
-            resp = client.head(url, follow_redirects=True)
-            resp.raise_for_status()
-            ctype = resp.headers.get("content-type", "").split(";")[0].strip()
-            size = int(resp.headers.get("content-length", 0))
-            return ctype, size, str(resp.url)
-    except Exception:
-        return None, None, None
 
 
 def _sanitize_filename(url: str) -> str:

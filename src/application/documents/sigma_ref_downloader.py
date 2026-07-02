@@ -4,16 +4,18 @@ from __future__ import annotations
 
 import logging
 import threading
-import time
 import urllib.parse
 from collections.abc import Callable
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, cast
 
-import httpx
 import yaml
 
+from src.shared.http import RETRY_STATUSES
+from src.shared.http import download_file as http_download_file
+from src.shared.http import head_url as http_head_url
+from src.shared.utils.registry_utils import build_registry_entry
 from src.shared.utils.crypto_utils import compute_sha256_file, compute_sha256_str
 from src.shared.utils.identify_file_type import (
     SUPPORTED_DOC_EXTENSION_MAP,
@@ -25,9 +27,6 @@ from src.core.sigma.models import is_sigma_rule_dict
 from src.shared.utils import iso_now
 
 logger = logging.getLogger(__name__)
-MAX_RETRIES = 3
-BACKOFF_DELAYS = [1, 4, 9]
-RETRY_STATUSES = {429, 500, 502, 503, 504}
 DEFAULT_REQUEST_DELAY = 0.5
 DEFAULT_MAX_WORKERS = 5
 SUPPORTED_EXTENSIONS: dict[str, str] = {
@@ -78,128 +77,6 @@ def _detect_url_type(url: str, content_type: str | None = None) -> str | None:
             return "office_document"
 
     return None
-
-
-def _head_content_type(url: str, timeout: int = 10) -> str | None:
-    """Do a HEAD request to discover the Content-Type of a URL.
-
-    Args:
-        url: The URL to check.
-        timeout: HTTP request timeout in seconds.
-
-    Returns:
-        The Content-Type header value, or None if the request failed.
-    """
-    try:
-        with httpx.Client(timeout=httpx.Timeout(timeout), follow_redirects=True) as client:
-            response = client.head(url)
-            response.raise_for_status()
-            ct = response.headers.get("content-type")
-            return str(ct) if ct else None
-    except Exception:
-        return None
-
-
-def _download_file(
-    url: str,
-    output_path: Path,
-    timeout: int = 30,
-    max_retries: int = MAX_RETRIES,
-) -> tuple[bool, int | None]:
-    """Download a single file with retry and exponential backoff.
-
-    Args:
-        url: The URL to download.
-        output_path: Local filesystem path to save the file.
-        timeout: HTTP request timeout in seconds.
-        max_retries: Maximum number of retry attempts. 0 means no retries.
-
-    Returns:
-        True if download succeeded, False otherwise.
-    """
-    for attempt in range(1, max_retries + 1):
-        try:
-            with httpx.Client(timeout=httpx.Timeout(timeout), follow_redirects=True) as client:
-                response = client.get(url)
-                response.raise_for_status()
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-            output_path.write_bytes(response.content)
-            return True, None
-
-        except OSError as exc:
-            logger.warning("Filesystem error for %s: %s — skipping", url, exc)
-            if output_path.exists():
-                try:
-                    output_path.unlink()
-                except OSError:
-                    pass
-            return False, None
-
-        except httpx.HTTPStatusError as exc:
-            status = exc.response.status_code
-            if status in RETRY_STATUSES and attempt < max_retries:
-                retry_after = _get_retry_after(exc.response)
-                if retry_after is not None:
-                    wait: float = min(retry_after, 120)
-                else:
-                    wait = _backoff_delay(attempt)
-                logger.warning(
-                    "HTTP %d on attempt %d/%d for %s — waiting %ds",
-                    status,
-                    attempt,
-                    max_retries,
-                    url,
-                    wait,
-                )
-                time.sleep(wait)
-                continue
-            logger.warning("HTTP %d for %s — giving up", status, url)
-            return False, status
-
-        except (
-            httpx.TimeoutException,
-            httpx.NetworkError,
-            httpx.ConnectError,
-            httpx.RemoteProtocolError,
-        ) as exc:
-            if attempt < max_retries:
-                wait: float = _backoff_delay(attempt)  # type: ignore[no-redef]
-                logger.warning(
-                    "Network error on attempt %d/%d for %s: %s — waiting %ds",
-                    attempt,
-                    max_retries,
-                    url,
-                    exc,
-                    wait,
-                )
-                time.sleep(wait)
-                continue
-            logger.warning("Network error for %s after %d attempts: %s", url, max_retries, exc)
-            return False, None
-
-    return False, None
-
-
-def _backoff_delay(attempt: int) -> float:
-    """Return the backoff delay for the given attempt number (1-indexed).
-
-    Falls back to the last configured delay value if attempt exceeds the list.
-    """
-    idx = attempt - 1
-    if idx < len(BACKOFF_DELAYS):
-        return BACKOFF_DELAYS[idx]
-    return BACKOFF_DELAYS[-1]
-
-
-def _get_retry_after(response: httpx.Response) -> int | None:
-    """Extract Retry-After header value as seconds."""
-    raw = response.headers.get("Retry-After")
-    if raw is None:
-        return None
-    try:
-        return int(raw)
-    except ValueError:
-        return None
 
 
 def _load_registry(path: Path, db: DatabaseService) -> dict[str, Any]:
@@ -291,35 +168,6 @@ def _maybe_record_error(
             )
         except Exception:
             logger.warning("Failed to record error for %s", normalized_url)
-
-
-def _make_entry(
-    url_hash: str,
-    original_url: str,
-    normalized_url: str,
-    content_type: str,
-    rule_id: str,
-    title: str,
-    timestamp: str,
-    content_sha256: str,
-    file_name: str = "",
-    file_size: int | None = None,
-) -> dict[str, Any]:
-    """Build a registry entry dict with all fields expected by _save_registry."""
-    return {
-        "original_url": original_url,
-        "normalized_url": normalized_url,
-        "content_type": content_type,
-        "rule_id": rule_id,
-        "title": title,
-        "timestamp": timestamp,
-        "content_sha256": content_sha256,
-        "org": "sigmaref",
-        "repo": "references",
-        "file_name": file_name,
-        "file_size": file_size,
-        "last_seen": timestamp,
-    }
 
 
 def download_references(
@@ -542,14 +390,13 @@ def download_references(
                             }
                         )
                         continue
-                registry[url_hash] = _make_entry(
+                registry[url_hash] = build_registry_entry(
                     url_hash=url_hash,
                     original_url=ref,
                     normalized_url=normalized,
                     content_type=ftype or "markdown",
                     rule_id=rule_id,
                     title=rule_title,
-                    timestamp=iso_now(),
                     content_sha256=content_hash,
                     file_name=output_file.name,
                     file_size=output_file.stat().st_size,
@@ -580,7 +427,7 @@ def download_references(
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_map: dict[Future, dict[str, Any]] = {}
             for item in head_pending:
-                future = executor.submit(_head_content_type, item["normalized"])
+                future = executor.submit(http_head_url, item["normalized"], 10, check_ssrf=False)
                 future_map[future] = item
             resolved = 0
             for future in as_completed(future_map):
@@ -588,7 +435,7 @@ def download_references(
                 item = future_map[future]
                 if progress_callback:
                     progress_callback(resolved, len(head_pending), "downloading")
-                head_ct = future.result()
+                head_ct, _, _ = future.result()
                 ftype = _detect_url_type(item["normalized"], content_type=head_ct)
                 ext = item["ext"]
                 if not ext and ftype is not None:
@@ -627,9 +474,10 @@ def download_references(
             future_map = {}
             for item in download_queue:
                 future = executor.submit(
-                    _download_file,  # type: ignore[arg-type]
+                    http_download_file,
                     item["normalized_url"],
                     item["output_file"],
+                    check_ssrf=False,
                 )
                 future_map[future] = item
 
@@ -641,14 +489,13 @@ def download_references(
                 if success:
                     output_file = item["output_file"]
                     content_hash = compute_sha256_file(output_file) if output_file.exists() else ""
-                    registry[item["url_hash"]] = _make_entry(
+                    registry[item["url_hash"]] = build_registry_entry(
                         url_hash=item["url_hash"],
                         original_url=item["original_url"],
                         normalized_url=item["normalized_url"],
                         content_type=item["content_type"],
                         rule_id=item["rule_id"],
                         title=item["rule_title"],
-                        timestamp=iso_now(),
                         content_sha256=content_hash,
                         file_name=output_file.name,
                         file_size=output_file.stat().st_size if output_file.exists() else None,
