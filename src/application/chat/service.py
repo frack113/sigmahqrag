@@ -17,6 +17,7 @@ from src.application.sigma.translate import (
 )
 from src.application.tools import ToolContext, ToolDispatcher, get_tools
 from src.core.search.engine import SearchEngine
+from src.core.sigma.models import SigmaRule
 from src.api.v1.chat.schemas import ChatMode
 
 logger = logging.getLogger(__name__)
@@ -33,7 +34,7 @@ class ChatService:
         self.rag_pipeline = RAGPipeline()
         self.validator = SigmaValidator()
         self._history: list[dict[str, str]] = []
-        self._uploaded_rule: dict[str, Any] | None = None
+        self._uploaded_rule: SigmaRule | None = None
         self._last_citations: list[str] = []
         self._current_prompt_id: str = ""
 
@@ -231,7 +232,7 @@ class ChatService:
         if not self._uploaded_rule:
             return "No Sigma rule uploaded. Please upload a .yaml file first."
 
-        related = await self.search_engine.search(self._uploaded_rule.get("name", ""))
+        related = await self.search_engine.search(self._uploaded_rule.name)
         return await self.rag_pipeline.explain_rule(
             self._uploaded_rule, related, system_prompt_id=self._current_prompt_id
         )
@@ -245,7 +246,7 @@ class ChatService:
             yield "No Sigma rule uploaded. Please upload a .yaml file first."
             return
 
-        related = await self.search_engine.search(self._uploaded_rule.get("name", ""))
+        related = await self.search_engine.search(self._uploaded_rule.name)
         async for token in self.rag_pipeline.explain_rule_stream(
             self._uploaded_rule, related, system_prompt_id=self._current_prompt_id
         ):
@@ -345,19 +346,19 @@ class ChatService:
         except Exception as e:
             logger.error(f"RAG pipeline failed: {e}")
 
-    async def validate_and_store_yaml(self, content: bytes) -> dict[str, Any]:
+    async def validate_and_store_yaml(self, content: bytes) -> SigmaRule:
         """Validate YAML content and store rule data in session.
 
         Args:
             content: Raw YAML file content
 
         Returns:
-            Parsed and validated rule dictionary
+            Parsed and validated SigmaRule
         """
-        rule_data = self.validator.validate(content)
-        self._uploaded_rule = rule_data
+        rule = self.validator.validate(content)
+        self._uploaded_rule = rule
         self.rag_pipeline.cache.invalidate()
-        return rule_data
+        return rule
 
     def get_last_citations(self) -> list[str]:
         """Get citations from the last search response."""

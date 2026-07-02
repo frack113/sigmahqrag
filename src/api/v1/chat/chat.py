@@ -102,11 +102,11 @@ async def upload_sigma_rule(file: UploadFile) -> dict:
             content.decode("utf-8")
         except UnicodeDecodeError:
             raise HTTPException(status_code=400, detail="File is not valid UTF-8 text")
-        rule_data = await _get_chat_service().validate_and_store_yaml(content)
+        rule = await _get_chat_service().validate_and_store_yaml(content)
 
         return {
-            "rule_name": rule_data.get("name", "Unknown"),
-            "rule_id": rule_data.get("id", ""),
+            "rule_name": rule.name,
+            "rule_id": rule.id,
             "validated": True,
         }
     except ValidationError as e:

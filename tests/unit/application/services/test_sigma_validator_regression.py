@@ -1,26 +1,21 @@
 """Regression tests for SigmaValidator contract.
 
-These tests capture the current contract of SigmaValidator.validate()
-so that when it is changed from returning dict[str, Any] to SigmaRule:
-- Every dict access pattern is identified
-- Every consumer is accounted for
-
-Run before and after the refactoring.
+These tests capture the contract of SigmaValidator.validate()
+after the refactoring from dict[str, Any] to SigmaRule.
 """
 
 from __future__ import annotations
-
-from typing import Any
 
 import pytest
 import yaml
 
 from src.application.sigma.validator import SigmaValidator
+from src.core.sigma.models import SigmaRule
 from src.shared.exceptions import ValidationError
 
 _VALID_YAML = b"""
 id: regr_test_001
-name: Regression Test Rule
+title: Regression Test Rule
 description: A rule for regression testing
 detection:
     selection:
@@ -28,51 +23,52 @@ detection:
 condition: selection
 """
 
-_VALID_DICT: dict[str, Any] = {
-    "id": "regr_test_001",
-    "name": "Regression Test Rule",
-    "description": "A rule for regression testing",
-    "detection": {"selection": {"EventID": 4625}},
-    "condition": "selection",
-}
+_VALID_YAML_WITH_NAME = b"""
+id: regr_test_002
+name: Name-Based Rule
+description: A rule using name instead of title
+detection:
+    selection:
+        EventID: 4625
+condition: selection
+"""
 
 
 class TestSigmaValidatorRegression:
-    """Regression tests: current contract of SigmaValidator."""
+    """Regression tests: updated contract of SigmaValidator."""
 
     def setup_method(self) -> None:
         self.validator = SigmaValidator()
 
     # --- Return type contract ---
 
-    def test_validate_returns_dict(self) -> None:
+    def test_validate_returns_sigma_rule(self) -> None:
         result = self.validator.validate(_VALID_YAML)
-        assert isinstance(result, dict), "Must return a dict"
+        assert isinstance(result, SigmaRule), "Must return a SigmaRule"
 
-    def test_validate_dict_contains_expected_keys(self) -> None:
+    def test_validate_rule_has_expected_attributes(self) -> None:
         result = self.validator.validate(_VALID_YAML)
-        assert "id" in result
-        assert "name" in result
-        assert "description" in result
-        assert "detection" in result
+        assert result.id == "regr_test_001"
+        assert result.title == "Regression Test Rule"
+        assert result.name == "Regression Test Rule"
+        assert result.description == "A rule for regression testing"
+        assert "selection" in result.detection
 
-    def test_validate_dict_supports_bracket_access(self) -> None:
+    def test_validate_rule_supports_name_property(self) -> None:
         result = self.validator.validate(_VALID_YAML)
-        assert result["id"] == "regr_test_001"
+        assert result.name == result.title
 
-    def test_validate_dict_supports_get_access(self) -> None:
+    def test_validate_rule_yaml_dumpable(self) -> None:
         result = self.validator.validate(_VALID_YAML)
-        assert result.get("condition") == "selection"
-
-    def test_validate_dict_supports_get_missing_key(self) -> None:
-        result = self.validator.validate(_VALID_YAML)
-        assert result.get("nonexistent") is None
-
-    def test_validate_dict_yaml_dumpable(self) -> None:
-        result = self.validator.validate(_VALID_YAML)
-        dumped = yaml.dump(result, default_flow_style=False)
+        dumped = yaml.dump(result.to_dict(), default_flow_style=False)
         assert isinstance(dumped, str)
         assert "regr_test_001" in dumped
+
+    def test_validate_accepts_name_instead_of_title(self) -> None:
+        result = self.validator.validate(_VALID_YAML_WITH_NAME)
+        assert isinstance(result, SigmaRule)
+        assert result.title == "Name-Based Rule"
+        assert result.name == "Name-Based Rule"
 
     # --- Error contract ---
 
@@ -94,10 +90,10 @@ class TestSigmaValidatorRegression:
 
     # --- Deprecated fields (warnings, not errors) ---
 
-    def test_deprecated_fields_still_in_dict(self) -> None:
+    def test_deprecated_fields_still_in_rule(self) -> None:
         yaml_with_deprecated = b"""
-id: regr_test_002
-name: Rule with deprecated
+id: regr_test_003
+title: Rule with deprecated
 description: Contains level and falsepositives
 level: high
 falsepositives:
@@ -107,8 +103,53 @@ detection:
         EventID: 4625
 """
         result = self.validator.validate(yaml_with_deprecated)
-        assert result["level"] == "high"
-        assert result["falsepositives"] == ["FP1"]
+        assert result.level == "high"
+        assert result.falsepositives == ["FP1"]
+
+    # --- Level validation ---
+
+    def test_invalid_level_raises_error(self) -> None:
+        with pytest.raises(ValidationError) as exc_info:
+            self.validator.validate(b"""
+id: test-001
+title: Test
+description: Invalid level
+level: invalid_level
+detection:
+  selection:
+    EventID: 1
+""")
+        assert exc_info.value.details["field"] == "level"
+
+    def test_valid_levels_accepted(self) -> None:
+        for level in ("informational", "low", "medium", "high", "critical"):
+            result = self.validator.validate(
+                f"""id: test-001
+title: Test {level}
+description: Testing level {level}
+level: {level}
+detection:
+  selection:
+    EventID: 1
+condition: selection
+""".encode()
+            )
+            assert result.level == level
+
+    # --- Status validation ---
+
+    def test_invalid_status_raises_error(self) -> None:
+        with pytest.raises(ValidationError) as exc_info:
+            self.validator.validate(b"""
+id: test-001
+title: Test
+description: Invalid status
+status: unknown_status
+detection:
+  selection:
+    EventID: 1
+""")
+        assert exc_info.value.details["field"] == "status"
 
     # --- Edge cases ---
 
@@ -131,54 +172,55 @@ detection:
 
 
 class TestChatServiceConsumerRegression:
-    """Regression: ChatService usage patterns on validate result.
+    """Regression: ChatService usage patterns on SigmaRule.
 
-    ChatService stores the validator result in self._uploaded_rule
-    (typed as dict[str, Any]) and accesses it via:
-      - .get("name", "")
-      - .get("id", "N/A")
-      - .get("description")
-      - Passes it to RAGPipeline methods as dict[str, Any]
-      - Passes it to search_engine.search() as .get("name", "")
+    After the refactoring, ChatService._uploaded_rule is SigmaRule | None
+    and is accessed via:
+      - .name (was .get("name", ""))
+      - .id (was .get("id", "N/A"))
+      - .description (was .get("description"))
     """
 
-    def test_uploaded_rule_get_name(self) -> None:
-        result = _VALID_DICT
-        name = result.get("name", "")
-        assert name == "Regression Test Rule"
+    def _make_rule(self) -> SigmaRule:
+        return SigmaRule(
+            id="regr_test_001",
+            title="Regression Test Rule",
+            description="A rule for regression testing",
+            detection={"selection": {"EventID": 4625}},
+            condition="selection",
+        )
 
-    def test_uploaded_rule_get_id(self) -> None:
-        result = _VALID_DICT
-        rule_id = result.get("id", "N/A")
-        assert rule_id == "regr_test_001"
+    def test_uploaded_rule_name(self) -> None:
+        rule = self._make_rule()
+        assert rule.name == "Regression Test Rule"
 
-    def test_uploaded_rule_get_description(self) -> None:
-        result = _VALID_DICT
-        desc = result.get("description")
-        assert desc == "A rule for regression testing"
+    def test_uploaded_rule_id(self) -> None:
+        rule = self._make_rule()
+        assert rule.id == "regr_test_001"
 
-    def test_uploaded_rule_missing_key_returns_default(self) -> None:
-        result: dict[str, Any] = {}
-        assert result.get("name", "") == ""
-        assert result.get("id", "N/A") == "N/A"
-        assert result.get("description") is None
+    def test_uploaded_rule_description(self) -> None:
+        rule = self._make_rule()
+        assert rule.description == "A rule for regression testing"
 
     def test_rag_pipeline_format_rule_yaml(self) -> None:
-        dumped = yaml.dump(_VALID_DICT, default_flow_style=False, allow_unicode=True)
+        rule = self._make_rule()
+        dumped = yaml.dump(rule.to_dict(), default_flow_style=False, allow_unicode=True)
         assert isinstance(dumped, str)
-        assert "Regression Test Rule" in dumped
+        assert "regr_test_001" in dumped
 
     def test_rag_pipeline_fallback_explanation(self) -> None:
+        rule = self._make_rule()
         parts = [
-            f"**Rule:** {_VALID_DICT.get('name', 'Unknown')}",
-            f"**ID:** {_VALID_DICT.get('id', 'N/A')}",
+            f"**Rule:** {rule.name}",
+            f"**ID:** {rule.id}",
         ]
-        if desc := _VALID_DICT.get("description"):
-            parts.append(f"**Description:** {desc}")
+        if rule.description:
+            parts.append(f"**Description:** {rule.description}")
         text = "\n".join(parts)
         assert "Regression Test Rule" in text
         assert "regr_test_001" in text
 
     def test_search_engine_search_uses_name(self) -> None:
-        query = _VALID_DICT.get("name", "")
+        rule = self._make_rule()
+        query = rule.name
         assert query == "Regression Test Rule"

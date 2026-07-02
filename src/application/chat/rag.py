@@ -11,6 +11,7 @@ import yaml
 from jinja2 import Template
 
 from src.core.search.engine import SearchEngine
+from src.core.sigma.models import SigmaRule
 from src.infrastructure.llm.llamacpp import LlamaClient
 
 from src.application.system.cache import ResponseCache
@@ -96,25 +97,25 @@ class RAGPipeline:
 
     async def explain_rule(
         self,
-        rule_data: dict[str, Any],
+        rule: SigmaRule,
         related_results: list[dict[str, Any]] | None = None,
         system_prompt_id: str = "",
     ) -> str:
         """Generate explanation for an uploaded Sigma rule."""
         related_text = self._format_search_results(related_results or [])
         cache_key = self.cache.generate_key(
-            query=rule_data.get("name", ""),
+            query=rule.name,
             context=related_text,
         )
 
         cached = self.cache.get(cache_key)
         if cached:
-            logger.info(f"Cache hit for rule explanation: {rule_data.get('name')}")
+            logger.info(f"Cache hit for rule explanation: {rule.name}")
             return cached
 
         try:
             prompt_content = self._resolve_prompt(system_prompt_id, mode="explain")
-            rule_yaml = await self._format_rule_yaml(rule_data)
+            rule_yaml = await self._format_rule_yaml(rule)
             prompt = Template(prompt_content).render(
                 uploaded_rule=rule_yaml,
                 related_rules=related_text,
@@ -128,31 +129,31 @@ class RAGPipeline:
             return response
         except Exception as e:
             logger.error(f"LLM generation failed: {e}")
-            return self._fallback_explanation(rule_data)
+            return self._fallback_explanation(rule)
 
     async def explain_rule_stream(
         self,
-        rule_data: dict[str, Any],
+        rule: SigmaRule,
         related_results: list[dict[str, Any]] | None = None,
         system_prompt_id: str = "",
     ) -> AsyncGenerator[str, None]:
         """Stream explanation for an uploaded Sigma rule."""
         related_text = self._format_search_results(related_results or [])
         cache_key = self.cache.generate_key(
-            query=rule_data.get("name", ""),
+            query=rule.name,
             context=related_text,
         )
 
         cached = self.cache.get(cache_key)
         if cached:
-            logger.info(f"Cache hit for rule explanation: {rule_data.get('name')}")
+            logger.info(f"Cache hit for rule explanation: {rule.name}")
             for token in cached:
                 yield token
             return
 
         try:
             prompt_content = self._resolve_prompt(system_prompt_id, mode="explain")
-            rule_yaml = await self._format_rule_yaml(rule_data)
+            rule_yaml = await self._format_rule_yaml(rule)
             prompt = Template(prompt_content).render(
                 uploaded_rule=rule_yaml,
                 related_rules=related_text,
@@ -166,7 +167,7 @@ class RAGPipeline:
                 yield token
         except Exception as e:
             logger.error(f"LLM generation failed: {e}")
-            fallback = self._fallback_explanation(rule_data)
+            fallback = self._fallback_explanation(rule)
             for token in fallback:
                 yield token
 
@@ -268,25 +269,25 @@ class RAGPipeline:
 
     async def analyze_coverage(
         self,
-        rule_data: dict[str, Any],
+        rule: SigmaRule,
         related_results: list[dict[str, Any]],
         system_prompt_id: str = "",
     ) -> str:
         """Analyze detection coverage gaps."""
         related_text = self._format_search_results(related_results)
         cache_key = self.cache.generate_key(
-            query=rule_data.get("name", ""),
+            query=rule.name,
             context=related_text,
         )
 
         cached = self.cache.get(cache_key)
         if cached:
-            logger.info(f"Cache hit for coverage analysis: {rule_data.get('name')}")
+            logger.info(f"Cache hit for coverage analysis: {rule.name}")
             return cached
 
         try:
             prompt_content = self._resolve_prompt(system_prompt_id, mode="coverage")
-            rule_yaml = await self._format_rule_yaml(rule_data)
+            rule_yaml = await self._format_rule_yaml(rule)
             prompt = Template(prompt_content).render(
                 uploaded_rule=rule_yaml,
                 related_rules=related_text,
@@ -304,27 +305,27 @@ class RAGPipeline:
 
     async def analyze_coverage_stream(
         self,
-        rule_data: dict[str, Any],
+        rule: SigmaRule,
         related_results: list[dict[str, Any]],
         system_prompt_id: str = "",
     ) -> AsyncGenerator[str, None]:
         """Stream coverage analysis for an uploaded Sigma rule."""
         related_text = self._format_search_results(related_results)
         cache_key = self.cache.generate_key(
-            query=rule_data.get("name", ""),
+            query=rule.name,
             context=related_text,
         )
 
         cached = self.cache.get(cache_key)
         if cached:
-            logger.info(f"Cache hit for coverage analysis: {rule_data.get('name')}")
+            logger.info(f"Cache hit for coverage analysis: {rule.name}")
             for token in cached:
                 yield token
             return
 
         try:
             prompt_content = self._resolve_prompt(system_prompt_id, mode="coverage")
-            rule_yaml = await self._format_rule_yaml(rule_data)
+            rule_yaml = await self._format_rule_yaml(rule)
             prompt = Template(prompt_content).render(
                 uploaded_rule=rule_yaml,
                 related_rules=related_text,
@@ -377,21 +378,22 @@ class RAGPipeline:
 
         return "\n\n".join(lines)
 
-    async def _format_rule_yaml(self, rule: dict[str, Any]) -> str:
+    async def _format_rule_yaml(self, rule: SigmaRule) -> str:
         """Format rule data as readable YAML-like text."""
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(
-            None, lambda: yaml.dump(rule, default_flow_style=False, allow_unicode=True)
+            None,
+            lambda: yaml.dump(rule.to_dict(), default_flow_style=False, allow_unicode=True),
         )
 
-    def _fallback_explanation(self, rule_data: dict[str, Any]) -> str:
+    def _fallback_explanation(self, rule: SigmaRule) -> str:
         """Fallback explanation without LLM."""
         parts = [
-            f"**Rule:** {rule_data.get('name', 'Unknown')}",
-            f"**ID:** {rule_data.get('id', 'N/A')}",
+            f"**Rule:** {rule.name}",
+            f"**ID:** {rule.id}",
         ]
-        if desc := rule_data.get("description"):
-            parts.append(f"**Description:** {desc}")
+        if rule.description:
+            parts.append(f"**Description:** {rule.description}")
         return "\n".join(parts)
 
     def _fallback_search_results(self, results: list[dict[str, Any]]) -> str:
