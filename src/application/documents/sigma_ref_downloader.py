@@ -25,6 +25,8 @@ from src.shared.utils.url_utils import is_private_url, normalize_url, url_ext
 from src.infrastructure.database import DatabaseService
 from src.core.sigma.models import is_sigma_rule_dict
 from src.shared.utils import iso_now
+from src.shared.utils.sigma_utils import extract_sigma_references
+from src.config.settings import get_config
 
 logger = logging.getLogger(__name__)
 DEFAULT_REQUEST_DELAY = 0.5
@@ -170,6 +172,75 @@ def _maybe_record_error(
             logger.warning("Failed to record error for %s", normalized_url)
 
 
+def download_sigma_references(
+    db: DatabaseService,
+    output_dir: str,
+    mode: str = "scan",
+    rules_dir: str | None = None,
+    supported_types: set[str] | None = None,
+    request_delay: float = DEFAULT_REQUEST_DELAY,
+    progress_callback: Callable[[int, int, str], None] | None = None,
+    max_workers: int = DEFAULT_MAX_WORKERS,
+    selected_dirs: list[str] | None = None,
+) -> dict[str, Any]:
+    """Download Sigma rule references using the specified mode.
+
+    Two modes are supported:
+
+    - **scan** (default): Scans a local directory of Sigma rule YAML files,
+      extracts reference URLs, and downloads matching documents.
+      Requires ``rules_dir``.
+
+    - **registry**: Reads pending Sigma rule entries from the doc_registry,
+      resolves their local file paths, and downloads referenced documents.
+      Does **not** require ``rules_dir``.
+
+    Args:
+        db: Database service instance.
+        output_dir: Path to the output directory for downloaded files.
+        mode: ``"scan"`` or ``"registry"``.
+        rules_dir: Path to the directory containing Sigma rule YAML files
+            (only used in ``"scan"`` mode).
+        supported_types: Set of FileType values to accept (e.g. {"markdown"}).
+            Defaults to all reference doc types.
+        request_delay: Seconds to wait between download requests.
+        progress_callback: Optional callback(current, total, phase).
+        max_workers: Max concurrent HTTP download threads.
+        selected_dirs: Optional list of relative directory paths to scan
+            (only used in ``"scan"`` mode).
+
+    Returns:
+        Dict with summary stats: total_rules, total_refs, downloaded, skipped, failed.
+    """
+    if supported_types is None:
+        supported_types = SUPPORTED_REFERENCE_DOC_TYPES
+
+    if mode == "scan":
+        if not rules_dir:
+            raise ValueError("rules_dir is required in scan mode")
+        return _download_scan_mode(
+            rules_dir=rules_dir,
+            output_dir=output_dir,
+            db=db,
+            supported_types=supported_types,
+            request_delay=request_delay,
+            progress_callback=progress_callback,
+            max_workers=max_workers,
+            selected_dirs=selected_dirs,
+        )
+    if mode == "registry":
+        return _download_registry_mode(
+            output_dir=output_dir,
+            db=db,
+            supported_types=supported_types,
+            request_delay=request_delay,
+            progress_callback=progress_callback,
+            max_workers=max_workers,
+        )
+    msg = f"Unknown mode: {mode!r} (expected 'scan' or 'registry')"
+    raise ValueError(msg)
+
+
 def download_references(
     rules_dir: str,
     output_dir: str,
@@ -185,23 +256,32 @@ def download_references(
     Scans all Sigma rules in the given directory, extracts reference URLs,
     filters by supported document types, and downloads matching files.
 
-    Args:
-        rules_dir: Path to the directory containing Sigma rule YAML files.
-        output_dir: Path to the output directory for downloaded files.
-        db: Database service instance.
-        supported_types: Set of FileType values to accept (e.g. {"markdown"}).
-            Defaults to {"markdown"}.
-        request_delay: Seconds to wait between download requests (sequential
-            phase only; parallel phase uses max_workers instead).
-        progress_callback: Optional callback(current, total) called after each file.
-        max_workers: Max concurrent HTTP download threads.
-        selected_dirs: Optional list of relative directory paths to scan.
-            If provided, only files within these directories are processed.
-            Directories not in this list are excluded from scanning.
-
-    Returns:
-        Dict with summary stats: total_rules, total_refs, downloaded, skipped, failed.
+    Delegates to :func:`download_sigma_references` with ``mode="scan"``.
     """
+    return download_sigma_references(
+        db=db,
+        output_dir=output_dir,
+        mode="scan",
+        rules_dir=rules_dir,
+        supported_types=supported_types,
+        request_delay=request_delay,
+        progress_callback=progress_callback,
+        max_workers=max_workers,
+        selected_dirs=selected_dirs,
+    )
+
+
+def _download_scan_mode(
+    rules_dir: str,
+    output_dir: str,
+    db: DatabaseService,
+    supported_types: set[str] | None = None,
+    request_delay: float = DEFAULT_REQUEST_DELAY,
+    progress_callback: Callable[[int, int, str], None] | None = None,
+    max_workers: int = DEFAULT_MAX_WORKERS,
+    selected_dirs: list[str] | None = None,
+) -> dict[str, Any]:
+    """Scan-mode implementation — see :func:`download_sigma_references`."""
     if supported_types is None:
         supported_types = SUPPORTED_REFERENCE_DOC_TYPES
 
@@ -535,4 +615,280 @@ def _empty_summary() -> dict[str, Any]:
         "downloaded": 0,
         "skipped": 0,
         "failed": 0,
+    }
+
+
+# ------------------------------------------------------------------
+# Registry mode — reads pending Sigma rules from doc_registry and
+# downloads their referenced documents.
+# ------------------------------------------------------------------
+
+
+def _resolve_rule_path(entry: dict, cfg: Any) -> Path | None:
+    """Resolve the local file path for a sigma rule entry."""
+    org = entry.get("org", "")
+    repo = entry.get("repo", "")
+    file_name = entry.get("file_name", "")
+
+    if not file_name:
+        return None
+
+    if org == "local":
+        base = Path(str(cfg.local_documents_path))
+        return Path(base, file_name)
+
+    if org == "sigmaref":
+        base = Path(str(cfg.sigmaref_documents_path))
+        return Path(base, file_name)
+
+    if org and repo:
+        base = Path(str(cfg.paths_github_dir))
+        return Path(base, org, repo, file_name)
+
+    return None
+
+
+def _download_registry_mode(
+    output_dir: str,
+    db: DatabaseService,
+    supported_types: set[str] | None = None,
+    request_delay: float = DEFAULT_REQUEST_DELAY,
+    progress_callback: Callable[[int, int, str], None] | None = None,
+    max_workers: int = DEFAULT_MAX_WORKERS,
+) -> dict[str, Any]:
+    """Registry-mode implementation — see :func:`download_sigma_references`."""
+    if supported_types is None:
+        supported_types = SUPPORTED_REFERENCE_DOC_TYPES
+
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    entries = db.get_pending_registry_all()
+    sigma_entries = [
+        e
+        for e in entries
+        if e.get("content_type") == "sigma_rule" and e.get("embed_status") == "discovery"
+    ]
+
+    total_rules = len(sigma_entries)
+    total_refs = 0
+    downloaded = 0
+    skipped = 0
+    failed = 0
+
+    cfg = get_config()
+
+    with _registry_lock:
+        registry = _load_registry(output_path, db)
+
+    head_queue: list[dict[str, Any]] = []
+    download_ready: list[dict[str, Any]] = []
+    seen_urls: set[str] = set()
+
+    for rule_entry in sigma_entries:
+        rule_id: str = rule_entry.get("rule_id", "00000000-0000-0000-0000-000000000000")
+        original_url = rule_entry.get("original_url", "")
+        file_name = rule_entry.get("file_name", "")
+
+        file_path = _resolve_rule_path(rule_entry, cfg)
+        if not file_path or not file_path.exists():
+            logger.warning("Rule file not found, skipping: %s (url=%s)", file_name, original_url)
+            skipped += 1
+            continue
+
+        refs = extract_sigma_references(file_path)
+        rule_title = rule_entry.get("title", file_name)
+        logger.info("Rule %s processed: %d reference(s) found", rule_id, len(refs))
+
+        if not refs:
+            continue
+
+        total_refs += len(refs)
+
+        for ref_url in refs:
+            ref_url_clean = ref_url.strip()
+            if not ref_url_clean:
+                continue
+
+            norm_url = normalize_url(ref_url_clean)
+            url_hash = compute_sha256_str(norm_url)
+
+            if url_hash in seen_urls:
+                logger.debug("Reference already queued this run: %s", ref_url_clean)
+                skipped += 1
+                continue
+            seen_urls.add(url_hash)
+
+            existing = registry.get(url_hash)
+
+            if existing and existing.get("content_sha256"):
+                skipped += 1
+                continue
+
+            if existing:
+                download_ready.append(
+                    {
+                        "url": ref_url_clean,
+                        "rule_id": rule_id,
+                        "rule_title": rule_title,
+                        "url_hash": url_hash,
+                        "final_url": existing.get("normalized_url", ref_url_clean),
+                        "content_type": existing.get("content_type", ""),
+                    }
+                )
+            else:
+                head_queue.append(
+                    {
+                        "url": ref_url_clean,
+                        "rule_id": rule_id,
+                        "rule_title": rule_title,
+                    }
+                )
+
+    total_head = len(head_queue)
+    total_download_ready = len(download_ready)
+
+    # Phase 1: parallel HEAD requests
+    head_pending: list[dict[str, Any]] = []
+    head_completed = 0
+    if head_queue:
+        with ThreadPoolExecutor(max_workers=max_workers) as head_executor:
+            head_futures: dict[Future, dict[str, Any]] = {}
+            for item in head_queue:
+                future = head_executor.submit(http_head_url, item["url"], 15.0)
+                head_futures[future] = item
+
+            for future in as_completed(head_futures):
+                head_completed += 1
+                if progress_callback:
+                    progress_callback(
+                        head_completed,
+                        total_head + total_download_ready,
+                        "resolving URLs",
+                    )
+                item = head_futures[future]
+                url = item["url"]
+                try:
+                    content_type, size, final_url = future.result()
+                    norm_url = normalize_url(final_url or url)
+                    url_hash = compute_sha256_str(norm_url)
+
+                    if content_type not in supported_types:
+                        db.batch_upsert_doc_registry(
+                            [
+                                build_registry_entry(
+                                    normalized_url=norm_url,
+                                    content_type=content_type or "unknown",
+                                    rule_id=item["rule_id"],
+                                    title=item["rule_title"],
+                                    embed_status="head_verified",
+                                )
+                            ]
+                        )
+                        skipped += 1
+                        continue
+
+                    db.batch_upsert_doc_registry(
+                        [
+                            build_registry_entry(
+                                normalized_url=norm_url,
+                                content_type=content_type,
+                                rule_id=item["rule_id"],
+                                title=item["rule_title"],
+                                file_size=size,
+                                embed_status="head_verified",
+                            )
+                        ]
+                    )
+                    head_pending.append(
+                        {
+                            **item,
+                            "content_type": content_type,
+                            "size": size,
+                            "final_url": final_url or url,
+                            "url_hash": url_hash,
+                        }
+                    )
+                except Exception as e:
+                    logger.warning("HEAD failed for %s: %s", url, e)
+                    failed += 1
+
+    # Phase 2: merge & download
+    all_to_download = head_pending + download_ready
+    total_to_download = len(all_to_download)
+
+    _TYPE_TO_EXT = {
+        "html": ".html",
+        "markdown": ".md",
+        "plain_text": ".txt",
+        "pdf": ".pdf",
+        "office_document": ".docx",
+    }
+
+    def _download_one(item: dict[str, Any]) -> tuple[str, str, str, int] | None:
+        url = item["final_url"]
+        content_type = item.get("content_type", "")
+        ext = _TYPE_TO_EXT.get(content_type, ".md")
+        url_hash = item.get("url_hash") or compute_sha256_str(normalize_url(url))
+        file_path = output_path / f"{url_hash}{ext}"
+
+        if file_path.exists():
+            existing_entry = registry.get(url_hash)
+            if existing_entry and existing_entry.get("content_sha256"):
+                return None
+
+        ok, _ = http_download_file(url, file_path, check_ssrf=False)
+        if ok:
+            content = file_path.read_bytes()
+            content_hash = compute_sha256_str(content)
+            return ("ok", url_hash, content_hash, len(content))
+        logger.error("Reference download failed: %s", url)
+        return ("fail", "", "", 0)
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures: dict[Future, dict[str, Any]] = {
+            executor.submit(_download_one, item): item for item in all_to_download
+        }
+
+        for future in as_completed(futures):
+            item = futures[future]
+            try:
+                result = future.result()
+                if result is None:
+                    skipped += 1
+                elif result[0] == "ok":
+                    _, url_hash, content_hash, size = result
+                    entry = build_registry_entry(
+                        url_hash=url_hash,
+                        normalized_url=item.get("final_url", item["url"]),
+                        content_type=item["content_type"],
+                        rule_id=item["rule_id"],
+                        title=item["rule_title"],
+                        content_sha256=content_hash,
+                        file_name=f"{url_hash}{_TYPE_TO_EXT.get(item['content_type'], '.md')}",
+                        file_size=size,
+                        embed_status="discovery",
+                    )
+                    db.batch_upsert_doc_registry([entry])
+                    downloaded += 1
+                else:
+                    failed += 1
+            except Exception as e:
+                logger.error("Download task failed: %s", e)
+                failed += 1
+
+            if progress_callback:
+                completed = downloaded + failed
+                progress_callback(
+                    total_head + completed,
+                    total_head + total_to_download,
+                    "downloading",
+                )
+
+    return {
+        "total_rules": total_rules,
+        "total_refs": total_refs,
+        "downloaded": downloaded,
+        "skipped": skipped,
+        "failed": failed,
     }

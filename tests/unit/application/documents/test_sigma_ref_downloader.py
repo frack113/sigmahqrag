@@ -774,3 +774,145 @@ class TestConcurrencyLock:
     def test_lock_has_acquire_release(self) -> None:
         assert hasattr(_registry_lock, "acquire")
         assert hasattr(_registry_lock, "release")
+
+
+class TestDownloadSigmaReferencesContract:
+    """Contract tests: ``download_sigma_references`` with mode="scan" and
+    mode="registry" must use the same ``{url_hash}{ext}`` naming convention
+    for downloaded files.
+    """
+
+    def test_scan_mode_naming_convention(self, tmp_path: Path) -> None:
+        """Scan mode downloads to ``{url_hash}.md``."""
+        rules_dir = tmp_path / "rules"
+        rules_dir.mkdir()
+        output_dir = tmp_path / "output"
+        ref_url = "https://example.com/test-doc.md"
+
+        rule = rules_dir / "test_rule.yml"
+        rule.write_text(f"""
+title: Test Rule
+id: contract-001
+logsource:
+  category: process_creation
+  product: windows
+detection:
+  selection:
+    EventID: 4688
+  condition: selection
+references:
+  - {ref_url}
+""")
+
+        expected_hash = _sha256(normalize_url(ref_url))
+        expected_filename = f"{expected_hash}.md"
+
+        def _fake_download(
+            url: str, output_path: Path, **kwargs: object
+        ) -> tuple[bool, int | None]:
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text("# test")
+            return True, None
+
+        db = _make_db()
+        with patch(
+            "src.application.documents.sigma_ref_downloader.http_download_file",
+            _fake_download,
+        ):
+            from src.application.documents.sigma_ref_downloader import (
+                download_sigma_references,
+            )
+
+            result = download_sigma_references(
+                db=db,
+                output_dir=str(output_dir),
+                mode="scan",
+                rules_dir=str(rules_dir),
+            )
+
+        assert result["downloaded"] == 1
+        assert (output_dir / expected_filename).exists()
+
+    def test_registry_mode_runs_without_error(self, tmp_path: Path) -> None:
+        """Registry mode runs without error (naming convention is inherited
+        from the shared download helpers)."""
+        output_dir = tmp_path / "output"
+        output_dir.mkdir(parents=True)
+
+        ref_url = "https://example.com/registry-doc.md"
+        norm_url = normalize_url(ref_url)
+        expected_hash = _sha256(norm_url)
+
+        rule_file = tmp_path / "rule.yml"
+        rule_file.write_text(f"""title: Registry Rule
+id: contract-002
+logsource:
+  category: process_creation
+  product: windows
+detection:
+  selection:
+    EventID: 4688
+  condition: selection
+references:
+  - {ref_url}
+""")
+
+        db = MagicMock()
+        db.get_pending_registry_all.return_value = [
+            {
+                "org": "local",
+                "repo": "references",
+                "file_name": "rule.yml",
+                "rule_id": "contract-002",
+                "original_url": "",
+                "title": "Registry Rule",
+                "content_type": "sigma_rule",
+                "embed_status": "discovery",
+                "url_hash": "dummy",
+                "normalized_url": "",
+            }
+        ]
+        db.get_entry.return_value = None
+        db.batch_upsert_doc_registry = MagicMock()
+
+        def _fake_download(
+            url: str, output_path: Path, **kwargs: object
+        ) -> tuple[bool, int | None]:
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text("# downloaded")
+            return True, None
+
+        with (
+            patch(
+                "src.application.documents.sigma_ref_downloader.get_config",
+            ) as mock_cfg,
+            patch(
+                "src.application.documents.sigma_ref_downloader.http_head_url",
+                return_value=("markdown", 1024, ref_url),
+            ),
+            patch(
+                "src.application.documents.sigma_ref_downloader.http_download_file",
+                _fake_download,
+            ),
+        ):
+            from src.application.documents.sigma_ref_downloader import (
+                download_sigma_references,
+            )
+
+            cfg = MagicMock()
+            cfg.local_documents_path = str(tmp_path)
+            cfg.sigmaref_documents_path = str(tmp_path)
+            cfg.paths_github_dir = str(tmp_path)
+            mock_cfg.return_value = cfg
+
+            result = download_sigma_references(
+                db=db,
+                output_dir=str(output_dir),
+                mode="registry",
+            )
+
+        assert result["total_rules"] == 1
+        assert result["total_refs"] == 1
+        # File should be written with {url_hash}{ext} naming
+        expected_filename = f"{expected_hash}.md"
+        assert (output_dir / expected_filename).exists()
