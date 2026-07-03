@@ -167,7 +167,8 @@ async def create_collection(
         if enable_hybrid:
             sparse_vectors_config = {
                 "text-sparse": qdrant_client.models.SparseVectorParams(
-                    index=qdrant_client.models.SparseIndexParams()
+                    index=qdrant_client.models.SparseIndexParams(),
+                    on_disk=True,
                 )
             }
         quantization_config = None

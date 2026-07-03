@@ -103,6 +103,8 @@ ALPHA_BY_COLLECTION: dict[str, float] = {
     "sigma_spec": 0.3,  # semantic-leaning — specs describe abstract concepts
 }
 
+RRF_K_DEFAULT = 60
+
 
 def _node_to_result(node: Any) -> dict[str, Any]:
     """Convert a LlamaIndex NodeWithScore to the legacy dict format.
@@ -308,6 +310,8 @@ class SearchEngine:
         llm_client: LlamaClient | None = None,
         alpha: float | None = None,
         alpha_by_collection: dict[str, float] | None = None,
+        rrf_k: int = 60,
+        rrf_weights: dict[str, float] | None = None,
     ) -> None:
         """Initialize search engine.
 
@@ -324,6 +328,10 @@ class SearchEngine:
                 override.  Defaults to 0.3.
             alpha_by_collection: Per-collection hybrid weights.  Takes precedence
                 over the global ``alpha``.  See ``ALPHA_BY_COLLECTION`` for defaults.
+            rrf_k: RRF constant (default 60).  Lower values give top ranks more
+                weight; higher values flatten the score distribution.
+            rrf_weights: Per-collection RRF boost factors (default 1.0 for all).
+                Weighted RRF formula: ``score = weight / (rrf_k + rank)``.
         """
         self.collection_names = collection_names or list(DEFAULT_COLLECTIONS)
         self.top_k = top_k
@@ -335,6 +343,8 @@ class SearchEngine:
         if alpha_by_collection:
             merged.update(alpha_by_collection)
         self._alpha_by_collection = merged
+        self._rrf_k = rrf_k
+        self._rrf_weights = rrf_weights or {}
 
     async def search(
         self,
@@ -444,16 +454,21 @@ class SearchEngine:
             ]
             all_results = await asyncio.gather(*tasks, return_exceptions=True)
 
+        rrf_k = self._rrf_k
+        rrf_weights = self._rrf_weights
+
         rrf_scores: dict[tuple[str, str], dict[str, Any]] = {}
-        for col_results in all_results:
+        for col_idx, col_results in enumerate(all_results):
             if isinstance(col_results, Exception):
                 logger.warning(
                     "Collection search failed during RRF fusion, skipping: %s", col_results
                 )
                 continue
             results_list: list[dict[str, Any]] = col_results  # type: ignore[assignment]
+            col_name = collections[col_idx] if col_idx < len(collections) else ""
+            weight = rrf_weights.get(col_name, 1.0)
             for rank, result in enumerate(results_list, start=1):
-                rrf_score = 1.0 / (60 + rank)
+                rrf_score = weight / (rrf_k + rank)
                 text = result.get("text", "")
                 meta = result.get("metadata", {})
                 file_path = meta.get("file_path", "") if isinstance(meta, dict) else ""

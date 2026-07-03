@@ -118,7 +118,10 @@ async def store_embeddings(
                 collection_name=collection_name,
                 vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE),
                 sparse_vectors_config={
-                    "text-sparse": SparseVectorParams(index=SparseIndexParams()),
+                    "text-sparse": SparseVectorParams(
+                        index=SparseIndexParams(),
+                        on_disk=True,
+                    ),
                 },
                 quantization_config=ScalarQuantization(
                     scalar=ScalarQuantizationConfig(
