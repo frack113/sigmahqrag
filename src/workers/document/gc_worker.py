@@ -11,6 +11,15 @@ from src.workers.enums import WorkerName, WorkerStatus
 logger = logging.getLogger(__name__)
 
 
+def _is_orphan_candidate(stem: str, known_hashes: set[str]) -> bool:
+    """Return True if *stem* looks like a SHA256 hex hash not in *known_hashes*."""
+    if len(stem) != 64:
+        return False
+    if not all(c in "0123456789abcdef" for c in stem):
+        return False
+    return stem not in known_hashes
+
+
 class DocGCWorker(BaseWorker):
     """Garbage-collects document entries whose files are permanently deleted.
 
@@ -55,13 +64,14 @@ class DocGCWorker(BaseWorker):
 
             removed_head = self.db.delete_head_verified_orphans(grace_days=grace_days)
             removed_unref = self.db.delete_unreferenced_entries()
+            removed_orphan_files = self._gc_orphaned_sigmaref_files()
 
             scanned = deleted
 
             logger.info(
                 f"[DocGCWorker] Complete: scanned={scanned}, removed={deleted}, "
                 f"reappears={skipped_found}, head_verified={removed_head}, "
-                f"unreferenced={removed_unref}"
+                f"unreferenced={removed_unref}, orphaned_files={removed_orphan_files}"
             )
 
         except Exception as e:
@@ -166,6 +176,64 @@ class DocGCWorker(BaseWorker):
                 continue
 
         return False
+
+    def _gc_orphaned_sigmaref_files(self) -> int:
+        """Move files in ``sigmaref/`` whose ``url_hash`` no longer exists in
+        ``doc_registry`` into ``.trash/``.
+
+        Returns the number of files removed.
+        """
+        cfg = get_config()
+        base = Path(cfg.sigmaref_documents_path)
+        if not base.exists():
+            return 0
+
+        # Collect all known sigmaref url_hashes in a single query
+        known: set[str] = set()
+        try:
+            with self.db._lock:
+                rows = self.db._writer_conn.execute(
+                    "SELECT url_hash FROM doc_registry WHERE org = 'sigmaref'"
+                ).fetchall()
+                known = {r[0] for r in rows}
+        except Exception:
+            logger.warning("Failed to query doc_registry for orphaned file scan")
+            return 0
+
+        trash_dir = base / ".trash"
+        removed = 0
+
+        for entry in sorted(base.iterdir()):
+            if entry.name.startswith("."):
+                continue
+
+            if entry.is_dir():
+                for f in sorted(entry.iterdir()):
+                    if f.is_file() and not f.name.startswith("."):
+                        if _is_orphan_candidate(f.stem, known):
+                            self._trash_file(f, trash_dir)
+                            removed += 1
+                if entry.is_dir() and not any(entry.iterdir()):
+                    try:
+                        entry.rmdir()
+                    except OSError:
+                        pass
+            elif entry.is_file():
+                if _is_orphan_candidate(entry.stem, known):
+                    self._trash_file(entry, trash_dir)
+                    removed += 1
+
+        return removed
+
+    def _trash_file(self, file_path: Path, trash_dir: Path) -> None:
+        """Move *file_path* to *trash_dir*, skipping if already gone."""
+        try:
+            trash_dir.mkdir(parents=True, exist_ok=True)
+            dest = trash_dir / file_path.name
+            file_path.rename(dest)
+            logger.info("Moved orphaned sigmaref file to trash: %s", dest)
+        except OSError:
+            logger.warning("Failed to move orphaned file: %s", file_path)
 
     def _cleanup_orphaned_error_entries(self) -> int:
         """Remove error entries whose URLs are no longer in doc_registry."""
