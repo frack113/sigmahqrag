@@ -694,8 +694,8 @@ Phase 10 — P3 + Q3 (architecture finale)
   │     ├── sigma_ref_paths.py — subdir_for(), sigmaref_write_path(), sigmaref_resolve_path()
   │     ├── sigma_ref_url.py — detect_url_type(), is_reference_url(), resolve_ext()
   │     └── sigma_ref_registry.py — load_registry(), save_registry(), load_error_registry(), maybe_record_error()
-  ├── P3.2 Connection pooling HTTP
-  ├── P3.3 Unifier chemins d'indexation (upload→Qdrant)
+  ├── P3.2 ✅ Connection pooling HTTP (get_pooled_client with httpx.HTTPTransport)
+  ├── P3.3 ✅ Unifier chemins d'indexation (upload→Qdrant via index_after_upload)
   └── Q3.3 Oversampling + rescore avec quantification
 ```
 
