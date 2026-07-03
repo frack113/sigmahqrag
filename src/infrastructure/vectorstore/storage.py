@@ -7,7 +7,7 @@ import uuid
 from typing import Any
 
 import qdrant_client
-from qdrant_client.models import FieldCondition, Filter, MatchValue
+from qdrant_client.models import FieldCondition, Filter, MatchValue, Modifier
 
 from src.infrastructure.vectorstore.client import get_qdrant_client
 
@@ -120,6 +120,7 @@ async def store_embeddings(
                 sparse_vectors_config={
                     "text-sparse": SparseVectorParams(
                         index=SparseIndexParams(),
+                        modifier=Modifier.IDF,
                         on_disk=True,
                     ),
                 },

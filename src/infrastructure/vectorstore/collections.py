@@ -168,6 +168,7 @@ async def create_collection(
             sparse_vectors_config = {
                 "text-sparse": qdrant_client.models.SparseVectorParams(
                     index=qdrant_client.models.SparseIndexParams(),
+                    modifier=qdrant_client.models.Modifier.IDF,
                     on_disk=True,
                 )
             }
