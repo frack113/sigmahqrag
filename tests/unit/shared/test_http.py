@@ -8,11 +8,13 @@ from unittest.mock import MagicMock, patch
 import httpx
 
 from src.shared.http import (
-    _backoff_delay,
-    _get_retry_after,
+    close_all_pooled_clients,
     create_client,
     download_file,
+    get_pooled_client,
     head_url,
+    _backoff_delay,
+    _get_retry_after,
 )
 
 
@@ -58,9 +60,9 @@ class TestHeadUrl:
         }
         mock_resp.url = httpx.URL("https://example.com/doc")
         mock_client = MagicMock(spec=httpx.Client)
-        mock_client.__enter__.return_value.head.return_value = mock_resp
+        mock_client.head.return_value = mock_resp
 
-        with patch("src.shared.http.create_client", return_value=mock_client):
+        with patch("src.shared.http.get_pooled_client", return_value=mock_client):
             ctype, size, final_url = head_url("https://example.com/doc")
 
         assert ctype == "text/html"
@@ -69,22 +71,20 @@ class TestHeadUrl:
 
     def test_returns_none_on_http_error(self) -> None:
         mock_client = MagicMock(spec=httpx.Client)
-        mock_client.__enter__.return_value.head.side_effect = httpx.HTTPStatusError(
+        mock_client.head.side_effect = httpx.HTTPStatusError(
             "404", request=MagicMock(), response=MagicMock()
         )
 
-        with patch("src.shared.http.create_client", return_value=mock_client):
+        with patch("src.shared.http.get_pooled_client", return_value=mock_client):
             result = head_url("https://example.com/404")
 
         assert result == (None, None, None)
 
     def test_returns_none_on_connection_error(self) -> None:
         mock_client = MagicMock(spec=httpx.Client)
-        mock_client.__enter__.return_value.head.side_effect = httpx.ConnectError(
-            "connection refused"
-        )
+        mock_client.head.side_effect = httpx.ConnectError("connection refused")
 
-        with patch("src.shared.http.create_client", return_value=mock_client):
+        with patch("src.shared.http.get_pooled_client", return_value=mock_client):
             result = head_url("https://example.com/down")
 
         assert result == (None, None, None)
@@ -100,9 +100,9 @@ class TestHeadUrl:
         mock_resp.headers = {}
         mock_resp.url = httpx.URL("https://example.com/doc")
         mock_client = MagicMock(spec=httpx.Client)
-        mock_client.__enter__.return_value.head.return_value = mock_resp
+        mock_client.head.return_value = mock_resp
 
-        with patch("src.shared.http.create_client", return_value=mock_client):
+        with patch("src.shared.http.get_pooled_client", return_value=mock_client):
             ctype, size, final_url = head_url("https://example.com/doc")
 
         assert ctype is None
@@ -119,10 +119,10 @@ class TestHeadUrl:
         mock_resp = MagicMock(spec=httpx.Response)
         mock_resp.headers = {"content-type": "text/plain"}
         mock_resp.url = httpx.URL("http://localhost:8080/doc")
-        mock_client.__enter__.return_value.head.return_value = mock_resp
+        mock_client.head.return_value = mock_resp
 
         with (
-            patch("src.shared.http.create_client", return_value=mock_client),
+            patch("src.shared.http.get_pooled_client", return_value=mock_client),
             patch("src.shared.http.is_private_url", return_value=True),
         ):
             ctype, size, url = head_url("http://localhost:8080/doc", check_ssrf=False)
@@ -136,9 +136,9 @@ class TestDownloadFile:
         mock_resp = MagicMock(spec=httpx.Response)
         mock_resp.content = b"hello world"
         mock_client = MagicMock(spec=httpx.Client)
-        mock_client.__enter__.return_value.get.return_value = mock_resp
+        mock_client.get.return_value = mock_resp
 
-        with patch("src.shared.http.create_client", return_value=mock_client):
+        with patch("src.shared.http.get_pooled_client", return_value=mock_client):
             ok, status = download_file("https://example.com/doc", output)
 
         assert ok is True
@@ -164,13 +164,13 @@ class TestDownloadFile:
         mock_resp_ok.content = b"content"
 
         mock_client = MagicMock(spec=httpx.Client)
-        mock_client.__enter__.return_value.get.side_effect = [
+        mock_client.get.side_effect = [
             httpx.HTTPStatusError("429", request=MagicMock(), response=mock_resp_429),
             mock_resp_ok,
         ]
 
         with (
-            patch("src.shared.http.create_client", return_value=mock_client),
+            patch("src.shared.http.get_pooled_client", return_value=mock_client),
             patch("time.sleep"),
         ):
             ok, status = download_file("https://example.com/doc", output)
@@ -180,13 +180,13 @@ class TestDownloadFile:
     def test_retries_on_network_error(self, tmp_path: Path) -> None:
         output = tmp_path / "retry_net.md"
         mock_client = MagicMock(spec=httpx.Client)
-        mock_client.__enter__.return_value.get.side_effect = [
+        mock_client.get.side_effect = [
             httpx.ConnectError("timeout"),
             MagicMock(content=b"ok"),
         ]
 
         with (
-            patch("src.shared.http.create_client", return_value=mock_client),
+            patch("src.shared.http.get_pooled_client", return_value=mock_client),
             patch("time.sleep"),
         ):
             ok, status = download_file("https://example.com/doc", output)
@@ -196,10 +196,10 @@ class TestDownloadFile:
     def test_gives_up_after_max_retries(self, tmp_path: Path) -> None:
         output = tmp_path / "fail.md"
         mock_client = MagicMock(spec=httpx.Client)
-        mock_client.__enter__.return_value.get.side_effect = httpx.ConnectError("always fails")
+        mock_client.get.side_effect = httpx.ConnectError("always fails")
 
         with (
-            patch("src.shared.http.create_client", return_value=mock_client),
+            patch("src.shared.http.get_pooled_client", return_value=mock_client),
             patch("time.sleep"),
         ):
             ok, status = download_file("https://example.com/doc", output, max_retries=2)
@@ -212,11 +212,11 @@ class TestDownloadFile:
         mock_resp = MagicMock(spec=httpx.Response)
         mock_resp.status_code = 403
         mock_client = MagicMock(spec=httpx.Client)
-        mock_client.__enter__.return_value.get.side_effect = httpx.HTTPStatusError(
+        mock_client.get.side_effect = httpx.HTTPStatusError(
             "403", request=MagicMock(), response=mock_resp
         )
 
-        with patch("src.shared.http.create_client", return_value=mock_client):
+        with patch("src.shared.http.get_pooled_client", return_value=mock_client):
             ok, status = download_file("https://example.com/forbidden", output)
 
         assert ok is False
@@ -227,9 +227,9 @@ class TestDownloadFile:
         mock_resp = MagicMock(spec=httpx.Response)
         mock_resp.content = b"data"
         mock_client = MagicMock(spec=httpx.Client)
-        mock_client.__enter__.return_value.get.return_value = mock_resp
+        mock_client.get.return_value = mock_resp
 
-        with patch("src.shared.http.create_client", return_value=mock_client):
+        with patch("src.shared.http.get_pooled_client", return_value=mock_client):
             ok, status = download_file("https://example.com/doc", output)
 
         assert ok is False
@@ -244,13 +244,13 @@ class TestDownloadFile:
         mock_resp_ok.content = b"content"
 
         mock_client = MagicMock(spec=httpx.Client)
-        mock_client.__enter__.return_value.get.side_effect = [
+        mock_client.get.side_effect = [
             httpx.HTTPStatusError("429", request=MagicMock(), response=mock_resp_429),
             mock_resp_ok,
         ]
 
         with (
-            patch("src.shared.http.create_client", return_value=mock_client),
+            patch("src.shared.http.get_pooled_client", return_value=mock_client),
             patch("time.sleep") as mock_sleep,
         ):
             ok, status = download_file("https://example.com/doc", output)
@@ -288,3 +288,26 @@ class TestGetRetryAfter:
         resp = MagicMock(spec=httpx.Response)
         resp.headers = {"Retry-After": "invalid"}
         assert _get_retry_after(resp) is None
+
+
+class TestPooledClient:
+    def test_returns_same_client_for_same_params(self) -> None:
+        c1 = get_pooled_client(timeout=30.0, follow_redirects=True)
+        c2 = get_pooled_client(timeout=30.0, follow_redirects=True)
+        assert c1 is c2
+
+    def test_returns_different_client_for_different_timeout(self) -> None:
+        c1 = get_pooled_client(timeout=30.0)
+        c2 = get_pooled_client(timeout=45.0)
+        assert c1 is not c2
+
+    def test_returns_different_client_for_different_redirects(self) -> None:
+        c1 = get_pooled_client(follow_redirects=True)
+        c2 = get_pooled_client(follow_redirects=False)
+        assert c1 is not c2
+
+    def test_close_all_clears_pool(self) -> None:
+        c1 = get_pooled_client(timeout=30.0)
+        close_all_pooled_clients()
+        c2 = get_pooled_client(timeout=30.0)
+        assert c1 is not c2

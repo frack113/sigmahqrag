@@ -8,8 +8,10 @@ Consolidates the HTTP logic duplicated across:
 from __future__ import annotations
 
 import logging
+import threading
 import time
 from pathlib import Path
+from typing import Any
 
 import httpx
 
@@ -22,6 +24,70 @@ DEFAULT_USER_AGENT = "SigmaRAG/1.0"
 MAX_RETRIES = 3
 BACKOFF_DELAYS = [1.0, 4.0, 9.0]
 RETRY_STATUSES = {429, 500, 502, 503, 504}
+
+
+# ------------------------------------------------------------------
+# Connection pool
+# ------------------------------------------------------------------
+
+_pool_lock = threading.Lock()
+_pool: dict[str, httpx.Client] = {}
+
+
+def _pool_key(timeout: float, follow_redirects: bool) -> str:
+    return f"{timeout:.1f}:{follow_redirects}"
+
+
+def get_pooled_client(
+    timeout: float = DEFAULT_TIMEOUT,
+    headers: dict[str, str] | None = None,
+    follow_redirects: bool = True,
+) -> httpx.Client:
+    """Return a pooled ``httpx.Client`` keyed by (timeout, follow_redirects).
+
+    Connections are reused across requests to the same host, reducing TCP
+    handshake overhead for repeated downloads (e.g. reference documents).
+    """
+    key = _pool_key(timeout, follow_redirects)
+    with _pool_lock:
+        client = _pool.get(key)
+        if client is not None:
+            return client
+
+    merged: dict[str, str] = {"User-Agent": DEFAULT_USER_AGENT}
+    if headers:
+        merged.update(headers)
+
+    transport = httpx.HTTPTransport(
+        retries=2,
+        limits=httpx.Limits(
+            max_connections=100,
+            max_keepalive_connections=20,
+            keepalive_expiry=30.0,
+        ),
+    )
+
+    new_client = httpx.Client(
+        timeout=httpx.Timeout(timeout),
+        headers=merged,
+        follow_redirects=follow_redirects,
+        transport=transport,
+    )
+
+    with _pool_lock:
+        _pool[key] = new_client
+    return new_client
+
+
+def close_all_pooled_clients() -> None:
+    """Close all pooled HTTP clients. Call at shutdown."""
+    with _pool_lock:
+        for client in _pool.values():
+            try:
+                client.close()
+            except Exception:
+                pass
+        _pool.clear()
 
 
 def create_client(
@@ -44,7 +110,7 @@ def create_client(
     -------
     httpx.Client
     """
-    merged = {"User-Agent": DEFAULT_USER_AGENT}
+    merged: dict[str, Any] = {"User-Agent": DEFAULT_USER_AGENT}
     if headers:
         merged.update(headers)
     return httpx.Client(
@@ -81,15 +147,15 @@ def head_url(
         return None, None, None
 
     try:
-        with create_client(timeout=timeout) as client:
-            resp = client.head(url)
-            resp.raise_for_status()
-            ctype = resp.headers.get("content-type")
-            if ctype:
-                ctype = ctype.split(";")[0].strip()
-            size_str = resp.headers.get("content-length", "0")
-            size = int(size_str) if size_str else 0
-            return ctype, size, str(resp.url)
+        client = get_pooled_client(timeout=timeout)
+        resp = client.head(url)
+        resp.raise_for_status()
+        ctype = resp.headers.get("content-type")
+        if ctype:
+            ctype = ctype.split(";")[0].strip()
+        size_str = resp.headers.get("content-length", "0")
+        size = int(size_str) if size_str else 0
+        return ctype, size, str(resp.url)
     except Exception:
         return None, None, None
 
@@ -127,12 +193,12 @@ def download_file(
         return False, None
 
     path = Path(output_path)
+    client = get_pooled_client(timeout=timeout)
 
     for attempt in range(1, max_retries + 1):
         try:
-            with create_client(timeout=timeout) as client:
-                resp = client.get(url)
-                resp.raise_for_status()
+            resp = client.get(url)
+            resp.raise_for_status()
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(resp.content)
             return True, None
