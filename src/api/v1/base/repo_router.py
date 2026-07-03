@@ -424,9 +424,11 @@ def create_repo_router(
     async def select_dirs(
         org: str,
         name: str,
-        request: SelectDirsRequest,
+        request_body: SelectDirsRequest,
+        background_tasks: BackgroundTasks,
+        request: Request,
     ) -> SelectDirsResponse:
-        """Save selected directories for a repository."""
+        """Save selected directories for a repository and trigger discovery."""
         try:
             _validate_org_name(org, name)
         except HTTPException as e:
@@ -440,11 +442,19 @@ def create_repo_router(
                 )
         except Exception as e:
             return SelectDirsResponse(success=False, error=str(e))
-        result = save_selected_dirs(org, name, request.selected, repos_dir=repos_dir)
+        result = save_selected_dirs(org, name, request_body.selected, repos_dir=repos_dir)
         if result.get("success"):
+            dispatcher = request.app.state.dispatcher
+            background_tasks.add_task(
+                dispatcher.ask_for_worker,
+                WorkerName.GITHUB_DISCOVERY,
+                task_type=WorkerName.GITHUB_DISCOVERY.value,
+                collection_name="all",
+                repo_key=f"{org}/{name}",
+            )
             return SelectDirsResponse(
                 success=True,
-                message=f"Saved {len(request.selected)} selected directories for {org}/{name}",
+                message=f"Saved {len(request_body.selected)} selected directories for {org}/{name}",
             )
         return SelectDirsResponse(
             success=False,

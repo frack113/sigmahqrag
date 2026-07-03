@@ -125,24 +125,33 @@ class GenericDiscoveryWorker(DiscoveryWorker):
         gh_base = self.github_base_dir or Path(task.get("github_base_dir", "data/github"))
         gh_base = gh_base.resolve()
 
-        try:
-            repo_keys = self.db.get_repos_with_selected_dirs()
-        except Exception as e:
-            logger.error(f"[GenericDiscoveryWorker] Failed to query repo keys: {e}")
-            return
-
-        if not repo_keys:
-            self._update_progress(worker_name, 100, "")
-            logger.info("[GenericDiscoveryWorker] No repos with selected dirs")
-            return
-
-        repo_items: list[tuple[str, str]] = []
-        for repo_key in repo_keys:
+        repo_key = task.get("repo_key")
+        if repo_key:
             parts = repo_key.split("/")
-            if len(parts) != 2:
+            if len(parts) == 2:
+                repo_items = [(parts[0], parts[1])]
+            else:
                 logger.warning(f"[GenericDiscoveryWorker] Invalid repo key: {repo_key}")
-                continue
-            repo_items.append((parts[0], parts[1]))
+                return
+        else:
+            try:
+                repo_keys = self.db.get_repos_with_selected_dirs()
+            except Exception as e:
+                logger.error(f"[GenericDiscoveryWorker] Failed to query repo keys: {e}")
+                return
+
+            if not repo_keys:
+                self._update_progress(worker_name, 100, "")
+                logger.info("[GenericDiscoveryWorker] No repos with selected dirs")
+                return
+
+            repo_items: list[tuple[str, str]] = []
+            for rk in repo_keys:
+                parts = rk.split("/")
+                if len(parts) != 2:
+                    logger.warning(f"[GenericDiscoveryWorker] Invalid repo key: {rk}")
+                    continue
+                repo_items.append((parts[0], parts[1]))
 
         all_files = self._collect_repo_files(repo_items, gh_base)
 
@@ -150,7 +159,7 @@ class GenericDiscoveryWorker(DiscoveryWorker):
             self._update_progress(worker_name, 1, f"{len(all_files)} files found")
 
         logger.info(
-            f"[GenericDiscoveryWorker] Found {len(all_files)} files across {len(repo_keys)} repos"
+            f"[GenericDiscoveryWorker] Found {len(all_files)} files across {len(repo_items)} repos"
         )
 
         if all_files:
