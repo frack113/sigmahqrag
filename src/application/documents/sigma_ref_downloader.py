@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 import threading
-import urllib.parse
 from collections.abc import Callable
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -13,7 +12,6 @@ from typing import Any, cast
 import yaml
 
 from src.shared.constants import NULL_UUID
-from src.shared.http import RETRY_STATUSES
 from src.shared.http import download_file as http_download_file
 from src.shared.http import head_url as http_head_url
 from src.shared.utils.registry_utils import build_registry_entry
@@ -26,14 +24,26 @@ from src.shared.utils.identify_file_type import (
     SUPPORTED_DOC_EXTENSION_MAP,
     SUPPORTED_REFERENCE_DOC_TYPES,
     filetype_ext,
-    filetype_subdir,
 )
-from src.shared.utils.url_utils import is_private_url, normalize_url, url_ext
+from src.shared.utils.url_utils import is_private_url, normalize_url
 from src.infrastructure.database import DatabaseService
 from src.core.sigma.models import is_sigma_rule_dict
-from src.shared.utils import iso_now
 from src.shared.utils.sigma_utils import extract_sigma_references
 from src.config.settings import get_config
+
+# Local helper modules
+from .sigma_ref_paths import (
+    resolve_rule_path as _resolve_rule_path,
+    sigmaref_resolve_path as _sigmaref_resolve_path,
+    sigmaref_write_path as _sigmaref_write_path,
+)
+from .sigma_ref_url import detect_url_type as _detect_url_type
+from .sigma_ref_registry import (
+    load_registry as _load_registry,
+    load_error_registry as _load_error_registry,
+    maybe_record_error as _maybe_record_error,
+    save_registry as _save_registry,
+)
 
 logger = logging.getLogger(__name__)
 DEFAULT_REQUEST_DELAY = 0.5
@@ -41,170 +51,7 @@ DEFAULT_MAX_WORKERS = 5
 SUPPORTED_EXTENSIONS: dict[str, str] = {
     ext: ft.value for ext, ft in SUPPORTED_DOC_EXTENSION_MAP.items()
 }
-
 _registry_lock = threading.Lock()
-
-
-def _subdir_for(content_type: str | None) -> str:
-    """Return the subdirectory name for a given content type."""
-    return filetype_subdir(content_type or "")
-
-
-def _sigmaref_write_path(output_path: Path, content_type: str | None, file_name: str) -> Path:
-    """Return the subdir path for writing a sigmaref file, creating the subdir as needed."""
-    subdir = _subdir_for(content_type)
-    path = output_path / subdir
-    path.mkdir(parents=True, exist_ok=True)
-    return path / file_name
-
-
-def _sigmaref_resolve_path(output_path: Path, content_type: str | None, file_name: str) -> Path:
-    """Resolve the path to an existing sigmaref file, with flat-layout fallback.
-
-    Checks the subdir first, then the old flat layout for backward compatibility
-    with files downloaded before R2.1.  Returns the subdir path if neither exists.
-    """
-    candidate = output_path / _subdir_for(content_type) / file_name
-    if candidate.exists():
-        return candidate
-    flat = output_path / file_name
-    if flat.exists():
-        return flat
-    return candidate
-
-
-def _detect_url_type(url: str, content_type: str | None = None) -> str | None:
-    """Detect the document type of a reference URL.
-
-    Checks URL extension first, then falls back to HTTP Content-Type.
-
-    Args:
-        url: The reference URL.
-        content_type: Optional HTTP Content-Type header value.
-
-    Returns:
-        The FileType value string (e.g. "markdown") or None if unsupported.
-    """
-    parsed = urllib.parse.urlparse(url)
-    path = parsed.path.rstrip("/")
-    ext = Path(path).suffix.lower()
-
-    if ext in SUPPORTED_EXTENSIONS:
-        return SUPPORTED_EXTENSIONS[ext]
-
-    if content_type:
-        ct = content_type.lower()
-        if ct.startswith("text/markdown"):
-            return "markdown"
-        if ct.startswith("text/html"):
-            return "html"
-        if ct.startswith("text/plain"):
-            if ext in {".md", ".markdown"}:
-                return "markdown"
-            return "plain_text"
-        if ct.startswith("application/pdf"):
-            return "pdf"
-        if ct.startswith("application/vnd.openxmlformats-officedocument"):
-            return "office_document"
-        if ct.startswith("application/vnd.oasis.opendocument"):
-            return "office_document"
-        if ct.startswith("application/msword"):
-            return "office_document"
-        if ct.startswith("application/rtf"):
-            return "office_document"
-
-    return None
-
-
-def _load_registry(path: Path, db: DatabaseService) -> dict[str, Any]:
-    """Load the registry from doc_registry for sigmaref org.
-
-    Returns an empty dict if DB not available.
-    """
-    entries = db.get_entries_by_org("sigmaref", limit=0)
-    registry = {}
-    for entry in entries:
-        url_hash = entry["url_hash"]
-        registry[url_hash] = {
-            "original_url": entry.get("original_url", ""),
-            "normalized_url": entry.get("normalized_url"),
-            "content_type": entry.get("content_type"),
-            "rule_id": entry.get("rule_id"),
-            "title": entry.get("title"),
-            "timestamp": entry.get("timestamp"),
-            "content_sha256": entry.get("content_sha256"),
-            "embed_status": entry.get("embed_status"),
-            "last_seen": entry.get("last_seen"),
-            "file_name": entry.get("file_name", ""),
-        }
-    return registry
-
-
-def _save_registry(registry: dict[str, Any], path: Path, db: DatabaseService) -> None:
-    """Save the registry to doc_registry atomically in a single batch."""
-    rows = []
-    now = iso_now()
-    for url_hash, entry in registry.items():
-        if isinstance(entry, dict):
-            rows.append(
-                {
-                    "url_hash": url_hash,
-                    "original_url": entry.get("original_url", ""),
-                    "normalized_url": entry.get("normalized_url"),
-                    "content_type": entry.get("content_type"),
-                    "rule_id": entry.get("rule_id"),
-                    "title": entry.get("title"),
-                    "timestamp": entry.get("timestamp"),
-                    "content_sha256": entry.get("content_sha256"),
-                    "org": entry.get("org", "sigmaref"),
-                    "repo": entry.get("repo", "references"),
-                    "file_name": entry.get("file_name", ""),
-                    "file_size": entry.get("file_size"),
-                    "embed_status": entry.get("embed_status", "discovery"),
-                    "last_seen": entry.get("last_seen", now),
-                }
-            )
-    db.batch_upsert_doc_registry(rows)
-
-
-def _load_error_registry(db: DatabaseService) -> set[str]:
-    """Load the set of url_hash values that have previously failed (30x/40x)."""
-    try:
-        entries = db.get_doc_errors()
-        return {e["url_hash"] for e in entries}
-    except Exception:
-        logger.warning("Failed to load error registry from DuckDB — proceeding without it")
-        return set()
-
-
-def _maybe_record_error(
-    db: DatabaseService,
-    url_hash: str,
-    original_url: str,
-    normalized_url: str,
-    status_code: int | None,
-    rule_id: str,
-    rule_title: str,
-) -> None:
-    """Record a 30x/40x download error in doc_error so it is skipped on retry."""
-    if status_code is None:
-        return
-    if 300 <= status_code < 500 or (status_code >= 500 and status_code not in RETRY_STATUSES):
-        try:
-            db.upsert_doc_error(
-                {
-                    "url_hash": url_hash,
-                    "original_url": original_url,
-                    "normalized_url": normalized_url,
-                    "error_code": status_code,
-                    "error_message": f"HTTP {status_code}",
-                    "org": "sigmaref",
-                    "repo": "references",
-                    "timestamp": iso_now(),
-                }
-            )
-        except Exception:
-            logger.warning("Failed to record error for %s", normalized_url)
 
 
 def download_sigma_references(
@@ -460,7 +307,7 @@ def _download_scan_mode(
                 # File missing or no file_name — fall through to re-download
 
             # Determine extension and content type
-            ext = url_ext(normalized)
+            ext = filetype_ext(normalized)
             ftype = _detect_url_type(normalized)
             if ftype is None and url_hash in registry:
                 ct = registry[url_hash].get("content_type")
@@ -585,7 +432,7 @@ def _download_scan_mode(
             future_map = {}
             for item in download_queue:
                 future = executor.submit(
-                    http_download_file,
+                    http_download_file,  # type: ignore[arg-type]
                     item["normalized_url"],
                     item["output_file"],
                     check_ssrf=False,
@@ -656,30 +503,6 @@ def _empty_summary() -> dict[str, Any]:
 # Registry mode — reads pending Sigma rules from doc_registry and
 # downloads their referenced documents.
 # ------------------------------------------------------------------
-
-
-def _resolve_rule_path(entry: dict, cfg: Any) -> Path | None:
-    """Resolve the local file path for a sigma rule entry."""
-    org = entry.get("org", "")
-    repo = entry.get("repo", "")
-    file_name = entry.get("file_name", "")
-
-    if not file_name:
-        return None
-
-    if org == "local":
-        base = Path(str(cfg.local_documents_path))
-        return Path(base, file_name)
-
-    if org == "sigmaref":
-        base = Path(str(cfg.sigmaref_documents_path))
-        return Path(base, file_name)
-
-    if org and repo:
-        base = Path(str(cfg.paths_github_dir))
-        return Path(base, org, repo, file_name)
-
-    return None
 
 
 def _download_registry_mode(
@@ -887,8 +710,8 @@ def _download_registry_mode(
                 result = future.result()
                 if result is None:
                     skipped += 1
-                elif result[0] == "ok":
-                    _, url_hash, content_hash, size = result
+                elif result is not None and result[0] == "ok":
+                    _, url_hash, content_hash, size = cast(tuple[str, str, str, int], result)
                     entry = build_registry_entry(
                         url_hash=url_hash,
                         normalized_url=item.get("final_url", item["url"]),
