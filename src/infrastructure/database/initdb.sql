@@ -94,7 +94,7 @@ CREATE TABLE IF NOT EXISTS rule_references (
     rule_id  TEXT NOT NULL,
     url_hash TEXT NOT NULL,
     ref_url  TEXT NOT NULL,
-    created  TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    created  TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', current_timestamp)),
     PRIMARY KEY (rule_id, url_hash)
 );
 

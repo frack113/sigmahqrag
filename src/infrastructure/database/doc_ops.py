@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import os
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 from src.shared.constants import NULL_UUID
@@ -643,6 +644,9 @@ class DatabaseServiceDocOps:
         Returns:
             Number of deleted entries.
         """
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=grace_days)).strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        )
         with self._lock:
             # Find orphan url_hashes
             orphans = self._writer_conn.execute(
@@ -650,8 +654,8 @@ class DatabaseServiceDocOps:
                 "WHERE embed_status = 'head_verified' "
                 "AND (content_sha256 IS NULL OR content_sha256 = '') "
                 "AND (last_seen IS NULL "
-                "     OR last_seen < strftime('%Y-%m-%dT%H:%M:%fZ', 'now', ?))",
-                [f"-{grace_days} days"],
+                "     OR last_seen < ?)",
+                [cutoff],
             ).fetchall()
             orphan_hashes = [row[0] for row in orphans]
 

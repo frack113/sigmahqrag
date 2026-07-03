@@ -72,7 +72,7 @@ class TestDuckDbStatus:
         assert status["state"] == "dirty_tables"
         assert status["needs_fix"] is True
         assert status["needs_clean"] is False
-        assert len(status["tables_missing"]) == 10
+        assert len(status["tables_missing"]) == 11
         assert status["tables_excess"] == []
 
     def test_excess_tables_state(self, manager: DuckDbManager, tmp_path: Path) -> None:
