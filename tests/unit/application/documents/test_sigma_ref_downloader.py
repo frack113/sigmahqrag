@@ -916,3 +916,130 @@ references:
         # File should be written with {url_hash}{ext} naming
         expected_filename = f"{expected_hash}.md"
         assert (output_dir / expected_filename).exists()
+
+
+class TestRuleReferences:
+    """Tests for rule↔reference tracking."""
+
+    def test_scan_mode_populates_rule_references(self, tmp_path: Path) -> None:
+        """Scan mode inserts rule_references rows via batch_upsert_rule_references."""
+        rules_dir = tmp_path / "rules"
+        rules_dir.mkdir()
+        output_dir = tmp_path / "output"
+        ref_url = "https://example.com/tracked-doc.md"
+
+        rule = rules_dir / "test_rule.yml"
+        rule.write_text(f"""
+title: Tracked Rule
+id: tracked-001
+logsource:
+  category: process_creation
+  product: windows
+detection:
+  selection:
+    EventID: 4688
+  condition: selection
+references:
+  - {ref_url}
+""")
+
+        db = _make_db()
+        db.batch_upsert_rule_references = MagicMock()
+
+        def _fake_download(
+            url: str, output_path: Path, **kwargs: object
+        ) -> tuple[bool, int | None]:
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text("# tracked")
+            return True, None
+
+        with patch(
+            "src.application.documents.sigma_ref_downloader.http_download_file",
+            _fake_download,
+        ):
+            from src.application.documents.sigma_ref_downloader import (
+                download_sigma_references,
+            )
+
+            result = download_sigma_references(
+                db=db,
+                output_dir=str(output_dir),
+                mode="scan",
+                rules_dir=str(rules_dir),
+            )
+
+        assert result["downloaded"] == 1
+        db.batch_upsert_rule_references.assert_called_once()
+        args = db.batch_upsert_rule_references.call_args[0][0]
+        assert len(args) == 1
+        assert args[0]["rule_id"] == "tracked-001"
+        assert args[0]["ref_url"] == ref_url
+
+    def test_scan_mode_dedup_urls_in_rule_refs(self, tmp_path: Path) -> None:
+        """Two rules referencing the same URL get two rule_references rows."""
+        rules_dir = tmp_path / "rules"
+        rules_dir.mkdir()
+        output_dir = tmp_path / "output"
+        ref_url = "https://example.com/shared-doc.md"
+
+        rule_a = rules_dir / "rule_a.yml"
+        rule_a.write_text(f"""
+title: Rule A
+id: rule-a
+logsource:
+  category: process_creation
+  product: windows
+detection:
+  selection:
+    EventID: 4625
+  condition: selection
+references:
+  - {ref_url}
+""")
+
+        rule_b = rules_dir / "rule_b.yml"
+        rule_b.write_text(f"""
+title: Rule B
+id: rule-b
+logsource:
+  category: process_creation
+  product: windows
+detection:
+  selection:
+    EventID: 4688
+  condition: selection
+references:
+  - {ref_url}
+""")
+
+        db = _make_db()
+        db.batch_upsert_rule_references = MagicMock()
+
+        def _fake_download(
+            url: str, output_path: Path, **kwargs: object
+        ) -> tuple[bool, int | None]:
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text("# shared")
+            return True, None
+
+        with patch(
+            "src.application.documents.sigma_ref_downloader.http_download_file",
+            _fake_download,
+        ):
+            from src.application.documents.sigma_ref_downloader import (
+                download_sigma_references,
+            )
+
+            download_sigma_references(
+                db=db,
+                output_dir=str(output_dir),
+                mode="scan",
+                rules_dir=str(rules_dir),
+            )
+
+        db.batch_upsert_rule_references.assert_called_once()
+        rows = db.batch_upsert_rule_references.call_args[0][0]
+        assert len(rows) == 2
+        rule_ids = {r["rule_id"] for r in rows}
+        assert rule_ids == {"rule-a", "rule-b"}
+        assert rows[0]["url_hash"] == rows[1]["url_hash"]

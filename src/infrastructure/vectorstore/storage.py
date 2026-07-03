@@ -106,6 +106,9 @@ async def store_embeddings(
         if collection_name not in existing_collections:
             from qdrant_client.models import (
                 Distance,
+                ScalarQuantization,
+                ScalarQuantizationConfig,
+                ScalarType,
                 SparseIndexParams,
                 SparseVectorParams,
                 VectorParams,
@@ -117,6 +120,13 @@ async def store_embeddings(
                 sparse_vectors_config={
                     "text-sparse": SparseVectorParams(index=SparseIndexParams()),
                 },
+                quantization_config=ScalarQuantization(
+                    scalar=ScalarQuantizationConfig(
+                        type=ScalarType.INT8,
+                        always_ram=True,
+                        quantile=0.5,
+                    )
+                ),
             )
 
         # Delete old points for each source before upserting

@@ -15,6 +15,32 @@ from .client import get_qdrant_client
 logger = logging.getLogger(__name__)
 
 
+def collection_hnsw_config(
+    collection_name: str,
+) -> qdrant_client.models.HnswConfigDiff | None:
+    """Return per-collection HNSW config.
+
+    ``sigma_rules`` is kept in-RAM with higher ``ef_construct`` for
+    better recall.  ``sigma_docs`` and ``sigma_spec`` (cold collections)
+    use on-disk storage to save RAM.
+    """
+    if collection_name == "sigma_rules":
+        return qdrant_client.models.HnswConfigDiff(
+            m=16,
+            ef_construct=200,
+            full_scan_threshold_kb=10000,
+            on_disk=False,
+        )
+    if collection_name in ("sigma_docs", "sigma_spec"):
+        return qdrant_client.models.HnswConfigDiff(
+            m=16,
+            ef_construct=100,
+            full_scan_threshold_kb=10000,
+            on_disk=True,
+        )
+    return None
+
+
 def _get_collections_sync(client) -> Any:
     """Synchronous wrapper for client.get_collections()."""
     return client.get_collections()
@@ -32,15 +58,24 @@ def _count_sync(client, collection_name: str) -> int:
 
 
 def _create_collection_sync(
-    client, collection_name: str, vectors_config, sparse_vectors_config=None
+    client,
+    collection_name: str,
+    vectors_config,
+    sparse_vectors_config=None,
+    quantization_config=None,
+    hnsw_config=None,
 ):
     """Synchronous wrapper for client.create_collection()."""
-    kwargs = {
+    kwargs: dict[str, Any] = {
         "collection_name": collection_name,
         "vectors_config": vectors_config,
     }
     if sparse_vectors_config is not None:
         kwargs["sparse_vectors_config"] = sparse_vectors_config
+    if quantization_config is not None:
+        kwargs["quantization_config"] = quantization_config
+    if hnsw_config is not None:
+        kwargs["hnsw_config"] = hnsw_config
     client.create_collection(**kwargs)
 
 
@@ -104,9 +139,24 @@ async def list_collections(host: str, port: int) -> list[dict[str, Any]]:
 
 
 async def create_collection(
-    host: str, port: int, collection_name: str, vector_size: int = 384, enable_hybrid: bool = True
+    host: str,
+    port: int,
+    collection_name: str,
+    vector_size: int = 384,
+    enable_hybrid: bool = True,
+    enable_quantization: bool = True,
 ) -> bool:
-    """Create a new collection (with optional sparse vector support for hybrid search)."""
+    """Create a new collection (with optional sparse vector support for hybrid search).
+
+    When *enable_quantization* is True, ScalarQuantization INT8 is applied
+    to reduce vector memory footprint by ~4x with minimal recall loss when
+    combined with rescore.
+
+    HNSW config is selected per-collection via :func:`collection_hnsw_config`:
+    ``sigma_rules`` uses in-RAM HNSW with higher ``ef_construct`` for
+    better recall, while ``sigma_docs`` and ``sigma_spec`` use on-disk
+    storage to save RAM.
+    """
     client = get_qdrant_client(host=host, port=port)
     try:
         vectors_config = qdrant_client.models.VectorParams(
@@ -120,8 +170,24 @@ async def create_collection(
                     index=qdrant_client.models.SparseIndexParams()
                 )
             }
+        quantization_config = None
+        if enable_quantization:
+            quantization_config = qdrant_client.models.ScalarQuantization(
+                scalar=qdrant_client.models.ScalarQuantizationConfig(
+                    type=qdrant_client.models.ScalarType.INT8,
+                    always_ram=True,
+                    quantile=0.5,
+                )
+            )
+        hnsw_config = collection_hnsw_config(collection_name)
         await asyncio.to_thread(
-            _create_collection_sync, client, collection_name, vectors_config, sparse_vectors_config
+            _create_collection_sync,
+            client,
+            collection_name,
+            vectors_config,
+            sparse_vectors_config,
+            quantization_config,
+            hnsw_config,
         )
         await asyncio.to_thread(_create_payload_indexes_sync, client, collection_name)
         logger.info(

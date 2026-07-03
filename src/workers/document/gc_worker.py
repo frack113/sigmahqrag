@@ -51,10 +51,16 @@ class DocGCWorker(BaseWorker):
             )
 
             skipped_found = self._cleanup_orphaned_error_entries()
+
+            removed_head = self.db.delete_head_verified_orphans(grace_days=grace_days)
+            removed_unref = self.db.delete_unreferenced_entries()
+
             scanned = deleted
 
             logger.info(
-                f"[DocGCWorker] Complete: scanned={scanned}, removed={deleted}, reappears={skipped_found}"
+                f"[DocGCWorker] Complete: scanned={scanned}, removed={deleted}, "
+                f"reappears={skipped_found}, head_verified={removed_head}, "
+                f"unreferenced={removed_unref}"
             )
 
         except Exception as e:

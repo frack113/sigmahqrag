@@ -1,6 +1,7 @@
 import logging
 from pathlib import Path
 
+from src.shared.constants import NULL_UUID
 from src.shared.utils.crypto_utils import compute_sha256_file, compute_sha256_str
 from src.shared.utils.identify_file_type import identify
 from src.shared.utils import iso_now
@@ -40,7 +41,7 @@ class DiscoveryWorker(BaseWorker):
         original_url: str,
         normalized_url: str,
         title: str,
-        rule_id: str = "00000000-0000-0000-0000-000000000000",
+        rule_id: str = NULL_UUID,
     ) -> dict:
         url_hash = compute_sha256_str(normalized_url)
         now = iso_now()

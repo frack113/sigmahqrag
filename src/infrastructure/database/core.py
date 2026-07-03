@@ -27,6 +27,7 @@ _VALID_TABLES = frozenset(
         "doc_registry",
         "sigma_spec",
         "doc_error",
+        "rule_references",
         "git_metadata",
         "git_selected_dirs",
         "worker_state",

@@ -89,6 +89,17 @@ CREATE TABLE IF NOT EXISTS sigma_spec (
 CREATE INDEX IF NOT EXISTS idx_sigma_spec_embed ON sigma_spec(embed_status);
 CREATE INDEX IF NOT EXISTS idx_sigma_spec_org_repo ON sigma_spec(org, repo);
 
+-- rule_references (junction table: rule_id ↔ reference url_hash — M:N)
+CREATE TABLE IF NOT EXISTS rule_references (
+    rule_id  TEXT NOT NULL,
+    url_hash TEXT NOT NULL,
+    ref_url  TEXT NOT NULL,
+    created  TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+    PRIMARY KEY (rule_id, url_hash)
+);
+
+CREATE INDEX IF NOT EXISTS idx_rule_ref_url_hash ON rule_references(url_hash);
+
 -- doc_error (failed URLs — 30x/40x errors to skip on retry)
 CREATE TABLE IF NOT EXISTS doc_error (
     url_hash TEXT PRIMARY KEY,

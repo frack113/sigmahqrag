@@ -12,6 +12,7 @@ from typing import Any, cast
 
 import yaml
 
+from src.shared.constants import NULL_UUID
 from src.shared.http import RETRY_STATUSES
 from src.shared.http import download_file as http_download_file
 from src.shared.http import head_url as http_head_url
@@ -339,6 +340,7 @@ def _download_scan_mode(
     # Phase 1: scan YAML files, classify refs
     download_queue: list[dict[str, Any]] = []
     head_pending: list[dict[str, Any]] = []
+    rule_refs: list[dict[str, str]] = []
 
     total_files = len(yml_files)
     for file_idx, yml_file in enumerate(yml_files):
@@ -380,6 +382,8 @@ def _download_scan_mode(
             normalized = normalize_url(ref)
 
             url_hash = compute_sha256_str(normalized)
+
+            rule_refs.append({"rule_id": rule_id, "url_hash": url_hash, "ref_url": ref})
 
             if url_hash in error_registry:
                 logger.debug("Skipping previously failed URL: %s", normalized)
@@ -596,6 +600,9 @@ def _download_scan_mode(
     with _registry_lock:
         _save_registry(registry, output_path, db)
 
+    if rule_refs:
+        db.batch_upsert_rule_references(rule_refs)
+
     summary: dict[str, Any] = {
         "total_rules": total_rules,
         "total_refs": total_refs,
@@ -684,9 +691,10 @@ def _download_registry_mode(
     head_queue: list[dict[str, Any]] = []
     download_ready: list[dict[str, Any]] = []
     seen_urls: set[str] = set()
+    rule_refs: list[dict[str, str]] = []
 
     for rule_entry in sigma_entries:
-        rule_id: str = rule_entry.get("rule_id", "00000000-0000-0000-0000-000000000000")
+        rule_id: str = rule_entry.get("rule_id", NULL_UUID)
         original_url = rule_entry.get("original_url", "")
         file_name = rule_entry.get("file_name", "")
 
@@ -718,6 +726,8 @@ def _download_registry_mode(
                 skipped += 1
                 continue
             seen_urls.add(url_hash)
+
+            rule_refs.append({"rule_id": rule_id, "url_hash": url_hash, "ref_url": ref_url_clean})
 
             existing = registry.get(url_hash)
 
@@ -884,6 +894,9 @@ def _download_registry_mode(
                     total_head + total_to_download,
                     "downloading",
                 )
+
+    if rule_refs:
+        db.batch_upsert_rule_references(rule_refs)
 
     return {
         "total_rules": total_rules,

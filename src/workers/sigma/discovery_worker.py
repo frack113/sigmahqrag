@@ -5,8 +5,10 @@ from __future__ import annotations
 import logging
 from enum import Enum
 from pathlib import Path
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Optional
 
+from src.shared.constants import NULL_UUID
 from src.shared.utils.identify_file_type import SIGMA_RULE_EXTENSIONS, SUPPORTED_DOC_EXTENSION_MAP
 from src.shared.utils.sigma_utils import get_sigma_rule_id
 from src.infrastructure.database.service import DatabaseService
@@ -134,40 +136,15 @@ class GenericDiscoveryWorker(DiscoveryWorker):
             logger.info("[GenericDiscoveryWorker] No repos with selected dirs")
             return
 
-        all_files: list[tuple[Path, Path, str, str]] = []
+        repo_items: list[tuple[str, str]] = []
         for repo_key in repo_keys:
             parts = repo_key.split("/")
             if len(parts) != 2:
                 logger.warning(f"[GenericDiscoveryWorker] Invalid repo key: {repo_key}")
                 continue
+            repo_items.append((parts[0], parts[1]))
 
-            org, repo = parts
-            repo_path = gh_base / org / repo
-
-            if not repo_path.exists():
-                logger.warning(f"[GenericDiscoveryWorker] Repo not found: {repo_path}")
-                continue
-
-            selected = self.selected_dirs or self._get_selected_dirs(repo_key)
-
-            for found_file in repo_path.rglob("*"):
-                if (
-                    not found_file.is_file()
-                    or found_file.suffix.lower() not in SUPPORTED_EXTENSIONS
-                ):
-                    continue
-
-                if selected:
-                    rel_to_repo = found_file.relative_to(repo_path).as_posix()
-                    if not any(
-                        rel_to_repo == sd.lstrip("./")
-                        or rel_to_repo.startswith(sd.lstrip("./") + "/")
-                        for sd in selected
-                        if sd
-                    ):
-                        continue
-
-                all_files.append((found_file, repo_path, org, repo))
+        all_files = self._collect_repo_files(repo_items, gh_base)
 
         if self.dispatcher:
             self._update_progress(worker_name, 1, f"{len(all_files)} files found")
@@ -177,7 +154,11 @@ class GenericDiscoveryWorker(DiscoveryWorker):
         )
 
         if all_files:
-            entries, processed_count, skipped_count = self._scan_all_github(all_files, worker_name)
+            entries, processed_count, skipped_count = self._scan_all(
+                all_files,
+                worker_name,
+                lambda fp, bp, o, r: self._prepare_entry(fp, bp, o, r, is_github=True),
+            )
             self._write_entries(
                 entries, worker_name, len(all_files), processed_count, skipped_count
             )
@@ -206,47 +187,20 @@ class GenericDiscoveryWorker(DiscoveryWorker):
             logger.info("[GenericDiscoveryWorker] No spec repos found")
             return
 
-        all_files: list[tuple[Path, Path, str, str]] = []
+        repo_items: list[tuple[str, str]] = []
         for repo_info in repos:
             org = repo_info.get("org", "")
             repo_name = repo_info.get("name", "")
-            if not org or not repo_name:
-                continue
+            if org and repo_name:
+                repo_items.append((org, repo_name))
 
-            repo_path = spec_base / org / repo_name
-            if not repo_path.exists():
-                logger.warning(f"[GenericDiscoveryWorker] Repo path not found: {repo_path}")
-                continue
-
-            repo_key = f"{org}/{repo_name}"
-            selected = self.selected_dirs or self._get_selected_dirs(repo_key)
-
-            try:
-                for found_file in repo_path.rglob("*"):
-                    if (
-                        not found_file.is_file()
-                        or found_file.suffix.lower() not in SUPPORTED_EXTENSIONS
-                    ):
-                        continue
-
-                    if selected:
-                        rel_to_repo = found_file.relative_to(repo_path).as_posix()
-                        if not any(
-                            rel_to_repo == sd.lstrip("./")
-                            or rel_to_repo.startswith(sd.lstrip("./") + "/")
-                            for sd in selected
-                            if sd
-                        ):
-                            continue
-
-                    all_files.append((found_file, repo_path, org, repo_name))
-            except PermissionError as e:
-                logger.warning(
-                    "[GenericDiscoveryWorker] Permission denied scanning %s: %s",
-                    repo_path,
-                    e,
-                )
-                continue
+        try:
+            all_files = self._collect_repo_files(repo_items, spec_base)
+        except PermissionError as e:
+            logger.warning(
+                "[GenericDiscoveryWorker] Permission denied scanning %s: %s", spec_base, e
+            )
+            all_files = []
 
         if self.dispatcher:
             self._update_progress(worker_name, 1, f"{len(all_files)} files found")
@@ -256,15 +210,23 @@ class GenericDiscoveryWorker(DiscoveryWorker):
         )
 
         if all_files:
-            entries, processed_count, skipped_count = self._scan_all_spec(all_files, worker_name)
-            self._write_spec_entries(
-                entries, worker_name, len(all_files), processed_count, skipped_count
+            entries, processed_count, skipped_count = self._scan_all(
+                all_files, worker_name, self._prepare_spec_entry
+            )
+            self._write_entries(
+                entries,
+                worker_name,
+                len(all_files),
+                processed_count,
+                skipped_count,
+                batch_upsert_fn=self.db.batch_upsert_sigma_spec,
             )
 
-    def _scan_all_spec(
+    def _scan_all(
         self,
         files: list[tuple[Path, Path, str, str]],
         worker_name: WorkerName,
+        prepare_fn: Callable,
     ) -> tuple[list[dict], int, int]:
         entries: list[dict] = []
         processed_count = 0
@@ -272,7 +234,7 @@ class GenericDiscoveryWorker(DiscoveryWorker):
 
         for idx, (file_path, base_path, org, repo) in enumerate(files):
             try:
-                entry = self._prepare_spec_entry(file_path, base_path, org, repo)
+                entry = prepare_fn(file_path, base_path, org, repo)
                 if entry is not None:
                     entries.append(entry)
                     processed_count += 1
@@ -328,19 +290,24 @@ class GenericDiscoveryWorker(DiscoveryWorker):
             logger.error(f"[GenericDiscoveryWorker] Cannot prepare spec entry for {file_path}: {e}")
             return None
 
-    def _write_spec_entries(
-        self, entries: list[dict], worker_name: WorkerName, total: int, processed: int, skipped: int
+    def _write_entries(
+        self,
+        entries: list[dict],
+        worker_name: WorkerName,
+        total: int,
+        processed: int,
+        skipped: int,
+        batch_upsert_fn: Callable | None = None,
     ) -> None:
         if not entries:
             self._update_progress(worker_name, 100, "")
             return
 
+        upsert_fn = batch_upsert_fn or self.db.batch_upsert_doc_registry
         try:
-            self.db.batch_upsert_sigma_spec(entries)
+            upsert_fn(entries)
         except Exception as e:
-            logger.error(
-                f"[GenericDiscoveryWorker] Batch upsert sigma_spec failed: {e}", exc_info=True
-            )
+            logger.error(f"[GenericDiscoveryWorker] Batch upsert failed: {e}", exc_info=True)
 
         if total > 0 and self.dispatcher:
             pct = int((processed + skipped) / total * 100)
@@ -374,33 +341,6 @@ class GenericDiscoveryWorker(DiscoveryWorker):
             except Exception as e:
                 logger.error(f"[GenericDiscoveryWorker] Error processing {file_path}: {e}")
                 skipped_count += 1
-
-        return entries, processed_count, skipped_count
-
-    def _scan_all_github(
-        self,
-        files: list[tuple[Path, Path, str, str]],
-        worker_name: WorkerName,
-    ) -> tuple[list[dict], int, int]:
-        entries: list[dict] = []
-        processed_count = 0
-        skipped_count = 0
-
-        for idx, (file_path, base_path, org, repo) in enumerate(files):
-            try:
-                entry = self._prepare_entry(file_path, base_path, org, repo, is_github=True)
-                if entry is not None:
-                    entries.append(entry)
-                    processed_count += 1
-                else:
-                    skipped_count += 1
-            except Exception as e:
-                logger.error(f"[GenericDiscoveryWorker] Unexpected error on {file_path}: {e}")
-                skipped_count += 1
-
-            if idx % 50 == 0 and self.dispatcher:
-                pct = int((idx + 1) / len(files) * 100) if files else 0
-                self._update_progress(worker_name, pct, str(file_path))
 
         return entries, processed_count, skipped_count
 
@@ -439,7 +379,7 @@ class GenericDiscoveryWorker(DiscoveryWorker):
             content_type = self._identify_content_type(file_path)
             title = file_path.stem
 
-            rule_id = "00000000-0000-0000-0000-000000000000"
+            rule_id = NULL_UUID
             if content_type == "sigma_rule":
                 rid = get_sigma_rule_id(file_path)
                 if rid:
@@ -460,6 +400,55 @@ class GenericDiscoveryWorker(DiscoveryWorker):
         except Exception as e:
             logger.error(f"[GenericDiscoveryWorker] Cannot prepare entry for {file_path}: {e}")
             return None
+
+    # ------------------------------------------------------------------
+    # Shared repo scanning
+    # ------------------------------------------------------------------
+
+    def _collect_repo_files(
+        self,
+        repo_items: list[tuple[str, str]],
+        repo_base: Path,
+    ) -> list[tuple[Path, Path, str, str]]:
+        """Iterate over repos and collect supported files with selected_dirs filtering.
+
+        Args:
+            repo_items: List of ``(org, repo_name)`` tuples.
+            repo_base: Base path under which ``{org}/{repo}`` directories live.
+
+        Returns:
+            List of ``(file_path, repo_path, org, repo_name)`` tuples.
+        """
+        all_files: list[tuple[Path, Path, str, str]] = []
+        for org, repo in repo_items:
+            repo_path = repo_base / org / repo
+            if not repo_path.exists():
+                logger.warning(f"[GenericDiscoveryWorker] Repo not found: {repo_path}")
+                continue
+
+            repo_key = f"{org}/{repo}"
+            selected = self.selected_dirs or self._get_selected_dirs(repo_key)
+
+            for found_file in repo_path.rglob("*"):
+                if (
+                    not found_file.is_file()
+                    or found_file.suffix.lower() not in SUPPORTED_EXTENSIONS
+                ):
+                    continue
+
+                if selected:
+                    rel_to_repo = found_file.relative_to(repo_path).as_posix()
+                    if not any(
+                        rel_to_repo == sd.lstrip("./")
+                        or rel_to_repo.startswith(sd.lstrip("./") + "/")
+                        for sd in selected
+                        if sd
+                    ):
+                        continue
+
+                all_files.append((found_file, repo_path, org, repo))
+
+        return all_files
 
     # ------------------------------------------------------------------
     # Helpers
