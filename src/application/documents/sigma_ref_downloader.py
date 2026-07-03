@@ -19,6 +19,7 @@ from src.shared.http import head_url as http_head_url
 from src.shared.utils.registry_utils import build_registry_entry
 from src.shared.utils.crypto_utils import compute_sha256_file, compute_sha256_str
 from src.shared.utils.identify_file_type import (
+    FILETYPE_TO_EXT,
     SUPPORTED_DOC_EXTENSION_MAP,
     SUPPORTED_REFERENCE_DOC_TYPES,
 )
@@ -442,14 +443,7 @@ def _download_scan_mode(
                 continue
 
             if not ext and ftype is not None:
-                _TYPE_TO_EXT: dict[str, str] = {
-                    "html": ".html",
-                    "markdown": ".md",
-                    "plain_text": ".txt",
-                    "pdf": ".pdf",
-                    "office_document": ".docx",
-                }
-                ext = _TYPE_TO_EXT.get(ftype, ".md")
+                ext = FILETYPE_TO_EXT.get(ftype, ".md")
 
             if not ext:
                 ext = ".md"
@@ -523,14 +517,7 @@ def _download_scan_mode(
                 ftype = _detect_url_type(item["normalized"], content_type=head_ct)
                 ext = item["ext"]
                 if not ext and ftype is not None:
-                    _TYPE_TO_EXT = {
-                        "html": ".html",
-                        "markdown": ".md",
-                        "plain_text": ".txt",
-                        "pdf": ".pdf",
-                        "office_document": ".docx",
-                    }
-                    ext = _TYPE_TO_EXT.get(ftype, ".md")
+                    ext = FILETYPE_TO_EXT.get(ftype, ".md")
                 if not ext:
                     ext = ".md"
                 output_file = output_path / f"{item['url_hash']}{ext}"
@@ -827,18 +814,10 @@ def _download_registry_mode(
     all_to_download = head_pending + download_ready
     total_to_download = len(all_to_download)
 
-    _TYPE_TO_EXT = {
-        "html": ".html",
-        "markdown": ".md",
-        "plain_text": ".txt",
-        "pdf": ".pdf",
-        "office_document": ".docx",
-    }
-
     def _download_one(item: dict[str, Any]) -> tuple[str, str, str, int] | None:
         url = item["final_url"]
         content_type = item.get("content_type", "")
-        ext = _TYPE_TO_EXT.get(content_type, ".md")
+        ext = FILETYPE_TO_EXT.get(content_type, ".md")
         url_hash = item.get("url_hash") or compute_sha256_str(normalize_url(url))
         file_path = output_path / f"{url_hash}{ext}"
 
@@ -875,7 +854,7 @@ def _download_registry_mode(
                         rule_id=item["rule_id"],
                         title=item["rule_title"],
                         content_sha256=content_hash,
-                        file_name=f"{url_hash}{_TYPE_TO_EXT.get(item['content_type'], '.md')}",
+                        file_name=f"{url_hash}{FILETYPE_TO_EXT.get(item['content_type'], '.md')}",
                         file_size=size,
                         embed_status="discovery",
                     )

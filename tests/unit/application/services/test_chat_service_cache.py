@@ -26,7 +26,7 @@ class TestSearchCacheCleanup:
         with patch.object(
             svc, "_execute_tool_calls", new_callable=AsyncMock, return_value="Answer"
         ):
-            result = await svc._handle_search(message)
+            result = await svc._handle_search(message, "")
 
         svc.rag_pipeline.llm_client.erase_slot_cache.assert_not_awaited()
         assert result == "Answer"
@@ -37,7 +37,7 @@ class TestSearchCacheCleanup:
         with patch.object(
             svc, "_execute_tool_calls", new_callable=AsyncMock, return_value="Answer"
         ):
-            await svc._handle_search("simple question")
+            await svc._handle_search("simple question", "")
 
         svc.rag_pipeline.llm_client.erase_slot_cache.assert_not_awaited()
 
@@ -50,7 +50,7 @@ class TestSearchCacheCleanup:
         with patch.object(
             svc, "_execute_tool_calls", new_callable=AsyncMock, return_value="Answer"
         ):
-            result = await svc._handle_search("detection:\n  condition: selection")
+            result = await svc._handle_search("detection:\n  condition: selection", "")
 
         assert result == "Answer"
 
@@ -83,7 +83,7 @@ class TestSearchStreamCacheCleanup:
             ),
         ):
             tokens = []
-            async for t in svc._handle_search_stream(message):
+            async for t in svc._handle_search_stream(message, "", ""):
                 tokens.append(t)
 
         svc.rag_pipeline.llm_client.erase_slot_cache.assert_awaited_once()

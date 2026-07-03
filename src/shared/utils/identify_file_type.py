@@ -56,6 +56,14 @@ SUPPORTED_DOC_EXTENSION_MAP: dict[str, FileType] = {
     ".odp": FileType.OFFICE_DOCUMENT,
 }
 
+FILETYPE_TO_EXT: dict[str, str] = {
+    FileType.MARKDOWN.value: ".md",
+    FileType.PDF.value: ".pdf",
+    FileType.PLAIN_TEXT.value: ".txt",
+    FileType.HTML.value: ".html",
+    FileType.OFFICE_DOCUMENT.value: ".docx",
+}
+
 SUPPORTED_REFERENCE_DOC_TYPES: set[str] = {
     FileType.MARKDOWN.value,
     FileType.PDF.value,
