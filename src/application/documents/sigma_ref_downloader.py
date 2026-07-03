@@ -17,9 +17,14 @@ from src.shared.http import RETRY_STATUSES
 from src.shared.http import download_file as http_download_file
 from src.shared.http import head_url as http_head_url
 from src.shared.utils.registry_utils import build_registry_entry
-from src.shared.utils.crypto_utils import compute_sha256_file, compute_sha256_str
+from src.shared.utils.crypto_utils import (
+    compute_sha256_bytes,
+    compute_sha256_file,
+    compute_sha256_str,
+)
 from src.shared.utils.identify_file_type import (
     FILETYPE_TO_EXT,
+    FILETYPE_TO_SUBDIR,
     SUPPORTED_DOC_EXTENSION_MAP,
     SUPPORTED_REFERENCE_DOC_TYPES,
 )
@@ -38,6 +43,34 @@ SUPPORTED_EXTENSIONS: dict[str, str] = {
 }
 
 _registry_lock = threading.Lock()
+
+
+def _subdir_for(content_type: str | None) -> str:
+    """Return the subdirectory name for a given content type."""
+    return FILETYPE_TO_SUBDIR.get(content_type or "", "misc")
+
+
+def _sigmaref_write_path(output_path: Path, content_type: str | None, file_name: str) -> Path:
+    """Return the subdir path for writing a sigmaref file, creating the subdir as needed."""
+    subdir = _subdir_for(content_type)
+    path = output_path / subdir
+    path.mkdir(parents=True, exist_ok=True)
+    return path / file_name
+
+
+def _sigmaref_resolve_path(output_path: Path, content_type: str | None, file_name: str) -> Path:
+    """Resolve the path to an existing sigmaref file, with flat-layout fallback.
+
+    Checks the subdir first, then the old flat layout for backward compatibility
+    with files downloaded before R2.1.  Returns the subdir path if neither exists.
+    """
+    candidate = output_path / _subdir_for(content_type) / file_name
+    if candidate.exists():
+        return candidate
+    flat = output_path / file_name
+    if flat.exists():
+        return flat
+    return candidate
 
 
 def _detect_url_type(url: str, content_type: str | None = None) -> str | None:
@@ -395,7 +428,10 @@ def _download_scan_mode(
             if url_hash in registry:
                 fname = registry[url_hash].get("file_name", "")
                 if fname:
-                    output_file = output_path / fname
+                    content_type_for_subdir = registry[url_hash].get("content_type", "")
+                    output_file = _sigmaref_resolve_path(
+                        output_path, content_type_for_subdir, fname
+                    )
                     if output_file.exists():
                         existing_sha = registry[url_hash].get("content_sha256")
                         if (
@@ -407,7 +443,9 @@ def _download_scan_mode(
                                     "url_hash": url_hash,
                                     "original_url": ref,
                                     "normalized_url": normalized,
-                                    "output_file": output_file,
+                                    "output_file": _sigmaref_write_path(
+                                        output_path, content_type_for_subdir, fname
+                                    ),
                                     "content_type": registry[url_hash].get(
                                         "content_type", "markdown"
                                     ),
@@ -448,7 +486,8 @@ def _download_scan_mode(
             if not ext:
                 ext = ".md"
 
-            output_file = output_path / f"{url_hash}{ext}"
+            fname = f"{url_hash}{ext}"
+            output_file = _sigmaref_resolve_path(output_path, ftype, fname)
 
             if output_file.exists():
                 content_hash = compute_sha256_file(output_file)
@@ -460,7 +499,7 @@ def _download_scan_mode(
                                 "url_hash": url_hash,
                                 "original_url": ref,
                                 "normalized_url": normalized,
-                                "output_file": output_file,
+                                "output_file": _sigmaref_write_path(output_path, ftype, fname),
                                 "content_type": ftype or "markdown",
                                 "rule_id": rule_id,
                                 "rule_title": rule_title,
@@ -491,7 +530,7 @@ def _download_scan_mode(
                     "url_hash": url_hash,
                     "original_url": ref,
                     "normalized_url": normalized,
-                    "output_file": output_file,
+                    "output_file": _sigmaref_write_path(output_path, ftype, fname),
                     "content_type": ftype,
                     "rule_id": rule_id,
                     "rule_title": rule_title,
@@ -520,7 +559,8 @@ def _download_scan_mode(
                     ext = FILETYPE_TO_EXT.get(ftype, ".md")
                 if not ext:
                     ext = ".md"
-                output_file = output_path / f"{item['url_hash']}{ext}"
+                fname = f"{item['url_hash']}{ext}"
+                output_file = _sigmaref_resolve_path(output_path, ftype, fname)
                 if ftype is None or ftype not in supported_types:
                     skipped += 1
                     continue
@@ -529,7 +569,7 @@ def _download_scan_mode(
                         "url_hash": item["url_hash"],
                         "original_url": item["original_url"],
                         "normalized_url": item["normalized"],
-                        "output_file": output_file,
+                        "output_file": _sigmaref_write_path(output_path, ftype, fname),
                         "content_type": ftype,
                         "rule_id": item["rule_id"],
                         "rule_title": item["rule_title"],
@@ -819,17 +859,19 @@ def _download_registry_mode(
         content_type = item.get("content_type", "")
         ext = FILETYPE_TO_EXT.get(content_type, ".md")
         url_hash = item.get("url_hash") or compute_sha256_str(normalize_url(url))
-        file_path = output_path / f"{url_hash}{ext}"
-
-        if file_path.exists():
+        fname = f"{url_hash}{ext}"
+        existing_path = _sigmaref_resolve_path(output_path, content_type, fname)
+        if existing_path.exists():
             existing_entry = registry.get(url_hash)
             if existing_entry and existing_entry.get("content_sha256"):
                 return None
 
+        file_path = _sigmaref_write_path(output_path, content_type, fname)
+
         ok, _ = http_download_file(url, file_path, check_ssrf=False)
         if ok:
             content = file_path.read_bytes()
-            content_hash = compute_sha256_str(content)
+            content_hash = compute_sha256_bytes(content)
             return ("ok", url_hash, content_hash, len(content))
         logger.error("Reference download failed: %s", url)
         return ("fail", "", "", 0)

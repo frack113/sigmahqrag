@@ -16,6 +16,7 @@ from src.core.base import TransformConfig
 from src.core.document.parser.generic_parser import GenericTransform
 from src.core.pipeline.ingestion import IngestionPipelineBuilder
 from src.infrastructure.database import DatabaseService
+from src.shared.utils.identify_file_type import FILETYPE_TO_SUBDIR
 
 logger = logging.getLogger(__name__)
 
@@ -175,7 +176,12 @@ class UnifiedIndexer:
             return Path(cfg.local_documents_path).resolve() / file_name
 
         if org == "sigmaref":
-            return Path(cfg.sigmaref_documents_path).resolve() / file_name
+            base = Path(cfg.sigmaref_documents_path).resolve()
+            subdir = FILETYPE_TO_SUBDIR.get(row.get("content_type", ""), "misc")
+            candidate = base / subdir / file_name
+            if candidate.exists():
+                return candidate
+            return base / file_name
 
         repo = row.get("repo", "") or ""
         if org and repo:

@@ -64,6 +64,14 @@ FILETYPE_TO_EXT: dict[str, str] = {
     FileType.OFFICE_DOCUMENT.value: ".docx",
 }
 
+FILETYPE_TO_SUBDIR: dict[str, str] = {
+    FileType.MARKDOWN.value: "markdown",
+    FileType.PDF.value: "pdf",
+    FileType.PLAIN_TEXT.value: "plain_text",
+    FileType.HTML.value: "html",
+    FileType.OFFICE_DOCUMENT.value: "office",
+}
+
 SUPPORTED_REFERENCE_DOC_TYPES: set[str] = {
     FileType.MARKDOWN.value,
     FileType.PDF.value,

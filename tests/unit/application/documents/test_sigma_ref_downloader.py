@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 from src.shared.utils import iso_now
 from src.shared.utils.crypto_utils import compute_sha256_file as _sha256_file
 from src.shared.utils.crypto_utils import compute_sha256_str as _sha256
+from src.shared.utils.identify_file_type import FILETYPE_TO_SUBDIR
 from src.shared.utils.url_utils import is_private_url as _is_private_url, normalize_url
 
 from src.application.documents.sigma_ref_downloader import (
@@ -831,7 +832,7 @@ references:
             )
 
         assert result["downloaded"] == 1
-        assert (output_dir / expected_filename).exists()
+        assert (output_dir / FILETYPE_TO_SUBDIR["markdown"] / expected_filename).exists()
 
     def test_registry_mode_runs_without_error(self, tmp_path: Path) -> None:
         """Registry mode runs without error (naming convention is inherited
@@ -915,7 +916,7 @@ references:
         assert result["total_refs"] == 1
         # File should be written with {url_hash}{ext} naming
         expected_filename = f"{expected_hash}.md"
-        assert (output_dir / expected_filename).exists()
+        assert (output_dir / FILETYPE_TO_SUBDIR["markdown"] / expected_filename).exists()
 
 
 class TestRuleReferences:

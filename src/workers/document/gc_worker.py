@@ -4,6 +4,7 @@ import logging
 from pathlib import Path
 
 from src.config.settings import get_config
+from src.shared.utils.identify_file_type import FILETYPE_TO_SUBDIR
 from src.workers.base import BaseWorker
 from src.workers.enums import WorkerName, WorkerStatus
 
@@ -100,6 +101,7 @@ class DocGCWorker(BaseWorker):
                         org or "",
                         repo or "",
                         file_name or "",
+                        content_type or "",
                         local_base,
                         github_base,
                     )
@@ -124,6 +126,7 @@ class DocGCWorker(BaseWorker):
         org: str,
         repo: str,
         file_name: str,
+        content_type: str,
         local_base: Path,
         github_base: Path,
     ) -> bool:
@@ -133,19 +136,21 @@ class DocGCWorker(BaseWorker):
 
         candidates: list[Path] = []
 
-        # Case 1: local files â†’ {local_base}/{file_name}
+        # Case 1: local files → {local_base}/{file_name}
         if org == "local":
             candidates.append(local_base / file_name)
 
-        # Case 2: GitHub files â†’ {github_base}/{org}/{repo}/{file_name}
+        # Case 2: GitHub files → {github_base}/{org}/{repo}/{file_name}
         if org and org not in ("local", "sigmaref") and repo:
             candidates.append(github_base / org / repo / file_name)
 
-        # Case 3: sigmaref files ��' local base with file_name or hash prefix
+        # Case 3: sigmaref files → subdir/{file_name} with flat fallback
         if org == "sigmaref":
             from src.config.settings import get_config
 
             sigmaref_base = get_config().sigmaref_documents_path
+            subdir = FILETYPE_TO_SUBDIR.get(content_type, "misc")
+            candidates.append(Path(sigmaref_base) / subdir / file_name)
             candidates.append(Path(sigmaref_base) / file_name)
             if "." in file_name and not file_name.startswith("."):
                 base, ext = file_name.rsplit(".", 1)
