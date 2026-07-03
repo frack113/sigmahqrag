@@ -449,6 +449,25 @@ class DatabaseServiceDocOps:
             )
             self._writer_conn.commit()
 
+    def delete_doc_registry_by_url_hashes(self, url_hashes: list[str]) -> None:
+        if not url_hashes:
+            return
+        with self._lock:
+            placeholders = ",".join("?" for _ in url_hashes)
+            self._writer_conn.execute(
+                f"DELETE FROM doc_registry WHERE url_hash IN ({placeholders})",
+                url_hashes,
+            )
+            self._writer_conn.commit()
+
+    def get_doc_registry_url_hashes_by_repo(self, org: str, repo: str) -> list[str]:
+        with self._lock:
+            results = self._writer_conn.execute(
+                "SELECT url_hash FROM doc_registry WHERE org = ? AND repo = ?",
+                (org, repo),
+            ).fetchall()
+        return [row[0] for row in results]
+
     def get_local_files(self, limit: int = 1000, offset: int = 0) -> list[dict]:
         with self._lock:
             results = self._writer_conn.execute(
@@ -641,6 +660,42 @@ class DatabaseServiceDocOps:
         with self._lock:
             self._writer_conn.execute("DELETE FROM rule_references WHERE url_hash = ?", (url_hash,))
             self._writer_conn.commit()
+
+    def get_rule_id_by_url_hash(self, url_hash: str) -> str | None:
+        """Return the rule_id associated with a doc_registry entry."""
+        with self._lock:
+            result = self._writer_conn.execute(
+                "SELECT rule_id FROM doc_registry WHERE url_hash = ?", (url_hash,)
+            ).fetchone()
+        return result[0] if result else None
+
+    def get_rule_reference_paths(self, rule_id: str) -> list[Path]:
+        """Return the on-disk paths for all reference documents of a rule."""
+        with self._lock:
+            results = self._writer_conn.execute(
+                "SELECT r.ref_url, d.file_name, d.content_type "
+                "FROM rule_references r "
+                "JOIN doc_registry d ON r.url_hash = d.url_hash "
+                "WHERE r.rule_id = ?",
+                (rule_id,),
+            ).fetchall()
+        paths: list[Path] = []
+        for ref_url, file_name, content_type in results:
+            try:
+                from src.application.documents.sigma_ref_paths import sigmaref_resolve_path
+                from src.config.settings import get_config
+
+                cfg = get_config()
+                path = sigmaref_resolve_path(
+                    Path(cfg.sigmaref_documents_path).resolve(),
+                    content_type,
+                    file_name or "",
+                )
+                if path.exists():
+                    paths.append(path)
+            except Exception:
+                continue
+        return paths
 
     # ------------------------------------------------------------------
     # R1.4 — cleanup orphaned head_verified entries (no content_sha256)

@@ -116,6 +116,32 @@ class GenericDiscoveryWorker(DiscoveryWorker):
         self._write_entries(
             entries, worker_name, len(files_to_process), processed_count, skipped_count
         )
+        self._garbage_collect_local(collection_name, entries)
+
+    def _garbage_collect_local(self, collection_name: str, current_entries: list[dict]) -> None:
+        current_hashes = {e["url_hash"] for e in current_entries}
+        if not current_hashes:
+            return
+        try:
+            existing = self.db.get_doc_registry_url_hashes_by_repo("local", collection_name)
+        except Exception:
+            return
+        stale_hashes = [h for h in existing if h not in current_hashes]
+        if stale_hashes:
+            self._cleanup_rule_references(stale_hashes)
+            try:
+                self.db.delete_doc_registry_by_url_hashes(stale_hashes)
+                logger.info(
+                    "[GenericDiscoveryWorker] Garbage collected %d stale local entries for %s",
+                    len(stale_hashes),
+                    collection_name,
+                )
+            except Exception as e:
+                logger.error(
+                    "[GenericDiscoveryWorker] Failed to garbage collect local %s: %s",
+                    collection_name,
+                    e,
+                )
 
     # ------------------------------------------------------------------
     # GitHub source
@@ -153,6 +179,26 @@ class GenericDiscoveryWorker(DiscoveryWorker):
                     continue
                 repo_items.append((parts[0], parts[1]))
 
+        # Always garbage collect from all repos with active selections
+        # plus the repo being scanned (selections may have just been cleared)
+        gc_repos: list[tuple[str, str]] = []
+        gc_seen: set[str] = set()
+        try:
+            all_selected = self.db.get_repos_with_selected_dirs()
+            for rk in all_selected:
+                parts = rk.split("/")
+                if len(parts) == 2:
+                    key = f"{parts[0]}/{parts[1]}"
+                    if key not in gc_seen:
+                        gc_repos.append((parts[0], parts[1]))
+                        gc_seen.add(key)
+        except Exception:
+            pass
+        if repo_key and repo_key not in gc_seen:
+            parts = repo_key.split("/")
+            if len(parts) == 2:
+                gc_repos.append((parts[0], parts[1]))
+
         all_files = self._collect_repo_files(repo_items, gh_base)
 
         if self.dispatcher:
@@ -171,6 +217,63 @@ class GenericDiscoveryWorker(DiscoveryWorker):
             self._write_entries(
                 entries, worker_name, len(all_files), processed_count, skipped_count
             )
+            self._garbage_collect_github(gc_repos, entries)
+
+    def _garbage_collect_github(
+        self,
+        repo_items: list[tuple[str, str]],
+        current_entries: list[dict],
+    ) -> None:
+        current_hashes = {e["url_hash"] for e in current_entries}
+        if not current_hashes:
+            return
+        for org, repo in repo_items:
+            try:
+                existing = self.db.get_doc_registry_url_hashes_by_repo(org, repo)
+            except Exception:
+                continue
+            stale_hashes = [h for h in existing if h not in current_hashes]
+            if stale_hashes:
+                self._cleanup_rule_references(stale_hashes)
+                try:
+                    self.db.delete_doc_registry_by_url_hashes(stale_hashes)
+                    logger.info(
+                        "[GenericDiscoveryWorker] Garbage collected %d stale entries for %s/%s",
+                        len(stale_hashes),
+                        org,
+                        repo,
+                    )
+                except Exception as e:
+                    logger.error(
+                        "[GenericDiscoveryWorker] Failed to garbage collect for %s/%s: %s",
+                        org,
+                        repo,
+                        e,
+                    )
+
+    def _cleanup_rule_references(self, url_hashes: list[str]) -> None:
+        """Delete on-disk reference files for stale doc_registry entries."""
+        for url_hash in url_hashes:
+            try:
+                rule_id = self.db.get_rule_id_by_url_hash(url_hash)
+                if not rule_id or rule_id == "00000000-0000-0000-0000-000000000000":
+                    continue
+                paths = self.db.get_rule_reference_paths(rule_id)
+                for path in paths:
+                    try:
+                        path.unlink(missing_ok=True)
+                    except OSError as e:
+                        logger.warning(
+                            "[GenericDiscoveryWorker] Failed to delete ref %s: %s",
+                            path,
+                            e,
+                        )
+            except Exception as e:
+                logger.warning(
+                    "[GenericDiscoveryWorker] Failed to cleanup refs for %s: %s",
+                    url_hash,
+                    e,
+                )
 
     # ------------------------------------------------------------------
     # Specification repository source
@@ -230,6 +333,43 @@ class GenericDiscoveryWorker(DiscoveryWorker):
                 skipped_count,
                 batch_upsert_fn=self.db.batch_upsert_sigma_spec,
             )
+            self._garbage_collect_spec(repos, entries)
+
+    def _garbage_collect_spec(
+        self,
+        repos: list[dict],
+        current_entries: list[dict],
+    ) -> None:
+        current_hashes = {e["url_hash"] for e in current_entries}
+        if not current_hashes:
+            return
+        for repo_info in repos:
+            org = repo_info.get("org", "")
+            repo_name = repo_info.get("name", "")
+            if not org or not repo_name:
+                continue
+            try:
+                existing = self.db.get_doc_registry_url_hashes_by_repo(org, repo_name)
+            except Exception:
+                continue
+            stale_hashes = [h for h in existing if h not in current_hashes]
+            if stale_hashes:
+                self._cleanup_rule_references(stale_hashes)
+                try:
+                    self.db.delete_doc_registry_by_url_hashes(stale_hashes)
+                    logger.info(
+                        "[GenericDiscoveryWorker] Garbage collected %d stale spec entries for %s/%s",
+                        len(stale_hashes),
+                        org,
+                        repo_name,
+                    )
+                except Exception as e:
+                    logger.error(
+                        "[GenericDiscoveryWorker] Failed to garbage collect spec %s/%s: %s",
+                        org,
+                        repo_name,
+                        e,
+                    )
 
     def _scan_all(
         self,

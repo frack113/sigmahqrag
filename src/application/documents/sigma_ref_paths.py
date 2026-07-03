@@ -52,7 +52,7 @@ def sigmaref_resolve_path(output_path: Path, content_type: str | None, file_name
     candidate = sigmaref_write_path(output_path, content_type, file_name)
     if candidate.exists():
         return candidate
-    return output_path / file_name
+    return sigmaref_write_path(output_path, content_type, file_name)
 
 
 def resolve_rule_path(entry: dict, cfg: Any) -> Path | None:
@@ -78,7 +78,7 @@ def resolve_rule_path(entry: dict, cfg: Any) -> Path | None:
         candidate = base / subdir / file_name
         if candidate.exists():
             return candidate
-        return base / file_name
+        return candidate
 
     if org and repo:
         return Path(cfg.paths_github_dir).resolve() / org / repo / file_name
