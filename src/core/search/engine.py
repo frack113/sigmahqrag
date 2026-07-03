@@ -95,6 +95,14 @@ def _get_search_embed_model() -> Any:
 
 DEFAULT_COLLECTIONS = ["sigma_rules", "sigma_docs", "sigma_spec"]
 
+# Per-collection hybrid alpha values (1.0 = pure dense, 0.0 = pure sparse)
+# Tuned for each collection's usage pattern — see Q2.1
+ALPHA_BY_COLLECTION: dict[str, float] = {
+    "sigma_rules": 0.5,  # balanced — rules mix technical keywords & semantics
+    "sigma_docs": 0.7,  # keyword-leaning — reference docs use precise terms
+    "sigma_spec": 0.3,  # semantic-leaning — specs describe abstract concepts
+}
+
 
 def _node_to_result(node: Any) -> dict[str, Any]:
     """Convert a LlamaIndex NodeWithScore to the legacy dict format.
@@ -298,7 +306,8 @@ class SearchEngine:
         similarity_threshold: float = SIMILARITY_THRESHOLD,
         use_router: bool = False,
         llm_client: LlamaClient | None = None,
-        alpha: float = 0.3,
+        alpha: float | None = None,
+        alpha_by_collection: dict[str, float] | None = None,
     ) -> None:
         """Initialize search engine.
 
@@ -311,14 +320,21 @@ class SearchEngine:
                 relevant collections instead of all three.
             llm_client: Optional LlamaClient for the router.
                 When not provided, creates a new LlamaClient.
-            alpha: Hybrid search weight (1.0=pure dense, 0.0=pure sparse, 0.3=keyword-leaning).
+            alpha: Fallback hybrid weight when a collection has no per-collection
+                override.  Defaults to 0.3.
+            alpha_by_collection: Per-collection hybrid weights.  Takes precedence
+                over the global ``alpha``.  See ``ALPHA_BY_COLLECTION`` for defaults.
         """
         self.collection_names = collection_names or list(DEFAULT_COLLECTIONS)
         self.top_k = top_k
         self.similarity_threshold = similarity_threshold
         self.use_router = use_router
         self._llm_client = llm_client
-        self.alpha = alpha
+        self._fallback_alpha = alpha if alpha is not None else 0.3
+        merged = dict(ALPHA_BY_COLLECTION)
+        if alpha_by_collection:
+            merged.update(alpha_by_collection)
+        self._alpha_by_collection = merged
 
     async def search(
         self,
@@ -364,7 +380,7 @@ class SearchEngine:
                     collection_name=col,
                     top_k=per_collection_k,
                     metadata_filter=qdrant_filter,
-                    alpha=self.alpha,
+                    alpha=self._alpha_by_collection.get(col, self._fallback_alpha),
                 )
                 retrievers.append(retriever)
             except Exception as e:
