@@ -75,7 +75,9 @@ def _recreate_collection(client: Any, collection_name: str, vector_size: int | N
                 type=models.ScalarType.INT8,
                 always_ram=True,
                 quantile=0.5,
-            )
+            ),
+            rescore=True,
+            oversampling=2.0,
         ),
     )
 

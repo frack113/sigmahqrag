@@ -4,7 +4,7 @@ import logging
 from pathlib import Path
 
 from src.config.settings import get_config
-from src.shared.utils.identify_file_type import FILETYPE_TO_SUBDIR
+from src.shared.utils.identify_file_type import filetype_subdir
 from src.workers.base import BaseWorker
 from src.workers.enums import WorkerName, WorkerStatus
 
@@ -65,13 +65,15 @@ class DocGCWorker(BaseWorker):
             removed_head = self.db.delete_head_verified_orphans(grace_days=grace_days)
             removed_unref = self.db.delete_unreferenced_entries()
             removed_orphan_files = self._gc_orphaned_sigmaref_files()
+            removed_trash = self._cleanup_trash(Path(cfg.sigmaref_documents_path) / ".trash")
 
             scanned = deleted
 
             logger.info(
                 f"[DocGCWorker] Complete: scanned={scanned}, removed={deleted}, "
                 f"reappears={skipped_found}, head_verified={removed_head}, "
-                f"unreferenced={removed_unref}, orphaned_files={removed_orphan_files}"
+                f"unreferenced={removed_unref}, orphaned_files={removed_orphan_files}, "
+                f"trash_cleaned={removed_trash}"
             )
 
         except Exception as e:
@@ -159,7 +161,7 @@ class DocGCWorker(BaseWorker):
             from src.config.settings import get_config
 
             sigmaref_base = get_config().sigmaref_documents_path
-            subdir = FILETYPE_TO_SUBDIR.get(content_type, "misc")
+            subdir = filetype_subdir(content_type or "")
             candidates.append(Path(sigmaref_base) / subdir / file_name)
             candidates.append(Path(sigmaref_base) / file_name)
             if "." in file_name and not file_name.startswith("."):
@@ -224,6 +226,40 @@ class DocGCWorker(BaseWorker):
                     removed += 1
 
         return removed
+
+    def _cleanup_trash(self, trash_dir: Path, max_age_days: int = 7) -> int:
+        """Permanently delete files in *trash_dir* older than *max_age_days*.
+
+        Returns the number of files deleted.
+        """
+        import time
+
+        deleted = 0
+        if not trash_dir.exists():
+            return 0
+
+        cutoff = time.time() - (max_age_days * 86400)
+
+        for entry in sorted(trash_dir.iterdir()):
+            if entry.is_file() and not entry.name.startswith("."):
+                try:
+                    stat = entry.stat()
+                    if stat.st_mtime < cutoff:
+                        entry.unlink()
+                        deleted += 1
+                        logger.info("Permanently deleted trashed file: %s", entry)
+                except OSError:
+                    logger.warning("Failed to delete trashed file: %s", entry)
+
+        # Remove empty subdirectories
+        for entry in sorted(trash_dir.iterdir()):
+            if entry.is_dir() and not any(entry.iterdir()):
+                try:
+                    entry.rmdir()
+                except OSError:
+                    pass
+
+        return deleted
 
     def _trash_file(self, file_path: Path, trash_dir: Path) -> None:
         """Move *file_path* to *trash_dir*, skipping if already gone."""

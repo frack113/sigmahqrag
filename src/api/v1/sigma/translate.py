@@ -17,6 +17,17 @@ router = APIRouter(prefix="/api/v1/translate", tags=["v1-translate"])
 
 DEFAULT_PROMPT_ID = "vulgarisation-english"
 
+# Module-level singleton to share SearchEngine/LlamaClient/Cache with ChatService
+_rag_pipeline: RAGPipeline | None = None
+
+
+def get_rag_pipeline() -> RAGPipeline:
+    """Return the shared RAGPipeline singleton."""
+    global _rag_pipeline
+    if _rag_pipeline is None:
+        _rag_pipeline = RAGPipeline()
+    return _rag_pipeline
+
 
 class TranslateDetectionRequest(BaseModel):
     """Request body for translating a Sigma detection block."""
@@ -57,7 +68,7 @@ async def translate_detection_endpoint(req: TranslateDetectionRequest) -> JSONRe
             content={"error": "yaml is required and cannot be empty"},
         )
 
-    rag = RAGPipeline()
+    rag = get_rag_pipeline()
 
     try:
         translation = await translate_detection(

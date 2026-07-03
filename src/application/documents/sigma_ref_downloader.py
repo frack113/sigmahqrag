@@ -23,10 +23,10 @@ from src.shared.utils.crypto_utils import (
     compute_sha256_str,
 )
 from src.shared.utils.identify_file_type import (
-    FILETYPE_TO_EXT,
-    FILETYPE_TO_SUBDIR,
     SUPPORTED_DOC_EXTENSION_MAP,
     SUPPORTED_REFERENCE_DOC_TYPES,
+    filetype_ext,
+    filetype_subdir,
 )
 from src.shared.utils.url_utils import is_private_url, normalize_url, url_ext
 from src.infrastructure.database import DatabaseService
@@ -47,7 +47,7 @@ _registry_lock = threading.Lock()
 
 def _subdir_for(content_type: str | None) -> str:
     """Return the subdirectory name for a given content type."""
-    return FILETYPE_TO_SUBDIR.get(content_type or "", "misc")
+    return filetype_subdir(content_type or "")
 
 
 def _sigmaref_write_path(output_path: Path, content_type: str | None, file_name: str) -> Path:
@@ -481,7 +481,7 @@ def _download_scan_mode(
                 continue
 
             if not ext and ftype is not None:
-                ext = FILETYPE_TO_EXT.get(ftype, ".md")
+                ext = filetype_ext(ftype)
 
             if not ext:
                 ext = ".md"
@@ -556,7 +556,7 @@ def _download_scan_mode(
                 ftype = _detect_url_type(item["normalized"], content_type=head_ct)
                 ext = item["ext"]
                 if not ext and ftype is not None:
-                    ext = FILETYPE_TO_EXT.get(ftype, ".md")
+                    ext = filetype_ext(ftype)
                 if not ext:
                     ext = ".md"
                 fname = f"{item['url_hash']}{ext}"
@@ -857,7 +857,7 @@ def _download_registry_mode(
     def _download_one(item: dict[str, Any]) -> tuple[str, str, str, int] | None:
         url = item["final_url"]
         content_type = item.get("content_type", "")
-        ext = FILETYPE_TO_EXT.get(content_type, ".md")
+        ext = filetype_ext(content_type)
         url_hash = item.get("url_hash") or compute_sha256_str(normalize_url(url))
         fname = f"{url_hash}{ext}"
         existing_path = _sigmaref_resolve_path(output_path, content_type, fname)
@@ -896,7 +896,7 @@ def _download_registry_mode(
                         rule_id=item["rule_id"],
                         title=item["rule_title"],
                         content_sha256=content_hash,
-                        file_name=f"{url_hash}{FILETYPE_TO_EXT.get(item['content_type'], '.md')}",
+                        file_name=f"{url_hash}{filetype_ext(item['content_type'])}",
                         file_size=size,
                         embed_status="discovery",
                     )

@@ -56,21 +56,24 @@ SUPPORTED_DOC_EXTENSION_MAP: dict[str, FileType] = {
     ".odp": FileType.OFFICE_DOCUMENT,
 }
 
-FILETYPE_TO_EXT: dict[str, str] = {
-    FileType.MARKDOWN.value: ".md",
-    FileType.PDF.value: ".pdf",
-    FileType.PLAIN_TEXT.value: ".txt",
-    FileType.HTML.value: ".html",
-    FileType.OFFICE_DOCUMENT.value: ".docx",
+FILETYPE_INFO: dict[str, dict[str, str]] = {
+    FileType.MARKDOWN.value: {"ext": ".md", "subdir": "markdown"},
+    FileType.PDF.value: {"ext": ".pdf", "subdir": "pdf"},
+    FileType.PLAIN_TEXT.value: {"ext": ".txt", "subdir": "plain_text"},
+    FileType.HTML.value: {"ext": ".html", "subdir": "html"},
+    FileType.OFFICE_DOCUMENT.value: {"ext": ".docx", "subdir": "office"},
 }
 
-FILETYPE_TO_SUBDIR: dict[str, str] = {
-    FileType.MARKDOWN.value: "markdown",
-    FileType.PDF.value: "pdf",
-    FileType.PLAIN_TEXT.value: "plain_text",
-    FileType.HTML.value: "html",
-    FileType.OFFICE_DOCUMENT.value: "office",
-}
+
+def filetype_ext(content_type: str) -> str:
+    """Return the file extension for a given content type."""
+    return FILETYPE_INFO.get(content_type, {}).get("ext", ".md")
+
+
+def filetype_subdir(content_type: str) -> str:
+    """Return the subdirectory name for a given content type."""
+    return FILETYPE_INFO.get(content_type, {}).get("subdir", "misc")
+
 
 SUPPORTED_REFERENCE_DOC_TYPES: set[str] = {
     FileType.MARKDOWN.value,

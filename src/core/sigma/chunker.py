@@ -386,14 +386,32 @@ class SigmaChunker(DocumentTransform):
 
     def _chunk_rule(self, rule: dict, llm_client: LLMClientLike | None = None) -> list[dict]:
         f = self._extract_fields(rule)
+        chunks = self._assemble_chunks(rule, f)
+
+        if llm_client is not None:
+            chunks = self._enrich_chunks(chunks, llm_client)
+
+        return chunks
+
+    def _assemble_chunks(self, rule: dict, f: dict) -> list[dict]:
+        """Assemble all chunks for a Sigma rule.
+
+        Args:
+            rule: The raw Sigma rule dict.
+            f: Extracted fields dict from ``_extract_fields()``.
+
+        Returns:
+            List of chunk dicts ready for document conversion.
+        """
         chunks: list[dict] = [
             self._build_executive_summary(rule, f),
             self._build_metadata_lifecycle(rule, f),
             self._build_logsource_context(rule, f),
         ]
-        attack = self._build_mitre_attack_mapping(rule, f)
-        if attack is not None:
+
+        if (attack := self._build_mitre_attack_mapping(rule, f)) is not None:
             chunks.append(attack)
+
         chunks.append(self._build_detection_condition(rule, f))
 
         det_chunks, all_facts = self._build_detection_block_chunks(rule, f)
@@ -408,9 +426,6 @@ class SigmaChunker(DocumentTransform):
                 self._build_backend_mapping_hints(rule, f),
             ]
         )
-
-        if llm_client is not None:
-            chunks = self._enrich_chunks(chunks, llm_client)
 
         return chunks
 

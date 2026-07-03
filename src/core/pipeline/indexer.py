@@ -16,7 +16,7 @@ from src.core.base import TransformConfig
 from src.core.document.parser.generic_parser import GenericTransform
 from src.core.pipeline.ingestion import IngestionPipelineBuilder
 from src.infrastructure.database import DatabaseService
-from src.shared.utils.identify_file_type import FILETYPE_TO_SUBDIR
+from src.shared.utils.identify_file_type import filetype_subdir
 
 logger = logging.getLogger(__name__)
 
@@ -139,7 +139,12 @@ class UnifiedIndexer:
         return result
 
     async def index_all(self, group: str | None = None) -> list[IndexResult]:
-        """Execute configured routes, optionally filtered by group ("spec" or "docs")."""
+        """Execute configured routes, optionally filtered by group ("spec" or "docs").
+
+        Only processes entries with ``embed_status = 'discovery'`` (new or
+        changed files).  Entries that are already ``'embedded'`` and whose
+        content has not changed are skipped — see Q3.4.
+        """
         if group == "spec":
             routes = [r for r in ROUTES if r.table_name == "sigma_spec"]
         elif group == "docs":
@@ -151,6 +156,16 @@ class UnifiedIndexer:
             r = await self.index(route)
             results.append(r)
         return results
+
+    async def index_incremental(self, group: str | None = None) -> list[IndexResult]:
+        """Alias for :meth:`index_all` — only pending/changed entries are indexed.
+
+        This is the preferred method for routine sync operations.  Full rebuild
+        (all entries) requires an explicit ``reset_embed_status_for_collection``
+        call via the API before calling this method.
+        """
+        logger.info("Starting incremental index (group=%s)", group)
+        return await self.index_all(group=group)
 
     def _get_pending(self, route: IndexRoute) -> list[dict]:
         """Fetch pending entries for a given route."""
@@ -177,7 +192,7 @@ class UnifiedIndexer:
 
         if org == "sigmaref":
             base = Path(cfg.sigmaref_documents_path).resolve()
-            subdir = FILETYPE_TO_SUBDIR.get(row.get("content_type", ""), "misc")
+            subdir = filetype_subdir(row.get("content_type", ""))
             candidate = base / subdir / file_name
             if candidate.exists():
                 return candidate

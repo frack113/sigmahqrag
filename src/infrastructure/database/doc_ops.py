@@ -102,7 +102,12 @@ class DatabaseServiceDocOps:
                     title = EXCLUDED.title,
                     timestamp = EXCLUDED.timestamp,
                     last_seen = EXCLUDED.last_seen,
-                    embed_status = EXCLUDED.embed_status""",
+                    embed_status = CASE
+                        WHEN excluded.content_sha256 IS NOT NULL
+                             AND excluded.content_sha256 != doc_registry.content_sha256
+                        THEN 'discovery'
+                        ELSE doc_registry.embed_status
+                    END""",
                 (
                     data.get("url_hash"),
                     data.get("org"),
@@ -144,7 +149,12 @@ class DatabaseServiceDocOps:
                     title = EXCLUDED.title,
                     timestamp = EXCLUDED.timestamp,
                     last_seen = EXCLUDED.last_seen,
-                    embed_status = EXCLUDED.embed_status""",
+                    embed_status = CASE
+                        WHEN excluded.content_sha256 IS NOT NULL
+                             AND excluded.content_sha256 != doc_registry.content_sha256
+                        THEN 'discovery'
+                        ELSE doc_registry.embed_status
+                    END""",
                 [
                     (
                         r.get("url_hash"),
@@ -255,7 +265,12 @@ class DatabaseServiceDocOps:
                     title = EXCLUDED.title,
                     timestamp = EXCLUDED.timestamp,
                     last_seen = EXCLUDED.last_seen,
-                    embed_status = EXCLUDED.embed_status""",
+                    embed_status = CASE
+                        WHEN excluded.content_sha256 IS NOT NULL
+                             AND excluded.content_sha256 != sigma_spec.content_sha256
+                        THEN 'discovery'
+                        ELSE sigma_spec.embed_status
+                    END""",
                 [
                     (
                         r.get("url_hash"),
