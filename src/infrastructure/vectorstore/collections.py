@@ -25,17 +25,17 @@ def collection_hnsw_config(
     use on-disk storage to save RAM.
     """
     if collection_name == "sigma_rules":
-        return qdrant_client.models.HnswConfigDiff(  # type: ignore[call-arg]
+        return qdrant_client.models.HnswConfigDiff(
             m=16,
             ef_construct=200,
-            full_scan_threshold_kb=10000,
+            full_scan_threshold=10000,
             on_disk=False,
         )
     if collection_name in ("sigma_docs", "sigma_spec"):
-        return qdrant_client.models.HnswConfigDiff(  # type: ignore[call-arg]
+        return qdrant_client.models.HnswConfigDiff(
             m=16,
             ef_construct=100,
-            full_scan_threshold_kb=10000,
+            full_scan_threshold=10000,
             on_disk=True,
         )
     return None
@@ -166,22 +166,19 @@ async def create_collection(
         sparse_vectors_config: dict[str, Any] | None = None
         if enable_hybrid:
             sparse_vectors_config = {
-                "text-sparse": qdrant_client.models.SparseVectorParams(  # type: ignore[call-arg]
+                "text-sparse": qdrant_client.models.SparseVectorParams(
                     index=qdrant_client.models.SparseIndexParams(),
                     modifier=qdrant_client.models.Modifier.IDF,
-                    on_disk=True,
                 )
             }
         quantization_config = None
         if enable_quantization:
-            quantization_config = qdrant_client.models.ScalarQuantization(  # type: ignore[call-arg]
+            quantization_config = qdrant_client.models.ScalarQuantization(
                 scalar=qdrant_client.models.ScalarQuantizationConfig(
                     type=qdrant_client.models.ScalarType.INT8,
                     always_ram=True,
                     quantile=0.5,
-                ),
-                rescore=True,
-                oversampling=2.0,
+                )
             )
         hnsw_config = collection_hnsw_config(collection_name)
         await asyncio.to_thread(
