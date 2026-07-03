@@ -81,6 +81,6 @@ def resolve_rule_path(entry: dict, cfg: Any) -> Path | None:
         return base / file_name
 
     if org and repo:
-        return Path(cfg.sigmaref_documents_path).resolve() / org / repo / file_name
+        return Path(cfg.paths_github_dir).resolve() / org / repo / file_name
 
     return None
