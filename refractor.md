@@ -690,7 +690,10 @@ Phase 9 — Q2-Q3 (tuning recherche + architecture vectorstore) DONE
   └── Q3.4 Pipeline d'indexation incrémental
 
 Phase 10 — P3 + Q3 (architecture finale)
-  ├── P3.1 Split downloader.py (si toujours pertinent après R1.1)
+  ├── P3.1 ✅ Split downloader.py (si toujours pertinent après R1.1)
+  │     ├── sigma_ref_paths.py — subdir_for(), sigmaref_write_path(), sigmaref_resolve_path()
+  │     ├── sigma_ref_url.py — detect_url_type(), is_reference_url(), resolve_ext()
+  │     └── sigma_ref_registry.py — load_registry(), save_registry(), load_error_registry(), maybe_record_error()
   ├── P3.2 Connection pooling HTTP
   ├── P3.3 Unifier chemins d'indexation (upload→Qdrant)
   └── Q3.3 Oversampling + rescore avec quantification
