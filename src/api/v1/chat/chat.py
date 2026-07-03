@@ -92,8 +92,15 @@ async def send_chat_message(
 async def upload_sigma_rule(
     file: UploadFile,
     session_id: str | None = Depends(_get_session_id),
+    index_after_upload: bool = False,
 ) -> dict:
-    """Upload and validate a Sigma rule YAML file."""
+    """Upload and validate a Sigma rule YAML file.
+
+    Args:
+        file: The YAML file to upload
+        session_id: Optional session ID
+        index_after_upload: If True, index the rule to Qdrant immediately
+    """
     if not file.filename:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -123,11 +130,20 @@ async def upload_sigma_rule(
             raise HTTPException(status_code=400, detail="File is not valid UTF-8 text")
         rule = await _get_chat_service().validate_and_store_yaml(content, session_id)
 
-        return {
+        result: dict = {
             "rule_name": rule.name,
             "rule_id": rule.id,
             "validated": True,
         }
+
+        if index_after_upload:
+            from src.application.documents.indexing import index_sigma_rules
+
+            indexed = await index_sigma_rules([rule], mode="flat", index_after_upload=True)
+            result["indexed"] = indexed.get("indexed", 0)
+            result["collection"] = indexed.get("collection")
+
+        return result
     except ValidationError as e:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
