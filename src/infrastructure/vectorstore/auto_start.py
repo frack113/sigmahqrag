@@ -102,7 +102,6 @@ async def start_qdrant(
             pass
         await asyncio.sleep(1)
 
-    _qdrant_started_by_us = True
     raise ServiceStartError("Qdrant process started but health check timed out after 10s")
 
 

@@ -121,7 +121,6 @@ async def start_llamacpp() -> None:
             pass
         await asyncio.sleep(1)
 
-    _llamacpp_started_by_us = True
     raise ServiceStartError("llama.cpp process started but health check timed out after 10s")
 
 

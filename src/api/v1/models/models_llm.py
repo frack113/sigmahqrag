@@ -216,8 +216,14 @@ async def download_llm_model(
             from src.infrastructure.llm.llamacpp.auto_start import start_llamacpp as _start_llm
             from src.infrastructure.vectorstore.auto_start import start_qdrant as _start_qd
 
-            await _start_qd()
-            await _start_llm()
+            try:
+                await _start_qd()
+            except Exception:
+                logger.exception("Failed to auto-start Qdrant after download")
+            try:
+                await _start_llm()
+            except Exception:
+                logger.exception("Failed to auto-start llama.cpp after download")
 
     asyncio.create_task(download_in_background())
 
