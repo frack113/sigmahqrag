@@ -81,8 +81,13 @@ class TestPostOrchestrationDownload:
         assert response1.status_code == 202
         assert response2.status_code == 202
 
-    def test_download_returns_202_with_service_info(self, client: TestClient) -> None:
+    @patch("src.api.v1.system.orchestration.start_download", new_callable=AsyncMock)
+    def test_download_returns_202_with_service_info(
+        self, mock_start: AsyncMock, client: TestClient
+    ) -> None:
         """Given download endpoint called, when service name provided, then returns 202 with job info."""
+        mock_start.return_value = {"job_id": "job-456", "status": "started"}
+
         response = client.post(
             "/api/v1/orchestration/download",
             json={"service": "qdrant"},

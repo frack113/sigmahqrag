@@ -195,16 +195,6 @@ class QdrantInstallerService:
         archive_path = self.bin_dir / f"qdrant{ext}"
         binary_path = self.get_binary_path()
 
-        # Clean stale files before extraction to avoid version mix
-        for f in list(self.bin_dir.iterdir()):
-            if f.name == archive_path.name or f.is_dir():
-                continue
-            if f.suffix == ".exe" or f.name == "qdrant":
-                try:
-                    f.unlink()
-                except OSError:
-                    pass
-
         try:
             if progress_callback:
                 progress_callback(5, "Downloading binary...")
@@ -220,6 +210,16 @@ class QdrantInstallerService:
                 self._safe_extract_zip(archive_path, self.bin_dir)
             else:
                 self._safe_extract_tar_gz(archive_path, self.bin_dir)
+
+            # Clean stale files only after successful download + extraction
+            for f in list(self.bin_dir.iterdir()):
+                if f.name == archive_path.name or f.is_dir():
+                    continue
+                if f.suffix == ".exe" or f.name == "qdrant":
+                    try:
+                        f.unlink()
+                    except OSError:
+                        pass
 
             if progress_callback:
                 progress_callback(80, "Cleaning up...")
