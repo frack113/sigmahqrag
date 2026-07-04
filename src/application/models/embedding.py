@@ -76,7 +76,7 @@ class EmbeddingManager:
 
         service = HFDownloadService()
         repo = HFRepo.from_string(repo_id)
-        return service.get_model_info(repo)
+        return await service.get_model_info(repo)
 
     async def search_models(
         self, query: str = "sentence-transformers", limit: int = 10
@@ -212,7 +212,7 @@ class EmbeddingManager:
             repo = HFRepo.from_string(repo_id)
         except ValueError as e:
             raise DownloadError(f"Invalid repo_id '{repo_id}': {e}") from e
-        api = self.download_service.get_model_info(repo)
+        api = await self.download_service.get_model_info(repo)
         if api.siblings:
             return [f.rfilename for f in api.siblings]
         return []

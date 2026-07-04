@@ -32,12 +32,6 @@ def detect_url_type(url: str, content_type: str | None = None) -> str | None:
         ctype = content_type.split(";")[0].strip().lower()
         if "markdown" in ctype:
             return "markdown"
-        if "pdf" in ctype:
-            return "pdf"
-        if "html" in ctype:
-            return "html"
-        if "text" in ctype:
-            return "markdown"
 
     # Fall back to URL extension
     ext = url_ext(url)

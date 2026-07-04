@@ -295,9 +295,9 @@ class TestSupportedDocExtensionMap:
 class TestSupportedReferenceDocTypes:
     def test_contains_relevant_types(self) -> None:
         assert "markdown" in SUPPORTED_REFERENCE_DOC_TYPES
-        assert "pdf" in SUPPORTED_REFERENCE_DOC_TYPES
-        assert "plain_text" in SUPPORTED_REFERENCE_DOC_TYPES
-        assert "office_document" in SUPPORTED_REFERENCE_DOC_TYPES
+        assert "pdf" not in SUPPORTED_REFERENCE_DOC_TYPES
+        assert "plain_text" not in SUPPORTED_REFERENCE_DOC_TYPES
+        assert "office_document" not in SUPPORTED_REFERENCE_DOC_TYPES
 
     def test_excludes_media_types(self) -> None:
         excluded = {"image", "audio", "video", "archive", "executable"}

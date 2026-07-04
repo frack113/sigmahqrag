@@ -113,9 +113,13 @@ async def search_embedding_models(
     manager: EmbeddingManager = Depends(get_embedding_manager),
 ) -> JSONResponse:
     """Search for embedding models on HuggingFace."""
+    from src.application.models.exceptions import DownloadError
+
     try:
         results = await manager.search_models(query, limit=limit)
         return JSONResponse(content={"models": [{"repo_id": r.full_id} for r in results]})
+    except DownloadError as e:
+        return JSONResponse(status_code=400, content={"error": str(e)})
     except Exception as e:
         logger.error(f"Search failed: {e}")
         return JSONResponse(status_code=500, content={"error": "An internal error occurred"})

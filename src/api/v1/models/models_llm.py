@@ -91,7 +91,7 @@ async def list_llm_model_files(repo_id: str | None = None) -> JSONResponse:
 
     try:
         mm = get_embedding_manager()
-        files = mm.download_service.list_gguf_files(HFRepo.from_string(repo_id))
+        files = await mm.download_service.list_gguf_files(HFRepo.from_string(repo_id))
         return JSONResponse(content={"files": files})
     except Exception as e:
         logger.error(f"Failed to list files for {repo_id}: {e}")
@@ -171,7 +171,7 @@ async def download_llm_model(
             resolved_filename = filename
             if not resolved_filename:
                 mm = get_embedding_manager()
-                files = mm.download_service.list_gguf_files(HFRepo.from_string(repo_id))
+                files = await mm.download_service.list_gguf_files(HFRepo.from_string(repo_id))
                 if files:
                     resolved_filename = files[0]["filename"]
             if not resolved_filename:

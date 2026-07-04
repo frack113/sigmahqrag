@@ -29,6 +29,22 @@ Server starts on `http://localhost:8000` .
 
 - Config managed via the web UI Config page (stored in DuckDB)
 
+### AirGap / Offline Mode
+
+Set `HF_HUB_OFFLINE=1` to prevent HuggingFace API requests (useful for fully
+disconnected deployments):
+
+```bash
+HF_HUB_OFFLINE=1 uv run python main.py
+```
+
+By default, the app sets `HF_HUB_OFFLINE=1` (via `os.environ.setdefault` in
+`src/main.py`) to avoid accidental network calls in an AirGap context.
+
+Functions that **explicitly need online access** (model search, model info,
+GGUF file listing) temporarily remove the env var during the API call, then
+restore it — so searching and downloading models works even in AirGap mode.
+
 ## Testing
 
 ```bash
