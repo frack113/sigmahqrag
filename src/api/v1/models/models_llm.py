@@ -74,10 +74,14 @@ async def search_llm_models(query: str, limit: int = 20) -> JSONResponse:
     No pipeline tag filter is applied because many GGUF repos
     (e.g. MaziyarPanahi/*, bartowski/*) do not set a pipeline_tag.
     """
+    from src.application.models.exceptions import DownloadError
+
     try:
         service = HFDownloadService()
         results = await service.list_models(query)
         return JSONResponse(content={"models": [{"repo_id": r.full_id} for r in results[:limit]]})
+    except DownloadError as e:
+        return JSONResponse(status_code=400, content={"error": str(e)})
     except Exception as e:
         logger.error(f"LLM search failed: {e}")
         return JSONResponse(status_code=500, content={"error": "An internal error occurred"})

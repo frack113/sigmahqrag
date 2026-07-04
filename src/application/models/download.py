@@ -123,6 +123,7 @@ class HFDownloadService:
             query: Search query string.
             task: Optional pipeline tag filter (e.g. ``"feature-extraction"``
                 for embedding models, ``"text-generation"`` for LLMs).
+                When ``None``, no pipeline tag filter is applied.
 
         Returns:
             List of matching :class:`HFRepo` instances.
@@ -135,13 +136,23 @@ class HFDownloadService:
         try:
             api = HfApi(token=self.token)
             kwargs: dict[str, Any] = {"search": query, "sort": "downloads"}
-            pipeline_tags = [task] if task else ["feature-extraction"]
-            if task == "feature-extraction":
+            if task is None:
+                pipeline_tags: list[str] = []
+            elif task == "feature-extraction":
                 pipeline_tags = ["feature-extraction", "sentence-similarity"]
+            else:
+                pipeline_tags = [task]
             seen: set[str] = set()
             results: list[HFRepo] = []
-            for tag in pipeline_tags:
-                kwargs["pipeline_tag"] = tag
+            if pipeline_tags:
+                for tag in pipeline_tags:
+                    kwargs["pipeline_tag"] = tag
+                    for r in api.list_models(**kwargs):
+                        if r.id not in seen:
+                            seen.add(r.id)
+                            results.append(HFRepo.from_string(r.id))
+            else:
+                kwargs.pop("pipeline_tag", None)
                 for r in api.list_models(**kwargs):
                     if r.id not in seen:
                         seen.add(r.id)
