@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
@@ -187,11 +188,20 @@ async def download_llm_model(
             dest_dir = LLM_DIR / repo.owner / repo.name
             dest_dir.mkdir(parents=True, exist_ok=True)
 
-            hf_hub_download(
-                repo_id=repo_id,
-                filename=resolved_filename,
-                local_dir=dest_dir,
-            )
+            import huggingface_hub.constants as hc
+
+            was_offline = hc.HF_HUB_OFFLINE
+            hc.HF_HUB_OFFLINE = False
+            try:
+                _raw_token = os.environ.get("HF_TOKEN")
+                hf_hub_download(
+                    repo_id=repo_id,
+                    filename=resolved_filename,
+                    local_dir=dest_dir,
+                    token=_raw_token if _raw_token else None,
+                )
+            finally:
+                hc.HF_HUB_OFFLINE = was_offline
 
             db = get_database_service()
             reg = get_unified_registry()
