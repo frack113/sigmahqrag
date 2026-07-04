@@ -12,4 +12,5 @@ router = create_repo_router(
     include_detail_endpoint=True,
     include_status_endpoint=True,
     include_outdated_check=True,
+    source_type="github",
 )

@@ -160,8 +160,9 @@ class GenericDiscoveryWorker(DiscoveryWorker):
                 logger.warning(f"[GenericDiscoveryWorker] Invalid repo key: {repo_key}")
                 return
         else:
+            st = "github" if worker_name == WorkerName.GITHUB_DISCOVERY else ""
             try:
-                repo_keys = self.db.get_repos_with_selected_dirs()
+                repo_keys = self.db.get_repos_with_selected_dirs(source_type=st)
             except Exception as e:
                 logger.error(f"[GenericDiscoveryWorker] Failed to query repo keys: {e}")
                 return
@@ -184,7 +185,7 @@ class GenericDiscoveryWorker(DiscoveryWorker):
         gc_repos: list[tuple[str, str]] = []
         gc_seen: set[str] = set()
         try:
-            all_selected = self.db.get_repos_with_selected_dirs()
+            all_selected = self.db.get_repos_with_selected_dirs(source_type=st)
             for rk in all_selected:
                 parts = rk.split("/")
                 if len(parts) == 2:

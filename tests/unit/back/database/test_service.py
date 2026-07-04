@@ -1131,6 +1131,21 @@ class TestReposWithSelectedDirs:
         assert "a/r1" in repos
         assert "b/r2" in repos
 
+    def test_filter_by_source_type(self, db: DatabaseService) -> None:
+        db.set_selected_dirs("a/r1", ["rules"], source_type="github")
+        db.set_selected_dirs("b/r2", ["docs"], source_type="spec")
+        github_repos = db.get_repos_with_selected_dirs(source_type="github")
+        spec_repos = db.get_repos_with_selected_dirs(source_type="spec")
+        assert github_repos == ["a/r1"]
+        assert spec_repos == ["b/r2"]
+
+    def test_no_filter_returns_all(self, db: DatabaseService) -> None:
+        db.set_selected_dirs("a/r1", ["rules"], source_type="github")
+        db.set_selected_dirs("b/r2", ["docs"], source_type="spec")
+        repos = db.get_repos_with_selected_dirs()
+        assert "a/r1" in repos
+        assert "b/r2" in repos
+
 
 class TestGetInstance:
     def test_get_instance_without_init_raises(self) -> None:

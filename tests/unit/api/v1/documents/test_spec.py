@@ -13,11 +13,14 @@ from src.api.v1.documents.spec import router
 @pytest.fixture
 def client():
     """Create a test client with the spec router."""
+    from unittest.mock import MagicMock
+
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
 
     app = FastAPI()
     app.include_router(router)
+    app.state.dispatcher = MagicMock()
     return TestClient(app, raise_server_exceptions=False)
 
 
@@ -187,7 +190,7 @@ class TestSpecReposEndpoint:
         repo_dir = tmp_path / "SigmaHQ" / "sigma-specification"
         repo_dir.mkdir(parents=True)
 
-        def mock_save(org, name, selected, repos_dir=None):
+        def mock_save(org, name, selected, repos_dir=None, source_type=""):
             return {"success": True}
 
         repo_path = tmp_path / "SigmaHQ" / "sigma-specification"

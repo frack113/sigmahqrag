@@ -6,6 +6,7 @@ from pathlib import Path
 from src.api.v1.base.repo_router import create_repo_router
 from src.config.settings import get_config
 from src.infrastructure.database import DatabaseService
+from src.workers.enums import WorkerName
 
 logger = logging.getLogger(__name__)
 
@@ -28,4 +29,7 @@ router = create_repo_router(
     include_outdated_check=False,
     on_delete_cleanup=_cleanup_sigma_spec,
     use_get_for_sync=True,
+    select_dirs_worker=WorkerName.SPEC_DISCOVERY,
+    scan_workers=[WorkerName.SPEC_DISCOVERY],
+    source_type="spec",
 )

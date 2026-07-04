@@ -128,6 +128,9 @@ def create_repo_router(
     include_scan_endpoint: bool = True,
     on_delete_cleanup: Callable[[str, str], None] | None = None,
     use_get_for_sync: bool = False,
+    select_dirs_worker: WorkerName = WorkerName.GITHUB_DISCOVERY,
+    scan_workers: list[WorkerName] | None = None,
+    source_type: str = "",
 ) -> APIRouter:
     """Create a configured repository management router.
 
@@ -151,6 +154,13 @@ def create_repo_router(
         Extra cleanup callback on repo deletion (receives ``org, name``).
     use_get_for_sync : bool
         Use GET instead of POST for the single-repo sync endpoint.
+    select_dirs_worker : WorkerName
+        Worker type to dispatch after saving selected dirs (default: GITHUB_DISCOVERY).
+    scan_workers : list[WorkerName] | None
+        Worker types to dispatch after a scan sync. When ``None``, fires all three discovery
+        workers (GITHUB, LOCAL, SPEC) for backward compatibility.
+    source_type : str
+        Source type identifier stored with selected dirs (e.g. 'github', 'spec').
     """
     router = APIRouter(prefix=prefix, tags=tags)  # type: ignore[arg-type]
     _sync_lock = Lock()
@@ -254,7 +264,7 @@ def create_repo_router(
                         },
                         repos_dir=rd,
                     )
-                    save_selected_dirs(org, name, [], repos_dir=rd)
+                    save_selected_dirs(org, name, [], repos_dir=rd, source_type=source_type)
                 else:
                     save_metadata(
                         org,
@@ -442,13 +452,15 @@ def create_repo_router(
                 )
         except Exception as e:
             return SelectDirsResponse(success=False, error=str(e))
-        result = save_selected_dirs(org, name, request_body.selected, repos_dir=repos_dir)
+        result = save_selected_dirs(
+            org, name, request_body.selected, repos_dir=repos_dir, source_type=source_type
+        )
         if result.get("success"):
             dispatcher = request.app.state.dispatcher
             background_tasks.add_task(
                 dispatcher.ask_for_worker,
-                WorkerName.GITHUB_DISCOVERY,
-                task_type=WorkerName.GITHUB_DISCOVERY.value,
+                select_dirs_worker,
+                task_type=select_dirs_worker.value,
                 collection_name="all",
                 repo_key=f"{org}/{name}",
             )
@@ -491,11 +503,18 @@ def create_repo_router(
             def _run_scan() -> None:
                 with _sync_lock:
                     _sync_single_repo(org, name, None)
-                for wc, coll in [
-                    (WorkerName.GITHUB_DISCOVERY, "all"),
-                    (WorkerName.LOCAL_DISCOVERY, "local"),
-                    (WorkerName.SPEC_DISCOVERY, "spec"),
-                ]:
+                _workers = scan_workers or [
+                    WorkerName.GITHUB_DISCOVERY,
+                    WorkerName.LOCAL_DISCOVERY,
+                    WorkerName.SPEC_DISCOVERY,
+                ]
+                _collection_map = {
+                    WorkerName.GITHUB_DISCOVERY: "all",
+                    WorkerName.LOCAL_DISCOVERY: "local",
+                    WorkerName.SPEC_DISCOVERY: "spec",
+                }
+                for wc in _workers:
+                    coll = _collection_map.get(wc, "all")
                     dispatcher.ask_for_worker(wc, task_type=wc.value, collection_name=coll)
 
             background_tasks.add_task(_run_scan)

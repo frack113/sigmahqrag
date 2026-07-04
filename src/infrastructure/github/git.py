@@ -384,7 +384,11 @@ def list_directory_tree(
 
 
 def save_selected_dirs(
-    org: str, name: str, selected: list[str], repos_dir: Path | None = None
+    org: str,
+    name: str,
+    selected: list[str],
+    repos_dir: Path | None = None,
+    source_type: str = "",
 ) -> dict[str, Any]:
     """Save selected directories for a repository to DuckDB.
 
@@ -393,6 +397,7 @@ def save_selected_dirs(
         name: Repository name
         selected: List of relative folder paths
         repos_dir: Base directory for cloned repos
+        source_type: Source type identifier (e.g. 'github', 'spec')
 
     Returns:
         Result dict with success status
@@ -400,7 +405,7 @@ def save_selected_dirs(
     db = DatabaseService.get_instance()
     repo_key = _get_repo_key(org, name)
     try:
-        db.set_selected_dirs(repo_key, selected)
+        db.set_selected_dirs(repo_key, selected, source_type=source_type)
         db.persist()
         logger.info(f"Saved selection for {org}/{name}: {selected}")
         return {"success": True}

@@ -72,11 +72,24 @@ class DatabaseServiceCore:
         initdb_path = Path(__file__).parent / "initdb.sql"
         self._writer_conn.execute(initdb_path.read_text(encoding="utf-8"))
         self._writer_conn.commit()
+        self._apply_migrations()
         if self.db_path.exists():
             self._load_from_file()
         self._initialized = True
         self._conn = self._writer_conn
         logger.info("Schema initialized successfully")
+
+    def _apply_migrations(self) -> None:
+        """Apply schema migrations idempotently."""
+        migrations = [
+            "ALTER TABLE git_selected_dirs ADD COLUMN IF NOT EXISTS source_type TEXT NOT NULL DEFAULT ''",
+        ]
+        for sql in migrations:
+            try:
+                self._writer_conn.execute(sql)
+                self._writer_conn.commit()
+            except Exception as e:
+                logger.warning("Migration failed (may already be applied): %s", e)
 
     def _load_from_file(self) -> None:
         with self._lock:
@@ -89,6 +102,15 @@ class DatabaseServiceCore:
                         f"INSERT OR REPLACE INTO {table} SELECT * FROM file_db.{table}"
                     )
                 except Exception:
+                    if table == "git_selected_dirs":
+                        try:
+                            self._writer_conn.execute(
+                                "INSERT OR REPLACE INTO git_selected_dirs (repo_key, dir_path, updated) "
+                                "SELECT repo_key, dir_path, updated FROM file_db.git_selected_dirs"
+                            )
+                            continue
+                        except Exception:
+                            pass
                     logger.warning("Table %s not found in existing database — skipping", table)
             self._writer_conn.execute("DETACH file_db")
             logger.info("Loaded tables from disk")

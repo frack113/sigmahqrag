@@ -116,7 +116,9 @@ class TestSaveSelectedDirs:
         ):
             result = save_selected_dirs("org", "repo", ["src/", "docs/"])
             assert result["success"] is True
-            mock_db.set_selected_dirs.assert_called_once_with("org/repo", ["src/", "docs/"])
+            mock_db.set_selected_dirs.assert_called_once_with(
+                "org/repo", ["src/", "docs/"], source_type=""
+            )
 
     def test_handles_exception(self) -> None:
         mock_db = MagicMock()

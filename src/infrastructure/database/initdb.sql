@@ -65,6 +65,7 @@ CREATE TABLE IF NOT EXISTS git_metadata (
 CREATE TABLE IF NOT EXISTS git_selected_dirs (
     repo_key TEXT NOT NULL,
     dir_path TEXT NOT NULL,
+    source_type TEXT NOT NULL DEFAULT '',
     updated TEXT,
     PRIMARY KEY (repo_key, dir_path)
 );
@@ -150,4 +151,4 @@ CREATE INDEX IF NOT EXISTS idx_doc_registry_org_repo ON doc_registry(org, repo);
 INSERT OR IGNORE INTO config (key, value) VALUES
     ('app_version', '"0.1.0"'),
     ('theme', '"dark"'),
-    ('schema_version', '20260619');
+    ('schema_version', '20260704');
