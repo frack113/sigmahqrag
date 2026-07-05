@@ -107,6 +107,19 @@ class UnifiedIndexer:
                 if not docs:
                     continue
 
+                # Inject doc_registry metadata (rule_id, original_url, etc.)
+                # into each document so the Qdrant point carries the provenance
+                # of the reference (which rule referenced it, where from).
+                if route.table_name == "doc_registry":
+                    source_meta = {
+                        k: row.get(k)
+                        for k in ("rule_id", "original_url", "normalized_url", "url_hash", "content_type", "title")
+                        if row.get(k)
+                    }
+                    if source_meta:
+                        for doc in docs:
+                            doc.metadata.update(source_meta)
+
                 # Some transforms (notably SigmaParser → SigmaChunker) may emit
                 # chunks with empty text (missing fields). The pipeline filters
                 # those out internally, but we skip empties early to avoid the

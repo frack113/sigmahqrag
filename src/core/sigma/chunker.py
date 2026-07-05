@@ -427,6 +427,12 @@ class SigmaChunker(DocumentTransform):
             ]
         )
 
+        refs = f.get("references", [])
+        if refs:
+            ref_text = "\n\nReferences:\n" + "\n".join(f"  - {r}" for r in refs)
+            for chunk in chunks:
+                chunk["text"] += ref_text
+
         return chunks
 
     def _dict_to_document(self, chunk_data: dict, source_file: str | None = None) -> Document:

@@ -37,6 +37,7 @@ FILTER_KEYS = frozenset(
         "chunk_type",
         "collection",
         "tags",
+        "references",
     }
 )
 
@@ -274,6 +275,8 @@ def format_result_by_collection(result: dict[str, Any]) -> dict[str, Any]:
             "doc_type": meta.get("doc_type", ""),
             "heading_text": meta.get("heading_text", ""),
             "heading_level": meta.get("heading_level", 0),
+            "original_url": meta.get("original_url", ""),
+            "source_rule_id": meta.get("rule_id", ""),
         }
 
     # sigma_spec or unknown

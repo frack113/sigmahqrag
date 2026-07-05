@@ -126,6 +126,9 @@ def _sigma_rule_to_text(rule: SigmaRule) -> str:
     if rule.level:
         parts.append(f"Level: {rule.level}")
 
+    if rule.references:
+        parts.append(f"References: {', '.join(rule.references)}")
+
     return "\n".join(parts)
 
 
@@ -140,6 +143,7 @@ def _sigma_rule_to_metadata(rule: SigmaRule) -> dict[str, Any]:
         "status": rule.status,
         "tags": rule.tags,
         "logsource": rule.logsource,
+        "references": rule.references,
         "chunk_type": "full_rule",
     }
 

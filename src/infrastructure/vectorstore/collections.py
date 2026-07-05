@@ -93,6 +93,7 @@ PAYLOAD_INDEXES: list[tuple[str, str]] = [
     ("chunk_type", "keyword"),
     ("collection", "keyword"),
     ("tags", "keyword"),
+    ("references", "keyword"),
 ]
 
 
