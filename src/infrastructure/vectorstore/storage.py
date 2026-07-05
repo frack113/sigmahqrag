@@ -97,9 +97,8 @@ async def store_embeddings(
             )
         )
 
+    client = get_qdrant_client()
     try:
-        client = get_qdrant_client()
-
         # Auto-create collection if missing (include sparse vectors so hybrid
         # search works even when the collection is created via this code path).
         existing_collections = [c.name for c in client.get_collections().collections]
@@ -150,6 +149,8 @@ async def store_embeddings(
     except Exception as e:
         logger.error("Failed to store embeddings: %s", e)
         return False
+    finally:
+        client.close()
 
 
 async def search(

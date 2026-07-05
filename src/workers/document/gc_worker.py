@@ -54,7 +54,6 @@ class DocGCWorker(BaseWorker):
             )
 
             deleted = self._gc_entries(
-                table="doc_registry",
                 local_base=Path(cfg.local_documents_path),
                 github_base=Path(cfg.paths_github_dir),
                 grace_days=grace_days,
@@ -89,7 +88,6 @@ class DocGCWorker(BaseWorker):
 
     def _gc_entries(
         self,
-        table: str,
         local_base: Path,
         github_base: Path,
         grace_days: int,
@@ -100,11 +98,12 @@ class DocGCWorker(BaseWorker):
         try:
             with self.db._lock:
                 rows = self.db._writer_conn.execute(
-                    f"""SELECT url_hash, org, repo, file_name, embed_status, last_seen, content_type
-                        FROM {table}
-                        WHERE embed_status IN ('error', 'skipped')
-                        AND last_seen < (CURRENT_TIMESTAMP - INTERVAL {grace_days} DAY)
-                        ORDER BY url_hash"""
+                    "SELECT url_hash, org, repo, file_name, embed_status, last_seen, content_type "
+                    "FROM doc_registry "
+                    "WHERE embed_status IN ('error', 'skipped') "
+                    "AND last_seen < (CURRENT_TIMESTAMP - INTERVAL ? DAY) "
+                    "ORDER BY url_hash",
+                    (grace_days,),
                 ).fetchall()
 
                 for row in rows:
@@ -121,15 +120,14 @@ class DocGCWorker(BaseWorker):
                     if scanned:
                         continue
 
-                    with self.db._lock:
-                        self.db._writer_conn.execute(
-                            f"DELETE FROM {table} WHERE url_hash = ?",
-                            (url_hash,),
-                        )
+                    self.db._writer_conn.execute(
+                        "DELETE FROM doc_registry WHERE url_hash = ?",
+                        (url_hash,),
+                    )
                     deleted += 1
 
         except Exception as e:
-            logger.error(f"[DocGCWorker] Error processing table {table}: {e}", exc_info=True)
+            logger.error(f"[DocGCWorker] Error processing table doc_registry: {e}", exc_info=True)
 
         return deleted
 

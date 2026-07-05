@@ -2,7 +2,7 @@ import logging
 import threading
 import uuid
 from concurrent.futures import Future, ThreadPoolExecutor
-from typing import Dict, Type
+from typing import Type
 
 from src.infrastructure.database.service import DatabaseService
 from src.workers.base import BaseWorker
@@ -22,7 +22,7 @@ class TaskDispatcher:
     The dispatcher alone controls when a WAITING worker transitions to RUNNING.
     """
 
-    _WORKER_TYPES: Dict[WorkerName, Type[BaseWorker]] = {
+    _WORKER_TYPES: dict[WorkerName, Type[BaseWorker]] = {
         WorkerName.SIGMAREF_DISCOVERY: SigmaRefProcessor,
         WorkerName.GITHUB_DISCOVERY: GenericDiscoveryWorker,
         WorkerName.LOCAL_DISCOVERY: GenericDiscoveryWorker,
@@ -37,12 +37,12 @@ class TaskDispatcher:
         self._running = False
         self._stop_event = threading.Event()
         self._lock = threading.Lock()
-        self._pending_tasks: Dict[WorkerName, dict] = {}
+        self._pending_tasks: dict[WorkerName, dict] = {}
         self._executor: ThreadPoolExecutor | None = None
         self._thread: threading.Thread | None = None
         self._db: DatabaseService | None = None
-        self._workers: Dict[WorkerName, BaseWorker] = {}
-        self._worker_states: Dict[WorkerName, dict] = {}
+        self._workers: dict[WorkerName, BaseWorker] = {}
+        self._worker_states: dict[WorkerName, dict] = {}
 
     # ------------------------------------------------------------------
     # Public API

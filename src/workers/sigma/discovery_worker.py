@@ -6,7 +6,7 @@ import logging
 from enum import Enum
 from pathlib import Path
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from src.shared.constants import NULL_UUID
 from src.shared.utils.identify_file_type import SIGMA_RULE_EXTENSIONS, SUPPORTED_DOC_EXTENSION_MAP
@@ -54,14 +54,14 @@ class GenericDiscoveryWorker(DiscoveryWorker):
 
     def __init__(
         self,
-        db: Optional["DatabaseService"] = None,
-        dispatcher: Optional["TaskDispatcher"] = None,
+        db: DatabaseService | None = None,
+        dispatcher: TaskDispatcher | None = None,
         *,
         source_type: SourceType = SourceType.LOCAL,
-        base_dir: Optional[Path] = None,
-        github_base_dir: Optional[Path] = None,
-        spec_repos_dir: Optional[Path] = None,
-        selected_dirs: Optional[list[str]] = None,
+        base_dir: Path | None = None,
+        github_base_dir: Path | None = None,
+        spec_repos_dir: Path | None = None,
+        selected_dirs: list[str] | None = None,
     ) -> None:
         super().__init__(db or DatabaseService.get_instance(), dispatcher)
         self.source_type = source_type
@@ -151,6 +151,8 @@ class GenericDiscoveryWorker(DiscoveryWorker):
         gh_base = self.github_base_dir or Path(task.get("github_base_dir", "data/github"))
         gh_base = gh_base.resolve()
 
+        st = "github" if worker_name == WorkerName.GITHUB_DISCOVERY else ""
+
         repo_key = task.get("repo_key")
         if repo_key:
             parts = repo_key.split("/")
@@ -160,7 +162,6 @@ class GenericDiscoveryWorker(DiscoveryWorker):
                 logger.warning(f"[GenericDiscoveryWorker] Invalid repo key: {repo_key}")
                 return
         else:
-            st = "github" if worker_name == WorkerName.GITHUB_DISCOVERY else ""
             try:
                 repo_keys = self.db.get_repos_with_selected_dirs(source_type=st)
             except Exception as e:
@@ -172,7 +173,7 @@ class GenericDiscoveryWorker(DiscoveryWorker):
                 logger.info("[GenericDiscoveryWorker] No repos with selected dirs")
                 return
 
-            repo_items: list[tuple[str, str]] = []
+            repo_items = []
             for rk in repo_keys:
                 parts = rk.split("/")
                 if len(parts) != 2:
