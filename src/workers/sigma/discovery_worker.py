@@ -440,31 +440,6 @@ class GenericDiscoveryWorker(DiscoveryWorker):
             logger.error(f"[GenericDiscoveryWorker] Cannot prepare spec entry for {file_path}: {e}")
             return None
 
-    def _write_entries(
-        self,
-        entries: list[dict],
-        worker_name: WorkerName,
-        total: int,
-        processed: int,
-        skipped: int,
-        batch_upsert_fn: Callable | None = None,
-    ) -> None:
-        if not entries:
-            self._update_progress(worker_name, 100, "")
-            return
-
-        upsert_fn = batch_upsert_fn or self.db.batch_upsert_doc_registry
-        try:
-            upsert_fn(entries)
-        except Exception as e:
-            logger.error(f"[GenericDiscoveryWorker] Batch upsert failed: {e}", exc_info=True)
-
-        if total > 0 and self.dispatcher:
-            pct = int((processed + skipped) / total * 100)
-            self._update_progress(worker_name, pct, "")
-
-        self._update_progress(worker_name, 100, "")
-
     # ------------------------------------------------------------------
     # Shared scanning logic
     # ------------------------------------------------------------------
@@ -614,14 +589,21 @@ class GenericDiscoveryWorker(DiscoveryWorker):
             return []
 
     def _write_entries(
-        self, entries: list[dict], worker_name: WorkerName, total: int, processed: int, skipped: int
+        self,
+        entries: list[dict],
+        worker_name: WorkerName,
+        total: int,
+        processed: int,
+        skipped: int,
+        batch_upsert_fn: Callable | None = None,
     ) -> None:
         if not entries:
             self._update_progress(worker_name, 100, "")
             return
 
+        upsert_fn = batch_upsert_fn or self.db.batch_upsert_doc_registry
         try:
-            self.db.batch_upsert_doc_registry(entries)
+            upsert_fn(entries)
         except Exception as e:
             logger.error(f"[GenericDiscoveryWorker] Batch upsert failed: {e}", exc_info=True)
 
