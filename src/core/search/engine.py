@@ -368,6 +368,15 @@ class SearchEngine:
         limit = top_k if top_k is not None else self.top_k
         per_collection_k = max(limit * 2, 10)
 
+        # Parse inline key:value filters (e.g. references:url) from query
+        inline_filters, clean_query = parse_query_filters(query)
+        if inline_filters:
+            metadata_filter = {**(metadata_filter or {}), **inline_filters}
+            query = clean_query if clean_query else query
+
+        # When filtering by references, always include sigma_docs
+        has_ref_filter = metadata_filter and "references" in metadata_filter
+
         # Determine which collections to search
         cols_to_search: list[str] = []
         if self.use_router:
@@ -381,6 +390,11 @@ class SearchEngine:
                 cols_to_search = self.collection_names
         else:
             cols_to_search = self.collection_names
+
+        # When filtering by references, always include sigma_docs even if
+        # the router chose otherwise — reference docs live there.
+        if has_ref_filter and "sigma_docs" not in cols_to_search:
+            cols_to_search.append("sigma_docs")
 
         # Build Qdrant filter for metadata filtering
         qdrant_filter = build_qdrant_filter(metadata_filter) if metadata_filter else None
