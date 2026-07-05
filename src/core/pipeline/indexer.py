@@ -113,7 +113,14 @@ class UnifiedIndexer:
                 if route.table_name == "doc_registry":
                     source_meta = {
                         k: row.get(k)
-                        for k in ("rule_id", "original_url", "normalized_url", "url_hash", "content_type", "title")
+                        for k in (
+                            "rule_id",
+                            "original_url",
+                            "normalized_url",
+                            "url_hash",
+                            "content_type",
+                            "title",
+                        )
                         if row.get(k)
                     }
                     if source_meta:
