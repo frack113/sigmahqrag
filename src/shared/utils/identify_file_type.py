@@ -62,6 +62,7 @@ FILETYPE_INFO: dict[str, dict[str, str]] = {
     FileType.PLAIN_TEXT.value: {"ext": ".txt", "subdir": "plain_text"},
     FileType.HTML.value: {"ext": ".html", "subdir": "html"},
     FileType.OFFICE_DOCUMENT.value: {"ext": ".docx", "subdir": "office"},
+    FileType.YAML.value: {"ext": ".yml", "subdir": "yaml"},
 }
 
 
@@ -77,6 +78,10 @@ def filetype_subdir(content_type: str) -> str:
 
 SUPPORTED_REFERENCE_DOC_TYPES: set[str] = {
     FileType.MARKDOWN.value,
+    FileType.HTML.value,
+    FileType.YAML.value,
+    FileType.PLAIN_TEXT.value,
+    FileType.PDF.value,
 }
 
 PUREMAGIC_TYPE_MAP: dict[str, FileType] = {
