@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import threading
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import duckdb
+
+from src.infrastructure.database import DatabaseService
 from src.workers.document.gc_worker import DocGCWorker, _is_orphan_candidate
 
 _VALID_HASH = "ab" * 32  # 64-char hex
@@ -156,3 +160,107 @@ class TestGcOrphanedSigmarefFiles:
             result = worker._gc_orphaned_sigmaref_files()
 
         assert result == 0
+
+
+class TestDeleteUnreferencedEntries:
+    def _make_db_service(self) -> DatabaseService:
+        """Create a DatabaseService with an in-memory DuckDB and required tables."""
+        db = DatabaseService.__new__(DatabaseService)
+        db._lock = threading.Lock()
+        db._writer_conn = duckdb.connect(":memory:")
+        db._writer_conn.execute("""
+            CREATE TABLE doc_registry (
+                url_hash TEXT PRIMARY KEY,
+                org TEXT,
+                repo TEXT,
+                content_type TEXT,
+                file_name TEXT,
+                content_sha256 TEXT,
+                file_size BIGINT,
+                original_url TEXT NOT NULL,
+                normalized_url TEXT,
+                rule_id TEXT,
+                title TEXT,
+                timestamp TEXT,
+                last_seen TEXT,
+                embed_status TEXT DEFAULT 'discovery'
+            )
+        """)
+        db._writer_conn.execute("""
+            CREATE TABLE rule_references (
+                rule_id TEXT NOT NULL,
+                url_hash TEXT NOT NULL,
+                ref_url TEXT NOT NULL,
+                created TEXT
+            )
+        """)
+        db._writer_conn.execute("""
+            CREATE TABLE doc_error (
+                url_hash TEXT PRIMARY KEY,
+                original_url TEXT NOT NULL,
+                normalized_url TEXT NOT NULL,
+                error_code INTEGER,
+                error_message TEXT,
+                org TEXT,
+                repo TEXT,
+                timestamp TEXT
+            )
+        """)
+        db._safe_query = lambda sql, params=None: db._writer_conn.execute(
+            sql, params or []
+        ).fetchall()
+        return db
+
+    def _insert_doc(self, db: DatabaseService, url_hash: str, org: str = "sigmaref") -> None:
+        db._writer_conn.execute(
+            "INSERT INTO doc_registry (url_hash, org, original_url, normalized_url) VALUES (?, ?, ?, ?)",
+            [url_hash, org, f"https://example.com/{url_hash}", f"https://example.com/{url_hash}"],
+        )
+
+    def _insert_ref(self, db: DatabaseService, url_hash: str) -> None:
+        db._writer_conn.execute(
+            "INSERT INTO rule_references (rule_id, url_hash, ref_url) VALUES (?, ?, ?)",
+            ["rule-1", url_hash, f"https://example.com/{url_hash}"],
+        )
+
+    def test_deletes_orphan_entries(self) -> None:
+        db = self._make_db_service()
+        self._insert_doc(db, "orphan1")
+        self._insert_doc(db, "orphan2")
+        self._insert_doc(db, "referenced1")
+        self._insert_ref(db, "referenced1")
+
+        result = db.delete_unreferenced_entries()
+
+        assert result == 2
+        remaining = db._writer_conn.execute(
+            "SELECT url_hash FROM doc_registry ORDER BY url_hash"
+        ).fetchall()
+        assert remaining == [("referenced1",)]
+
+    def test_noop_when_no_orphans(self) -> None:
+        db = self._make_db_service()
+        self._insert_doc(db, "ref1")
+        self._insert_ref(db, "ref1")
+
+        result = db.delete_unreferenced_entries()
+
+        assert result == 0
+        remaining = db._writer_conn.execute(
+            "SELECT COUNT(*) FROM doc_registry"
+        ).fetchone()[0]
+        assert remaining == 1
+
+    def test_skips_local_and_github_entries(self) -> None:
+        db = self._make_db_service()
+        self._insert_doc(db, "sigmaref_orphan", org="sigmaref")
+        self._insert_doc(db, "local_file", org="local")
+        self._insert_doc(db, "github_file", org="sigmahq")
+
+        result = db.delete_unreferenced_entries()
+
+        assert result == 1  # only sigmaref_orphan deleted
+        remaining = db._writer_conn.execute(
+            "SELECT url_hash FROM doc_registry ORDER BY url_hash"
+        ).fetchall()
+        assert remaining == [("github_file",), ("local_file",)]
