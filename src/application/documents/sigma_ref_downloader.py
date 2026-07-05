@@ -460,6 +460,10 @@ def _download_scan_mode(
                     )
                     downloaded += 1
                 else:
+                    logger.debug(
+                        "Reference download failed | url=%s rule_id=%s status=%s",
+                        item["original_url"], item["rule_id"], status_code,
+                    )
                     _maybe_record_error(
                         db,
                         item["url_hash"],
@@ -484,8 +488,22 @@ def _download_scan_mode(
         "skipped": skipped,
         "failed": failed,
     }
-    logger.info("Download complete: %s", summary)
+    _log_download_summary(summary)
     return summary
+
+
+def _log_download_summary(summary: dict[str, Any]) -> None:
+    """Log download summary and warn if failure rate exceeds threshold."""
+    logger.info("Download complete: %s", summary)
+    total_refs = summary.get("total_refs", 0)
+    failed = summary.get("failed", 0)
+    if total_refs > 0:
+        fail_rate = failed / total_refs
+        if fail_rate > 0.05:
+            logger.warning(
+                "High reference failure rate: %.1f%% (%d/%d) — check network or URL validity",
+                fail_rate * 100, failed, total_refs,
+            )
 
 
 def _empty_summary() -> dict[str, Any]:
@@ -742,10 +760,12 @@ def _download_registry_mode(
     if rule_refs:
         db.batch_upsert_rule_references(rule_refs)
 
-    return {
+    summary = {
         "total_rules": total_rules,
         "total_refs": total_refs,
         "downloaded": downloaded,
         "skipped": skipped,
         "failed": failed,
     }
+    _log_download_summary(summary)
+    return summary
