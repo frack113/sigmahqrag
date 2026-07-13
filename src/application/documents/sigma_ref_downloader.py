@@ -462,7 +462,9 @@ def _download_scan_mode(
                 else:
                     logger.debug(
                         "Reference download failed | url=%s rule_id=%s status=%s",
-                        item["original_url"], item["rule_id"], status_code,
+                        item["original_url"],
+                        item["rule_id"],
+                        status_code,
                     )
                     _maybe_record_error(
                         db,
@@ -502,7 +504,9 @@ def _log_download_summary(summary: dict[str, Any]) -> None:
         if fail_rate > 0.05:
             logger.warning(
                 "High reference failure rate: %.1f%% (%d/%d) — check network or URL validity",
-                fail_rate * 100, failed, total_refs,
+                fail_rate * 100,
+                failed,
+                total_refs,
             )
 
 

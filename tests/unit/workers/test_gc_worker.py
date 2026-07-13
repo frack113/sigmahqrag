@@ -246,9 +246,7 @@ class TestDeleteUnreferencedEntries:
         result = db.delete_unreferenced_entries()
 
         assert result == 0
-        remaining = db._writer_conn.execute(
-            "SELECT COUNT(*) FROM doc_registry"
-        ).fetchone()[0]
+        remaining = db._writer_conn.execute("SELECT COUNT(*) FROM doc_registry").fetchone()[0]
         assert remaining == 1
 
     def test_skips_local_and_github_entries(self) -> None:
