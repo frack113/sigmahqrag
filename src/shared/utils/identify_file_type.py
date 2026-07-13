@@ -78,10 +78,7 @@ def filetype_subdir(content_type: str) -> str:
 
 SUPPORTED_REFERENCE_DOC_TYPES: set[str] = {
     FileType.MARKDOWN.value,
-    FileType.HTML.value,
-    FileType.YAML.value,
-    FileType.PLAIN_TEXT.value,
-    FileType.PDF.value,
+    FileType.SIGMA_RULE.value,
 }
 
 PUREMAGIC_TYPE_MAP: dict[str, FileType] = {
