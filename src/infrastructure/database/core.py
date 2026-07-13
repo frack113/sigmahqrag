@@ -82,7 +82,9 @@ class DatabaseServiceCore:
     def _apply_migrations(self) -> None:
         """Apply schema migrations idempotently."""
         migrations = [
-            "ALTER TABLE git_selected_dirs ADD COLUMN IF NOT EXISTS source_type TEXT NOT NULL DEFAULT ''",
+            "ALTER TABLE git_selected_dirs ADD COLUMN IF NOT EXISTS source_type TEXT",
+            "UPDATE git_selected_dirs SET source_type = '' WHERE source_type IS NULL",
+            "UPDATE config SET value = '20260704' WHERE key = 'schema_version'",
         ]
         for sql in migrations:
             try:
