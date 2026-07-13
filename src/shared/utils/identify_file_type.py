@@ -56,12 +56,26 @@ SUPPORTED_DOC_EXTENSION_MAP: dict[str, FileType] = {
     ".odp": FileType.OFFICE_DOCUMENT,
 }
 
+FILETYPE_INFO: dict[str, dict[str, str]] = {
+    FileType.MARKDOWN.value: {"ext": ".md", "subdir": "markdown"},
+    FileType.SIGMA_RULE.value: {"ext": ".yml", "subdir": "sigma"},
+    FileType.OFFICE_DOCUMENT.value: {"ext": ".docx", "subdir": "office"},
+}
+
+
+def filetype_ext(content_type: str) -> str:
+    """Return the file extension for a given content type."""
+    return FILETYPE_INFO.get(content_type, {}).get("ext", ".md")
+
+
+def filetype_subdir(content_type: str) -> str:
+    """Return the subdirectory name for a given content type."""
+    return FILETYPE_INFO.get(content_type, {}).get("subdir", "misc")
+
+
 SUPPORTED_REFERENCE_DOC_TYPES: set[str] = {
     FileType.MARKDOWN.value,
-    FileType.PDF.value,
-    FileType.PLAIN_TEXT.value,
-    FileType.HTML.value,
-    FileType.OFFICE_DOCUMENT.value,
+    FileType.SIGMA_RULE.value,
 }
 
 PUREMAGIC_TYPE_MAP: dict[str, FileType] = {

@@ -15,8 +15,11 @@ from src.api.v1.infrastructure.github import router
 @pytest.fixture
 def client():
     """Create a test client with mocked dependencies."""
+    from unittest.mock import MagicMock
+
     app = FastAPI()
     app.include_router(router)
+    app.state.dispatcher = MagicMock()
     return TestClient(app, raise_server_exceptions=False)
 
 

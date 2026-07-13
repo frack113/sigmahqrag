@@ -1,4 +1,4 @@
-"""Qdrant indexing for Sigma rules."""
+"""Qdrant indexing for Sigma rules and reference documents."""
 
 from __future__ import annotations
 
@@ -30,6 +30,7 @@ async def index_sigma_rules(
     rules: list[SigmaRule],
     collection_name: str | None = None,
     mode: str = "flat",
+    index_after_upload: bool = False,
 ) -> dict[str, Any]:
     """Index Sigma rules in Qdrant.
 
@@ -37,6 +38,7 @@ async def index_sigma_rules(
         rules: List of SigmaRule to index
         collection_name: Optional collection name override
         mode: 'flat' (one chunk per rule) or 'rich' (multiple chunks per rule)
+        index_after_upload: If True, index immediately after upload (incremental)
 
     Returns:
         Dict with indexing results
@@ -47,16 +49,17 @@ async def index_sigma_rules(
     config = get_config()
     collection = collection_name or config.qdrant_collection_name
 
-    service_client = get_qdrant_client(host=config.qdrant_host, port=config.qdrant_port)
-    try:
-        # Delete + full reindex strategy: clear old vectors before pipeline insert
-        service_client.delete_collection(collection)
-    except Exception as e:
-        logger.warning(
-            "Collection %s not found or cannot be deleted (first run?): %s", collection, e
-        )
-    finally:
-        service_client.close()
+    if not index_after_upload:
+        service_client = get_qdrant_client(host=config.qdrant_host, port=config.qdrant_port)
+        try:
+            # Delete + full reindex strategy: clear old vectors before pipeline insert
+            service_client.delete_collection(collection)
+        except Exception as e:
+            logger.warning(
+                "Collection %s not found or cannot be deleted (first run?): %s", collection, e
+            )
+        finally:
+            service_client.close()
 
     nodes = []
     for rule in rules:
@@ -123,6 +126,9 @@ def _sigma_rule_to_text(rule: SigmaRule) -> str:
     if rule.level:
         parts.append(f"Level: {rule.level}")
 
+    if rule.references:
+        parts.append(f"References: {', '.join(rule.references)}")
+
     return "\n".join(parts)
 
 
@@ -137,6 +143,7 @@ def _sigma_rule_to_metadata(rule: SigmaRule) -> dict[str, Any]:
         "status": rule.status,
         "tags": rule.tags,
         "logsource": rule.logsource,
+        "references": rule.references,
         "chunk_type": "full_rule",
     }
 

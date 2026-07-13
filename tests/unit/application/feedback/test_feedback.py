@@ -105,8 +105,8 @@ class TestFeedbackModels:
 
 class TestResolveDbPath:
     def test_absolute_path(self) -> None:
-        repo = FeedbackRepository(db_path="C:\\absolute\\path.db")
-        assert str(repo._db_path) == "C:\\absolute\\path.db"
+        repo = FeedbackRepository(db_path="/tmp/absolute/path.db")
+        assert str(repo._db_path) == "/tmp/absolute/path.db"
 
     def test_relative_path(self) -> None:
         repo = FeedbackRepository(db_path="relative.db")

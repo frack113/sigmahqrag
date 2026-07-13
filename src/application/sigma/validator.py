@@ -7,26 +7,32 @@ from typing import Any
 
 import yaml
 
+from src.core.sigma.models import SigmaRule
 from src.shared.exceptions import ValidationError
 
 logger = logging.getLogger(__name__)
 
-REQUIRED_FIELDS = ["id", "name", "description", "detection"]
+REQUIRED_FIELDS = ["id", "description", "detection"]
 DEPRECATED_FIELDS = ["level", "falsepositives"]  # Sigma v2 deprecated
 MAX_FILE_SIZE = 1024 * 1024
+
+_VALID_LEVELS = frozenset({"informational", "low", "medium", "high", "critical"})
+_VALID_STATUSES = frozenset(
+    {"experimental", "stable", "testing", "deprecated", "test", "unsupported"}
+)
 
 
 class SigmaValidator:
     """Validates Sigma rule YAML files."""
 
-    def validate(self, content: bytes) -> dict[str, Any]:
+    def validate(self, content: bytes) -> SigmaRule:
         """Validate Sigma rule YAML content.
 
         Args:
             content: Raw YAML file content as bytes
 
         Returns:
-            Parsed and validated rule dictionary
+            Parsed and validated SigmaRule
 
         Raises:
             ValidationError: If validation fails
@@ -41,29 +47,49 @@ class SigmaValidator:
             )
 
         try:
-            rule_data = yaml.safe_load(content)
+            data = yaml.safe_load(content)
         except yaml.YAMLError as e:
             raise ValidationError(
                 field="yaml_syntax",
                 message=f"Invalid YAML syntax: {str(e)}",
             ) from None
 
-        if not isinstance(rule_data, dict):
+        if not isinstance(data, dict):
             raise ValidationError(
                 field="yaml_structure",
                 message="YAML content must be a mapping (dictionary)",
             )
 
-        self._validate_required_fields(rule_data)
-        self._validate_field_types(rule_data)
-        self._validate_detection_section(rule_data)
-        self._check_deprecated_fields(rule_data)
-        self._validate_condition_syntax(rule_data)
-        return rule_data
+        # Normalize name/title duality — Sigma YAML uses "name" or "title"
+        self._normalize_name_title(data)
+
+        self._validate_required_fields(data)
+        self._validate_field_types(data)
+        self._validate_detection_section(data)
+        self._check_deprecated_fields(data)
+        self._validate_condition_syntax(data)
+        self._validate_level(data)
+        self._validate_status(data)
+
+        return SigmaRule.from_dict(data)
+
+    def _normalize_name_title(self, data: dict[str, Any]) -> None:
+        """Normalize 'name' / 'title' duality.
+
+        Sigma YAML can use either key. The model uses 'title'.
+        """
+        if "title" in data and "name" not in data:
+            data["name"] = data["title"]
+        elif "name" in data and "title" not in data:
+            data["title"] = data["name"]
 
     def _validate_required_fields(self, data: dict[str, Any]) -> None:
         """Validate that all required Sigma fields are present."""
+        # At least one of 'name' or 'title' is required
+        has_name_field = "name" in data or "title" in data
         missing = [field for field in REQUIRED_FIELDS if field not in data]
+        if not has_name_field:
+            missing.append("name")
         if missing:
             raise ValidationError(
                 field="required_fields",
@@ -75,7 +101,8 @@ class SigmaValidator:
         if not isinstance(data.get("id"), str) or not data["id"].strip():
             raise ValidationError(field="id", message="Rule ID must be a non-empty string")
 
-        if not isinstance(data.get("name"), str) or not data["name"].strip():
+        name_val = data.get("name") or data.get("title", "")
+        if not isinstance(name_val, str) or not name_val.strip():
             raise ValidationError(field="name", message="Rule name must be a non-empty string")
 
         if not isinstance(data.get("description"), str) or not data["description"].strip():
@@ -108,10 +135,8 @@ class SigmaValidator:
         """Validate condition syntax if present."""
         condition = data.get("condition")
         if condition and isinstance(condition, str):
-            # Basic validation: condition should reference detection keys
             detection_keys = set(data.get("detection", {}).keys())
             condition_words = set(condition.replace("(", " ").replace(")", " ").split())
-            # Check if condition references non-existent detection keys
             invalid_refs = (
                 condition_words - detection_keys - {"and", "or", "not", "1", "of", "them"}
             )
@@ -119,3 +144,23 @@ class SigmaValidator:
                 logger.warning(
                     f"Condition may reference non-existent detection keys: {invalid_refs}"
                 )
+
+    def _validate_level(self, data: dict[str, Any]) -> None:
+        """Validate level field if present."""
+        level = data.get("level")
+        if level is not None and level not in _VALID_LEVELS:
+            raise ValidationError(
+                field="level",
+                message=f"Invalid level '{level}'. "
+                f"Must be one of: {', '.join(sorted(_VALID_LEVELS))}",
+            )
+
+    def _validate_status(self, data: dict[str, Any]) -> None:
+        """Validate status field if present."""
+        status = data.get("status")
+        if status is not None and status not in _VALID_STATUSES:
+            raise ValidationError(
+                field="status",
+                message=f"Invalid status '{status}'. "
+                f"Must be one of: {', '.join(sorted(_VALID_STATUSES))}",
+            )

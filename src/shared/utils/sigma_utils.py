@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
+
 
 import yaml
 
@@ -33,7 +33,7 @@ def extract_sigma_references(file_path: Path) -> list[str]:
         return []
 
 
-def get_sigma_rule_id(file_path: Path) -> Optional[str]:
+def get_sigma_rule_id(file_path: Path) -> str | None:
     """Extract the Sigma rule UUID from the ``id`` field if present."""
     try:
         data = yaml.safe_load(file_path.read_text(encoding="utf-8"))

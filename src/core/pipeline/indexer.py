@@ -16,6 +16,7 @@ from src.core.base import TransformConfig
 from src.core.document.parser.generic_parser import GenericTransform
 from src.core.pipeline.ingestion import IngestionPipelineBuilder
 from src.infrastructure.database import DatabaseService
+from src.shared.utils.identify_file_type import filetype_subdir
 
 logger = logging.getLogger(__name__)
 
@@ -106,6 +107,26 @@ class UnifiedIndexer:
                 if not docs:
                     continue
 
+                # Inject doc_registry metadata (rule_id, original_url, etc.)
+                # into each document so the Qdrant point carries the provenance
+                # of the reference (which rule referenced it, where from).
+                if route.table_name == "doc_registry":
+                    source_meta = {
+                        k: row.get(k)
+                        for k in (
+                            "rule_id",
+                            "original_url",
+                            "normalized_url",
+                            "url_hash",
+                            "content_type",
+                            "title",
+                        )
+                        if row.get(k)
+                    }
+                    if source_meta:
+                        for doc in docs:
+                            doc.metadata.update(source_meta)
+
                 # Some transforms (notably SigmaParser → SigmaChunker) may emit
                 # chunks with empty text (missing fields). The pipeline filters
                 # those out internally, but we skip empties early to avoid the
@@ -138,7 +159,12 @@ class UnifiedIndexer:
         return result
 
     async def index_all(self, group: str | None = None) -> list[IndexResult]:
-        """Execute configured routes, optionally filtered by group ("spec" or "docs")."""
+        """Execute configured routes, optionally filtered by group ("spec" or "docs").
+
+        Only processes entries with ``embed_status = 'discovery'`` (new or
+        changed files).  Entries that are already ``'embedded'`` and whose
+        content has not changed are skipped — see Q3.4.
+        """
         if group == "spec":
             routes = [r for r in ROUTES if r.table_name == "sigma_spec"]
         elif group == "docs":
@@ -150,6 +176,16 @@ class UnifiedIndexer:
             r = await self.index(route)
             results.append(r)
         return results
+
+    async def index_incremental(self, group: str | None = None) -> list[IndexResult]:
+        """Alias for :meth:`index_all` — only pending/changed entries are indexed.
+
+        This is the preferred method for routine sync operations.  Full rebuild
+        (all entries) requires an explicit ``reset_embed_status_for_collection``
+        call via the API before calling this method.
+        """
+        logger.info("Starting incremental index (group=%s)", group)
+        return await self.index_all(group=group)
 
     def _get_pending(self, route: IndexRoute) -> list[dict]:
         """Fetch pending entries for a given route."""
@@ -175,7 +211,12 @@ class UnifiedIndexer:
             return Path(cfg.local_documents_path).resolve() / file_name
 
         if org == "sigmaref":
-            return Path(cfg.sigmaref_documents_path).resolve() / file_name
+            base = Path(cfg.sigmaref_documents_path).resolve()
+            subdir = filetype_subdir(row.get("content_type", ""))
+            candidate = base / subdir / file_name
+            if candidate.exists():
+                return candidate
+            return base / file_name
 
         repo = row.get("repo", "") or ""
         if org and repo:

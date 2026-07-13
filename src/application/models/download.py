@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import os
 from pathlib import Path
@@ -22,7 +23,8 @@ class HFDownloadService:
         token: str | None = None,
     ) -> None:
         self.temp_dir = temp_dir or TEMP_DIR
-        self.token = token or os.environ.get("HF_TOKEN")
+        raw_token = token or os.environ.get("HF_TOKEN")
+        self.token = raw_token if raw_token else None
         self.temp_dir.mkdir(parents=True, exist_ok=True)
         self._metadata: dict[str, dict] = {}
         self._load_metadata()
@@ -36,16 +38,21 @@ class HFDownloadService:
         except RuntimeError:
             pass
 
-    def list_gguf_files(
+    async def list_gguf_files(
         self,
         repo: HFRepo,
     ) -> list[dict[str, Any]]:
         """List all .gguf files in a repository with metadata."""
+        import huggingface_hub.constants as hc
         from huggingface_hub import HfApi
 
-        api = HfApi(token=self.token)
+        was_offline = hc.HF_HUB_OFFLINE
+        hc.HF_HUB_OFFLINE = False
         try:
-            info = api.model_info(repo_id=repo.full_id, files_metadata=True)
+            api = HfApi(token=self.token)
+            info = await asyncio.to_thread(
+                api.model_info, repo_id=repo.full_id, files_metadata=True
+            )
             siblings = info.siblings or []
 
             results = []
@@ -60,24 +67,38 @@ class HFDownloadService:
             return results
         except Exception as e:
             raise DownloadError(f"Failed to list GGUF files for {repo.full_id}: {e}") from e
+        finally:
+            hc.HF_HUB_OFFLINE = was_offline
 
-    def get_model_info(self, repo: HFRepo):
+    async def get_model_info(self, repo: HFRepo):
         """Get model info from HuggingFace."""
+        import huggingface_hub.constants as hc
         from huggingface_hub import HfApi
 
-        api = HfApi(token=self.token)
-        return api.model_info(repo_id=repo.full_id)
+        was_offline = hc.HF_HUB_OFFLINE
+        hc.HF_HUB_OFFLINE = False
+        try:
+            api = HfApi(token=self.token)
+            return await asyncio.to_thread(api.model_info, repo_id=repo.full_id)
+        finally:
+            hc.HF_HUB_OFFLINE = was_offline
 
     def download_repo(self, repo: HFRepo, target_dir: Path) -> Path:
         """Download an entire repository."""
+        import huggingface_hub.constants as hc
         from huggingface_hub import snapshot_download
 
-        path = snapshot_download(
-            repo_id=repo.full_id,
-            local_dir=target_dir,
-            token=self.token,
-        )
-        return Path(path)
+        was_offline = hc.HF_HUB_OFFLINE
+        hc.HF_HUB_OFFLINE = False
+        try:
+            path = snapshot_download(
+                repo_id=repo.full_id,
+                local_dir=target_dir,
+                token=self.token,
+            )
+            return Path(path)
+        finally:
+            hc.HF_HUB_OFFLINE = was_offline
 
     def verify_checksum(self, file_path: Path, expected_sha256: str) -> bool:
         """Verify file checksum."""
@@ -102,22 +123,36 @@ class HFDownloadService:
             query: Search query string.
             task: Optional pipeline tag filter (e.g. ``"feature-extraction"``
                 for embedding models, ``"text-generation"`` for LLMs).
+                When ``None``, no pipeline tag filter is applied.
 
         Returns:
             List of matching :class:`HFRepo` instances.
         """
+        import huggingface_hub.constants as hc
         from huggingface_hub import HfApi
 
-        api = HfApi(token=self.token)
-        kwargs: dict[str, Any] = {"search": query, "sort": "downloads"}
-        pipeline_tags = [task] if task else ["feature-extraction"]
-        if task == "feature-extraction":
-            pipeline_tags = ["feature-extraction", "sentence-similarity"]
+        was_offline = hc.HF_HUB_OFFLINE
+        hc.HF_HUB_OFFLINE = False
         try:
+            api = HfApi(token=self.token)
+            kwargs: dict[str, Any] = {"search": query, "sort": "downloads"}
+            if task is None:
+                pipeline_tags: list[str] = []
+            elif task == "feature-extraction":
+                pipeline_tags = ["feature-extraction", "sentence-similarity"]
+            else:
+                pipeline_tags = [task]
             seen: set[str] = set()
             results: list[HFRepo] = []
-            for tag in pipeline_tags:
-                kwargs["pipeline_tag"] = tag
+            if pipeline_tags:
+                for tag in pipeline_tags:
+                    kwargs["pipeline_tag"] = tag
+                    for r in api.list_models(**kwargs):
+                        if r.id not in seen:
+                            seen.add(r.id)
+                            results.append(HFRepo.from_string(r.id))
+            else:
+                kwargs.pop("pipeline_tag", None)
                 for r in api.list_models(**kwargs):
                     if r.id not in seen:
                         seen.add(r.id)
@@ -125,3 +160,5 @@ class HFDownloadService:
             return results
         except Exception as e:
             raise DownloadError(f"Failed to search models: {e}") from e
+        finally:
+            hc.HF_HUB_OFFLINE = was_offline

@@ -16,26 +16,36 @@ from src.application.sigma.translate import (
     translate_detection,
 )
 from src.application.tools import ToolContext, ToolDispatcher, get_tools
-from src.core.search.engine import SearchEngine
+from src.core.search.engine import SearchEngine, format_result_by_collection
+from src.core.sigma.models import SigmaRule
 from src.api.v1.chat.schemas import ChatMode
+from src.shared.session import SessionStore
 
 logger = logging.getLogger(__name__)
 
 MAX_HISTORY = 50
 MAX_TOOL_CALLS = 5
 
+_session_store = SessionStore()
+
+
+def get_session_store() -> SessionStore:
+    return _session_store
+
 
 class ChatService:
-    """Service layer for chat operations."""
+    """Service layer for chat operations.
+
+    Session-scoped state (history, uploaded rule, citations) is stored in
+    a shared :class:`SessionStore` keyed by *session_id*.  Callers should
+    pass a unique *session_id* (e.g. from ``X-Session-ID`` header) to
+    avoid state leaking between users.
+    """
 
     def __init__(self, use_router: bool = True) -> None:
         self.search_engine = SearchEngine(use_router=use_router)
         self.rag_pipeline = RAGPipeline()
         self.validator = SigmaValidator()
-        self._history: list[dict[str, str]] = []
-        self._uploaded_rule: dict[str, Any] | None = None
-        self._last_citations: list[str] = []
-        self._current_prompt_id: str = ""
 
         # Tool-calling setup
         self._tool_executor = ToolDispatcher(get_tools())
@@ -44,6 +54,31 @@ class ChatService:
             llm_client=self.rag_pipeline.llm_client,
             rag_pipeline=self.rag_pipeline,
         )
+
+    # ------------------------------------------------------------------
+    # Session helpers
+    # ------------------------------------------------------------------
+
+    def _sid(self, session_id: str | None) -> str:
+        return session_id or "_default"
+
+    def _get_rule(self, session_id: str | None) -> SigmaRule | None:
+        return get_session_store().get(self._sid(session_id), "_uploaded_rule")
+
+    def _set_rule(self, session_id: str | None, rule: SigmaRule | None) -> None:
+        get_session_store().set(self._sid(session_id), "_uploaded_rule", rule)
+
+    def _get_history(self, session_id: str | None) -> list[dict[str, str]]:
+        return get_session_store().get(self._sid(session_id), "_history", [])
+
+    def _set_history(self, session_id: str | None, history: list[dict[str, str]]) -> None:
+        get_session_store().set(self._sid(session_id), "_history", history)
+
+    def _get_citations(self, session_id: str | None) -> list[str]:
+        return get_session_store().get(self._sid(session_id), "_last_citations", [])
+
+    def _set_citations(self, session_id: str | None, citations: list[str]) -> None:
+        get_session_store().set(self._sid(session_id), "_last_citations", citations)
 
     def _get_tool_schemas(self) -> list[dict[str, Any]]:
         """Return OpenAI-compatible tool schemas for the LLM."""
@@ -55,6 +90,7 @@ class ChatService:
         mode: str = ChatMode.SEARCH.value,
         model: str = "",
         prompt_id: str = "",
+        session_id: str | None = None,
     ) -> str:
         """Process a chat message based on the current mode.
 
@@ -63,6 +99,7 @@ class ChatService:
             mode: Chat mode (search, coverage, explain)
             model: Selected LLM model path
             prompt_id: Selected system prompt ID
+            session_id: Session identifier for state isolation.
 
         Returns:
             AI response text
@@ -70,21 +107,21 @@ class ChatService:
         if not message.strip():
             return ""
 
-        self._add_to_history("user", message)
-        self._current_prompt_id = prompt_id
+        sid = self._sid(session_id)
+        self._add_to_history("user", message, sid)
 
         try:
             if mode == ChatMode.EXPLAIN.value:
-                response = await self._handle_explain(message)
+                response = await self._handle_explain(message, prompt_id, sid)
             elif mode == ChatMode.COVERAGE.value:
-                response = await self._handle_coverage(message)
+                response = await self._handle_coverage(message, prompt_id, sid)
             else:
-                response = await self._handle_search(message)
+                response = await self._handle_search(message, prompt_id)
         except Exception as e:
             logger.error(f"Chat processing error: {e}")
             response = f"Error processing message: {str(e)}"
 
-        self._add_to_history("assistant", response)
+        self._add_to_history("assistant", response, sid)
         return response
 
     async def process_message_stream(
@@ -93,13 +130,14 @@ class ChatService:
         mode: str = ChatMode.SEARCH.value,
         model: str = "",
         prompt_id: str = "",
+        session_id: str | None = None,
     ) -> AsyncGenerator[str, None]:
         """Stream a chat message response based on the current mode."""
         if not message.strip():
             return
 
-        self._add_to_history("user", message)
-        self._current_prompt_id = prompt_id
+        sid = self._sid(session_id)
+        self._add_to_history("user", message, sid)
         if model:
             logger.info("Selected model: %s", model)
         if prompt_id:
@@ -108,15 +146,15 @@ class ChatService:
         accumulated: list[str] = []
         try:
             if mode == ChatMode.EXPLAIN.value:
-                async for token in self._handle_explain_stream(message):
+                async for token in self._handle_explain_stream(message, prompt_id, sid):
                     accumulated.append(token)
                     yield token
             elif mode == ChatMode.COVERAGE.value:
-                async for token in self._handle_coverage_stream(message):
+                async for token in self._handle_coverage_stream(message, prompt_id, sid):
                     accumulated.append(token)
                     yield token
             else:
-                async for token in self._handle_search_stream(message):
+                async for token in self._handle_search_stream(message, prompt_id, sid):
                     accumulated.append(token)
                     yield token
         except Exception as e:
@@ -125,7 +163,7 @@ class ChatService:
             accumulated.append(error_text)
             yield error_text
 
-        self._add_to_history("assistant", "".join(accumulated))
+        self._add_to_history("assistant", "".join(accumulated), sid)
 
     async def _execute_tool_calls(self, messages: list[dict[str, Any]]) -> str:
         """Execute tool calls returned by the LLM in a multi-turn loop.
@@ -208,13 +246,9 @@ class ChatService:
             logger.error("Tool-calling chat failed: %s", e)
             raise
 
-    async def _handle_search(self, message: str) -> str:
-        """Handle search mode: multi-turn tool-calling loop.
-
-        Uses search_sigma, filter_metadata, explain_detection, explain_rule,
-        and summarize tools to answer questions about Sigma detection rules.
-        """
-        prompt_content = self.rag_pipeline._resolve_prompt(self._current_prompt_id, mode="search")
+    async def _handle_search(self, message: str, prompt_id: str) -> str:
+        """Handle search mode: multi-turn tool-calling loop."""
+        prompt_content = self.rag_pipeline._resolve_prompt(prompt_id, mode="search")
         assistant_message = {
             "role": "assistant",
             "content": message,
@@ -226,34 +260,37 @@ class ChatService:
         messages = [system_msg, assistant_message]
         return await self._execute_tool_calls(messages)
 
-    async def _handle_explain(self, message: str) -> str:
+    async def _handle_explain(self, message: str, prompt_id: str, sid: str) -> str:
         """Handle explain mode: analyze uploaded Sigma rule."""
-        if not self._uploaded_rule:
+        rule = self._get_rule(sid)
+        if not rule:
             return "No Sigma rule uploaded. Please upload a .yaml file first."
 
-        related = await self.search_engine.search(self._uploaded_rule.get("name", ""))
-        return await self.rag_pipeline.explain_rule(
-            self._uploaded_rule, related, system_prompt_id=self._current_prompt_id
-        )
+        related = await self.search_engine.search(rule.name)
+        return await self.rag_pipeline.explain_rule(rule, related, system_prompt_id=prompt_id)
 
     async def _handle_explain_stream(
         self,
         message: str,
+        prompt_id: str,
+        sid: str,
     ) -> AsyncGenerator[str, None]:
         """Handle explain mode with streaming."""
-        if not self._uploaded_rule:
+        rule = self._get_rule(sid)
+        if not rule:
             yield "No Sigma rule uploaded. Please upload a .yaml file first."
             return
 
-        related = await self.search_engine.search(self._uploaded_rule.get("name", ""))
+        related = await self.search_engine.search(rule.name)
         async for token in self.rag_pipeline.explain_rule_stream(
-            self._uploaded_rule, related, system_prompt_id=self._current_prompt_id
+            rule, related, system_prompt_id=prompt_id
         ):
             yield token
 
-    async def _handle_coverage(self, message: str) -> str:
+    async def _handle_coverage(self, message: str, prompt_id: str, sid: str) -> str:
         """Handle coverage mode."""
-        if not self._uploaded_rule:
+        rule = self._get_rule(sid)
+        if not rule:
             return "No Sigma rule uploaded. Upload a .yaml file to check coverage."
 
         results = await self.search_engine.search(message)
@@ -262,7 +299,7 @@ class ChatService:
 
         try:
             return await self.rag_pipeline.analyze_coverage(
-                self._uploaded_rule, results, system_prompt_id=self._current_prompt_id
+                rule, results, system_prompt_id=prompt_id
             )
         except Exception as e:
             logger.error(f"RAG pipeline failed: {e}")
@@ -271,6 +308,8 @@ class ChatService:
     async def _handle_search_stream(
         self,
         message: str,
+        prompt_id: str,
+        sid: str,
     ) -> AsyncGenerator[str, None]:
         """Handle search mode with streaming: semantic search + LLM token stream.
 
@@ -295,14 +334,15 @@ class ChatService:
             yield "No matching Sigma rules found. Try a different query."
             return
 
-        self._last_citations = [
+        citations = [
             self.search_engine.get_citation(r)
             for r in results[:5]
             if self.search_engine.get_citation(r)
         ]
+        self._set_citations(sid, citations)
 
-        if self._last_citations:
-            yield f"__CITATIONS__:{json.dumps(self._last_citations)}"
+        if citations:
+            yield f"__CITATIONS__:{json.dumps(citations)}"
 
         # If we have a translation, prepend it as context
         augmented_message = message
@@ -311,10 +351,12 @@ class ChatService:
                 f"[Auto-translated detection]\n{translation}\n\n[Original YAML]\n{message}"
             )
 
+        formatted_results = [format_result_by_collection(r) for r in results]
+
         try:
             found = False
             async for token in self.rag_pipeline.answer_search_query_stream(
-                augmented_message, results, system_prompt_id=self._current_prompt_id
+                augmented_message, formatted_results, system_prompt_id=prompt_id
             ):
                 yield token
                 found = True
@@ -326,9 +368,12 @@ class ChatService:
     async def _handle_coverage_stream(
         self,
         message: str,
+        prompt_id: str,
+        sid: str,
     ) -> AsyncGenerator[str, None]:
         """Handle coverage mode with streaming."""
-        if not self._uploaded_rule:
+        rule = self._get_rule(sid)
+        if not rule:
             yield "No Sigma rule uploaded. Upload a .yaml file to check coverage."
             return
 
@@ -337,53 +382,61 @@ class ChatService:
             yield "No related rules found for coverage analysis."
             return
 
+        formatted_results = [format_result_by_collection(r) for r in results]
+
         try:
             async for token in self.rag_pipeline.analyze_coverage_stream(
-                self._uploaded_rule, results, system_prompt_id=self._current_prompt_id
+                rule, formatted_results, system_prompt_id=prompt_id
             ):
                 yield token
         except Exception as e:
             logger.error(f"RAG pipeline failed: {e}")
 
-    async def validate_and_store_yaml(self, content: bytes) -> dict[str, Any]:
+    async def validate_and_store_yaml(
+        self, content: bytes, session_id: str | None = None
+    ) -> SigmaRule:
         """Validate YAML content and store rule data in session.
 
         Args:
             content: Raw YAML file content
+            session_id: Session identifier for state isolation.
 
         Returns:
-            Parsed and validated rule dictionary
+            Parsed and validated SigmaRule
         """
-        rule_data = self.validator.validate(content)
-        self._uploaded_rule = rule_data
+        rule = self.validator.validate(content)
+        self._set_rule(session_id, rule)
         self.rag_pipeline.cache.invalidate()
-        return rule_data
+        return rule
 
-    def get_last_citations(self) -> list[str]:
+    def get_last_citations(self, session_id: str | None = None) -> list[str]:
         """Get citations from the last search response."""
-        return self._last_citations.copy()
+        return self._get_citations(session_id).copy()
 
-    def _add_to_history(self, role: str, content: str) -> None:
+    def _add_to_history(self, role: str, content: str, sid: str) -> None:
         """Add a message to chat history (max 50 messages)."""
-        self._history.append(
+        history = self._get_history(sid)
+        history.append(
             {
                 "role": role,
                 "content": content,
                 "timestamp": datetime.now(UTC).isoformat(),
             }
         )
-        if len(self._history) > MAX_HISTORY:
-            self._history = self._history[-MAX_HISTORY:]
+        if len(history) > MAX_HISTORY:
+            history = history[-MAX_HISTORY:]
+        self._set_history(sid, history)
 
-    def get_history(self) -> list[dict[str, str]]:
+    def get_history(self, session_id: str | None = None) -> list[dict[str, str]]:
         """Get chat history."""
-        return self._history.copy()
+        return self._get_history(session_id).copy()
 
-    async def clear_history(self) -> None:
+    async def clear_history(self, session_id: str | None = None) -> None:
         """Clear chat history, uploaded rule, and llama.cpp KV cache."""
-        self._history.clear()
-        self._uploaded_rule = None
-        self._last_citations.clear()
+        sid = self._sid(session_id)
+        self._set_history(sid, [])
+        self._set_rule(sid, None)
+        self._set_citations(sid, [])
         try:
             await self.rag_pipeline.llm_client.erase_slot_cache()
         except Exception:

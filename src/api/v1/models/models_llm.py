@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
@@ -74,10 +75,14 @@ async def search_llm_models(query: str, limit: int = 20) -> JSONResponse:
     No pipeline tag filter is applied because many GGUF repos
     (e.g. MaziyarPanahi/*, bartowski/*) do not set a pipeline_tag.
     """
+    from src.application.models.exceptions import DownloadError
+
     try:
         service = HFDownloadService()
         results = await service.list_models(query)
         return JSONResponse(content={"models": [{"repo_id": r.full_id} for r in results[:limit]]})
+    except DownloadError as e:
+        return JSONResponse(status_code=400, content={"error": str(e)})
     except Exception as e:
         logger.error(f"LLM search failed: {e}")
         return JSONResponse(status_code=500, content={"error": "An internal error occurred"})
@@ -91,7 +96,7 @@ async def list_llm_model_files(repo_id: str | None = None) -> JSONResponse:
 
     try:
         mm = get_embedding_manager()
-        files = mm.download_service.list_gguf_files(HFRepo.from_string(repo_id))
+        files = await mm.download_service.list_gguf_files(HFRepo.from_string(repo_id))
         return JSONResponse(content={"files": files})
     except Exception as e:
         logger.error(f"Failed to list files for {repo_id}: {e}")
@@ -171,7 +176,7 @@ async def download_llm_model(
             resolved_filename = filename
             if not resolved_filename:
                 mm = get_embedding_manager()
-                files = mm.download_service.list_gguf_files(HFRepo.from_string(repo_id))
+                files = await mm.download_service.list_gguf_files(HFRepo.from_string(repo_id))
                 if files:
                     resolved_filename = files[0]["filename"]
             if not resolved_filename:
@@ -183,11 +188,20 @@ async def download_llm_model(
             dest_dir = LLM_DIR / repo.owner / repo.name
             dest_dir.mkdir(parents=True, exist_ok=True)
 
-            hf_hub_download(
-                repo_id=repo_id,
-                filename=resolved_filename,
-                local_dir=dest_dir,
-            )
+            import huggingface_hub.constants as hc
+
+            was_offline = hc.HF_HUB_OFFLINE
+            hc.HF_HUB_OFFLINE = False
+            try:
+                _raw_token = os.environ.get("HF_TOKEN")
+                hf_hub_download(
+                    repo_id=repo_id,
+                    filename=resolved_filename,
+                    local_dir=dest_dir,
+                    token=_raw_token if _raw_token else None,
+                )
+            finally:
+                hc.HF_HUB_OFFLINE = was_offline
 
             db = get_database_service()
             reg = get_unified_registry()
@@ -202,8 +216,14 @@ async def download_llm_model(
             from src.infrastructure.llm.llamacpp.auto_start import start_llamacpp as _start_llm
             from src.infrastructure.vectorstore.auto_start import start_qdrant as _start_qd
 
-            await _start_qd()
-            await _start_llm()
+            try:
+                await _start_qd()
+            except Exception:
+                logger.exception("Failed to auto-start Qdrant after download")
+            try:
+                await _start_llm()
+            except Exception:
+                logger.exception("Failed to auto-start llama.cpp after download")
 
     asyncio.create_task(download_in_background())
 

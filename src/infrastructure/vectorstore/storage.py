@@ -7,7 +7,7 @@ import uuid
 from typing import Any
 
 import qdrant_client
-from qdrant_client.models import FieldCondition, Filter, MatchValue
+from qdrant_client.models import FieldCondition, Filter, MatchValue, Modifier
 
 from src.infrastructure.vectorstore.client import get_qdrant_client
 
@@ -97,15 +97,17 @@ async def store_embeddings(
             )
         )
 
+    client = get_qdrant_client()
     try:
-        client = get_qdrant_client()
-
         # Auto-create collection if missing (include sparse vectors so hybrid
         # search works even when the collection is created via this code path).
         existing_collections = [c.name for c in client.get_collections().collections]
         if collection_name not in existing_collections:
             from qdrant_client.models import (
                 Distance,
+                ScalarQuantization,
+                ScalarQuantizationConfig,
+                ScalarType,
                 SparseIndexParams,
                 SparseVectorParams,
                 VectorParams,
@@ -115,8 +117,18 @@ async def store_embeddings(
                 collection_name=collection_name,
                 vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE),
                 sparse_vectors_config={
-                    "text-sparse": SparseVectorParams(index=SparseIndexParams()),
+                    "text-sparse": SparseVectorParams(
+                        index=SparseIndexParams(),
+                        modifier=Modifier.IDF,
+                    ),
                 },
+                quantization_config=ScalarQuantization(
+                    scalar=ScalarQuantizationConfig(
+                        type=ScalarType.INT8,
+                        always_ram=True,
+                        quantile=0.5,
+                    )
+                ),
             )
 
         # Delete old points for each source before upserting
@@ -137,6 +149,8 @@ async def store_embeddings(
     except Exception as e:
         logger.error("Failed to store embeddings: %s", e)
         return False
+    finally:
+        client.close()
 
 
 async def search(

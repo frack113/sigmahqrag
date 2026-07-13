@@ -38,13 +38,37 @@ class TestSearchAPI:
     @patch("src.core.search.engine.SearchEngine.search", new_callable=AsyncMock)
     def test_search_returns_results(self, mock_search: AsyncMock, client: TestClient) -> None:
         """Test search returns results."""
-        mock_search.return_value = [{"id": "rule-001"}, {"id": "rule-002"}]
+        mock_search.return_value = [
+            {
+                "text": "rule text",
+                "score": 0.9,
+                "metadata": {
+                    "collection": "sigma_rules",
+                    "source_file": "/rules/test.yml",
+                    "rule_id": "abc-123",
+                    "title": "Test Rule",
+                },
+            },
+            {
+                "text": "doc text",
+                "score": 0.8,
+                "metadata": {
+                    "collection": "sigma_docs",
+                    "source_file": "/docs/test.md",
+                    "original_url": "https://example.com",
+                },
+            },
+        ]
 
         response = client.post("/api/v1/search", json={"query": "test", "limit": 10})
 
         assert response.status_code == 200
         data = response.json()
-        assert data["data"] == [{"id": "rule-001"}, {"id": "rule-002"}]
+        assert len(data["data"]) == 2
+        assert data["data"][0]["collection"] == "sigma_rules"
+        assert data["data"][0]["rule_id"] == "abc-123"
+        assert data["data"][1]["collection"] == "sigma_docs"
+        assert data["data"][1]["source_file"] == "/docs/test.md"
         assert data["meta"]["total"] == 2
 
     def test_search_empty_query(self, client: TestClient) -> None:

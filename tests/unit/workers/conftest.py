@@ -47,6 +47,10 @@ def mock_db() -> MagicMock:
     db.get_local_file_count = MagicMock(return_value=0)
     db.get_repos_with_selected_dirs = MagicMock(return_value=[])
     db.get_selected_dirs = MagicMock(return_value=[])
+    db.get_doc_registry_url_hashes_by_repo = MagicMock(return_value=[])
+    db.delete_doc_registry_by_url_hashes = MagicMock()
+    db.get_rule_id_by_url_hash = MagicMock(return_value=None)
+    db.get_rule_reference_paths = MagicMock(return_value=[])
     return db
 
 

@@ -8,7 +8,7 @@ import src.application.system.datadir
 class TestOfficialDirs:
     def test_returns_expected_count(self, tmp_path: Path) -> None:
         dirs = src.application.system.datadir.DataDirManager.official_dirs(str(tmp_path))
-        assert len(dirs) == 14  # 12 leaves + documents + models parents
+        assert len(dirs) == 15  # 13 leaves + documents + models parents
 
     def test_base_is_resolved(self, tmp_path: Path) -> None:
         dirs = src.application.system.datadir.DataDirManager.official_dirs(str(tmp_path))

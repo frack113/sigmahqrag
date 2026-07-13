@@ -26,7 +26,7 @@ class TestSearchCacheCleanup:
         with patch.object(
             svc, "_execute_tool_calls", new_callable=AsyncMock, return_value="Answer"
         ):
-            result = await svc._handle_search(message)
+            result = await svc._handle_search(message, "")
 
         svc.rag_pipeline.llm_client.erase_slot_cache.assert_not_awaited()
         assert result == "Answer"
@@ -37,7 +37,7 @@ class TestSearchCacheCleanup:
         with patch.object(
             svc, "_execute_tool_calls", new_callable=AsyncMock, return_value="Answer"
         ):
-            await svc._handle_search("simple question")
+            await svc._handle_search("simple question", "")
 
         svc.rag_pipeline.llm_client.erase_slot_cache.assert_not_awaited()
 
@@ -50,7 +50,7 @@ class TestSearchCacheCleanup:
         with patch.object(
             svc, "_execute_tool_calls", new_callable=AsyncMock, return_value="Answer"
         ):
-            result = await svc._handle_search("detection:\n  condition: selection")
+            result = await svc._handle_search("detection:\n  condition: selection", "")
 
         assert result == "Answer"
 
@@ -83,7 +83,7 @@ class TestSearchStreamCacheCleanup:
             ),
         ):
             tokens = []
-            async for t in svc._handle_search_stream(message):
+            async for t in svc._handle_search_stream(message, "", ""):
                 tokens.append(t)
 
         svc.rag_pipeline.llm_client.erase_slot_cache.assert_awaited_once()
@@ -96,11 +96,11 @@ class TestTranslateEndpointCacheCleanup:
             patch(
                 "src.api.v1.sigma.translate.translate_detection", new_callable=AsyncMock
             ) as mock_translate,
-            patch("src.api.v1.sigma.translate.RAGPipeline") as mock_rag_cls,
+            patch("src.api.v1.sigma.translate.get_rag_pipeline") as mock_get_rag,
         ):
             mock_rag = MagicMock()
             mock_rag.llm_client.erase_slot_cache = AsyncMock()
-            mock_rag_cls.return_value = mock_rag
+            mock_get_rag.return_value = mock_rag
             mock_translate.return_value = "Translated text"
 
             from fastapi.testclient import TestClient

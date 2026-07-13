@@ -55,7 +55,7 @@ detection:
 """
     # Should not raise - deprecated fields are warnings only
     result = validator.validate(content)
-    assert result["level"] == "high"
+    assert result.level == "high"
 
 
 def test_validate_condition_syntax() -> None:
@@ -72,7 +72,7 @@ condition: selection
 """
     # Should not raise - valid condition
     result = validator.validate(content)
-    assert result.get("condition") == "selection"
+    assert result.condition == "selection"
 
 
 def test_validate_condition_invalid_ref() -> None:
@@ -89,7 +89,7 @@ condition: nonexistent
 """
     # Should log warning but not raise
     result = validator.validate(content)
-    assert result.get("condition") == "nonexistent"
+    assert result.condition == "nonexistent"
 
 
 def test_validate_empty_description() -> None:

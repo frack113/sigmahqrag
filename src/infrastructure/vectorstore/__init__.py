@@ -226,7 +226,9 @@ class QdrantVectorService:
         finally:
             client.close()
 
-    async def create_collection(self, enable_hybrid: bool = True) -> None:
+    async def create_collection(
+        self, enable_hybrid: bool = True, enable_quantization: bool = True
+    ) -> None:
         """Create the collection if it doesn't exist."""
         if self._vector_store is None:
             await self.initialize()
@@ -239,8 +241,12 @@ class QdrantVectorService:
             self.collection_name,
             self.vector_size,
             enable_hybrid=enable_hybrid,
+            enable_quantization=enable_quantization,
         )
-        logger.info(f"Collection {self.collection_name} ready (hybrid={enable_hybrid})")
+        logger.info(
+            f"Collection {self.collection_name} ready "
+            f"(hybrid={enable_hybrid}, quantization={enable_quantization})"
+        )
 
     def __repr__(self) -> str:
         return f"QdrantService(collection={self.collection_name}, host={self.host}:{self.port})"

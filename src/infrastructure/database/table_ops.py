@@ -191,22 +191,26 @@ class DatabaseServiceTableOps:
             ).fetchall()
         return [row[0] for row in results]
 
-    def get_repos_with_selected_dirs(self) -> list[str]:
+    def get_repos_with_selected_dirs(self, source_type: str | None = None) -> list[str]:
+        query = "SELECT DISTINCT repo_key FROM git_selected_dirs"
+        params: list[Any] = []
+        if source_type:
+            query += " WHERE source_type = ?"
+            params.append(source_type)
+        query += " ORDER BY repo_key"
         with self._lock:
-            results = self._writer_conn.execute(
-                "SELECT DISTINCT repo_key FROM git_selected_dirs ORDER BY repo_key"
-            ).fetchall()
+            results = self._writer_conn.execute(query, params).fetchall()
         return [row[0] for row in results]
 
-    def set_selected_dirs(self, repo_key: str, dirs: list[str]) -> None:
+    def set_selected_dirs(self, repo_key: str, dirs: list[str], source_type: str = "") -> None:
         with self._lock:
             self._writer_conn.execute(
                 "DELETE FROM git_selected_dirs WHERE repo_key = ?", (repo_key,)
             )
             for d in dirs:
                 self._writer_conn.execute(
-                    "INSERT INTO git_selected_dirs (repo_key, dir_path, updated) VALUES (?, ?, ?)",
-                    (repo_key, d, iso_now()),
+                    "INSERT INTO git_selected_dirs (repo_key, dir_path, source_type, updated) VALUES (?, ?, ?, ?)",
+                    (repo_key, d, source_type, iso_now()),
                 )
             self._writer_conn.commit()
 

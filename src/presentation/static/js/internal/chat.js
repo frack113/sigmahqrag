@@ -403,6 +403,38 @@
 						}
 
 						if (data.indexOf("__CITATIONS__:") === 0) {
+							const citations = (() => {
+								try {
+									return JSON.parse(data.slice(15));
+								} catch {
+									return [];
+								}
+							})();
+							if (citations.length > 0) {
+								if (!bubbleInfo) {
+									hideTyping();
+									bubbleInfo = makeMessageEl("assistant", "", true);
+								}
+								const existing =
+									bubbleInfo.el.querySelector(".citations-block");
+								if (existing) existing.remove();
+								const block = document.createElement("div");
+								block.className = "citations-block";
+								const title = document.createElement("div");
+								title.className = "citations-title";
+								title.textContent = "Sources";
+								block.appendChild(title);
+								const list = document.createElement("div");
+								list.className = "citations-list";
+								citations.forEach((c) => {
+									const item = document.createElement("div");
+									item.className = "citation-item";
+									item.textContent = c;
+									list.appendChild(item);
+								});
+								block.appendChild(list);
+								bubbleInfo.el.appendChild(block);
+							}
 							continue;
 						}
 

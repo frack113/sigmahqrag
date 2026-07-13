@@ -6,19 +6,29 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from src.application.chat.service import ChatService
+from src.core.sigma.models import SigmaRule
+
+
+def _make_test_rule(**overrides: str) -> SigmaRule:
+    data = {
+        "id": "test_001",
+        "title": "Test Rule",
+        "description": "A test rule",
+        "detection": {"selection": {"EventID": 4625}},
+        "logsource": {"category": "process_creation", "product": "windows"},
+        **overrides,
+    }
+    return SigmaRule(**data)
 
 
 @pytest.fixture
 def chat_service() -> ChatService:
     """Create ChatService with mocked dependencies."""
-    # Create service first
     service = ChatService()
 
-    # Mock search_engine
     service.search_engine = MagicMock()
     service.search_engine.search = AsyncMock(return_value=[])
 
-    # Mock the rag_pipeline
     service.rag_pipeline = MagicMock()
     service.rag_pipeline.explain_rule = AsyncMock(
         return_value="This rule detects failed login attempts..."
@@ -28,25 +38,20 @@ def chat_service() -> ChatService:
     service.rag_pipeline.cache = MagicMock()
     service.rag_pipeline.cache.invalidate = MagicMock()
 
-    # Mock the validator
     service.validator = MagicMock()
-    service.validator.validate.return_value = {
-        "id": "test_001",
-        "name": "Test Rule",
-        "description": "A test rule",
-        "detection": {"selection": {"EventID": 4625}},
-    }
+    service.validator.validate.return_value = _make_test_rule()
 
-    # Mock the tool execution to avoid HTTP calls to LLM
     service._execute_tool_calls = AsyncMock(return_value="I found 2 relevant rules...")
 
     return service
 
 
+_TEST_SID = "test-session"
+
+
 @pytest.mark.asyncio
 async def test_upload_then_explain_flow(chat_service: ChatService) -> None:
-    """Test complete flow: upload YAML → explain rule."""
-    # Upload a valid Sigma rule
+    """Test complete flow: upload YAML to session → explain rule."""
     yaml_content = b"""
 id: test_001
 name: Test Rule
@@ -55,11 +60,10 @@ detection:
     selection:
         EventID: 4625
 """
-    rule_data = await chat_service.validate_and_store_yaml(yaml_content)
-    assert rule_data["id"] == "test_001"
+    rule_data = await chat_service.validate_and_store_yaml(yaml_content, _TEST_SID)
+    assert rule_data.id == "test_001"
 
-    # Explain the rule
-    response = await chat_service._handle_explain("explain this rule")
+    response = await chat_service._handle_explain("explain this rule", "", _TEST_SID)
     assert "detects failed login" in response.lower()
     chat_service.rag_pipeline.explain_rule.assert_called_once()
 
@@ -67,7 +71,6 @@ detection:
 @pytest.mark.asyncio
 async def test_search_flow(chat_service: ChatService) -> None:
     """Test search mode flow with LLM response."""
-    # Mock search results
     chat_service.search_engine.search = AsyncMock(
         return_value=[
             {"text": "Rule 1 content", "citation": "sigma:rule_1", "score": 0.95},
@@ -75,12 +78,11 @@ async def test_search_flow(chat_service: ChatService) -> None:
         ]
     )
 
-    # Mock RAG pipeline response
     chat_service.rag_pipeline.answer_search_query = AsyncMock(
         return_value="I found 2 relevant rules..."
     )
 
-    response = await chat_service._handle_search("failed logon events")
+    response = await chat_service._handle_search("failed logon events", "")
     assert "found" in response.lower()
     chat_service._execute_tool_calls.assert_called_once()
 
@@ -88,24 +90,17 @@ async def test_search_flow(chat_service: ChatService) -> None:
 @pytest.mark.asyncio
 async def test_coverage_flow(chat_service: ChatService) -> None:
     """Test coverage analysis flow."""
-    # Setup uploaded rule
-    chat_service._uploaded_rule = {
-        "id": "test_001",
-        "name": "Test Rule",
-        "detection": {"selection": {"EventID": 4625}},
-    }
+    chat_service._set_rule(_TEST_SID, _make_test_rule())
 
-    # Mock search results
     chat_service.search_engine.search = AsyncMock(
         return_value=[
             {"text": "Related rule 1", "citation": "sigma:rule_2"},
         ]
     )
 
-    # Mock RAG pipeline response
     chat_service.rag_pipeline.analyze_coverage = AsyncMock(return_value="Coverage analysis: ...")
 
-    response = await chat_service._handle_coverage("check coverage")
+    response = await chat_service._handle_coverage("check coverage", "", _TEST_SID)
     assert "coverage" in response.lower()
     chat_service.rag_pipeline.analyze_coverage.assert_called_once()
 
@@ -121,24 +116,21 @@ detection:
     selection:
         EventID: 4648
 """
-    await chat_service.validate_and_store_yaml(yaml_content)
+    await chat_service.validate_and_store_yaml(yaml_content, _TEST_SID)
     chat_service.rag_pipeline.cache.invalidate.assert_called_once()
 
 
 @pytest.mark.asyncio
 async def test_fallback_when_llm_unavailable(chat_service: ChatService) -> None:
     """Test fallback responses when LLM fails."""
-    # Mock RAG pipeline to raise exception
     chat_service.rag_pipeline.answer_search_query = AsyncMock(side_effect=Exception("LLM down"))
 
-    # Mock search results
     chat_service.search_engine.search = AsyncMock(
         return_value=[
             {"text": "Some rule content", "score": 0.9},
         ]
     )
 
-    response = await chat_service._handle_search("test query")
-    # Should return fallback (not exception)
+    response = await chat_service._handle_search("test query", "")
     assert response != ""
     assert "Some rule content" in response or "rule" in response.lower()

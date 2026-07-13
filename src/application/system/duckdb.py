@@ -38,6 +38,7 @@ _EXPECTED_TABLES = [
     "git_metadata",
     "git_selected_dirs",
     "sigma_spec",
+    "rule_references",
     "doc_error",
     "worker_state",
     "release_cache",

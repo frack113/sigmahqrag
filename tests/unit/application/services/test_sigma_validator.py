@@ -19,9 +19,10 @@ detection:
         EventID: 4625
 """
     result = validator.validate(content)
-    assert result["id"] == "test_rule_001"
-    assert result["name"] == "Test Rule"
-    assert "detection" in result
+    assert result.id == "test_rule_001"
+    assert result.name == "Test Rule"
+    assert result.title == "Test Rule"
+    assert "selection" in result.detection
 
 
 def test_validate_missing_fields() -> None:
@@ -211,11 +212,11 @@ detection:
 condition: selection
 """
     result = validator.validate(content)
-    assert result["condition"] == "selection"
+    assert result.condition == "selection"
 
 
 def test_validate_condition_non_string() -> None:
-    """Test non-string condition is silently accepted."""
+    """Test non-string condition is cast to string."""
     validator = SigmaValidator()
     content = b"""
 id: rule_001
@@ -227,4 +228,4 @@ detection:
 condition: true
 """
     result = validator.validate(content)
-    assert result["condition"] is True
+    assert result.condition == "True"

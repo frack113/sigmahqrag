@@ -86,167 +86,134 @@ class SigmaChunker(DocumentTransform):
 
         return documents
 
-    def _chunk_rule(self, rule: dict, llm_client: LLMClientLike | None = None) -> list[dict]:
-        """Chunk a single Sigma rule dict into enriched chunk dicts.
+    def _extract_fields(self, rule: dict) -> dict:
+        return {
+            "title": rule.get("title", "Untitled Sigma rule"),
+            "rule_id": rule.get("id"),
+            "description": rule.get("description", ""),
+            "level": rule.get("level", "unknown"),
+            "status": rule.get("status", "unknown"),
+            "tags": rule.get("tags", []),
+            "detection": rule.get("detection", {}),
+            "condition": rule.get("detection", {}).get("condition", ""),
+            "falsepositives": rule.get("falsepositives", []),
+            "references": rule.get("references", []),
+            "author": rule.get("author", ""),
+            "date": rule.get("date", ""),
+            "modified": rule.get("modified", ""),
+            "product": rule.get("logsource", {}).get("product", "unknown"),
+            "category": rule.get("logsource", {}).get("category", "unknown"),
+            "service": rule.get("logsource", {}).get("service", "unknown"),
+        }
 
-        This is the refactored version of the legacy chunk_sigma_rules_rich function.
+    def _build_executive_summary(self, rule: dict, f: dict) -> dict:
+        return make_chunk(
+            rule,
+            "executive_summary",
+            (
+                f"Sigma rule: {f['title']}\n"
+                f"Rule ID: {f['rule_id']}\n"
+                f"Purpose: {f['description']}\n"
+                f"This rule is designed for {f['product']} logs with "
+                f"category={f['category']} and service={f['service']}.\n"
+                f"Severity: {f['level']}. Status: {f['status']}.\n"
+                f"Main detection logic: {f['condition']}"
+            ),
+            eval_questions=self._summarize_questions(f["title"]),
+        )
 
-        Args:
-            rule: Raw Sigma rule dict.
-            llm_client: Optional LLM client for keyword extraction.
-        """
-        title = rule.get("title", "Untitled Sigma rule")
-        rule_id = rule.get("id")
-        description = rule.get("description", "")
-        level = rule.get("level", "unknown")
-        status = rule.get("status", "unknown")
-        tags = rule.get("tags", [])
-        logsource = rule.get("logsource", {})
-        detection = rule.get("detection", {})
-        condition = detection.get("condition", "")
-        falsepositives = rule.get("falsepositives", [])
-        references = rule.get("references", [])
-        author = rule.get("author", "")
-        date = rule.get("date", "")
-        modified = rule.get("modified", "")
+    def _build_metadata_lifecycle(self, rule: dict, f: dict) -> dict:
+        return make_chunk(
+            rule,
+            "rule_metadata_lifecycle",
+            (
+                f"Rule metadata for {f['title']}.\n"
+                f"Rule ID: {f['rule_id']}\n"
+                f"Author: {f['author']}\n"
+                f"Created date: {f['date']}\n"
+                f"Modified date: {f['modified']}\n"
+                f"Status: {f['status']}\n"
+                f"Level: {f['level']}"
+            ),
+            extra_meta={"references": f["references"]},
+            eval_questions=self._lifecycle_questions(f["title"]),
+        )
 
-        product = logsource.get("product", "unknown")
-        category = logsource.get("category", "unknown")
-        service = logsource.get("service", "unknown")
+    def _build_logsource_context(self, rule: dict, f: dict) -> dict:
+        return make_chunk(
+            rule,
+            "logsource_context",
+            (
+                f"Logsource context for Sigma rule {f['title']}.\n"
+                f"Product: {f['product']}\n"
+                f"Category: {f['category']}\n"
+                f"Service: {f['service']}\n"
+                f"The rule expects telemetry from product={f['product']}, "
+                f"category={f['category']}, service={f['service']}."
+            ),
+            eval_questions=self._logsource_questions(
+                f["title"], f["product"], f["category"], f["service"]
+            ),
+        )
 
+    def _build_mitre_attack_mapping(self, rule: dict, f: dict) -> dict | None:
+        attack_tags = [tag for tag in f["tags"] if str(tag).startswith("attack.")]
+        if not attack_tags:
+            return None
+        return make_chunk(
+            rule,
+            "mitre_attack_mapping",
+            f"MITRE ATT&CK mapping for {f['title']}.\nTags:\n{format_value(attack_tags)}",
+            extra_meta={"attack_tags": attack_tags},
+            eval_questions=self._attck_questions(f["title"], attack_tags),
+        )
+
+    def _build_detection_condition(self, rule: dict, f: dict) -> dict:
+        return make_chunk(
+            rule,
+            "detection_condition",
+            (
+                f"Detection condition for {f['title']}.\n"
+                f"Condition: {f['condition']}\n"
+                f"Interpretation: this condition defines how selection and "
+                f"filter blocks are combined to trigger the rule."
+            ),
+            extra_meta={"condition": f["condition"]},
+            eval_questions=[
+                f"What is the Sigma condition of {f['title']}?",
+                f"How are selections and filters combined in {f['title']}?",
+                f"Que signifie la condition de détection de {f['title']} ?",
+            ],
+        )
+
+    def _build_detection_block_chunks(self, rule: dict, f: dict) -> tuple[list[dict], list[dict]]:
         chunks: list[dict] = []
-
-        # Executive summary
-        chunks.append(
-            make_chunk(
-                rule,
-                "executive_summary",
-                (
-                    f"Sigma rule: {title}\n"
-                    f"Rule ID: {rule_id}\n"
-                    f"Purpose: {description}\n"
-                    f"This rule is designed for {product} logs with "
-                    f"category={category} and service={service}.\n"
-                    f"Severity: {level}. Status: {status}.\n"
-                    f"Main detection logic: {condition}"
-                ),
-                eval_questions=self._summarize_questions(title),
-            )
-        )
-
-        # Rule metadata and lifecycle
-        chunks.append(
-            make_chunk(
-                rule,
-                "rule_metadata_lifecycle",
-                (
-                    f"Rule metadata for {title}.\n"
-                    f"Rule ID: {rule_id}\n"
-                    f"Author: {author}\n"
-                    f"Created date: {date}\n"
-                    f"Modified date: {modified}\n"
-                    f"Status: {status}\n"
-                    f"Level: {level}"
-                ),
-                extra_meta={"references": references},
-                eval_questions=self._lifecycle_questions(title),
-            )
-        )
-
-        # Logsource context
-        chunks.append(
-            make_chunk(
-                rule,
-                "logsource_context",
-                (
-                    f"Logsource context for Sigma rule {title}.\n"
-                    f"Product: {product}\n"
-                    f"Category: {category}\n"
-                    f"Service: {service}\n"
-                    f"The rule expects telemetry from product={product}, "
-                    f"category={category}, service={service}."
-                ),
-                eval_questions=self._logsource_questions(title, product, category, service),
-            )
-        )
-
-        # MITRE ATT&CK mapping
-        attack_tags = [tag for tag in tags if str(tag).startswith("attack.")]
-        if attack_tags:
-            chunks.append(
-                make_chunk(
-                    rule,
-                    "mitre_attack_mapping",
-                    (f"MITRE ATT&CK mapping for {title}.\nTags:\n{format_value(attack_tags)}"),
-                    extra_meta={"attack_tags": attack_tags},
-                    eval_questions=self._attck_questions(title, attack_tags),
-                )
-            )
-
-        # Detection condition
-        chunks.append(
-            make_chunk(
-                rule,
-                "detection_condition",
-                (
-                    f"Detection condition for {title}.\n"
-                    f"Condition: {condition}\n"
-                    f"Interpretation: this condition defines how selection and "
-                    f"filter blocks are combined to trigger the rule."
-                ),
-                extra_meta={"condition": condition},
-                eval_questions=[
-                    f"What is the Sigma condition of {title}?",
-                    f"How are selections and filters combined in {title}?",
-                    f"Que signifie la condition de détection de {title} ?",
-                ],
-            )
-        )
-
-        # Iteration over detection blocks
         all_atomic_facts: list[dict] = []
-        for detection_name, detection_value in detection.items():
+        for detection_name, detection_value in f["detection"].items():
             if detection_name == "condition":
                 continue
-
             is_filter = detection_name.startswith("filter")
             chunk_type = "detection_filter_block" if is_filter else "detection_selection_block"
-
             facts = flatten_detection_values(detection_value)
             all_atomic_facts.extend(
-                [
-                    {
-                        "detection_name": detection_name,
-                        **fact,
-                        "is_filter": is_filter,
-                    }
-                    for fact in facts
-                ]
+                {"detection_name": detection_name, **fact, "is_filter": is_filter} for fact in facts
             )
-
-            # Detection block chunk
             chunks.append(
                 make_chunk(
                     rule,
                     chunk_type,
                     (
-                        f"Detection block {detection_name} in Sigma rule {title}.\n"
+                        f"Detection block {detection_name} in Sigma rule {f['title']}.\n"
                         f"Block role: {'exclusion / false positive reduction' if is_filter else 'positive detection indicator'}\n"
                         f"Raw block:\n{format_value(detection_value)}"
                     ),
-                    extra_meta={
-                        "detection_name": detection_name,
-                        "is_filter": is_filter,
-                    },
-                    eval_questions=self._block_questions(title, detection_name, is_filter),
+                    extra_meta={"detection_name": detection_name, "is_filter": is_filter},
+                    eval_questions=self._block_questions(f["title"], detection_name, is_filter),
                 )
             )
-
-            # Field/operator groups
             by_field_operator: dict[str, list] = {}
             for fact in facts:
                 by_field_operator.setdefault(fact["field_operator"], []).append(fact["value"])
-
             for field_operator, values in by_field_operator.items():
                 field, operator = split_field_operator(field_operator)
                 chunks.append(
@@ -254,7 +221,7 @@ class SigmaChunker(DocumentTransform):
                         rule,
                         "field_operator_group",
                         (
-                            f"Field/operator group in {title}.\n"
+                            f"Field/operator group in {f['title']}.\n"
                             f"Detection block: {detection_name}\n"
                             f"Field: {field}\n"
                             f"Operator: {operator}\n"
@@ -267,11 +234,9 @@ class SigmaChunker(DocumentTransform):
                             "operator": operator,
                             "is_filter": is_filter,
                         },
-                        eval_questions=self._field_questions(title, field, operator),
+                        eval_questions=self._field_questions(f["title"], field, operator),
                     )
                 )
-
-            # Atomic indicators
             for fact in facts:
                 field, operator = split_field_operator(fact["field_operator"])
                 value = fact["value"]
@@ -280,13 +245,13 @@ class SigmaChunker(DocumentTransform):
                         rule,
                         "atomic_indicator",
                         (
-                            f"Atomic Sigma indicator for {title}.\n"
+                            f"Atomic Sigma indicator for {f['title']}.\n"
                             f"Detection block: {detection_name}\n"
                             f"Field: {field}\n"
                             f"Operator: {operator}\n"
                             f"Value: {value}\n"
                             f"Role: {'legitimate exclusion / filter' if is_filter else 'suspicious or monitored indicator'}\n"
-                            f"A match on this value contributes to the rule condition: {condition}"
+                            f"A match on this value contributes to the rule condition: {f['condition']}"
                         ),
                         extra_meta={
                             "detection_name": detection_name,
@@ -295,141 +260,178 @@ class SigmaChunker(DocumentTransform):
                             "value": value,
                             "is_filter": is_filter,
                         },
-                        eval_questions=self._indicator_questions(title, value),
+                        eval_questions=self._indicator_questions(f["title"], value),
                     )
                 )
+        return chunks, all_atomic_facts
 
-        # Indicator inventory
-        suspicious_values = [f for f in all_atomic_facts if not f["is_filter"]]
-        filter_values = [f for f in all_atomic_facts if f["is_filter"]]
-        chunks.append(
-            make_chunk(
-                rule,
-                "indicator_inventory",
-                (
-                    f"Indicator inventory for {title}.\n"
-                    f"Suspicious or monitored values:\n"
-                    f"{format_value([f['value'] for f in suspicious_values])}\n\n"
-                    f"Filtered legitimate values:\n"
-                    f"{format_value([f['value'] for f in filter_values])}"
-                ),
-                eval_questions=[
-                    f"List all monitored values in {title}.",
-                    f"What indicators are monitored by {title}?",
-                    f"Which values are excluded by {title}?",
-                ],
-            )
+    def _build_indicator_inventory(self, rule: dict, f: dict, all_facts: list[dict]) -> dict:
+        suspicious = [x for x in all_facts if not x["is_filter"]]
+        filters = [x for x in all_facts if x["is_filter"]]
+        return make_chunk(
+            rule,
+            "indicator_inventory",
+            (
+                f"Indicator inventory for {f['title']}.\n"
+                f"Suspicious or monitored values:\n"
+                f"{format_value([x['value'] for x in suspicious])}\n\n"
+                f"Filtered legitimate values:\n"
+                f"{format_value([x['value'] for x in filters])}"
+            ),
+            eval_questions=[
+                f"List all monitored values in {f['title']}.",
+                f"What indicators are monitored by {f['title']}?",
+                f"Which values are excluded by {f['title']}?",
+            ],
         )
 
-        # Investigation guidance
-        chunks.append(
-            make_chunk(
-                rule,
-                "investigation_guidance",
-                (
-                    f"Investigation guidance for alerts from {title}.\n"
-                    f"Investigate the entity, user, process, host, timestamp, "
-                    f"and event context that matched the Sigma rule.\n"
-                    f"Review whether the matched values are expected in the environment."
-                ),
-                eval_questions=[
-                    f"How should an analyst investigate alerts from {title}?",
-                    f"What context matters for {title} alerts?",
-                    f"Que faut-il vérifier lors d'une alerte {title} ?",
-                ],
-            )
+    def _build_investigation_guidance(self, rule: dict, f: dict) -> dict:
+        return make_chunk(
+            rule,
+            "investigation_guidance",
+            (
+                f"Investigation guidance for alerts from {f['title']}.\n"
+                f"Investigate the entity, user, process, host, timestamp, "
+                f"and event context that matched the Sigma rule.\n"
+                f"Review whether the matched values are expected in the environment."
+            ),
+            eval_questions=[
+                f"How should an analyst investigate alerts from {f['title']}?",
+                f"What context matters for {f['title']} alerts?",
+                f"Que faut-il vérifier lors d'une alerte {f['title']} ?",
+            ],
         )
 
-        # False positive context
-        chunks.append(
-            make_chunk(
-                rule,
-                "false_positive_context",
-                (
-                    f"False positive context for {title}.\n"
-                    f"False positives:\n{format_value(falsepositives)}\n"
-                    f"Common benign causes may include administrative activity, "
-                    f"automation, package managers, security tools."
-                ),
-                eval_questions=[
-                    f"What false positives can occur for {title}?",
-                    f"How can false positives be reduced for {title}?",
-                    f"Quels faux positifs sont attendus pour {title} ?",
-                ],
-            )
+    def _build_false_positive_context(self, rule: dict, f: dict) -> dict:
+        return make_chunk(
+            rule,
+            "false_positive_context",
+            (
+                f"False positive context for {f['title']}.\n"
+                f"False positives:\n{format_value(f['falsepositives'])}\n"
+                f"Common benign causes may include administrative activity, "
+                f"automation, package managers, security tools."
+            ),
+            eval_questions=[
+                f"What false positives can occur for {f['title']}?",
+                f"How can false positives be reduced for {f['title']}?",
+                f"Quels faux positifs sont attendus pour {f['title']} ?",
+            ],
         )
 
-        # Natural language queries
-        chunks.append(
-            make_chunk(
-                rule,
-                "natural_language_queries",
-                (
-                    f"Natural language retrieval hints for {title}.\n"
-                    f"This rule is relevant for questions such as:\n"
-                    f"- What does {title} detect?\n"
-                    f"- Which detection fields and values are used?\n"
-                    f"- What logsource is required?"
-                ),
-                eval_questions=[
-                    f"Which rule detects behavior described by {title}?",
-                    f"What fields are used by {title}?",
-                    f"What ATT&CK mapping is associated with {title}?",
-                ],
-            )
+    def _build_natural_language_queries(self, rule: dict, f: dict) -> dict:
+        return make_chunk(
+            rule,
+            "natural_language_queries",
+            (
+                f"Natural language retrieval hints for {f['title']}.\n"
+                f"This rule is relevant for questions such as:\n"
+                f"- What does {f['title']} detect?\n"
+                f"- Which detection fields and values are used?\n"
+                f"- What logsource is required?"
+            ),
+            eval_questions=[
+                f"Which rule detects behavior described by {f['title']}?",
+                f"What fields are used by {f['title']}?",
+                f"What ATT&CK mapping is associated with {f['title']}?",
+            ],
         )
 
-        # Backend mapping hints
-        detection_summary_lines: list[str] = []
-        for det_name, det_val in detection.items():
+    def _build_backend_mapping_hints(self, rule: dict, f: dict) -> dict:
+        lines: list[str] = []
+        for det_name, det_val in f["detection"].items():
             if det_name == "condition":
                 continue
-            is_filt = det_name.startswith("filter")
-            role = "exclusion" if is_filt else "selection"
-            detection_summary_lines.append(f"  - {det_name} ({role}): {format_value(det_val)}")
-        detection_summary = "\n".join(detection_summary_lines) if detection_summary_lines else "N/A"
-
-        chunks.append(
-            make_chunk(
-                rule,
-                "backend_mapping_hints",
-                (
-                    f"Backend mapping hints for {title}.\n"
-                    f"The detection fields should be mapped to the corresponding "
-                    f"SIEM, EDR, or log backend schema.\n"
-                    f"Operators from Sigma such as contains, startswith, endswith, "
-                    f"all, and equals should be preserved during translation.\n"
-                    f"Condition: {condition}\n\n"
-                    f"Detection blocks:\n{detection_summary}"
-                ),
-                eval_questions=[
-                    f"What fields should be mapped for {title}?",
-                    f"How should {title} be translated to a SIEM query?",
-                    f"What operators are used in {title}?",
-                ],
-            )
+            role = "exclusion" if det_name.startswith("filter") else "selection"
+            lines.append(f"  - {det_name} ({role}): {format_value(det_val)}")
+        summary = "\n".join(lines) if lines else "N/A"
+        return make_chunk(
+            rule,
+            "backend_mapping_hints",
+            (
+                f"Backend mapping hints for {f['title']}.\n"
+                f"The detection fields should be mapped to the corresponding "
+                f"SIEM, EDR, or log backend schema.\n"
+                f"Operators from Sigma such as contains, startswith, endswith, "
+                f"all, and equals should be preserved during translation.\n"
+                f"Condition: {f['condition']}\n\n"
+                f"Detection blocks:\n{summary}"
+            ),
+            eval_questions=[
+                f"What fields should be mapped for {f['title']}?",
+                f"How should {f['title']} be translated to a SIEM query?",
+                f"What operators are used in {f['title']}?",
+            ],
         )
 
-        # Enrich all chunks with LLM-generated summaries and keywords
+    def _enrich_chunks(self, chunks: list[dict], llm_client: LLMClientLike) -> list[dict]:
+        enriched: list[dict] = []
+        for chunk in chunks:
+            try:
+                result = enrich_by_llm(chunk["text"], llm_client)
+            except Exception:
+                logger.debug("LLM enrichment failed for chunk %s", chunk.get("chunk_type", "?"))
+                result = {"summary": None, "keywords": None, "error": "enrichment_failed"}
+            summary = result.get("summary") or ""
+            keywords = result.get("keywords") or ""
+            if summary or keywords:
+                enrichment = "\n\n---\n"
+                if summary:
+                    enrichment += f"Summary: {summary}\n\n"
+                if keywords:
+                    enrichment += f"Keywords: {keywords}\n"
+                chunk["text"] = chunk["text"] + enrichment
+            enriched.append(chunk)
+        return enriched
+
+    def _chunk_rule(self, rule: dict, llm_client: LLMClientLike | None = None) -> list[dict]:
+        f = self._extract_fields(rule)
+        chunks = self._assemble_chunks(rule, f)
+
         if llm_client is not None:
-            enriched_chunks: list[dict] = []
+            chunks = self._enrich_chunks(chunks, llm_client)
+
+        return chunks
+
+    def _assemble_chunks(self, rule: dict, f: dict) -> list[dict]:
+        """Assemble all chunks for a Sigma rule.
+
+        Args:
+            rule: The raw Sigma rule dict.
+            f: Extracted fields dict from ``_extract_fields()``.
+
+        Returns:
+            List of chunk dicts ready for document conversion.
+        """
+        chunks: list[dict] = [
+            self._build_executive_summary(rule, f),
+            self._build_metadata_lifecycle(rule, f),
+            self._build_logsource_context(rule, f),
+        ]
+
+        if (attack := self._build_mitre_attack_mapping(rule, f)) is not None:
+            chunks.append(attack)
+
+        chunks.append(self._build_detection_condition(rule, f))
+
+        det_chunks, all_facts = self._build_detection_block_chunks(rule, f)
+        chunks.extend(det_chunks)
+
+        chunks.extend(
+            [
+                self._build_indicator_inventory(rule, f, all_facts),
+                self._build_investigation_guidance(rule, f),
+                self._build_false_positive_context(rule, f),
+                self._build_natural_language_queries(rule, f),
+                self._build_backend_mapping_hints(rule, f),
+            ]
+        )
+
+        refs = f.get("references", [])
+        if refs:
+            ref_text = "\n\nReferences:\n" + "\n".join(f"  - {r}" for r in refs)
             for chunk in chunks:
-                try:
-                    result = enrich_by_llm(chunk["text"], llm_client)
-                except Exception:
-                    logger.debug("LLM enrichment failed for chunk %s", chunk.get("chunk_type", "?"))
-                    result = {"summary": None, "keywords": None, "error": "enrichment_failed"}
-                summary = result.get("summary") or ""
-                keywords = result.get("keywords") or ""
-                if summary or keywords:
-                    enrichment = "\n\n---\n"
-                    if summary:
-                        enrichment += f"Summary: {summary}\n\n"
-                    if keywords:
-                        enrichment += f"Keywords: {keywords}\n"
-                    chunk["text"] = chunk["text"] + enrichment
-                enriched_chunks.append(chunk)
-            chunks = enriched_chunks
+                chunk["text"] += ref_text
 
         return chunks
 
@@ -499,20 +501,6 @@ class SigmaChunker(DocumentTransform):
             f"Is {value} suspicious or filtered?",
             f"What field contains {value} in {title}?",
         ]
-
-    def _generate_eval_questions(self, rule: dict) -> dict[str, list[str]]:
-        """Generate eval question groups for a rule (for flat-mode post_process)."""
-        title = rule.get("title", "Untitled Sigma rule")
-        return {
-            "summary": self._summarize_questions(title),
-            "lifecycle": self._lifecycle_questions(title),
-            "logsource": self._logsource_questions(
-                title,
-                rule.get("logsource", {}).get("product", "unknown"),
-                rule.get("logsource", {}).get("category", "unknown"),
-                rule.get("logsource", {}).get("service", "unknown"),
-            ),
-        }
 
 
 # Register SigmaChunker for rich mode.

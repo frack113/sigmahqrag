@@ -110,6 +110,10 @@ STOP_WORDS: frozenset[str] = frozenset(
 _MIN_WORD_LENGTH = 3
 _MAX_HASH_ID = 2**24
 
+# BM25 default parameters
+_K1 = 1.2
+_B = 0.75
+
 
 def _tokenize(text: str) -> list[str]:
     """Lowercase tokenisation — alphanumeric words of at least *min* chars."""
@@ -121,8 +125,23 @@ def _token_id(token: str) -> int:
     return int(hashlib.md5(token.encode()).hexdigest()[:8], 16) % _MAX_HASH_ID
 
 
-def _encode_single(text: str) -> tuple[list[int], list[float]]:
-    """Encode *text* into a sparse vector (indices, values)."""
+def _tf_weight(freq: int) -> float:
+    """Sublinear TF saturation with BM25's k1."""
+    return (_K1 + 1.0) * freq / (_K1 + freq)
+
+
+def _encode_single(
+    text: str,
+    idf_map: dict[str, float] | None = None,
+    avg_doc_len: float | None = None,
+) -> tuple[list[int], list[float]]:
+    """Encode *text* into a sparse vector (indices, values).
+
+    When ``idf_map`` is provided, weights are BM25-style:
+        ``score = IDF * (k1 + 1) * tf / (k1 * (1 - b + b * Ld / Lavg) + tf)``
+
+    Otherwise falls back to sublinear TF (``1 + log(tf)``).
+    """
     tokens = [t for t in _tokenize(text) if t not in STOP_WORDS]
     if not tokens:
         return [], []
@@ -131,19 +150,65 @@ def _encode_single(text: str) -> tuple[list[int], list[float]]:
     for t in tokens:
         tf[t] = tf.get(t, 0) + 1
 
+    doc_len = len(tokens)
+    length_norm = 1.0
+    if avg_doc_len is not None and avg_doc_len > 0:
+        length_norm = 1.0 - _B + _B * (doc_len / avg_doc_len) * _K1
+
     indices: list[int] = []
     values: list[float] = []
     for term, freq in tf.items():
+        if idf_map is not None:
+            idf = idf_map.get(term, 1.5)
+            bm25_score = idf * _tf_weight(freq) / (length_norm + freq)
+            values.append(bm25_score)
+        else:
+            values.append(1.0 + math.log(freq))
         indices.append(_token_id(term))
-        values.append(1.0 + math.log(freq))
 
     return indices, values
+
+
+class IDFCalculator:
+    """Accumulates corpus-level term frequencies to compute IDF.
+
+    Usage:
+        calc = IDFCalculator()
+        for text in corpus:
+            calc.add_document(text)
+        idf_map = calc.idf()
+    """
+
+    def __init__(self) -> None:
+        self._df: dict[str, int] = {}
+        self._num_docs: int = 0
+
+    def add_document(self, text: str) -> int:
+        """Add a single document to the corpus. Returns token count."""
+        tokens = set(_tokenize(text))
+        tokens.discard("")
+        for t in tokens:
+            self._df[t] = self._df.get(t, 0) + 1
+        self._num_docs += 1
+        return len(tokens)
+
+    def idf(self, smooth: bool = True) -> dict[str, float]:
+        """Return ``{term: idf}`` map using BM25's IDF formula.
+
+        With smoothing: ``idf = log(1 + (N - df + 0.5) / (df + 0.5))``
+        """
+        n = self._num_docs
+        if n == 0:
+            return {}
+        if smooth:
+            return {t: math.log(1.0 + (n - df + 0.5) / (df + 0.5)) for t, df in self._df.items()}
+        return {t: math.log(n / df) for t, df in self._df.items()}
 
 
 def bm25_sparse_encoder(
     texts: list[str],
 ) -> tuple[list[list[int]], list[list[float]]]:
-    """BM25-style sparse encoder for a batch of texts.
+    """TF-only sparse encoder for a batch of texts.
 
     Each unique term gets weight = 1 + log(term_frequency).
     Token IDs are deterministic hashes, making the encoder stateless.
@@ -166,8 +231,36 @@ def bm25_sparse_encoder(
     return all_indices, all_values
 
 
+def bm25_idf_sparse_encoder(
+    texts: list[str],
+    *,
+    idf_map: dict[str, float],
+    avg_doc_len: float,
+) -> tuple[list[list[int]], list[list[float]]]:
+    """Full BM25 sparse encoder with IDF + document length normalisation.
+
+    Args:
+        texts: Batch of input strings.
+        idf_map: Pre-computed ``{term: idf}`` map.
+        avg_doc_len: Average document length for length normalisation.
+
+    Returns:
+        Tuple of (all_indices, all_values) where each element corresponds
+        to one input text.
+    """
+    all_indices: list[list[int]] = []
+    all_values: list[list[float]] = []
+
+    for text in texts:
+        indices, values = _encode_single(text, idf_map=idf_map, avg_doc_len=avg_doc_len)
+        all_indices.append(indices)
+        all_values.append(values)
+
+    return all_indices, all_values
+
+
 def create_sparse_encoder():
-    """Return a BM25-based sparse encoder compatible with LlamaIndex/Qdrant.
+    """Return a TF-based sparse encoder compatible with LlamaIndex/Qdrant.
 
     The returned callable accepts ``List[str]`` (batched) and returns
     ``Tuple[List[List[int]], List[List[float]]]``.

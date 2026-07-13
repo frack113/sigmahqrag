@@ -64,8 +64,18 @@ def _recreate_collection(client: Any, collection_name: str, vector_size: int | N
         collection_name=collection_name,
         vectors_config=models.VectorParams(size=vector_size, distance=models.Distance.COSINE),
         sparse_vectors_config={
-            "text-sparse": models.SparseVectorParams(index=models.SparseIndexParams())
+            "text-sparse": models.SparseVectorParams(
+                index=models.SparseIndexParams(),
+                modifier=models.Modifier.IDF,
+            )
         },
+        quantization_config=models.ScalarQuantization(
+            scalar=models.ScalarQuantizationConfig(
+                type=models.ScalarType.INT8,
+                always_ram=True,
+                quantile=0.5,
+            )
+        ),
     )
 
 

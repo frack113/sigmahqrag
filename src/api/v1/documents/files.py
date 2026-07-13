@@ -8,6 +8,8 @@ import shutil
 from pathlib import Path
 from typing import Any
 
+from src.shared.constants import NULL_UUID
+
 from fastapi import APIRouter, Depends, UploadFile
 from fastapi import File as FastAPIFile
 from pydantic import BaseModel
@@ -144,7 +146,7 @@ async def add_local_file(
             "file_size": file_size,
             "original_url": f"file://{dest_path.as_posix()}",
             "normalized_url": f"file://{dest_path.as_posix()}",
-            "rule_id": "00000000-0000-0000-0000-000000000000",
+            "rule_id": NULL_UUID,
             "title": title,
             "timestamp": iso_now(),
             "last_seen": iso_now(),

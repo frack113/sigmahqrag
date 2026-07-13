@@ -4,9 +4,7 @@ import os
 from pathlib import Path
 
 
-from src.core.sigma.models import SigmaRule
 from src.application.documents.parser import parse_sigma_rule, scan_directory
-from src.application.documents.validator import validate_sigma_rule
 
 FIXTURES_DIR = (Path(__file__).parent / ".." / ".." / ".." / "fixtures").resolve()
 
@@ -51,82 +49,3 @@ class TestSigmaRuleParser:
         files = scan_directory("/nonexistent/directory")
 
         assert files == []
-
-
-class TestSigmaRuleValidator:
-    """Test Sigma rule validator."""
-
-    def test_validate_valid_rule(self) -> None:
-        """Test validating a valid rule."""
-        rule = SigmaRule(
-            id="test-001",
-            title="Test Rule",
-            detection={"selection": {"EventID": 4688}},
-            condition="selection",
-            level="high",
-        )
-
-        result = validate_sigma_rule(rule)
-
-        assert result.valid is True
-        assert result.rule is not None
-        assert len(result.errors) == 0
-
-    def test_validate_missing_title(self) -> None:
-        """Test validating rule with missing title."""
-        rule = SigmaRule(
-            id="test-001",
-            title="",
-            detection={"selection": {"EventID": 4688}},
-            condition="selection",
-        )
-
-        result = validate_sigma_rule(rule)
-
-        assert result.valid is False
-        assert any(e.field == "title" for e in result.errors)
-
-    def test_validate_missing_condition(self) -> None:
-        """Test validating rule with missing condition."""
-        rule = SigmaRule(
-            id="test-001",
-            title="Test",
-            detection={"selection": {"EventID": 4688}},
-            condition="",
-        )
-
-        result = validate_sigma_rule(rule)
-
-        assert result.valid is False
-        assert any(e.field == "condition" for e in result.errors)
-
-    def test_validate_invalid_level(self) -> None:
-        """Test validating rule with invalid level."""
-        rule = SigmaRule(
-            id="test-001",
-            title="Test",
-            detection={"selection": {"EventID": 4688}},
-            condition="selection",
-            level="invalid_level",
-        )
-
-        result = validate_sigma_rule(rule)
-
-        assert result.valid is False
-        assert any(e.field == "level" for e in result.errors)
-
-    def test_validate_valid_levels(self) -> None:
-        """Test validating rule with valid levels."""
-        valid_levels = ["informational", "low", "medium", "high", "critical"]
-
-        for level in valid_levels:
-            rule = SigmaRule(
-                id="test-001",
-                title="Test",
-                detection={"selection": {"EventID": 4688}},
-                condition="selection",
-                level=level,
-            )
-
-            result = validate_sigma_rule(rule)
-            assert result.valid is True, f"Level {level} should be valid"

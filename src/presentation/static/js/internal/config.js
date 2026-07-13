@@ -1630,9 +1630,13 @@ function searchEmbModel() {
 			encodeURIComponent(query) +
 			"&limit=10",
 	)
-		.then((r) =>
-			r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)),
-		)
+		.then(async (r) => {
+			if (!r.ok) {
+				const body = await r.json().catch(() => ({}));
+				throw new Error(body?.error || `HTTP ${r.status}`);
+			}
+			return r.json();
+		})
 		.then((data) => {
 			const resultsEl = document.getElementById("emb-search-results");
 			if (!data.models || data.models.length === 0) {
@@ -1656,7 +1660,7 @@ function searchEmbModel() {
 		.catch((e) => {
 			console.error(e);
 			document.getElementById("emb-search-results").innerHTML =
-				'<p class="error-text">Search error.</p>';
+				`<p class="error-text">Search error: ${escHtml(e.message)}.</p>`;
 		});
 }
 
@@ -1665,9 +1669,13 @@ function searchLlmModel() {
 	if (!query) return;
 
 	fetch(`${CONFIG.llm.search}?query=${encodeURIComponent(query)}&limit=10`)
-		.then((r) =>
-			r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)),
-		)
+		.then(async (r) => {
+			if (!r.ok) {
+				const body = await r.json().catch(() => ({}));
+				throw new Error(body?.error || `HTTP ${r.status}`);
+			}
+			return r.json();
+		})
 		.then((data) => {
 			const resultsEl = document.getElementById("llm-search-results");
 			if (!data.models || data.models.length === 0) {
@@ -1693,7 +1701,7 @@ function searchLlmModel() {
 		.catch((e) => {
 			console.error(e);
 			document.getElementById("llm-search-results").innerHTML =
-				'<p class="error-text">Search error.</p>';
+				`<p class="error-text">Search error: ${escHtml(e.message)}.</p>`;
 		});
 }
 

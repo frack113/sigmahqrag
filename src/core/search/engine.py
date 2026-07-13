@@ -37,6 +37,7 @@ FILTER_KEYS = frozenset(
         "chunk_type",
         "collection",
         "tags",
+        "references",
     }
 )
 
@@ -94,6 +95,16 @@ def _get_search_embed_model() -> Any:
 
 
 DEFAULT_COLLECTIONS = ["sigma_rules", "sigma_docs", "sigma_spec"]
+
+# Per-collection hybrid alpha values (1.0 = pure dense, 0.0 = pure sparse)
+# Tuned for each collection's usage pattern — see Q2.1
+ALPHA_BY_COLLECTION: dict[str, float] = {
+    "sigma_rules": 0.5,  # balanced — rules mix technical keywords & semantics
+    "sigma_docs": 0.7,  # keyword-leaning — reference docs use precise terms
+    "sigma_spec": 0.3,  # semantic-leaning — specs describe abstract concepts
+}
+
+RRF_K_DEFAULT = 60
 
 
 def _node_to_result(node: Any) -> dict[str, Any]:
@@ -244,6 +255,9 @@ def format_result_by_collection(result: dict[str, Any]) -> dict[str, Any]:
         "score": result.get("score", 0.0),
         "collection": collection,
         "source_file": meta.get("source_file", ""),
+        "file_path": meta.get("file_path", ""),
+        "line_start": meta.get("line_start", ""),
+        "metadata": meta,
     }
 
     if collection == "sigma_rules":
@@ -264,6 +278,8 @@ def format_result_by_collection(result: dict[str, Any]) -> dict[str, Any]:
             "doc_type": meta.get("doc_type", ""),
             "heading_text": meta.get("heading_text", ""),
             "heading_level": meta.get("heading_level", 0),
+            "original_url": meta.get("original_url", ""),
+            "source_rule_id": meta.get("rule_id", ""),
         }
 
     # sigma_spec or unknown
@@ -298,7 +314,10 @@ class SearchEngine:
         similarity_threshold: float = SIMILARITY_THRESHOLD,
         use_router: bool = False,
         llm_client: LlamaClient | None = None,
-        alpha: float = 0.3,
+        alpha: float | None = None,
+        alpha_by_collection: dict[str, float] | None = None,
+        rrf_k: int = 60,
+        rrf_weights: dict[str, float] | None = None,
     ) -> None:
         """Initialize search engine.
 
@@ -311,14 +330,27 @@ class SearchEngine:
                 relevant collections instead of all three.
             llm_client: Optional LlamaClient for the router.
                 When not provided, creates a new LlamaClient.
-            alpha: Hybrid search weight (1.0=pure dense, 0.0=pure sparse, 0.3=keyword-leaning).
+            alpha: Fallback hybrid weight when a collection has no per-collection
+                override.  Defaults to 0.3.
+            alpha_by_collection: Per-collection hybrid weights.  Takes precedence
+                over the global ``alpha``.  See ``ALPHA_BY_COLLECTION`` for defaults.
+            rrf_k: RRF constant (default 60).  Lower values give top ranks more
+                weight; higher values flatten the score distribution.
+            rrf_weights: Per-collection RRF boost factors (default 1.0 for all).
+                Weighted RRF formula: ``score = weight / (rrf_k + rank)``.
         """
         self.collection_names = collection_names or list(DEFAULT_COLLECTIONS)
         self.top_k = top_k
         self.similarity_threshold = similarity_threshold
         self.use_router = use_router
         self._llm_client = llm_client
-        self.alpha = alpha
+        self._fallback_alpha = alpha if alpha is not None else 0.3
+        merged = dict(ALPHA_BY_COLLECTION)
+        if alpha_by_collection:
+            merged.update(alpha_by_collection)
+        self._alpha_by_collection = merged
+        self._rrf_k = rrf_k
+        self._rrf_weights = rrf_weights or {}
 
     async def search(
         self,
@@ -339,6 +371,15 @@ class SearchEngine:
         limit = top_k if top_k is not None else self.top_k
         per_collection_k = max(limit * 2, 10)
 
+        # Parse inline key:value filters (e.g. references:url) from query
+        inline_filters, clean_query = parse_query_filters(query)
+        if inline_filters:
+            metadata_filter = {**(metadata_filter or {}), **inline_filters}
+            query = clean_query if clean_query else query
+
+        # When filtering by references, always include sigma_docs
+        has_ref_filter = metadata_filter and "references" in metadata_filter
+
         # Determine which collections to search
         cols_to_search: list[str] = []
         if self.use_router:
@@ -353,6 +394,11 @@ class SearchEngine:
         else:
             cols_to_search = self.collection_names
 
+        # When filtering by references, always include sigma_docs even if
+        # the router chose otherwise — reference docs live there.
+        if has_ref_filter and "sigma_docs" not in cols_to_search:
+            cols_to_search.append("sigma_docs")
+
         # Build Qdrant filter for metadata filtering
         qdrant_filter = build_qdrant_filter(metadata_filter) if metadata_filter else None
 
@@ -364,7 +410,7 @@ class SearchEngine:
                     collection_name=col,
                     top_k=per_collection_k,
                     metadata_filter=qdrant_filter,
-                    alpha=self.alpha,
+                    alpha=self._alpha_by_collection.get(col, self._fallback_alpha),
                 )
                 retrievers.append(retriever)
             except Exception as e:
@@ -428,16 +474,21 @@ class SearchEngine:
             ]
             all_results = await asyncio.gather(*tasks, return_exceptions=True)
 
+        rrf_k = self._rrf_k
+        rrf_weights = self._rrf_weights
+
         rrf_scores: dict[tuple[str, str], dict[str, Any]] = {}
-        for col_results in all_results:
+        for col_idx, col_results in enumerate(all_results):
             if isinstance(col_results, Exception):
                 logger.warning(
                     "Collection search failed during RRF fusion, skipping: %s", col_results
                 )
                 continue
             results_list: list[dict[str, Any]] = col_results  # type: ignore[assignment]
+            col_name = collections[col_idx] if col_idx < len(collections) else ""
+            weight = rrf_weights.get(col_name, 1.0)
             for rank, result in enumerate(results_list, start=1):
-                rrf_score = 1.0 / (60 + rank)
+                rrf_score = weight / (rrf_k + rank)
                 text = result.get("text", "")
                 meta = result.get("metadata", {})
                 file_path = meta.get("file_path", "") if isinstance(meta, dict) else ""

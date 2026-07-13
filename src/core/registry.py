@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, Iterator, Type
+from collections.abc import Iterator
+from typing import TYPE_CHECKING, Type
 
 from .base import DocumentTransform
 

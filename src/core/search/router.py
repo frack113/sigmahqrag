@@ -21,8 +21,12 @@ Classify the user query into the most relevant collection(s).
 
 Collections:
 - sigma_rules: Detection rules (YARA, Sigma, Splunk queries, MITRE ATT&CK techniques, threat hunting, IOCs, log sources)
-- sigma_docs: Documentation (architecture, setup, configuration, how-to guides, explanations)
+- sigma_docs: Reference documents downloaded from external URLs linked to Sigma rules (blog posts, Microsoft docs, security research, LOLBas pages, PDFs, troubleshooting guides, external articles, references cited by rules)
 - sigma_spec: Specification reference (YAML format, field definitions, schema, syntax, encoding rules, modifiers, tags, logsource taxonomy, correlation rules, filters, FAQ level/status definitions)
+
+Search sigma_docs when the user asks about external references, citations, blog posts, articles,
+or documentation linked from Sigma rules. Queries mentioning specific URLs or reference
+documents should include sigma_docs.
 
 Examples of sigma_spec queries: "What severity levels exist", "How do I write a correlation rule", "What does the contains modifier do", "How to tag a MITRE technique", "What logsource for Windows Security", "How are maps evaluated", "What filename conventions for Sigma rules", "How does group-by work", "What is the difference between temporal and temporal_ordered"
 

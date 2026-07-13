@@ -57,11 +57,19 @@ class SigmaRule(BaseModel):
             rule_data["file_path"] = str(file_path)
         if line_number is not None:
             rule_data["line_number"] = line_number
+        # Normalize non-string condition values
+        if "condition" in rule_data and not isinstance(rule_data["condition"], str):
+            rule_data["condition"] = str(rule_data["condition"])
         return cls(**rule_data)
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return self.model_dump(exclude_none=True)
+
+    @property
+    def name(self) -> str:
+        """Alias for title — Sigma YAML uses 'name', model uses 'title'."""
+        return self.title
 
     @property
     def path(self) -> Path | None:

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 from typing import Any
 
 from fastapi import APIRouter
@@ -42,7 +41,10 @@ async def download_sparse_model() -> JSONResponse:
 
             SPARSE_MODEL_DIR.mkdir(parents=True, exist_ok=True)
 
-            was_offline = os.environ.pop("HF_HUB_OFFLINE", None)
+            import huggingface_hub.constants as hc
+
+            was_offline = hc.HF_HUB_OFFLINE
+            hc.HF_HUB_OFFLINE = False
             try:
                 from transformers import AutoModelForMaskedLM, AutoTokenizer
 
@@ -56,8 +58,7 @@ async def download_sparse_model() -> JSONResponse:
                 tokenizer.save_pretrained(str(SPARSE_MODEL_DIR))
                 model.save_pretrained(str(SPARSE_MODEL_DIR))
             finally:
-                if was_offline is not None:
-                    os.environ["HF_HUB_OFFLINE"] = was_offline
+                hc.HF_HUB_OFFLINE = was_offline
 
             _download_progress["sparse"] = {"progress": 100, "status": "completed"}
         except Exception as e:

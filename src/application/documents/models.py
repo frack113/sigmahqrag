@@ -4,24 +4,6 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-from src.core.sigma.models import SigmaRule
-
-
-class ValidationError(BaseModel):
-    """Validation error for a single field."""
-
-    field: str
-    message: str
-
-
-class ValidationResult(BaseModel):
-    """Result of validating a Sigma rule."""
-
-    valid: bool
-    rule: SigmaRule | None = None
-    errors: list[ValidationError] = Field(default_factory=list)
-    file_path: str | None = None
-
 
 class IngestRequest(BaseModel):
     """Request to ingest Sigma rules."""

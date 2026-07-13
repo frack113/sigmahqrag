@@ -288,6 +288,7 @@ class RepoBrowser {
 					if (btn) btn.disabled = false;
 				}, 2000);
 				this.loadRepos();
+				this.closeRepoDetail();
 				return;
 			}
 

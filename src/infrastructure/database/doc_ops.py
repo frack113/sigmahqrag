@@ -5,7 +5,10 @@ from __future__ import annotations
 import hashlib
 import logging
 import os
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
+
+from src.shared.constants import NULL_UUID
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -99,7 +102,12 @@ class DatabaseServiceDocOps:
                     title = EXCLUDED.title,
                     timestamp = EXCLUDED.timestamp,
                     last_seen = EXCLUDED.last_seen,
-                    embed_status = EXCLUDED.embed_status""",
+                    embed_status = CASE
+                        WHEN excluded.content_sha256 IS NOT NULL
+                             AND excluded.content_sha256 != doc_registry.content_sha256
+                        THEN 'discovery'
+                        ELSE doc_registry.embed_status
+                    END""",
                 (
                     data.get("url_hash"),
                     data.get("org"),
@@ -110,7 +118,7 @@ class DatabaseServiceDocOps:
                     data.get("file_size"),
                     data.get("original_url"),
                     data.get("normalized_url"),
-                    data.get("rule_id", "00000000-0000-0000-0000-000000000000"),
+                    data.get("rule_id", NULL_UUID),
                     data.get("title"),
                     data.get("timestamp"),
                     data.get("last_seen"),
@@ -141,7 +149,12 @@ class DatabaseServiceDocOps:
                     title = EXCLUDED.title,
                     timestamp = EXCLUDED.timestamp,
                     last_seen = EXCLUDED.last_seen,
-                    embed_status = EXCLUDED.embed_status""",
+                    embed_status = CASE
+                        WHEN excluded.content_sha256 IS NOT NULL
+                             AND excluded.content_sha256 != doc_registry.content_sha256
+                        THEN 'discovery'
+                        ELSE doc_registry.embed_status
+                    END""",
                 [
                     (
                         r.get("url_hash"),
@@ -153,7 +166,7 @@ class DatabaseServiceDocOps:
                         r.get("file_size"),
                         r.get("original_url"),
                         r.get("normalized_url"),
-                        r.get("rule_id", "00000000-0000-0000-0000-000000000000"),
+                        r.get("rule_id", NULL_UUID),
                         r.get("title"),
                         r.get("timestamp"),
                         r.get("last_seen"),
@@ -252,7 +265,12 @@ class DatabaseServiceDocOps:
                     title = EXCLUDED.title,
                     timestamp = EXCLUDED.timestamp,
                     last_seen = EXCLUDED.last_seen,
-                    embed_status = EXCLUDED.embed_status""",
+                    embed_status = CASE
+                        WHEN excluded.content_sha256 IS NOT NULL
+                             AND excluded.content_sha256 != sigma_spec.content_sha256
+                        THEN 'discovery'
+                        ELSE sigma_spec.embed_status
+                    END""",
                 [
                     (
                         r.get("url_hash"),
@@ -431,6 +449,25 @@ class DatabaseServiceDocOps:
             )
             self._writer_conn.commit()
 
+    def delete_doc_registry_by_url_hashes(self, url_hashes: list[str]) -> None:
+        if not url_hashes:
+            return
+        with self._lock:
+            placeholders = ",".join("?" for _ in url_hashes)
+            self._writer_conn.execute(
+                f"DELETE FROM doc_registry WHERE url_hash IN ({placeholders})",
+                url_hashes,
+            )
+            self._writer_conn.commit()
+
+    def get_doc_registry_url_hashes_by_repo(self, org: str, repo: str) -> list[str]:
+        with self._lock:
+            results = self._writer_conn.execute(
+                "SELECT url_hash FROM doc_registry WHERE org = ? AND repo = ?",
+                (org, repo),
+            ).fetchall()
+        return [row[0] for row in results]
+
     def get_local_files(self, limit: int = 1000, offset: int = 0) -> list[dict]:
         with self._lock:
             results = self._writer_conn.execute(
@@ -564,3 +601,177 @@ class DatabaseServiceDocOps:
                 logger.error(f"[resync_local_file_sizes] Batch update failed, rolling back: {e}")
 
         return {"updated": updated, "skipped": skipped, "error": errors, "incomplete": incomplete}
+
+    # ------------------------------------------------------------------
+    # RULE_REFERENCES table (junction rule_id ↔ url_hash)
+    # ------------------------------------------------------------------
+
+    def upsert_rule_reference(self, rule_id: str, url_hash: str, ref_url: str) -> None:
+        """Record that *rule_id* references *ref_url* (identified by *url_hash*)."""
+        with self._lock:
+            self._writer_conn.execute(
+                "INSERT INTO rule_references (rule_id, url_hash, ref_url) "
+                "VALUES (?, ?, ?) "
+                "ON CONFLICT (rule_id, url_hash) DO NOTHING",
+                (rule_id, url_hash, ref_url),
+            )
+            self._writer_conn.commit()
+
+    def batch_upsert_rule_references(self, rows: list[dict[str, str]]) -> None:
+        """Batch upsert rule_references rows.
+
+        Each row must have keys: rule_id, url_hash, ref_url.
+        """
+        with self._lock:
+            self._writer_conn.executemany(
+                "INSERT INTO rule_references (rule_id, url_hash, ref_url) "
+                "VALUES (?, ?, ?) "
+                "ON CONFLICT (rule_id, url_hash) DO NOTHING",
+                [(r["rule_id"], r["url_hash"], r["ref_url"]) for r in rows],
+            )
+            self._writer_conn.commit()
+
+    def get_referencing_rules(self, url_hash: str) -> list[dict]:
+        """Return all rules that reference the document identified by *url_hash*."""
+        with self._lock:
+            results = self._writer_conn.execute(
+                "SELECT rule_id, ref_url, created FROM rule_references WHERE url_hash = ? ORDER BY rule_id",
+                (url_hash,),
+            ).fetchall()
+            col_names = [desc[0] for desc in self._writer_conn.description]
+        return [dict(zip(col_names, row)) for row in results]
+
+    def get_rule_references(self, rule_id: str) -> list[dict]:
+        """Return all reference documents for a given *rule_id*."""
+        with self._lock:
+            results = self._writer_conn.execute(
+                "SELECT r.url_hash, r.ref_url, r.created, "
+                "d.content_type, d.file_name, d.embed_status, d.content_sha256 "
+                "FROM rule_references r "
+                "LEFT JOIN doc_registry d ON r.url_hash = d.url_hash "
+                "WHERE r.rule_id = ? ORDER BY r.ref_url",
+                (rule_id,),
+            ).fetchall()
+            col_names = [desc[0] for desc in self._writer_conn.description]
+        return [dict(zip(col_names, row)) for row in results]
+
+    def delete_rule_references_by_url_hash(self, url_hash: str) -> None:
+        """Delete all rule_references entries for a given *url_hash*."""
+        with self._lock:
+            self._writer_conn.execute("DELETE FROM rule_references WHERE url_hash = ?", (url_hash,))
+            self._writer_conn.commit()
+
+    def get_rule_id_by_url_hash(self, url_hash: str) -> str | None:
+        """Return the rule_id associated with a doc_registry entry."""
+        with self._lock:
+            result = self._writer_conn.execute(
+                "SELECT rule_id FROM doc_registry WHERE url_hash = ?", (url_hash,)
+            ).fetchone()
+        return result[0] if result else None
+
+    def get_rule_reference_paths(self, rule_id: str) -> list[Path]:
+        """Return the on-disk paths for all reference documents of a rule."""
+        with self._lock:
+            results = self._writer_conn.execute(
+                "SELECT r.ref_url, d.file_name, d.content_type "
+                "FROM rule_references r "
+                "JOIN doc_registry d ON r.url_hash = d.url_hash "
+                "WHERE r.rule_id = ?",
+                (rule_id,),
+            ).fetchall()
+        paths: list[Path] = []
+        for ref_url, file_name, content_type in results:
+            try:
+                from src.application.documents.sigma_ref_paths import sigmaref_resolve_path
+                from src.config.settings import get_config
+
+                cfg = get_config()
+                path = sigmaref_resolve_path(
+                    Path(cfg.sigmaref_documents_path).resolve(),
+                    content_type,
+                    file_name or "",
+                )
+                if path.exists():
+                    paths.append(path)
+            except Exception:
+                continue
+        return paths
+
+    # ------------------------------------------------------------------
+    # R1.4 — cleanup orphaned head_verified entries (no content_sha256)
+    # ------------------------------------------------------------------
+
+    def delete_head_verified_orphans(self, grace_days: int = 7) -> int:
+        """Delete doc_registry entries stuck in 'head_verified' without content.
+
+        These are entries created by a HEAD request whose content type was not
+        in the supported set — they will never transition to 'embedded'.
+        Also removes corresponding rule_references rows.
+
+        Args:
+            grace_days: Delete entries older than N days (default 7).
+
+        Returns:
+            Number of deleted entries.
+        """
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=grace_days)).strftime(
+            "%Y-%m-%dT%H:%M:%SZ"
+        )
+        with self._lock:
+            # Find orphan url_hashes
+            orphans = self._writer_conn.execute(
+                "SELECT url_hash FROM doc_registry "
+                "WHERE embed_status = 'head_verified' "
+                "AND (content_sha256 IS NULL OR content_sha256 = '') "
+                "AND (last_seen IS NULL "
+                "     OR last_seen < ?)",
+                [cutoff],
+            ).fetchall()
+            orphan_hashes = [row[0] for row in orphans]
+
+            if not orphan_hashes:
+                return 0
+
+            # Delete from rule_references first (FK-like cleanup)
+            placeholders = ",".join("?" for _ in orphan_hashes)
+            self._writer_conn.execute(
+                f"DELETE FROM rule_references WHERE url_hash IN ({placeholders})",
+                orphan_hashes,
+            )
+            # Delete from doc_registry
+            self._writer_conn.execute(
+                f"DELETE FROM doc_registry WHERE url_hash IN ({placeholders})",
+                orphan_hashes,
+            )
+            self._writer_conn.commit()
+
+        logger.info("Deleted %d orphan head_verified entries", len(orphan_hashes))
+        return len(orphan_hashes)
+
+    def delete_unreferenced_entries(self) -> int:
+        """Delete sigmaref entries whose url_hash is no longer in rule_references.
+
+        These are documents downloaded for rules that no longer exist or whose
+        references have been removed.  Only affects entries with ``org='sigmaref'``
+        to avoid touching local/GitHub entries.
+        """
+        with self._lock:
+            orphans = self._writer_conn.execute(
+                "SELECT url_hash FROM doc_registry "
+                "WHERE org = 'sigmaref' "
+                "AND url_hash NOT IN (SELECT DISTINCT url_hash FROM rule_references)",
+            ).fetchall()
+            orphan_hashes = [row[0] for row in orphans]
+
+            if not orphan_hashes:
+                return 0
+
+            placeholders = ",".join("?" for _ in orphan_hashes)
+            self._writer_conn.execute(
+                f"DELETE FROM doc_registry WHERE url_hash IN ({placeholders})",
+                orphan_hashes,
+            )
+            self._writer_conn.commit()
+
+        logger.info("Deleted %d unreferenced sigmaref entries", len(orphan_hashes))
+        return len(orphan_hashes)

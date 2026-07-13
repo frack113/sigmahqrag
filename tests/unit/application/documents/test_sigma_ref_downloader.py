@@ -3,25 +3,20 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import ANY, MagicMock, patch
-
-import httpx
+from unittest.mock import MagicMock, patch
 
 from src.shared.utils import iso_now
+from src.shared.utils.crypto_utils import compute_sha256_file as _sha256_file
+from src.shared.utils.crypto_utils import compute_sha256_str as _sha256
+from src.shared.utils.identify_file_type import filetype_subdir
+from src.shared.utils.url_utils import is_private_url as _is_private_url, normalize_url
 
 from src.application.documents.sigma_ref_downloader import (
-    _backoff_delay,
     _detect_url_type,
-    _download_file,
-    _get_retry_after,
-    _is_private_url,
     _load_registry,
     _registry_lock,
     _save_registry,
-    _sha256,
-    _sha256_file,
     download_references,
-    normalize_url,
 )
 
 
@@ -152,108 +147,6 @@ class TestDetectUrlType:
         )
 
 
-class TestDownloadFile:
-    def test_successful_download(self, tmp_path: Path) -> None:
-        url = "https://raw.githubusercontent.com/user/repo/main/test.md"
-        output = tmp_path / "test.md"
-
-        with patch("httpx.Client") as mock_client:
-            mock_response = mock_client.return_value.__enter__.return_value.get.return_value
-            mock_response.raise_for_status.return_value = None
-            mock_response.content = b"# Hello"
-            mock_response.status_code = 200
-
-            success, status_code = _download_file(url, output, timeout=30)
-            assert success is True
-            assert status_code is None
-            assert output.read_text() == "# Hello"
-
-    def test_retry_then_success(self, tmp_path: Path) -> None:
-        url = "https://example.com/doc.md"
-        output = tmp_path / "doc.md"
-        attempts: list[int] = []
-
-        class FakeResponse:
-            status_code = 200
-            headers = {}
-            content = b"success"
-
-            def raise_for_status(self) -> None:
-                pass
-
-        class FakeErrorResponse:
-            status_code = 500
-            headers = {}
-            content = b""
-
-        def mock_get(client_self, url: str, **kwargs: object) -> FakeResponse:
-            attempts.append(len(attempts) + 1)
-            if len(attempts) < 3:
-                resp = FakeErrorResponse()
-                raise httpx.HTTPStatusError("Server error", request=ANY, response=resp)  # type: ignore[arg-type]
-            return FakeResponse()
-
-        with patch.object(httpx.Client, "get", mock_get), patch("time.sleep"):
-            success, status_code = _download_file(url, output, timeout=30)
-            assert success is True
-            assert status_code is None
-            assert output.read_text() == "success"
-            assert len(attempts) == 3
-
-    def test_all_retries_fail(self, tmp_path: Path) -> None:
-        url = "https://example.com/fail.md"
-        output = tmp_path / "fail.md"
-
-        class ErrorResp:
-            status_code = 500
-            headers = {}
-
-        def failing_get(self, url, **kwargs):
-            raise httpx.HTTPStatusError("500", request=ANY, response=ErrorResp())
-
-        with patch.object(httpx.Client, "get", failing_get):
-            with patch("time.sleep"):
-                success, status_code = _download_file(url, output, timeout=30)
-                assert success is False
-                assert status_code == 500
-                assert not output.exists()
-
-    def test_zero_retries(self, tmp_path: Path) -> None:
-        url = "https://example.com/zero.md"
-        output = tmp_path / "zero.md"
-
-        call_count = 0
-
-        def failing_get(self, url, **kwargs):
-            nonlocal call_count
-            call_count += 1
-            raise httpx.ConnectError("connection failed")
-
-        with patch.object(httpx.Client, "get", failing_get):
-            success, status_code = _download_file(url, output, max_retries=0)
-            assert success is False
-            assert status_code is None
-            assert call_count == 0
-
-    def test_network_error_retries(self, tmp_path: Path) -> None:
-        url = "https://example.com/net.md"
-        output = tmp_path / "net.md"
-
-        call_count = 0
-
-        def failing_get(self, url, **kwargs):
-            nonlocal call_count
-            call_count += 1
-            raise httpx.ConnectError("connection refused")
-
-        with patch.object(httpx.Client, "get", failing_get):
-            with patch("time.sleep"):
-                success, status_code = _download_file(url, output, timeout=30)
-                assert success is False
-                assert status_code is None
-                assert call_count == 3
-
-
 class TestRegistry:
     def test_load_empty(self, tmp_path: Path) -> None:
         db = _make_db()
@@ -361,7 +254,7 @@ references:
 
         db = _make_db()
         with patch(
-            "src.application.documents.sigma_ref_downloader._download_file",
+            "src.application.documents.sigma_ref_downloader.http_download_file",
             return_value=(True, None),
         ):
             result = download_references(
@@ -425,7 +318,7 @@ references:
 
         db = _make_db()
         with patch(
-            "src.application.documents.sigma_ref_downloader._download_file",
+            "src.application.documents.sigma_ref_downloader.http_download_file",
             write_file,
         ):
             first = download_references(str(rules_dir), str(output_dir), db, selected_dirs=[""])
@@ -464,7 +357,7 @@ references:
 
         db = _make_db()
         with patch(
-            "src.application.documents.sigma_ref_downloader._download_file",
+            "src.application.documents.sigma_ref_downloader.http_download_file",
             check_normalized_url,
         ):
             result = download_references(str(rules_dir), str(output_dir), db, selected_dirs=[""])
@@ -506,7 +399,7 @@ references:
 
         db = _make_db()
         with patch(
-            "src.application.documents.sigma_ref_downloader._download_file",
+            "src.application.documents.sigma_ref_downloader.http_download_file",
             return_value=(True, None),
         ):
             result = download_references(str(rules_dir), str(output_dir), db, selected_dirs=[""])
@@ -534,7 +427,7 @@ references:
 
         db = _make_db()
         with patch(
-            "src.application.documents.sigma_ref_downloader._download_file",
+            "src.application.documents.sigma_ref_downloader.http_download_file",
             return_value=(False, None),
         ):
             result = download_references(str(rules_dir), str(output_dir), db, selected_dirs=[""])
@@ -572,7 +465,9 @@ references:
             return True, None
 
         db = _make_db()
-        with patch("src.application.documents.sigma_ref_downloader._download_file", capture_url):
+        with patch(
+            "src.application.documents.sigma_ref_downloader.http_download_file", capture_url
+        ):
             result = download_references(str(rules_dir), str(output_dir), db, selected_dirs=[""])
             assert result["downloaded"] == 2
             assert len(urls_downloaded) == 2
@@ -614,7 +509,7 @@ references:
         db = _make_db()
         with (
             patch(
-                "src.application.documents.sigma_ref_downloader._download_file",
+                "src.application.documents.sigma_ref_downloader.http_download_file",
                 write_on_download,
             ),
             patch("time.sleep"),
@@ -670,7 +565,7 @@ references:
         download_calls: list[str] = []
 
         def tracking_download(
-            url: str, output_path: Path, timeout: int = 30
+            url: str, output_path: Path, **kwargs: object
         ) -> tuple[bool, int | None]:
             download_calls.append(url)
             output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -679,7 +574,7 @@ references:
 
         with (
             patch(
-                "src.application.documents.sigma_ref_downloader._download_file",
+                "src.application.documents.sigma_ref_downloader.http_download_file",
                 tracking_download,
             ),
             patch("time.sleep"),
@@ -740,7 +635,7 @@ references:
 
         with (
             patch(
-                "src.application.documents.sigma_ref_downloader._download_file",
+                "src.application.documents.sigma_ref_downloader.http_download_file",
                 tracking_download,
             ),
         ):
@@ -798,7 +693,7 @@ references:
 
         with (
             patch(
-                "src.application.documents.sigma_ref_downloader._download_file",
+                "src.application.documents.sigma_ref_downloader.http_download_file",
                 tracking_download,
             ),
         ):
@@ -836,7 +731,7 @@ references:
         db = _make_db()
         with (
             patch(
-                "src.application.documents.sigma_ref_downloader._download_file",
+                "src.application.documents.sigma_ref_downloader.http_download_file",
                 return_value=(True, None),
             ),
             patch("time.sleep"),
@@ -866,38 +761,6 @@ class TestFragmentHandling:
         assert "#" not in result
 
 
-class TestBackoffDelay:
-    def test_first_attempt(self) -> None:
-        assert _backoff_delay(1) == 1
-
-    def test_second_attempt(self) -> None:
-        assert _backoff_delay(2) == 4
-
-    def test_third_attempt(self) -> None:
-        assert _backoff_delay(3) == 9
-
-    def test_beyond_list_length(self) -> None:
-        assert _backoff_delay(4) == 9
-        assert _backoff_delay(10) == 9
-
-
-class TestGetRetryAfter:
-    def test_no_header(self) -> None:
-        response = MagicMock()
-        response.headers = {}
-        assert _get_retry_after(response) is None
-
-    def test_valid_int(self) -> None:
-        response = MagicMock()
-        response.headers = {"Retry-After": "30"}
-        assert _get_retry_after(response) == 30
-
-    def test_invalid_value(self) -> None:
-        response = MagicMock()
-        response.headers = {"Retry-After": "not-a-number"}
-        assert _get_retry_after(response) is None
-
-
 class TestSha256File:
     def test_file_sha(self, tmp_path: Path) -> None:
         f = tmp_path / "test.txt"
@@ -912,3 +775,272 @@ class TestConcurrencyLock:
     def test_lock_has_acquire_release(self) -> None:
         assert hasattr(_registry_lock, "acquire")
         assert hasattr(_registry_lock, "release")
+
+
+class TestDownloadSigmaReferencesContract:
+    """Contract tests: ``download_sigma_references`` with mode="scan" and
+    mode="registry" must use the same ``{url_hash}{ext}`` naming convention
+    for downloaded files.
+    """
+
+    def test_scan_mode_naming_convention(self, tmp_path: Path) -> None:
+        """Scan mode downloads to ``{url_hash}.md``."""
+        rules_dir = tmp_path / "rules"
+        rules_dir.mkdir()
+        output_dir = tmp_path / "output"
+        ref_url = "https://example.com/test-doc.md"
+
+        rule = rules_dir / "test_rule.yml"
+        rule.write_text(f"""
+title: Test Rule
+id: contract-001
+logsource:
+  category: process_creation
+  product: windows
+detection:
+  selection:
+    EventID: 4688
+  condition: selection
+references:
+  - {ref_url}
+""")
+
+        expected_hash = _sha256(normalize_url(ref_url))
+        expected_filename = f"{expected_hash}.md"
+
+        def _fake_download(
+            url: str, output_path: Path, **kwargs: object
+        ) -> tuple[bool, int | None]:
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text("# test")
+            return True, None
+
+        db = _make_db()
+        with patch(
+            "src.application.documents.sigma_ref_downloader.http_download_file",
+            _fake_download,
+        ):
+            from src.application.documents.sigma_ref_downloader import (
+                download_sigma_references,
+            )
+
+            result = download_sigma_references(
+                db=db,
+                output_dir=str(output_dir),
+                mode="scan",
+                rules_dir=str(rules_dir),
+            )
+
+        assert result["downloaded"] == 1
+        assert (output_dir / filetype_subdir("markdown") / expected_filename).exists()
+
+    def test_registry_mode_runs_without_error(self, tmp_path: Path) -> None:
+        """Registry mode runs without error (naming convention is inherited
+        from the shared download helpers)."""
+        output_dir = tmp_path / "output"
+        output_dir.mkdir(parents=True)
+
+        ref_url = "https://example.com/registry-doc.md"
+        norm_url = normalize_url(ref_url)
+        expected_hash = _sha256(norm_url)
+
+        rule_file = tmp_path / "rule.yml"
+        rule_file.write_text(f"""title: Registry Rule
+id: contract-002
+logsource:
+  category: process_creation
+  product: windows
+detection:
+  selection:
+    EventID: 4688
+  condition: selection
+references:
+  - {ref_url}
+""")
+
+        db = MagicMock()
+        db.get_pending_registry_all.return_value = [
+            {
+                "org": "local",
+                "repo": "references",
+                "file_name": "rule.yml",
+                "rule_id": "contract-002",
+                "original_url": "",
+                "title": "Registry Rule",
+                "content_type": "sigma_rule",
+                "embed_status": "discovery",
+                "url_hash": "dummy",
+                "normalized_url": "",
+            }
+        ]
+        db.get_entry.return_value = None
+        db.batch_upsert_doc_registry = MagicMock()
+
+        def _fake_download(
+            url: str, output_path: Path, **kwargs: object
+        ) -> tuple[bool, int | None]:
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text("# downloaded")
+            return True, None
+
+        with (
+            patch(
+                "src.application.documents.sigma_ref_downloader.get_config",
+            ) as mock_cfg,
+            patch(
+                "src.application.documents.sigma_ref_downloader.http_head_url",
+                return_value=("markdown", 1024, ref_url),
+            ),
+            patch(
+                "src.application.documents.sigma_ref_downloader.http_download_file",
+                _fake_download,
+            ),
+        ):
+            from src.application.documents.sigma_ref_downloader import (
+                download_sigma_references,
+            )
+
+            cfg = MagicMock()
+            cfg.local_documents_path = str(tmp_path)
+            cfg.sigmaref_documents_path = str(tmp_path)
+            cfg.paths_github_dir = str(tmp_path)
+            mock_cfg.return_value = cfg
+
+            result = download_sigma_references(
+                db=db,
+                output_dir=str(output_dir),
+                mode="registry",
+            )
+
+        assert result["total_rules"] == 1
+        assert result["total_refs"] == 1
+        # File should be written with {url_hash}{ext} naming
+        expected_filename = f"{expected_hash}.md"
+        assert (output_dir / filetype_subdir("markdown") / expected_filename).exists()
+
+
+class TestRuleReferences:
+    """Tests for rule↔reference tracking."""
+
+    def test_scan_mode_populates_rule_references(self, tmp_path: Path) -> None:
+        """Scan mode inserts rule_references rows via batch_upsert_rule_references."""
+        rules_dir = tmp_path / "rules"
+        rules_dir.mkdir()
+        output_dir = tmp_path / "output"
+        ref_url = "https://example.com/tracked-doc.md"
+
+        rule = rules_dir / "test_rule.yml"
+        rule.write_text(f"""
+title: Tracked Rule
+id: tracked-001
+logsource:
+  category: process_creation
+  product: windows
+detection:
+  selection:
+    EventID: 4688
+  condition: selection
+references:
+  - {ref_url}
+""")
+
+        db = _make_db()
+        db.batch_upsert_rule_references = MagicMock()
+
+        def _fake_download(
+            url: str, output_path: Path, **kwargs: object
+        ) -> tuple[bool, int | None]:
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text("# tracked")
+            return True, None
+
+        with patch(
+            "src.application.documents.sigma_ref_downloader.http_download_file",
+            _fake_download,
+        ):
+            from src.application.documents.sigma_ref_downloader import (
+                download_sigma_references,
+            )
+
+            result = download_sigma_references(
+                db=db,
+                output_dir=str(output_dir),
+                mode="scan",
+                rules_dir=str(rules_dir),
+            )
+
+        assert result["downloaded"] == 1
+        db.batch_upsert_rule_references.assert_called_once()
+        args = db.batch_upsert_rule_references.call_args[0][0]
+        assert len(args) == 1
+        assert args[0]["rule_id"] == "tracked-001"
+        assert args[0]["ref_url"] == ref_url
+
+    def test_scan_mode_dedup_urls_in_rule_refs(self, tmp_path: Path) -> None:
+        """Two rules referencing the same URL get two rule_references rows."""
+        rules_dir = tmp_path / "rules"
+        rules_dir.mkdir()
+        output_dir = tmp_path / "output"
+        ref_url = "https://example.com/shared-doc.md"
+
+        rule_a = rules_dir / "rule_a.yml"
+        rule_a.write_text(f"""
+title: Rule A
+id: rule-a
+logsource:
+  category: process_creation
+  product: windows
+detection:
+  selection:
+    EventID: 4625
+  condition: selection
+references:
+  - {ref_url}
+""")
+
+        rule_b = rules_dir / "rule_b.yml"
+        rule_b.write_text(f"""
+title: Rule B
+id: rule-b
+logsource:
+  category: process_creation
+  product: windows
+detection:
+  selection:
+    EventID: 4688
+  condition: selection
+references:
+  - {ref_url}
+""")
+
+        db = _make_db()
+        db.batch_upsert_rule_references = MagicMock()
+
+        def _fake_download(
+            url: str, output_path: Path, **kwargs: object
+        ) -> tuple[bool, int | None]:
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_text("# shared")
+            return True, None
+
+        with patch(
+            "src.application.documents.sigma_ref_downloader.http_download_file",
+            _fake_download,
+        ):
+            from src.application.documents.sigma_ref_downloader import (
+                download_sigma_references,
+            )
+
+            download_sigma_references(
+                db=db,
+                output_dir=str(output_dir),
+                mode="scan",
+                rules_dir=str(rules_dir),
+            )
+
+        db.batch_upsert_rule_references.assert_called_once()
+        rows = db.batch_upsert_rule_references.call_args[0][0]
+        assert len(rows) == 2
+        rule_ids = {r["rule_id"] for r in rows}
+        assert rule_ids == {"rule-a", "rule-b"}
+        assert rows[0]["url_hash"] == rows[1]["url_hash"]
