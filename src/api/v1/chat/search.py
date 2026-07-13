@@ -6,7 +6,7 @@ import logging
 
 from fastapi import APIRouter, HTTPException, status
 
-from src.core.search.engine import SearchEngine
+from src.core.search.engine import SearchEngine, format_result_by_collection
 from src.api.v1.chat.schemas import SearchRequest, SearchResponse
 
 logger = logging.getLogger(__name__)
@@ -29,8 +29,9 @@ async def search_rules_endpoint(
         clean_query = request.query.replace("`", "").rstrip("?").strip()
         engine = SearchEngine(use_router=request.use_router)
         results = await engine.search(clean_query, top_k=request.limit)
+        formatted = [format_result_by_collection(r) for r in results]
         return SearchResponse(
-            data=results,
+            data=formatted,
             meta={"total": len(results), "query": request.query, "routed": request.use_router},
         )
     except Exception as e:

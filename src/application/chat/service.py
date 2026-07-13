@@ -16,7 +16,7 @@ from src.application.sigma.translate import (
     translate_detection,
 )
 from src.application.tools import ToolContext, ToolDispatcher, get_tools
-from src.core.search.engine import SearchEngine
+from src.core.search.engine import SearchEngine, format_result_by_collection
 from src.core.sigma.models import SigmaRule
 from src.api.v1.chat.schemas import ChatMode
 from src.shared.session import SessionStore
@@ -351,10 +351,12 @@ class ChatService:
                 f"[Auto-translated detection]\n{translation}\n\n[Original YAML]\n{message}"
             )
 
+        formatted_results = [format_result_by_collection(r) for r in results]
+
         try:
             found = False
             async for token in self.rag_pipeline.answer_search_query_stream(
-                augmented_message, results, system_prompt_id=prompt_id
+                augmented_message, formatted_results, system_prompt_id=prompt_id
             ):
                 yield token
                 found = True
@@ -380,9 +382,11 @@ class ChatService:
             yield "No related rules found for coverage analysis."
             return
 
+        formatted_results = [format_result_by_collection(r) for r in results]
+
         try:
             async for token in self.rag_pipeline.analyze_coverage_stream(
-                rule, results, system_prompt_id=prompt_id
+                rule, formatted_results, system_prompt_id=prompt_id
             ):
                 yield token
         except Exception as e:

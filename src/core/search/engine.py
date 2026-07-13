@@ -255,6 +255,9 @@ def format_result_by_collection(result: dict[str, Any]) -> dict[str, Any]:
         "score": result.get("score", 0.0),
         "collection": collection,
         "source_file": meta.get("source_file", ""),
+        "file_path": meta.get("file_path", ""),
+        "line_start": meta.get("line_start", ""),
+        "metadata": meta,
     }
 
     if collection == "sigma_rules":
