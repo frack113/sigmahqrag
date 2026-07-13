@@ -58,11 +58,8 @@ SUPPORTED_DOC_EXTENSION_MAP: dict[str, FileType] = {
 
 FILETYPE_INFO: dict[str, dict[str, str]] = {
     FileType.MARKDOWN.value: {"ext": ".md", "subdir": "markdown"},
-    FileType.PDF.value: {"ext": ".pdf", "subdir": "pdf"},
-    FileType.PLAIN_TEXT.value: {"ext": ".txt", "subdir": "plain_text"},
-    FileType.HTML.value: {"ext": ".html", "subdir": "html"},
+    FileType.SIGMA_RULE.value: {"ext": ".yml", "subdir": "sigma"},
     FileType.OFFICE_DOCUMENT.value: {"ext": ".docx", "subdir": "office"},
-    FileType.YAML.value: {"ext": ".yml", "subdir": "yaml"},
 }
 
 
